@@ -25,7 +25,6 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from faden_gateway.db.models.gateway import ProviderType
 from faden_gateway.services.gateway import content_hash, text_fingerprint
 from faden_gateway.services.gateway.provenance_client import (
     ProvenanceClient,
@@ -44,13 +43,6 @@ SHORT_TEXT_TOKENS = 200
 
 #: What a stream's event says when the engine gave no receipt.
 UNSIGNED: dict[str, Any] = {"receipt": None, "status": "unsigned", "reason": "server-unavailable"}
-
-#: The remote providers known to watermark their models' text, by the name their mark goes under. None yet:
-#: Anthropic marks per model (those released from 2 August 2026, older ones later), and OpenAI's mark is an
-#: account setting no answer shows. A provider counts here only with evidence for its models.
-_MARKING_PROVIDERS: dict[ProviderType, str] = {}
-_MARKING_LITELLM_PROVIDERS: dict[str, str] = {}
-
 
 def _choices(payload: Any) -> list[dict[str, Any]]:
     choices = payload.get("choices") if isinstance(payload, dict) else None
@@ -133,18 +125,32 @@ def _switched_off(params: dict[str, Any]) -> bool:
     )
 
 
-def _remote(candidate: Any) -> bool:
+def remote(candidate: Any) -> bool:
+    """Whether *candidate* is a remote provider's route (``remote_*``)."""
     provider = getattr(candidate, "provider_type", None)
     return str(getattr(provider, "value", provider) or "").startswith("remote_")
 
 
-def _marking_vendor(candidate: Any) -> str | None:
-    """The remote provider that marks its models' text itself, when the route goes to one."""
-    vendor = _MARKING_PROVIDERS.get(getattr(candidate, "provider_type", None))
-    if vendor is None:
-        litellm_provider = str(getattr(candidate, "litellm_provider", None) or "").lower()
-        vendor = _MARKING_LITELLM_PROVIDERS.get(litellm_provider)
-    return vendor
+def upstream_mark(candidate: Any) -> dict[str, Any] | None:
+    """The evidence an administrator gave that *candidate*'s remote provider marks its text; ``None``: none.
+
+    No provider counts as marking by its name: Anthropic marks per model, OpenAI's mark is an account
+    setting, and no answer of either says whether it was marked. The backend publishes the evidence per
+    route, in ``node_metadata["text_marking"]["upstream"]`` (text_marking.py).
+    """
+    policy = (getattr(candidate, "node_metadata", None) or {}).get("text_marking")
+    said = policy.get("upstream") if isinstance(policy, dict) else None
+    if not remote(candidate) or not isinstance(said, dict) or not said.get("evidence_url"):
+        return None
+    return said
+
+
+def _vendor(candidate: Any, evidence: dict[str, Any]) -> str:
+    named = evidence.get("vendor")
+    if isinstance(named, str) and named:
+        return named
+    provider = getattr(candidate, "provider_type", None)
+    return str(getattr(provider, "value", provider) or "remote").removeprefix("remote_")
 
 
 def _runtime_mark(candidate: Any) -> dict[str, Any] | None:
@@ -180,16 +186,22 @@ def watermarks(candidate: Any, sent: dict[str, Any]) -> bool:
     not asked to decode greedily (vLLM never watermarks that).
     """
     params = getattr(candidate, "extra_params", None) or {}
-    return (
-        not _remote(candidate)
-        and _runtime_mark(candidate) is not None
-        and not _switched_off(params)
-        and not _greedy({**sent, **params})
-    )
+    return runtime_marks(candidate) and not _greedy({**sent, **params})
+
+
+def runtime_marks(candidate: Any) -> bool:
+    """Whether *candidate* is a local route whose runtime writes the watermark, not switched off."""
+    params = getattr(candidate, "extra_params", None) or {}
+    return not remote(candidate) and _runtime_mark(candidate) is not None and not _switched_off(params)
 
 
 def watermark(
-    candidate: Any, sent: dict[str, Any], *, completion_tokens: int | None, text: str,
+    candidate: Any,
+    sent: dict[str, Any],
+    *,
+    completion_tokens: int | None,
+    text: str,
+    purpose: str | None = None,
 ) -> dict[str, Any]:
     """The receipt's ``watermark`` (``WatermarkStatus``) for an answer of *candidate*'s to the request *sent*.
 
@@ -197,24 +209,26 @@ def watermark(
     the text when the model gave no usage), ``short-text``; asked to decode
     greedily (by the request or the route's own parameters), ``no-watermark-greedy``;
     a local route, ``model`` when its runtime says it watermarks, else
-    ``runtime-without-watermark``; a remote provider that marks its text
-    (none yet: ``_MARKING_PROVIDERS``), ``upstream`` with the provider; any other,
-    ``no-watermark-remote-model``.
+    ``runtime-without-watermark``; a remote provider with evidence that it marks
+    its text (``upstream_mark``), ``upstream`` with the provider; any other,
+    ``no-watermark-remote-model``. Work the request declared exempt (*purpose*,
+    text_marking.py) on a route that does not mark is ``exempt-edit``.
     """
     tokens = completion_tokens if completion_tokens is not None else estimate_input_tokens(text)
     if tokens < SHORT_TEXT_TOKENS:
         return {"applied": "none", "reason": "short-text"}
     if _greedy({**sent, **(getattr(candidate, "extra_params", None) or {})}):
         return {"applied": "none", "reason": "no-watermark-greedy"}
-    if not _remote(candidate):
-        mark = _runtime_mark(candidate)
-        if mark is None or _switched_off(getattr(candidate, "extra_params", None) or {}):
-            return {"applied": "none", "reason": "runtime-without-watermark"}
-        return {"applied": "model", **mark}
-    vendor = _marking_vendor(candidate)
-    if vendor is not None:
-        return {"applied": "upstream", "vendor": vendor}
-    return {"applied": "none", "reason": "no-watermark-remote-model"}
+    if runtime_marks(candidate):
+        return {"applied": "model", **(_runtime_mark(candidate) or {})}
+    evidence = upstream_mark(candidate)
+    if evidence is not None:
+        return {"applied": "upstream", "vendor": _vendor(candidate, evidence)}
+    if purpose is not None:
+        reason = "exempt-edit"
+    else:
+        reason = "no-watermark-remote-model" if remote(candidate) else "runtime-without-watermark"
+    return {"applied": "none", "reason": reason}
 
 
 async def sign(
@@ -227,6 +241,7 @@ async def sign(
     model: str,
     agent: str | None,
     request_id: str,
+    purpose: str | None = None,
 ) -> SignedReceipt | None:
     """The engine's signed receipt for the answer *text*; ``None``, with one log line, when there is none.
 
@@ -235,7 +250,7 @@ async def sign(
     Never raises: a receipt the engine cannot sign never fails the answer.
     """
     try:
-        status = watermark(candidate, sent, completion_tokens=completion_tokens, text=text)
+        status = watermark(candidate, sent, completion_tokens=completion_tokens, text=text, purpose=purpose)
         return await client.receipt(
             content_sha256=content_hash.text_sha256(text), model=model, agent=agent, watermark=status,
             fingerprint=text_fingerprint.fingerprint(text),

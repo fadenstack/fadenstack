@@ -16,12 +16,13 @@ from starlette import status
 from faden_gateway.db.dao.gateway_dao import GatewayDAO
 from faden_gateway.db.dao.session_dao import SessionDAO
 from faden_gateway.db.models.gateway import TURNS_RETRYABLE, ChatMessage, TurnStatus
-from faden_gateway.services.gateway import faden_events, picture_marking, tool_classes
+from faden_gateway.services.gateway import faden_events, picture_marking, text_marking, tool_classes
 from faden_gateway.services.gateway.agents import AgentRequest
 from faden_gateway.services.gateway.audit import AuditService
 from faden_gateway.services.gateway.auth import (
     PII_WEAKEN_HEADER,
     AuthContext,
+    check_chat_permission,
     get_auth_context,
     pii_weaken_granted,
     require_chat,
@@ -760,6 +761,22 @@ async def create_chat_completions(
     return await serve_chat_completions(request, auth=auth, service=service)
 
 
+async def _declared_purpose(request: Request, auth: AuthContext, faden: Any) -> str | None:
+    """The exempt purpose the request's ``faden`` object declares, for a caller whose roles allow it."""
+    if faden is None:
+        return None
+    declared = isinstance(faden, dict) and faden.get("purpose") is not None
+    may_declare = False
+    if declared:
+        try:
+            await check_chat_permission(request.app, auth, text_marking.DECLARE_PURPOSE)
+            may_declare = True
+        except GatewayError as exc:
+            if exc.code != "permission_denied":
+                raise
+    return text_marking.purpose({"faden": faden}, may_declare=may_declare)
+
+
 async def serve_chat_completions(
     request: Request,
     *,
@@ -791,6 +808,8 @@ async def serve_chat_completions(
         # The chat page's replies run on their own: the page may leave and
         # come back. Not the model's field either.
         background = payload.pop("background", None) is True
+        # Exempt work the request declares (text_marking.py): never the model's field either.
+        purpose = await _declared_purpose(request, auth, payload.pop("faden", None))
 
         if parsed.stream:
             streamed = await service.route_stream_chat(
@@ -803,6 +822,7 @@ async def serve_chat_completions(
                 faden_events=events,
                 tool_mode=tool_mode,
                 background=background,
+                purpose=purpose,
             )
             return _streamed_response(streamed, request_id)
 
@@ -816,6 +836,7 @@ async def serve_chat_completions(
             agent=agent,
             faden_events=events,
             tool_mode=tool_mode,
+            purpose=purpose,
         )
         json_response = JSONResponse(
             status_code=non_stream.status_code,
@@ -828,6 +849,8 @@ async def serve_chat_completions(
         if non_stream.trace_id:
             json_response.headers["x-langfuse-trace-id"] = non_stream.trace_id
         _provenance_header(json_response, non_stream.provenance)
+        if non_stream.unmarked:
+            json_response.headers[text_marking.UNMARKED_HEADER] = "allowed-by-administrator"
         return json_response
     except ValidationError as exc:
         await _log_refusal(request, service, auth, agent, payload, 400, "validation_error")
@@ -887,6 +910,8 @@ def _streamed_response(streamed: StreamingGatewayResponse, request_id: str) -> S
     # The reply's row in the chat: what the chat page tries again or stops.
     if streamed.turn_id:
         response.headers["x-faden-turn-id"] = streamed.turn_id
+    if streamed.unmarked:
+        response.headers[text_marking.UNMARKED_HEADER] = "allowed-by-administrator"
     return response
 
 

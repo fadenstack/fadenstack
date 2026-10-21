@@ -36,6 +36,7 @@ from faden_gateway.services.gateway import (
     provider_address,
     skill_files,
     system_tools,
+    text_marking,
     text_receipts,
 )
 from faden_gateway.services.extensions import registry as extension_registry
@@ -180,6 +181,8 @@ class GatewayResponse:
     #: The answer's receipts from the provenance engine: its text's first (``text_receipts``), then those
     #: of the pictures it carries, marked, in their order.
     provenance: tuple[str, ...] = ()
+    #: The route answered without a mark, as an administrator allowed it (``text_marking``).
+    unmarked: bool = False
 
 
 @dataclass(slots=True, frozen=True)
@@ -193,6 +196,8 @@ class StreamingGatewayResponse:
     trace_id: str | None = None
     #: The reply's row in the chat session, when there is one.
     turn_id: str | None = None
+    #: The route answers without a mark, as an administrator allowed it (``text_marking``).
+    unmarked: bool = False
 
 
 #: What each endpoint can be sent to: the kinds a route declares
@@ -1131,6 +1136,10 @@ class _Prepared:
     #: Faden events sent before the answer (tools the client offered and a rule refuses, the
     #: chat's pictures a model that does not take pictures did not get).
     faden_leading: list[dict[str, Any]] = field(default_factory=list)
+    #: The exempt work the request declared (``faden.purpose``, text_marking.py); ``None``: none.
+    purpose: str | None = None
+    #: The route answers without a mark, as an administrator allowed it.
+    unmarked: bool = False
     #: The governance checks this request runs: EE's, and the tenant's tool rules.
     checks: list[Any] = field(default_factory=list)
     #: The user's messages this request stored in its session.
@@ -1251,6 +1260,7 @@ class GatewayService:
         agent: AgentRequest | None = None,
         faden_events: bool = False,
         tool_mode: str | None = None,
+        purpose: str | None = None,
     ) -> GatewayResponse:
         started = time.perf_counter()
         rerank: dict[str, Any] | None = None
@@ -1266,7 +1276,7 @@ class GatewayService:
 
         req = _Prepared(
             payload=payload, requested_skills=list(skills or []), agent=agent, faden_events=faden_events,
-            tool_mode_header=tool_mode,
+            tool_mode_header=tool_mode, purpose=purpose,
         )
         result: UpstreamResult | None = None
         error_code: str | None = None
@@ -1461,6 +1471,7 @@ class GatewayService:
                 latency_ms=latency_ms,
                 trace_id=req.trace_id,
                 provenance=receipts,
+                unmarked=req.unmarked,
             )
         except GatewayError as exc:
             exc.logged = True  # the finally below writes its row
@@ -1585,6 +1596,7 @@ class GatewayService:
             model=candidate.litellm_model or model_alias,
             agent=req.agent.id if req.agent is not None else None,
             request_id=request_id,
+            purpose=req.purpose,
         )
 
     async def _receipted(
@@ -1674,6 +1686,7 @@ class GatewayService:
         faden_events: bool = False,
         tool_mode: str | None = None,
         background: bool = False,
+        purpose: str | None = None,
     ) -> StreamingGatewayResponse:
         """A streamed chat completion.
 
@@ -1688,7 +1701,7 @@ class GatewayService:
 
         req = _Prepared(
             payload=payload, requested_skills=list(skills or []), agent=agent, faden_events=faden_events,
-            tool_mode_header=tool_mode,
+            tool_mode_header=tool_mode, purpose=purpose,
         )
         background = background and bool(session_id) and self.session_dao is not None
         stream_started = False
@@ -1809,6 +1822,7 @@ class GatewayService:
                     stats=stats,
                     trace_id=req.trace_id,
                     turn_id=req.turn_id,
+                    unmarked=req.unmarked,
                 )
 
             async def _stream_with_finalize() -> AsyncIterator[bytes]:
@@ -1874,6 +1888,7 @@ class GatewayService:
                 stats=stats,
                 trace_id=req.trace_id,
                 turn_id=req.turn_id,
+                unmarked=req.unmarked,
             )
         except GatewayError as exc:
             exc.logged = True  # the finally below writes its row
@@ -2396,6 +2411,10 @@ class GatewayService:
             )
         # A provider at a link-local or cloud metadata address gets no prompt (provider_address.py).
         candidates = await provider_address.usable(candidates)
+        # With the provenance module on, a chat answer that would carry no mark is refused, unless an
+        # administrator allowed it for the route or the request declared exempt work (text_marking.py).
+        if chat and self.provenance_client is not None and req.purpose is None:
+            candidates = text_marking.admit(candidates)
         if chat and media_fetch.needed(payload.get("messages")):
             # The media URLs the client sent, checked and fetched by the gateway before anything is
             # stored or sent: the model gets them as data: URLs (inlined below), and nothing after the
@@ -2508,6 +2527,11 @@ class GatewayService:
 
         # Everything that waits on another service is done: now the slot.
         req.decision = await self._lease(req, candidates=candidates, request_id=request_id)
+        if chat and self.provenance_client is not None and req.purpose is None:
+            unmarked = text_marking.notice(req.decision.candidate)
+            if unmarked is not None:
+                req.unmarked = True
+                req.faden_leading.append(unmarked)
 
         egress = payload
         if scanned is not None and _needs_scan(req.pii_policy, req.decision.candidate):

@@ -39,7 +39,7 @@ from tests.test_agent_routes import (  # noqa: F401 - the fixture the agent rout
 from tests.test_gateway_images import IMAGES, PICTURE, _Recording
 from tests.test_gateway_pipeline_combined import ALIAS, _Observability, _seed, _token
 from tests.test_provenance_module import BASE, TOKEN
-from tests.test_text_receipts import RECEIPTS, signed_receipt
+from tests.test_text_receipts import ALLOWED_UNMARKED, RECEIPTS, signed_receipt
 
 MARK = b"|marked"
 SECOND = base64.b64encode(base64.b64decode(PICTURE) + b"second").decode()
@@ -411,7 +411,7 @@ async def test_a_chats_pictures_leave_marked(
     fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
     engine: _Engine,
 ) -> None:
-    await _seed(db_session, provider=ProviderType.REMOTE_OPENAI, pii=None)
+    await _seed(db_session, provider=ProviderType.REMOTE_OPENAI, pii=None, node_metadata=ALLOWED_UNMARKED)
     fastapi_app.state.gateway_observability = _Observability()
     _chat_answers(monkeypatch, {"content": "Here it is.", "images": [
         {"type": "image_url", "index": 0, "image_url": {"url": f"data:image/png;base64,{PICTURE}"}},
@@ -436,7 +436,7 @@ async def test_a_chat_without_pictures_is_not_sent_to_the_mark_route(
     fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
     engine: _Engine,
 ) -> None:
-    await _seed(db_session, provider=ProviderType.VLLM, pii=None)
+    await _seed(db_session, provider=ProviderType.VLLM, pii=None, node_metadata=ALLOWED_UNMARKED)
     fastapi_app.state.gateway_observability = _Observability()
     _chat_answers(monkeypatch, {"content": "A lighthouse stands on a rock."})
 
@@ -453,7 +453,7 @@ async def test_a_chats_picture_that_cannot_be_marked_fails_the_answer(
     fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
     engine: _Engine,
 ) -> None:
-    await _seed(db_session, provider=ProviderType.REMOTE_OPENAI, pii=None)
+    await _seed(db_session, provider=ProviderType.REMOTE_OPENAI, pii=None, node_metadata=ALLOWED_UNMARKED)
     fastapi_app.state.gateway_observability = _Observability()
     _chat_answers(monkeypatch, {"content": "Here it is.", "images": [
         {"type": "image_url", "index": 0, "image_url": {"url": f"data:image/png;base64,{PICTURE}"}},
@@ -502,7 +502,7 @@ async def test_a_streamed_chats_pictures_leave_marked(
     monkeypatch: pytest.MonkeyPatch, engine: _Engine,
 ) -> None:
     """A chat route that declares no task, or a remote model, streams a picture: it leaves marked."""
-    await _seed(db_session, provider=ProviderType.VLLM, pii=None)
+    await _seed(db_session, provider=ProviderType.VLLM, pii=None, node_metadata=ALLOWED_UNMARKED)
     fastapi_app.state.gateway_observability = _Observability()
     picture = {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{PICTURE}"}}
     _streams(
@@ -525,7 +525,7 @@ async def test_a_streamed_picture_that_cannot_be_marked_ends_the_stream_without_
     fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
     engine: _Engine,
 ) -> None:
-    await _seed(db_session, provider=ProviderType.VLLM, pii=None)
+    await _seed(db_session, provider=ProviderType.VLLM, pii=None, node_metadata=ALLOWED_UNMARKED)
     fastapi_app.state.gateway_observability = _Observability()
     _streams(
         monkeypatch,

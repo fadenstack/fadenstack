@@ -28,7 +28,8 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_gateway.db.models.gateway import ProviderType
-from faden_gateway.services.gateway import picture_marking, text_fingerprint, text_receipts
+from faden_gateway.services.gateway import picture_marking, text_fingerprint, text_marking, text_receipts
+from faden_gateway.services.gateway.agents import AgentDirectory, UserFlags
 from faden_gateway.services.gateway import service as service_module
 from faden_gateway.services.gateway.content_hash import text_sha256
 from faden_gateway.services.gateway.llm_adapter import CompletionResult, LLMAdapter
@@ -288,11 +289,17 @@ def _answers(
     return sent
 
 
+#: The routes these tests seed answer whether they mark or not: an administrator allowed them to
+#: (text_marking.py). test_text_marking.py tests the refusal.
+ALLOWED_UNMARKED = {"text_marking": {"allow_unmarked": {"reason": "receipt tests", "by": "t", "at": "t"}}}
+
+
 async def _seeded(
     fastapi_app: FastAPI, db_session: AsyncSession, provider: ProviderType = ProviderType.VLLM,
     node_metadata: dict[str, Any] | None = None, pii: dict[str, Any] | None = None,
 ) -> None:
-    await _seed(db_session, provider=provider, pii=pii, node_metadata=node_metadata)
+    metadata = {**ALLOWED_UNMARKED, **(node_metadata or {})}
+    await _seed(db_session, provider=provider, pii=pii, node_metadata=metadata)
     fastapi_app.state.gateway_observability = _Observability()
 
 
@@ -471,13 +478,31 @@ def test_the_watermark_follows_the_engines_table(
     assert text_receipts.watermark(route, sent, completion_tokens=tokens, text=LONG) == expected
 
 
-def test_a_provider_with_evidence_for_its_mark_is_said_so(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setitem(text_receipts._MARKING_PROVIDERS, ProviderType.REMOTE_ANTHROPIC, "anthropic")  # noqa: SLF001
-    monkeypatch.setitem(text_receipts._MARKING_LITELLM_PROVIDERS, "anthropic", "anthropic")  # noqa: SLF001
-    for route in (_route(ProviderType.REMOTE_ANTHROPIC), _route(ProviderType.REMOTE_CUSTOM, litellm_provider="anthropic")):
-        assert text_receipts.watermark(route, {}, completion_tokens=400, text=LONG) == {
-            "applied": "upstream", "vendor": "anthropic",
+def test_a_provider_with_evidence_for_its_mark_is_said_so() -> None:
+    evidence = {"evidence_url": "https://example.com/marks", "evidence_date": "2026-10-21"}
+    named = {"text_marking": {"upstream": {**evidence, "vendor": "anthropic"}}}
+    assert text_receipts.watermark(
+        _route(ProviderType.REMOTE_CUSTOM, metadata=named), {}, completion_tokens=400, text=LONG,
+    ) == {"applied": "upstream", "vendor": "anthropic"}
+    unnamed = {"text_marking": {"upstream": evidence}}
+    assert text_receipts.watermark(
+        _route(ProviderType.REMOTE_OPENAI, metadata=unnamed), {}, completion_tokens=400, text=LONG,
+    ) == {"applied": "upstream", "vendor": "openai"}
+    # Without a link to the evidence, and for a local route, it counts for nothing.
+    for route in (_route(ProviderType.REMOTE_OPENAI, metadata={"text_marking": {"upstream": {"vendor": "x"}}}),
+                  _route(metadata=unnamed)):
+        assert text_receipts.watermark(route, {}, completion_tokens=400, text=LONG)["applied"] == "none"
+
+
+def test_exempt_work_on_a_route_that_does_not_mark_is_exempt_edit() -> None:
+    for route in (_route(), _route(ProviderType.REMOTE_OPENAI)):
+        assert text_receipts.watermark(route, {}, completion_tokens=400, text=LONG, purpose="code") == {
+            "applied": "none", "reason": "exempt-edit",
         }
+    marks = _route(metadata={"watermark": True})
+    assert text_receipts.watermark(marks, {}, completion_tokens=400, text=LONG, purpose="code")["applied"] == (
+        "model"
+    )
 
 
 def test_the_rows_apply_in_the_tables_order() -> None:
@@ -1023,7 +1048,7 @@ async def test_an_agents_answer_names_the_agent(
     client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
     backend: Any, engine: _Engine,  # noqa: F811 - the fixture
 ) -> None:
-    await _seed(db_session, provider=ProviderType.VLLM, pii=None)
+    await _seed(db_session, provider=ProviderType.VLLM, pii=None, node_metadata=ALLOWED_UNMARKED)
     _answers(monkeypatch)
 
     r = await client.post("/v1/agents/eplan-assistant/chat/completions", headers=_headers(**EVENTS), json={
@@ -1328,3 +1353,126 @@ async def test_with_the_module_off_checking_says_so(
     monkeypatch.setattr(fastapi_app.state, "provenance_client", None, raising=False)
     r = await client.post(VERIFY_URL, headers=_headers(_login_token(USER)), json={"text": LONG})
     assert (r.status_code, r.json()["error"]["code"]) == (503, "provenance_off")
+
+
+# -- Chat answers that would carry no mark (text_marking.py) --------------------------------------------------
+
+
+async def _seeded_unallowed(fastapi_app: FastAPI, db_session: AsyncSession, **metadata: Any) -> None:
+    """A route without an administrator's allowance to answer unmarked."""
+    await _seed(db_session, provider=ProviderType.VLLM, pii=None, node_metadata=metadata or None)
+    fastapi_app.state.gateway_observability = _Observability()
+
+
+@pytest.mark.anyio
+async def test_a_chat_to_a_route_that_does_not_mark_is_refused(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+    engine: _Engine,
+) -> None:
+    await _seeded_unallowed(fastapi_app, db_session)
+    sent = _answers(monkeypatch)
+
+    r = await _ask(client)
+
+    assert r.status_code == 403, r.text
+    assert r.json()["error"]["code"] == "unmarked_endpoint"
+    assert sent == [], "the model is never asked"
+    assert engine.asked == []
+
+
+@pytest.mark.anyio
+async def test_a_route_that_writes_the_watermark_answers_without_a_notice(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+    engine: _Engine,
+) -> None:
+    await _seeded_unallowed(fastapi_app, db_session, watermark=True)
+    _answers(monkeypatch)
+
+    r = await _ask(client, events=True)
+
+    assert r.status_code == 200, r.text
+    assert text_marking.UNMARKED_HEADER not in r.headers
+    assert not [e for e in r.json()["faden"]["events"] if e.get("name") == "faden.unmarked"]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("stream", [False, True], ids=["whole", "streamed"])
+async def test_a_route_allowed_to_answer_unmarked_answers_with_the_notice(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+    engine: _Engine, stream: bool,
+) -> None:
+    await _seeded(fastapi_app, db_session)
+    _answers(monkeypatch)
+
+    r = await _ask(client, stream=stream, events=True)
+
+    assert r.status_code == 200, r.text
+    assert r.headers[text_marking.UNMARKED_HEADER] == "allowed-by-administrator"
+    events = (
+        [data for _, data in _sse(r.text) if isinstance(data, dict)] if stream else r.json()["faden"]["events"]
+    )
+    notice = {"type": "CUSTOM", "name": "faden.unmarked", "value": {"reason": "allowed-by-administrator"}}
+    assert notice in events
+
+
+@pytest.mark.anyio
+async def test_with_the_module_off_nothing_is_refused(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await _seeded_unallowed(fastapi_app, db_session)
+    _answers(monkeypatch)
+
+    r = await _ask(client)
+
+    assert r.status_code == 200, r.text
+    assert text_marking.UNMARKED_HEADER not in r.headers
+
+
+@pytest.mark.anyio
+async def test_declared_exempt_work_passes_and_its_receipt_says_so(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+    engine: _Engine,
+) -> None:
+    await _seeded_unallowed(fastapi_app, db_session)
+    sent = _answers(monkeypatch, LONG, completion_tokens=250)
+
+    r = await _ask(client, faden={"purpose": "translation"})
+
+    assert r.status_code == 200, r.text
+    assert engine.asked[0]["watermark"] == {"applied": "none", "reason": "exempt-edit"}
+    assert "faden" not in sent[0], "the model never sees the field"
+
+
+class _Directory:
+    def __init__(self, permissions: frozenset[str]) -> None:
+        self.permissions = permissions
+
+    async def user(self, user_id: str) -> UserFlags:
+        return UserFlags(is_active=True, is_superuser=False, chat_permissions=self.permissions)
+
+    async def agent(self, key: tuple[str, str]) -> None:
+        return None
+
+
+@pytest.mark.anyio
+async def test_a_purpose_is_one_of_the_three_and_needs_the_permission(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+    engine: _Engine,
+) -> None:
+    await _seeded_unallowed(fastapi_app, db_session)
+    _answers(monkeypatch)
+    chats = frozenset({"chat.sessions:create", "chat.sessions:read"})
+    directory = _Directory(chats)
+    monkeypatch.setattr(
+        fastapi_app.state, "agent_directory",
+        AgentDirectory(fetch_agent=directory.agent, fetch_user=directory.user), raising=False,
+    )
+
+    r = await _ask(client, faden={"purpose": "code"})
+    assert r.status_code == 403, r.text
+    assert r.json()["error"]["code"] == "permission_denied"
+
+    directory.permissions = chats | {text_marking.DECLARE_PURPOSE}
+    r = await _ask(client, faden={"purpose": "essay"})
+    assert r.status_code == 400, r.text
+    assert r.json()["error"]["code"] == "invalid_purpose"
