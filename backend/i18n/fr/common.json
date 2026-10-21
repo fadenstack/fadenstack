@@ -2327,7 +2327,8 @@
     "rename_cancel": "Annuler",
     "title_label": "Titre du chat",
     "writing": "Une réponse est en cours de rédaction",
-    "ai_notice": "Les réponses sont générées par une IA et peuvent être erronées. Vérifiez l'essentiel."
+    "ai_notice": "Les réponses sont générées par une IA et peuvent être erronées. Vérifiez l'essentiel.",
+    "unmarked_notice": "Cette réponse ne porte aucune marque la signalant comme générée par l'IA : un administrateur a autorisé ce modèle sans marquage."
   },
   "mcp": {
     "servers_title": "Serveurs MCP",
@@ -4351,5 +4352,23 @@
   "pii_policy.form.adopt_profile": "Utiliser les valeurs du profil installé",
   "pii_policy.form.profile_mismatch": "Le profil de la politique diffère du service installé. Les requêtes protégées échoueront tant qu’un profil compatible ne sera pas sélectionné.",
   "pii_policy.form.profile_thresholds": "Utiliser les seuils du profil",
-  "pii_policy.form.installed_detector": "Détecteur installé"
+  "pii_policy.form.installed_detector": "Détecteur installé",
+  "text_marking": {
+    "status_upstream": "Marque lui-même son texte (preuve lue le {{date}}).",
+    "status_allowed": "Les réponses du chat partent sans marquage : {{reason}}",
+    "status_none_remote": "Les chats sont refusés : rien ne prouve que ce fournisseur marque son texte.",
+    "status_none_local": "Les chats ne reçoivent de réponse que si son runtime écrit le filigrane.",
+    "evidence_link": "Preuve",
+    "edit": "Marquage des contenus",
+    "title": "Marquage des contenus de {{name}}",
+    "intro": "Avec le marquage des contenus activé, la passerelle ne répond à un chat qu'avec un modèle dont les réponses portent une marque qui les signale comme générées par l'IA (règlement sur l'IA, art. 50, par. 2). Un runtime avec vLLM 0.30 ou ultérieur l'écrit ; un fournisseur distant peut marquer lui-même son texte.",
+    "choice_none": "Rien de défini : refuser les chats que ce modèle ne peut pas marquer",
+    "choice_upstream": "Le fournisseur marque lui-même le texte de ses modèles",
+    "evidence_url": "Où le fournisseur l'indique (https://...)",
+    "evidence_date": "Lu le",
+    "vendor": "Nom de son marquage (facultatif)",
+    "choice_allow": "Autoriser les réponses sans marquage",
+    "reason": "Motif",
+    "reason_help": "Enregistré avec votre nom et l'heure, et affiché dans le journal d'audit. Chaque réponse porte alors un avis."
+  }
 }

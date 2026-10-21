@@ -37,6 +37,7 @@ import {
   type Provider,
   type ResidencyKind,
   type ResidencyOverride,
+  type TextMarkingBody,
   type Runtime,
   type Model,
 } from "~/api/llm";
@@ -55,6 +56,7 @@ import {
 } from "~/lib/residency";
 import { useCan } from "~/lib/useCan";
 import ResidencyBar from "~/components/ResidencyBar";
+import { TextMarkingControl } from "~/components/TextMarkingControl";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -202,6 +204,8 @@ interface ProviderCardProps {
   t: (key: string, opts?: Record<string, unknown>) => string;
   /** Present when the viewer may say where a provider's prompts go. */
   onSetResidency?: (provider: Provider, override: ResidencyOverride) => void;
+  /** Present when the viewer may say how a provider's chat answers are marked. */
+  onSetTextMarking?: (provider: Provider, body: TextMarkingBody) => Promise<void>;
 }
 
 function ProviderCard({
@@ -211,6 +215,7 @@ function ProviderCard({
   usage,
   t,
   onSetResidency,
+  onSetTextMarking,
 }: ProviderCardProps) {
   const kind = residencyKind(provider);
   const isLocal = staysInside(kind);
@@ -362,6 +367,8 @@ function ProviderCard({
           </TextField>
         )}
 
+        <TextMarkingControl provider={provider} onSave={onSetTextMarking} />
+
         {/* Data volume */}
         {usage.totalRequests > 0 && (
           <Box
@@ -472,6 +479,17 @@ export default function SecurityMapPage() {
     }
   }
   const residencySetter = can("llm.providers:update") ? setResidency : undefined;
+
+  async function setTextMarking(provider: Provider, body: TextMarkingBody) {
+    setSaveError(null);
+    try {
+      const updated = await providersApi.setTextMarking(provider.id, body);
+      setAllProviders((current) => current.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
+    } catch (err: unknown) {
+      setSaveError(err instanceof Error ? err.message : t("common.action_failed"));
+    }
+  }
+  const textMarkingSetter = can("llm.providers:update") ? setTextMarking : undefined;
 
   const {
     localProviders,
@@ -877,6 +895,7 @@ export default function SecurityMapPage() {
                     usage={usageByProvider.get(p.id) ?? NO_USAGE}
                     t={t}
                     onSetResidency={residencySetter}
+                    onSetTextMarking={textMarkingSetter}
                   />
                 ))
               )}
@@ -936,6 +955,7 @@ export default function SecurityMapPage() {
                     usage={usageByProvider.get(p.id) ?? NO_USAGE}
                     t={t}
                     onSetResidency={residencySetter}
+                    onSetTextMarking={textMarkingSetter}
                   />
                 ))
               )}
@@ -966,6 +986,7 @@ export default function SecurityMapPage() {
                 usage={usageByProvider.get(p.id) ?? NO_USAGE}
                 t={t}
                 onSetResidency={residencySetter}
+                onSetTextMarking={textMarkingSetter}
               />
             ))}
           </CardContent>

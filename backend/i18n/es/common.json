@@ -2641,7 +2641,8 @@
     "rename_cancel": "Cancelar",
     "title_label": "Título del chat",
     "writing": "Se está escribiendo una respuesta",
-    "ai_notice": "Las respuestas las genera una IA y pueden contener errores. Compruebe lo importante."
+    "ai_notice": "Las respuestas las genera una IA y pueden contener errores. Compruebe lo importante.",
+    "unmarked_notice": "Esta respuesta no lleva ninguna marca que la identifique como generada por IA: un administrador permitió este modelo sin ella."
   },
   "tools": {
     "executionMode": "Ejecución",
@@ -4351,5 +4352,23 @@
   "pii_policy.form.adopt_profile": "Usar valores del perfil instalado",
   "pii_policy.form.profile_mismatch": "El perfil de la política no coincide con el servicio instalado. Las solicitudes protegidas fallarán hasta que se seleccione un perfil compatible.",
   "pii_policy.form.profile_thresholds": "Usar umbrales del perfil",
-  "pii_policy.form.installed_detector": "Detector instalado"
+  "pii_policy.form.installed_detector": "Detector instalado",
+  "text_marking": {
+    "status_upstream": "Marca su propio texto (prueba leída el {{date}}).",
+    "status_allowed": "Las respuestas del chat salen sin marca: {{reason}}",
+    "status_none_remote": "Los chats se rechazan: no hay pruebas de que este proveedor marque su texto.",
+    "status_none_local": "Los chats solo se responden si su runtime escribe la marca de agua.",
+    "evidence_link": "Prueba",
+    "edit": "Marcado de contenido",
+    "title": "Marcado de contenido de {{name}}",
+    "intro": "Con el marcado de contenido activado, el gateway solo responde a un chat con un modelo cuyas respuestas llevan una marca que las identifica como generadas por IA (Reglamento de IA, art. 50, apdo. 2). Un runtime con vLLM 0.30 o posterior la escribe; un proveedor remoto puede marcar su texto él mismo.",
+    "choice_none": "Nada definido: rechazar los chats que este modelo no puede marcar",
+    "choice_upstream": "El proveedor marca él mismo el texto de sus modelos",
+    "evidence_url": "Dónde lo indica el proveedor (https://...)",
+    "evidence_date": "Leído el",
+    "vendor": "Nombre de su marca (opcional)",
+    "choice_allow": "Permitir respuestas sin marca",
+    "reason": "Motivo",
+    "reason_help": "Se guarda con su nombre y la hora, y aparece en el registro de auditoría. Cada respuesta lleva entonces un aviso."
+  }
 }

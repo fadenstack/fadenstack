@@ -100,6 +100,7 @@ export function readFadenEvent(event: FadenEvent):
   | { kind: "approval"; approval: PendingApproval }
   | { kind: "denied"; notice: string }
   | { kind: "left_out"; leftOut: LeftOutFile }
+  | { kind: "unmarked" }
   | null {
   const value = (event.value ?? {}) as Record<string, unknown>;
   const text = (key: string) => (typeof value[key] === "string" ? (value[key] as string) : "");
@@ -120,6 +121,8 @@ export function readFadenEvent(event: FadenEvent):
       },
     };
   }
+  // The model answers without a mark that shows the answer as AI-generated: an administrator allowed it.
+  if (event.name === "faden.unmarked") return { kind: "unmarked" };
   if (event.name === "faden.tool_denied") {
     const name = text("toolCallName");
     return { kind: "denied", notice: name ? `${name}: ${text("message")}` : text("message") };
@@ -218,7 +221,8 @@ export function useChatStream({
     const read = readFadenEvent(event);
     if (read?.kind === "approval") setPendingApproval(read.approval);
     if (read?.kind === "denied") setToolNotices((prev) => [...prev, read.notice]);
-  }, []);
+    if (read?.kind === "unmarked") setToolNotices((prev) => [...prev, t("chat.unmarked_notice")]);
+  }, [t]);
   const answerApproval = useCallback(
     async (approved: boolean) => {
       const waiting = pendingApproval;

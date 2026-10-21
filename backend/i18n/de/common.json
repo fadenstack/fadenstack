@@ -2641,7 +2641,8 @@
     "rename_cancel": "Abbrechen",
     "title_label": "Chat-Titel",
     "writing": "Eine Antwort wird geschrieben",
-    "ai_notice": "Antworten werden von einer KI erzeugt und können falsch sein. Prüfen Sie Wichtiges."
+    "ai_notice": "Antworten werden von einer KI erzeugt und können falsch sein. Prüfen Sie Wichtiges.",
+    "unmarked_notice": "Diese Antwort trägt keine Kennzeichnung als KI-erzeugt: Ein Administrator hat dieses Modell ohne sie erlaubt."
   },
   "tools": {
     "executionMode": "Ausführung",
@@ -4351,5 +4352,23 @@
   "pii_policy.form.adopt_profile": "Standardwerte des installierten Profils verwenden",
   "pii_policy.form.profile_mismatch": "Das Richtlinienprofil entspricht nicht dem installierten Dienst. Geschützte Anfragen schlagen fehl, bis ein kompatibles Profil gewählt wird.",
   "pii_policy.form.profile_thresholds": "Schwellenwerte des Profils verwenden",
-  "pii_policy.form.installed_detector": "Installierte Erkennung"
+  "pii_policy.form.installed_detector": "Installierte Erkennung",
+  "text_marking": {
+    "status_upstream": "Kennzeichnet seinen Text selbst (Nachweis gelesen am {{date}}).",
+    "status_allowed": "Chat-Antworten gehen ohne Kennzeichnung hinaus: {{reason}}",
+    "status_none_remote": "Chats werden abgelehnt: Es gibt keinen Nachweis, dass dieser Anbieter seinen Text kennzeichnet.",
+    "status_none_local": "Chats werden nur beantwortet, wenn seine Runtime das Wasserzeichen schreibt.",
+    "evidence_link": "Nachweis",
+    "edit": "Kennzeichnung",
+    "title": "Kennzeichnung für {{name}}",
+    "intro": "Mit eingeschalteter Kennzeichnung beantwortet das Gateway einen Chat nur mit einem Modell, dessen Antworten eine Kennzeichnung als KI-erzeugt tragen (KI-Verordnung Art. 50 Abs. 2). Eine Runtime mit vLLM 0.30 oder neuer schreibt sie; ein externer Anbieter kann seinen Text selbst kennzeichnen.",
+    "choice_none": "Nichts festgelegt: Chats ablehnen, die dieses Modell nicht kennzeichnen kann",
+    "choice_upstream": "Der Anbieter kennzeichnet den Text seiner Modelle selbst",
+    "evidence_url": "Wo der Anbieter das sagt (https://...)",
+    "evidence_date": "Gelesen am",
+    "vendor": "Name seiner Kennzeichnung (optional)",
+    "choice_allow": "Antworten ohne Kennzeichnung erlauben",
+    "reason": "Begründung",
+    "reason_help": "Wird mit Ihrem Namen und der Zeit gespeichert und im Audit-Log gezeigt. Jede Antwort trägt dann einen Hinweis."
+  }
 }

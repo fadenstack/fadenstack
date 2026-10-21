@@ -106,6 +106,22 @@ export interface Residency {
   provider: string | null;
 }
 
+/**
+ * What an administrator set about marking a provider's chat answers (EU AI Act Art. 50(2)). With the
+ * provenance module on, the gateway refuses a chat to a route whose answers would carry no mark, unless the
+ * provider marks its text itself (`upstream`, with the evidence) or may answer unmarked (`allow_unmarked`).
+ */
+export interface TextMarking {
+  upstream?: { vendor?: string; evidence_url: string; evidence_date: string; by: string; at: string };
+  allow_unmarked?: { reason: string; by: string; at: string };
+}
+
+/** What the console sends: a part left out is cleared. */
+export interface TextMarkingBody {
+  upstream?: { vendor?: string; evidence_url: string; evidence_date: string } | null;
+  allow_unmarked?: { reason: string } | null;
+}
+
 export interface Provider {
   id: string;
   name: string;
@@ -140,6 +156,8 @@ export interface Provider {
   residency_override?: ResidencyOverride;
   /** Where its prompts go, with the evidence. Filled by list and get. */
   residency?: Residency | null;
+  /** What an administrator set about marking its chat answers; null: nothing. */
+  text_marking?: TextMarking | null;
   created_at: string;
   updated_at: string;
 }
@@ -424,6 +442,13 @@ export const providers = {
     return request<Provider>(`/providers/${id}/residency`, {
       method: "PUT",
       body: JSON.stringify({ override }),
+    });
+  },
+  /** Record that a provider marks its text, or allow its chat answers unmarked; `{}` clears both. */
+  setTextMarking(id: string, body: TextMarkingBody) {
+    return request<Provider>(`/providers/${id}/text-marking`, {
+      method: "PUT",
+      body: JSON.stringify(body),
     });
   },
   testEndpoint(payload: TestEndpointPayload) {

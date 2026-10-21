@@ -2641,7 +2641,8 @@
     "rename_cancel": "取消",
     "title_label": "聊天标题",
     "writing": "正在编写回复",
-    "ai_notice": "回答由人工智能生成，可能有误。请核实重要信息。"
+    "ai_notice": "回答由人工智能生成，可能有误。请核实重要信息。",
+    "unmarked_notice": "此回答不带表明其为 AI 生成的标识：管理员允许该模型在没有标识的情况下回答。"
   },
   "tools": {
     "executionMode": "执行",
@@ -4351,5 +4352,23 @@
   "pii_policy.form.adopt_profile": "使用已安装配置的默认值",
   "pii_policy.form.profile_mismatch": "策略配置与已安装的服务不匹配。选择兼容配置之前，受保护的请求将失败。",
   "pii_policy.form.profile_thresholds": "使用配置中的阈值",
-  "pii_policy.form.installed_detector": "已安装的检测器"
+  "pii_policy.form.installed_detector": "已安装的检测器",
+  "text_marking": {
+    "status_upstream": "自行标识其文本（证据读取于 {{date}}）。",
+    "status_allowed": "聊天回答不带标识发出：{{reason}}",
+    "status_none_remote": "聊天被拒绝：没有证据表明该提供方标识其文本。",
+    "status_none_local": "仅当其运行时写入水印时才回答聊天。",
+    "evidence_link": "证据",
+    "edit": "内容标识",
+    "title": "{{name}} 的内容标识",
+    "intro": "开启内容标识后，网关只用回答带有 AI 生成标识的模型来回答聊天（《人工智能法》第 50 条第 2 款）。vLLM 0.30 或更高版本的运行时会写入该标识；远程提供方可以自行标识其文本。",
+    "choice_none": "未设置：拒绝该模型无法标识的聊天",
+    "choice_upstream": "提供方自行标识其模型的文本",
+    "evidence_url": "提供方说明之处（https://...）",
+    "evidence_date": "读取日期",
+    "vendor": "其标识的名称（可选）",
+    "choice_allow": "允许不带标识的回答",
+    "reason": "原因",
+    "reason_help": "将与您的姓名和时间一起记录，并显示在审计日志中。此后每个回答都会带有提示。"
+  }
 }
