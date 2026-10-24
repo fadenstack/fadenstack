@@ -293,9 +293,11 @@ class Settings(BaseSettings):
     mailer_from_email: str = "noreply@faden.local"
     mailer_from_name: str = "Fadenstack"
 
-    # External Auth module settings (enterprise SSO)
+    # Sign-in module (services/sign_in): outside identity providers. The backend calls it with the token;
+    # without one it is not called at all.
     auth_enabled: bool = False
     auth_service_url: str = "http://127.0.0.1:8005"
+    auth_service_token: str = ""
 
     # Document Processor module settings (Docling)
     docling_enabled: bool = False

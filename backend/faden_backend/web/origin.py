@@ -7,11 +7,12 @@ state-changing request and to every WebSocket handshake says which site's page i
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from urllib.parse import urlparse
 
 from starlette.datastructures import Headers
-from starlette.requests import cookie_parser
+from starlette.requests import Request, cookie_parser
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -21,6 +22,27 @@ from faden_backend.settings import settings
 SIGN_IN_COOKIE = "fapiauth"
 
 _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+
+# A hostname, IPv4 address or bracketed IPv6 address, with an optional port.
+_HOST_RE = re.compile(
+    r"^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+    r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*"
+    r"|\[[0-9A-Fa-f:.]+\])(?::\d{1,5})?$",
+)
+
+
+def public_origin(request: Request) -> str:
+    """This backend as the caller reached it: ``scheme://host[:port]``.
+
+    The ``Host`` header is the one nginx passes on as the client sent it, port included, and the scheme its
+    ``X-Forwarded-Proto``. ``X-Forwarded-Host`` is not read: a client can put anything there. A host that is
+    not a plain name or address with an optional port is not used either.
+    """
+    host = request.headers.get("host", "").strip()
+    if not _HOST_RE.match(host):
+        return str(request.base_url).rstrip("/")
+    proto = request.headers.get("x-forwarded-proto", "").strip().lower()
+    return f"{proto if proto in ('http', 'https') else request.url.scheme}://{host}"
 
 
 def _site_of(url: str) -> str:

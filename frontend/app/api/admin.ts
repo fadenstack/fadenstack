@@ -877,10 +877,13 @@ export const adminGroups = {
 // Auth Providers (SSO)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** A provider people may sign in with (``GET /api/auth/sso/providers``). */
 export interface AuthProviderPublic {
-  id: string;
+  key: string;
   name: string;
-  provider_type: string;
+  /** ``redirect``: off to the provider and back; ``password``: name and password on this page. */
+  kind: "redirect" | "password";
+  posts_back?: boolean;
 }
 
 export interface AuthProviderDetail {
@@ -902,9 +905,11 @@ export interface AuthProviderDetail {
 }
 
 export const adminAuthProviders = {
-  /** List enabled providers for the login page (no auth required). */
-  listPublic() {
-    return request<AuthProviderPublic[]>("/auth-providers/public");
+  /** The providers people may sign in with, for the sign-in page (no sign-in needed). */
+  async listPublic(): Promise<AuthProviderPublic[]> {
+    const res = await fetch("/api/auth/sso/providers", { credentials: "include" });
+    if (!res.ok) throw new Error(`sign-in providers: ${res.status}`);
+    return (await res.json()) as AuthProviderPublic[];
   },
   /** List all providers (admin only). */
   list() {
@@ -957,9 +962,9 @@ export const adminAuthProviders = {
   delete(providerId: string) {
     return request<void>(`/auth-providers/${providerId}`, { method: "DELETE" });
   },
-  /** Returns the URL the user should be redirected to for SSO login. */
-  authorizeUrl(providerId: string) {
-    return `${BASE}/auth-providers/${providerId}/authorize`;
+  /** Where the browser goes to sign in with a redirect provider. */
+  startUrl(key: string) {
+    return `/api/auth/sso/${encodeURIComponent(key)}/start`;
   },
 };
 

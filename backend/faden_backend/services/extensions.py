@@ -15,6 +15,13 @@ Extension points for agents:
   ``AgentVersion.extensions``. A key nobody registered is refused, so no
   Enterprise setting is stored where nothing enforces it.
 - ``member_roles``: roles beside ``maintainer`` (EE: ``auditor``).
+
+Extension points for signing in:
+
+- ``password_sign_in_checks``: extra conditions on signing in with a password, for anyone but a
+  superuser (EE: addresses whose organisation signs in through its provider only). Each may only deny.
+- ``link_confirmation``: what happens when an outside sign-in meets an existing account it is not linked
+  to yet (core: refused, an administrator links them; EE: the account's owner confirms by e-mail).
 """
 
 from __future__ import annotations
@@ -63,6 +70,10 @@ class TenantLifetimes:
 AccessRule = Callable[[uuid.UUID, uuid.UUID], Awaitable[str | None]]
 #: Validates one ``extensions`` key; raises ``ValueError`` when invalid.
 VersionExtension = Callable[[Any], None]
+#: ``(email) -> reason`` to refuse a password sign-in, or ``None`` to allow it.
+PasswordSignInCheck = Callable[[str], Awaitable[str | None]]
+#: ``(session, user, identity) -> Refusal``: an outside sign-in met *user*'s account, not linked to it yet.
+LinkConfirmation = Callable[[Any, Any, Any], Awaitable[Any]]
 
 
 @dataclass
@@ -73,6 +84,8 @@ class ExtensionRegistry:
     token_lifetimes: TokenLifetimePolicy = field(default_factory=TenantLifetimes)
     version_extensions: dict[str, VersionExtension] = field(default_factory=dict)
     member_roles: set[str] = field(default_factory=lambda: {"maintainer"})
+    password_sign_in_checks: list[PasswordSignInCheck] = field(default_factory=list)
+    link_confirmation: LinkConfirmation | None = None
 
 
 registry = ExtensionRegistry()

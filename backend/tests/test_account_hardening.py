@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-from types import SimpleNamespace
 
 import pytest
 from fastapi import FastAPI
@@ -12,10 +11,8 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from faden_backend.db.models.oauth import OAuthAccount
 from faden_backend.db.models.users import User, get_jwt_strategy
 from faden_backend.settings import settings
-from faden_backend.web.api.admin.auth_providers.views import _process_oauth_login
 from tests.test_api_tokens import _As, _user, signed_in  # noqa: F401 - fixture used by name
 
 PASSWORD = "the-old-password"  # noqa: S105
@@ -166,63 +163,6 @@ async def test_the_stock_routes_that_edit_another_account_are_gone(fastapi_app: 
     paths = fastapi_app.openapi()["paths"]
     assert set(paths["/api/users/{id}"]) == {"get"}
     assert {"get", "patch"} <= set(paths["/api/users/me"]), "a person's own account is still theirs to read and edit"
-
-
-# ── SSO ─────────────────────────────────────────────────────────────────
-
-
-async def _sso(db: AsyncSession, email: str, account_id: str = "idp-1") -> str:
-    response = await _process_oauth_login(
-        session=db,
-        request=SimpleNamespace(url=SimpleNamespace(scheme="https")),
-        provider_name="corp-idp",
-        account_id=account_id,
-        account_email=email,
-        access_token="at",  # noqa: S106
-        expires_at=None,
-        refresh_token=None,
-        auto_register=True,
-        default_role_ids=[],
-    )
-    return response.headers["location"]
-
-
-@pytest.mark.anyio
-async def test_sso_does_not_sign_in_to_an_unverified_local_account(dbsession: AsyncSession) -> None:
-    person = await _person(dbsession, admin=True)
-    person.is_verified = False  # an address changed through the profile, or never confirmed
-    await dbsession.flush()
-
-    assert await _sso(dbsession, person.email) == "/login?error=account_not_verified"
-    linked = (await dbsession.execute(select(OAuthAccount).where(OAuthAccount.user_id == person.id))).scalars().all()
-    assert linked == [], "and nothing was linked to it"
-
-
-@pytest.mark.anyio
-async def test_sso_signs_in_to_a_verified_account_and_to_one_it_was_linked_to(dbsession: AsyncSession) -> None:
-    person = await _person(dbsession)
-    assert await _sso(dbsession, person.email) == "/admin/dashboard"
-
-    person.is_verified = False
-    await dbsession.flush()
-    assert await _sso(dbsession, person.email) == "/admin/dashboard", "the same provider account as before"
-    assert await _sso(dbsession, person.email, account_id="someone-else") == "/login?error=account_not_verified"
-
-
-@pytest.mark.anyio
-async def test_sso_does_not_sign_in_to_a_suspended_account(dbsession: AsyncSession) -> None:
-    person = await _person(dbsession)
-    person.is_active = False
-    await dbsession.flush()
-    assert await _sso(dbsession, person.email) == "/login?error=account_disabled"
-
-
-@pytest.mark.anyio
-async def test_sso_still_creates_an_account_for_a_new_address(dbsession: AsyncSession) -> None:
-    email = f"new-{uuid.uuid4().hex[:8]}@example.com"
-    assert await _sso(dbsession, email) == "/admin/dashboard"
-    made = (await dbsession.execute(select(User).where(User.email == email))).scalar_one()
-    assert made.is_verified is True and made.is_superuser is False
 
 
 # ── Deleting and demoting administrators ────────────────────────────────

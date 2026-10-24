@@ -159,15 +159,35 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
             log.exception("Could not record %s in the audit trail", action)
 
     async def authenticate(self, credentials: Any) -> User | None:
-        """Sign-in by password; a refused one is recorded with the address that was tried."""
+        """Sign-in by password; a refused one is recorded with the address that was tried.
+
+        The password checks of the extension registry (``password_sign_in_checks``) then apply to everyone
+        but a superuser, so an administrator can always get in. A check that fails counts as a refusal.
+        """
+        from faden_backend.db.models.containers import AuditResult  # noqa: PLC0415
+
         user = await super().authenticate(credentials)
         if user is None:
-            from faden_backend.db.models.containers import AuditResult  # noqa: PLC0415
-
             tried = str(getattr(credentials, "username", "") or "")[:320]
             await self._audit(
                 "auth.sign_in.failed", None, result=AuditResult.DENY, target=tried, metadata={"email": tried},
             )
+            return None
+        if user.is_superuser:
+            return user
+        from faden_backend.services.extensions import registry  # noqa: PLC0415
+
+        for check in registry.password_sign_in_checks:
+            try:
+                reason = await check(user.email)
+            except Exception:
+                log.exception("A password sign-in check failed; refusing the sign-in")
+                reason = "the sign-in check failed"
+            if reason:
+                await self._audit(
+                    "auth.sign_in.failed", user, result=AuditResult.DENY, metadata={"reason": reason},
+                )
+                raise HTTPException(status_code=400, detail="LOGIN_USE_SIGN_IN_PROVIDER")
         return user
 
     async def on_after_login(

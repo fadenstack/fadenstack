@@ -62,7 +62,7 @@ export default function LoginPage() {
     adminAuthProviders
       .listPublic()
       .then((providers) => {
-        if (!cancelled) setSsoProviders(providers);
+        if (!cancelled) setSsoProviders(providers.filter((p) => p.kind === "redirect"));
       })
       .catch(() => {
         // SSO not available — ignore
@@ -198,13 +198,13 @@ export default function LoginPage() {
                 <Divider>{t("auth.or_sso")}</Divider>
                 {ssoProviders.map((provider) => (
                   <Button
-                    key={provider.id}
+                    key={provider.key}
                     variant="outlined"
                     disabled={loading}
                     onClick={() => {
                       if (typeof window !== "undefined") {
-                        window.location.href = adminAuthProviders.authorizeUrl(
-                          provider.id,
+                        window.location.href = adminAuthProviders.startUrl(
+                          provider.key,
                         );
                       }
                     }}

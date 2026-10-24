@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -12,13 +12,14 @@ from faden_backend.db.base import Base
 
 
 class OAuthAccount(Base):
-    """Stores OAuth tokens linked to a user.
+    """A person's account at an outside sign-in provider, linked to their Fadenstack account.
 
-    Compatible with fastapi-users ``SQLAlchemyBaseOAuthAccountTableUUID``
-    layout but defined explicitly so Alembic picks it up.
+    ``oauth_name`` is the provider's key and ``account_id`` the person's stable ID there; together they name
+    one person, so there is one row for them. The provider's own tokens stay with the sign-in module.
     """
 
     __tablename__ = "oauth_account"
+    __table_args__ = (UniqueConstraint("oauth_name", "account_id", name="uq_oauth_account_provider_subject"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
@@ -37,6 +38,8 @@ class OAuthAccount(Base):
     refresh_token: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     account_id: Mapped[str] = mapped_column(String(320), nullable=False, index=True)
     account_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    # The last time the person signed in this way; ``None`` before any since this was kept.
+    last_sign_in_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class AuthProvider(Base):

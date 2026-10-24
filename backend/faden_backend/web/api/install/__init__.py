@@ -34,10 +34,9 @@ carries its own computed digest.
 from __future__ import annotations
 
 import hashlib
-import json
 import ipaddress
+import json
 import logging
-import re
 import socket
 from pathlib import Path
 
@@ -49,6 +48,7 @@ from yarl import URL
 
 from faden_backend.services import edge_trust
 from faden_backend.settings import DEFAULT_AGENT_BINARY_DIR, settings
+from faden_backend.web.origin import public_origin
 
 log = logging.getLogger(__name__)
 
@@ -195,32 +195,15 @@ def servable_binary(build: str) -> tuple[Path, str] | None:
     return None
 
 
-# A hostname, IPv4 address or bracketed IPv6 address, with an optional port.
-_HOST_RE = re.compile(
-    r"^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
-    r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*"
-    r"|\[[0-9A-Fa-f:.]+\])(?::\d{1,5})?$",
-)
-
-
 def _origin(request: Request) -> str:
-    """This backend, as the caller reached it.
+    """This backend, as the caller reached it (:func:`public_origin`).
 
     Taken from the request rather than configuration precisely because the
     node has to reach the same address the operator's browser did.  A
     configured value would be right in exactly the deployments that do not
     need this endpoint.
-
-    The ``Host`` header is the one nginx passes on as the client sent it, port
-    included. ``X-Forwarded-Host`` is not read: whatever a client put there
-    reached the install script, which a machine runs as root. A host that is
-    not a plain name or address with an optional port is not used either.
     """
-    host = request.headers.get("host", "").strip()
-    if not _HOST_RE.match(host):
-        return str(request.base_url).rstrip("/")
-    proto = request.headers.get("x-forwarded-proto", "").strip().lower()
-    return f"{proto if proto in ('http', 'https') else request.url.scheme}://{host}"
+    return public_origin(request)
 
 
 def _is_loopback(host: str) -> bool:

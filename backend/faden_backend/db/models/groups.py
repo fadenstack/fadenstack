@@ -68,3 +68,6 @@ class UserGroup(Base):
         ForeignKey("groups.id", ondelete="CASCADE"),
         primary_key=True,
     )
+    # Who keeps this membership: ``None``, an administrator; ``provider:<key>``, that sign-in provider, which
+    # takes it away again when the person no longer belongs (services/sign_in/accounts.py).
+    source: Mapped[str | None] = mapped_column(String(80), nullable=True)
