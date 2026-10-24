@@ -40,8 +40,9 @@ class FakeModule:
         self.finished: list[dict[str, Any]] = []
         self.admin_calls: list[tuple[str, str, Any, dict[str, str]]] = []
         self.down = False
+        self.start_refusal: str | None = None
 
-    def handler(self, request: httpx.Request) -> httpx.Response:  # noqa: PLR0911 -- one answer per route
+    def handler(self, request: httpx.Request) -> httpx.Response:  # noqa: C901, PLR0911 -- one answer per route
         """Answer *request* as the module would."""
         if self.down:
             raise httpx.ConnectError("down", request=request)
@@ -55,6 +56,8 @@ class FakeModule:
                 {"key": "dir", "name": "Directory", "kind": "password"},
             ])
         if path == "/api/v1/sign-in/start":
+            if self.start_refusal:
+                return httpx.Response(403, json={"detail": self.start_refusal})
             transaction = f"tx-{uuid.uuid4().hex}"
             self.started.append({**body, "transaction": transaction})
             return httpx.Response(200, json={
@@ -178,6 +181,16 @@ async def test_the_modules_refusal_is_passed_on(client: AsyncClient, fake: FakeM
         cookies={"faden_sso": started.cookies["faden_sso"]}, follow_redirects=False,
     )
     assert r.headers["location"] == "/login?error=not_allowed"
+
+
+@pytest.mark.anyio
+async def test_the_modules_reason_for_not_starting_is_passed_on(client: AsyncClient, fake: FakeModule) -> None:
+    fake.start_refusal = "license"
+    r = await client.get("/api/auth/sso/corp/start", follow_redirects=False)
+    assert r.headers["location"] == "/login?error=license"
+    fake.start_refusal = "something we never heard of"
+    r = await client.get("/api/auth/sso/corp/start", follow_redirects=False)
+    assert r.headers["location"] == "/login?error=provider_error"
 
 
 @pytest.mark.anyio

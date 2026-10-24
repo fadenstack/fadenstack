@@ -61,6 +61,14 @@ def _https(request: Request) -> bool:
     return public_origin(request).startswith("https://")
 
 
+def _refusal_named(detail: object, otherwise: Refusal) -> Refusal:
+    """The refusal a module's error names in its ``detail``, if it names one."""
+    try:
+        return Refusal(str(detail))
+    except ValueError:
+        return otherwise
+
+
 def _to_login(refusal: Refusal) -> RedirectResponse:
     """Back to the sign-in page, which says why in the person's language."""
     response = RedirectResponse(f"/login?error={refusal.value}", status_code=status.HTTP_302_FOUND)
@@ -131,7 +139,10 @@ async def start(key: Key, request: Request) -> RedirectResponse:
         return _to_login(Refusal.NEEDS_HTTPS)
     try:
         begun = await module.start(key, _return_url(request, provider))
-    except (module.ModuleUnavailableError, module.ModuleRefusedError) as exc:
+    except module.ModuleRefusedError as exc:
+        log.warning("Sign-in with %s could not start: %s", key, exc)
+        return _to_login(_refusal_named(exc.detail, Refusal.PROVIDER_ERROR))
+    except module.ModuleUnavailableError as exc:
         log.warning("Sign-in with %s could not start: %s", key, exc)
         return _to_login(Refusal.PROVIDER_UNAVAILABLE)
     response = RedirectResponse(begun.redirect_url, status_code=status.HTTP_302_FOUND)
