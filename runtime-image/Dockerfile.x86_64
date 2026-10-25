@@ -18,7 +18,7 @@
 # watermark (runtime-manifest-x86_64-vllm0.31.0.json; vLLM 0.26.0 before it,
 # runtime-manifest-x86_64.json). CUDA comes with the torch and vLLM wheels; the
 # host only needs the NVIDIA driver and container toolkit.
-FROM python:3.12.14-slim-trixie
+FROM python:3.15.0-slim-trixie
 
 ENV PIP_NO_CACHE_DIR=1 \
     PYTHONUNBUFFERED=1 \
