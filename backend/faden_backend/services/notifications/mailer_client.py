@@ -28,8 +28,8 @@ class MailerClient:
         return {}
 
     async def send_password_reset(self, payload: dict[str, Any]) -> None:
-        """POST /internal/v1/messages/password-reset."""
-        url = f"{self._base_url()}/internal/v1/messages/password-reset"
+        """POST /api/internal/v1/messages/password-reset."""
+        url = f"{self._base_url()}/api/internal/v1/messages/password-reset"
         resp = await self._http.post(
             url,
             json=payload,
@@ -39,8 +39,8 @@ class MailerClient:
         resp.raise_for_status()
 
     async def send_admin_alert(self, payload: dict[str, Any]) -> None:
-        """POST /internal/v1/messages/admin-alert."""
-        url = f"{self._base_url()}/internal/v1/messages/admin-alert"
+        """POST /api/internal/v1/messages/admin-alert."""
+        url = f"{self._base_url()}/api/internal/v1/messages/admin-alert"
         resp = await self._http.post(
             url,
             json=payload,
