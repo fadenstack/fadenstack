@@ -91,6 +91,8 @@ class NotificationDispatcher:
                 await self._mailer.send_password_reset(row.payload_json)
             elif row.kind == "admin_alert":
                 await self._mailer.send_admin_alert(row.payload_json)
+            elif row.kind == "link_confirmation":
+                await self._mailer.send_link_confirmation(row.payload_json)
             else:
                 log.warning("Unknown notification kind: %s", row.kind)
                 return

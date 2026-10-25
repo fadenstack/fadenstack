@@ -131,7 +131,16 @@
     "reset_password_missing_token": "URL 中缺少重置令牌。",
     "reset_password_mismatch": "两次输入的密码不一致。",
     "reset_password_too_short": "密码长度至少为 8 个字符。",
-    "reset_password_failed": "密码重置失败。"
+    "reset_password_failed": "密码重置失败。",
+    "link_title": "将此登录关联到您的账户",
+    "link_body": "{{provider}} 已以 {{identity}} 的身份登录。要将其关联到您的 Fadenstack 账户 {{account}} 吗？之后您将使用 {{provider}} 登录。",
+    "link_confirm": "关联",
+    "link_cancel": "不是我",
+    "link_done": "已关联。您现在可以使用 {{provider}} 登录。",
+    "link_expired": "此链接已被使用或已过期。请重新通过您的身份提供方登录以获取新链接。",
+    "link_refused": "此链接已无法确认。请联系管理员。",
+    "link_sent": "已存在使用此地址的账户。我们已向该地址发送了一个链接：请在那里确认此登录属于您，然后重新登录。",
+    "link_needs_admin": "已存在使用此地址的账户。需要管理员将此登录关联到该账户。"
   },
   "root_mode": {
     "active": "ROOT 模式已启用",

@@ -131,7 +131,16 @@
     "reset_password_missing_token": "Reset token is missing from the URL.",
     "reset_password_mismatch": "Passwords do not match.",
     "reset_password_too_short": "Password must be at least 8 characters.",
-    "reset_password_failed": "Failed to reset password."
+    "reset_password_failed": "Failed to reset password.",
+    "link_title": "Link this sign-in to your account",
+    "link_body": "{{provider}} signed in as {{identity}}. Link it to your Fadenstack account {{account}}? Afterwards you sign in with {{provider}}.",
+    "link_confirm": "Link it",
+    "link_cancel": "Not me",
+    "link_done": "Linked. You can now sign in with {{provider}}.",
+    "link_expired": "This link has been used or has expired. Sign in with your provider again to get a new one.",
+    "link_refused": "This link can no longer be confirmed. Ask an administrator.",
+    "link_sent": "An account with this address exists already. We sent a link to that address: confirm there that this sign-in is yours, then sign in again.",
+    "link_needs_admin": "An account with this address exists already. An administrator has to link this sign-in to it."
   },
   "root_mode": {
     "active": "ROOT MODE ACTIVE",

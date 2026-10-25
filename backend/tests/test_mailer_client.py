@@ -20,8 +20,10 @@ async def test_the_mailer_is_called_where_it_listens() -> None:
     async with httpx.AsyncClient(transport=transport) as http:
         mailer = MailerClient(http)
         await mailer.send_password_reset({})
+        await mailer.send_link_confirmation({})
         await mailer.send_admin_alert({})
     assert seen == [
         "/api/internal/v1/messages/password-reset",
+        "/api/internal/v1/messages/link-confirmation",
         "/api/internal/v1/messages/admin-alert",
     ]

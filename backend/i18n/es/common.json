@@ -131,7 +131,16 @@
     "reset_password_missing_token": "Falta el token de restablecimiento en la URL.",
     "reset_password_mismatch": "Las contraseñas no coinciden.",
     "reset_password_too_short": "La contraseña debe tener al menos 8 caracteres.",
-    "reset_password_failed": "No se pudo restablecer la contraseña."
+    "reset_password_failed": "No se pudo restablecer la contraseña.",
+    "link_title": "Vincular este inicio de sesión a tu cuenta",
+    "link_body": "{{provider}} ha iniciado sesión como {{identity}}. ¿Vincularlo a tu cuenta de Fadenstack {{account}}? Después iniciarás sesión con {{provider}}.",
+    "link_confirm": "Vincular",
+    "link_cancel": "No he sido yo",
+    "link_done": "Vinculado. Ya puedes iniciar sesión con {{provider}}.",
+    "link_expired": "Este enlace ya se ha usado o ha caducado. Vuelve a iniciar sesión con tu proveedor para recibir uno nuevo.",
+    "link_refused": "Este enlace ya no se puede confirmar. Consulta a un administrador.",
+    "link_sent": "Ya existe una cuenta con esta dirección. Hemos enviado un enlace a esa dirección: confirma allí que este inicio de sesión es tuyo y vuelve a iniciar sesión.",
+    "link_needs_admin": "Ya existe una cuenta con esta dirección. Un administrador tiene que vincular este inicio de sesión a ella."
   },
   "root_mode": {
     "active": "MODO ROOT ACTIVO",

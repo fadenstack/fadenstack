@@ -131,7 +131,16 @@
     "reset_password_missing_token": "Le jeton de réinitialisation est absent de l'URL.",
     "reset_password_mismatch": "Les mots de passe ne correspondent pas.",
     "reset_password_too_short": "Le mot de passe doit comporter au moins 8 caractères.",
-    "reset_password_failed": "Échec de la réinitialisation du mot de passe."
+    "reset_password_failed": "Échec de la réinitialisation du mot de passe.",
+    "link_title": "Lier cette connexion à votre compte",
+    "link_body": "{{provider}} vous a connecté en tant que {{identity}}. La lier à votre compte Fadenstack {{account}} ? Ensuite, vous vous connecterez avec {{provider}}.",
+    "link_confirm": "Lier",
+    "link_cancel": "Ce n'était pas moi",
+    "link_done": "C'est lié. Vous pouvez maintenant vous connecter avec {{provider}}.",
+    "link_expired": "Ce lien a déjà servi ou a expiré. Reconnectez-vous avec votre fournisseur pour en recevoir un nouveau.",
+    "link_refused": "Ce lien ne peut plus être confirmé. Adressez-vous à un administrateur.",
+    "link_sent": "Un compte avec cette adresse existe déjà. Nous avons envoyé un lien à cette adresse : confirmez-y que cette connexion est la vôtre, puis reconnectez-vous.",
+    "link_needs_admin": "Un compte avec cette adresse existe déjà. Un administrateur doit y lier cette connexion."
   },
   "root_mode": {
     "active": "MODE ROOT ACTIF",

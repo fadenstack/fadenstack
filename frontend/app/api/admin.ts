@@ -966,7 +966,44 @@ export const adminAuthProviders = {
   startUrl(key: string) {
     return `/api/auth/sso/${encodeURIComponent(key)}/start`;
   },
+  /** What the link an account's owner was sent would link; changes nothing (no sign-in needed). */
+  async linkPreview(token: string): Promise<LinkPreview> {
+    const res = await postLink("/api/auth/sso/link/preview", token);
+    return (await res.json()) as LinkPreview;
+  },
+  /** The account's owner confirms: the outside sign-in is linked to the account, once. */
+  async linkConfirm(token: string): Promise<void> {
+    await postLink("/api/auth/sso/link/confirm", token);
+  },
 };
+
+/** A sign-in that met an existing account, as its owner's link shows it. */
+export type LinkPreview = {
+  provider_name: string;
+  identity_email: string | null;
+  account_email: string;
+  expires_at: string;
+};
+
+/** A refused link; ``reason`` is the backend's refusal (``sign_in_expired`` once used or expired). */
+export class LinkRefused extends Error {
+  constructor(readonly reason: string) {
+    super(reason);
+  }
+}
+
+async function postLink(path: string, token: string): Promise<Response> {
+  // The token goes in the body, not the address, so it stays out of access logs.
+  const res = await fetch(path, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token }),
+  });
+  if (res.ok) return res;
+  const body = (await res.json().catch(() => ({}))) as { detail?: unknown };
+  throw new LinkRefused(typeof body.detail === "string" ? body.detail : `status_${res.status}`);
+}
 
 /** Fadenstack's own containers: edited only in Root Mode. */
 export function isSystemClass(cls: ContainerClass): boolean {

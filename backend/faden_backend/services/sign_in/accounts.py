@@ -51,7 +51,7 @@ def membership_source(provider: str) -> str:
     return f"provider:{provider}"
 
 
-async def _audit(
+async def audit(
     session: AsyncSession,
     action: str,
     user: User | None,
@@ -60,6 +60,7 @@ async def _audit(
     result: str = "allow",
     **metadata: object,
 ) -> None:
+    """Record *action* about *user* (or the identity, without an account) in the audit trail."""
     from faden_backend.db.models.containers import AuditResult  # noqa: PLC0415
     from faden_backend.services.audit import chain  # noqa: PLC0415
 
@@ -81,10 +82,11 @@ async def _audit(
         log.exception("Could not record %s in the audit trail", action)
 
 
-async def _refuse(
+async def refuse(
     session: AsyncSession, refusal: Refusal, identity: ExternalIdentity, user: User | None = None,
 ) -> Refusal:
-    await _audit(session, "auth.sign_in.refused", user, identity, result="deny", reason=refusal.value)
+    """*refusal*, recorded in the audit trail."""
+    await audit(session, "auth.sign_in.refused", user, identity, result="deny", reason=refusal.value)
     return refusal
 
 
@@ -95,8 +97,10 @@ async def find_link(session: AsyncSession, provider: str, subject: str) -> OAuth
     )
 
 
-async def link(session: AsyncSession, user: User, identity: ExternalIdentity) -> OAuthAccount:
-    """Link *identity* to *user*'s account (a confirmed link, or a new account)."""
+async def link(
+    session: AsyncSession, user: User, identity: ExternalIdentity, *, via: str = "sign_in",
+) -> OAuthAccount:
+    """Link *identity* to *user*'s account: a new account (``sign_in``), or its owner confirmed it."""
     row = OAuthAccount(
         id=uuid.uuid4(),
         user_id=user.id,
@@ -108,7 +112,7 @@ async def link(session: AsyncSession, user: User, identity: ExternalIdentity) ->
     )
     session.add(row)
     await session.flush()
-    await _audit(session, "auth.identity.link", user, identity, subject=identity.subject)
+    await audit(session, "auth.identity.link", user, identity, subject=identity.subject, via=via)
     return row
 
 
@@ -135,7 +139,7 @@ async def _new_account(session: AsyncSession, identity: ExternalIdentity, email:
         if default is not None:
             await rbac.assign_role(user.id, default.id)
     await session.flush()
-    await _audit(session, "user.create", user, identity, via="sign_in_provider")
+    await audit(session, "user.create", user, identity, via="sign_in_provider")
     return user
 
 
@@ -175,9 +179,9 @@ async def _linked(session: AsyncSession, found: OAuthAccount, identity: External
     """The account a known person is linked to, if they may still use it."""
     user = await session.get(User, found.user_id)
     if user is None:
-        return await _refuse(session, Refusal.NOT_ALLOWED, identity)
+        return await refuse(session, Refusal.NOT_ALLOWED, identity)
     if not user.is_active:
-        return await _refuse(session, Refusal.ACCOUNT_DISABLED, identity, user)
+        return await refuse(session, Refusal.ACCOUNT_DISABLED, identity, user)
     found.last_sign_in_at = datetime.now(UTC)
     if identity.email:
         found.account_email = identity.email
@@ -188,14 +192,14 @@ async def _linked(session: AsyncSession, found: OAuthAccount, identity: External
 async def _unlinked(session: AsyncSession, identity: ExternalIdentity) -> User | Refusal:
     """A new account for a person the provider has not signed in before, or why not."""
     if not identity.email:
-        return await _refuse(session, Refusal.EMAIL_MISSING, identity)
+        return await refuse(session, Refusal.EMAIL_MISSING, identity)
     if not identity.email_trusted:
-        return await _refuse(session, Refusal.EMAIL_NOT_TRUSTED, identity)
+        return await refuse(session, Refusal.EMAIL_NOT_TRUSTED, identity)
     existing = await session.scalar(select(User).where(func.lower(User.email) == identity.email.lower()))
     if existing is not None:
-        return await _refuse(session, await _meets_account(session, existing, identity), identity, existing)
+        return await refuse(session, await _meets_account(session, existing, identity), identity, existing)
     if not identity.create_account:
-        return await _refuse(session, Refusal.REGISTRATION_DISABLED, identity)
+        return await refuse(session, Refusal.REGISTRATION_DISABLED, identity)
     user = await _new_account(session, identity, identity.email)
     await link(session, user, identity)
     return user
@@ -225,7 +229,7 @@ async def sign_in(session: AsyncSession, identity: ExternalIdentity) -> SignedIn
     if identity.manage_groups:
         added, removed = await sync_groups(session, user, identity.provider, identity.group_ids)
     await session.flush()
-    await _audit(
+    await audit(
         session, "auth.sign_in", user, identity, method="provider", created=created,
         groups_added=added, groups_removed=removed,
     )
@@ -245,4 +249,4 @@ async def _follow_email(session: AsyncSession, user: User, identity: ExternalIde
         return
     old = user.email
     user.email = identity.email
-    await _audit(session, "user.account.update", user, identity, changed=["email"], previous=old)
+    await audit(session, "user.account.update", user, identity, changed=["email"], previous=old)

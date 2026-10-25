@@ -38,6 +38,17 @@ class MailerClient:
         )
         resp.raise_for_status()
 
+    async def send_link_confirmation(self, payload: dict[str, Any]) -> None:
+        """POST /api/internal/v1/messages/link-confirmation."""
+        url = f"{self._base_url()}/api/internal/v1/messages/link-confirmation"
+        resp = await self._http.post(
+            url,
+            json=payload,
+            headers=self._auth_headers(),
+            timeout=15.0,
+        )
+        resp.raise_for_status()
+
     async def send_admin_alert(self, payload: dict[str, Any]) -> None:
         """POST /api/internal/v1/messages/admin-alert."""
         url = f"{self._base_url()}/api/internal/v1/messages/admin-alert"

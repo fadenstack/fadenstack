@@ -42,6 +42,37 @@ class OAuthAccount(Base):
     last_sign_in_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class IdentityLinkRequest(Base):
+    """An outside identity waiting for an existing account's owner to confirm it is theirs.
+
+    Made when a sign-in with a provider meets an account with the same address that it is not linked to;
+    the owner gets a link at that address (``services/sign_in/link_requests.py``). Only the SHA-256 of the
+    link's token is kept; the token works once, until ``expires_at``.
+    """
+
+    __tablename__ = "identity_link_requests"
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("user.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    provider: Mapped[str] = mapped_column(String(100), nullable=False)
+    provider_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    subject: Mapped[str] = mapped_column(String(320), nullable=False)
+    identity_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    # The account's address the link went to: it must still be the account's when the link is used.
+    sent_to: Mapped[str] = mapped_column(String(320), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class AuthProvider(Base):
     """Admin-configured SSO provider (OIDC / OAuth2)."""
 

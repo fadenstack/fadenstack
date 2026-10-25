@@ -128,3 +128,33 @@ class NotificationService:
             ),
         )
         await self._session.flush()
+
+    async def enqueue_link_confirmation(
+        self,
+        *,
+        to_email: str,
+        to_name: str | None,
+        provider_name: str,
+        identity_email: str | None,
+        confirm_url: str,
+        expires_minutes: int,
+    ) -> None:
+        """Enqueue the mail that asks an account's owner to confirm an outside identity is theirs."""
+        payload = {
+            "to_email": to_email,
+            "to_name": to_name,
+            "provider_name": provider_name,
+            "identity_email": identity_email,
+            "confirm_url": confirm_url,
+            "expires_minutes": expires_minutes,
+            "requested_at": datetime.now(tz=UTC).isoformat(),
+        }
+        self._session.add(
+            NotificationOutbox(
+                id=uuid.uuid4(),
+                kind="link_confirmation",
+                payload_json=payload,
+                status="pending",
+            ),
+        )
+        await self._session.flush()

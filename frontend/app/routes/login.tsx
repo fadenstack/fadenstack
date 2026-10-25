@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { Link as RouterLink, useNavigate, useSearchParams } from "react-router";
+import { Link as RouterLink, useLocation, useNavigate, useSearchParams } from "react-router";
 import { auth } from "~/api/auth";
 import { adminAuthProviders, type AuthProviderPublic } from "~/api/admin";
 import { clearCachedAccess } from "~/lib/adminConstants";
@@ -17,6 +17,7 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import AppBrand from "~/components/AppBrand";
 import BrandMark from "~/components/BrandMark";
+import { LinkConfirmation } from "~/components/LinkConfirmation";
 import Link from "@mui/material/Link";
 import { helpUrl } from "~/lib/pageHelp";
 import { EXTERNAL_LINK, websiteUrl } from "~/lib/vendorLinks";
@@ -25,7 +26,11 @@ export default function LoginPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  const location = useLocation();
   const next = params.get("next") || "/admin/dashboard";
+  // The token from an account owner's link (LinkConfirmation): in the fragment, which browsers never send
+  // to the server; kept here and dropped from the address bar.
+  const [linkToken] = useState(() => new URLSearchParams(location.hash.slice(1)).get("link"));
 
   function resolvePostLoginPath(
     user: { is_superuser: boolean },
@@ -41,6 +46,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [ssoProviders, setSsoProviders] = useState<AuthProviderPublic[]>([]);
   const [isDevMode, setIsDevMode] = useState(false);
 
@@ -82,10 +88,17 @@ export default function LoginPage() {
         // health endpoint unavailable — stay in production mode
       });
 
-    // Check for OAuth error in query params
+    // A sign-in with an outside provider that came back refused
     const oauthError = params.get("error");
-    if (oauthError) {
+    if (oauthError === "link_confirmation_sent") {
+      setNotice(t("auth.link_sent"));
+    } else if (oauthError === "link_needs_confirmation") {
+      setError(t("auth.link_needs_admin"));
+    } else if (oauthError) {
       setError(t("common.sso_failed", { error: oauthError }));
+    }
+    if (linkToken) {
+      navigate({ pathname: location.pathname, search: location.search, hash: "" }, { replace: true });
     }
 
     return () => {
@@ -148,6 +161,8 @@ export default function LoginPage() {
               {t("auth.login_desc")}
             </Typography>
 
+            {linkToken && <LinkConfirmation token={linkToken} />}
+            {notice && <Alert severity="info">{notice}</Alert>}
             {error && <Alert severity="error">{error}</Alert>}
 
             <TextField

@@ -6,6 +6,9 @@
 - ``POST /api/auth/sso/{key}/acs``: the provider's answer as a posted form (SAML).
 - ``POST /api/auth/sso/{key}/password``: a directory account's name and password (LDAP).
 - ``GET  /api/auth/sso/{key}/metadata``: what the provider is set up with (SAML service-provider metadata).
+- ``POST /api/auth/sso/link/preview`` and ``/link/confirm``: an account's owner confirms that an outside
+  identity which met their account is theirs (``services/sign_in/link_requests.py``); the token goes in
+  the body, not the address, so it stays out of access logs.
 
 The binding cookie ties an answer to the browser that began the sign-in, so an answer someone else started
 cannot sign this browser in. It holds a hash of the sign-in's transaction, signed, for ten minutes. An answer
@@ -18,6 +21,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import time
+from datetime import datetime
 from typing import Annotated
 
 import jwt
@@ -28,8 +32,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
 from faden_backend.db.dependencies import get_db_session
-from faden_backend.db.models.users import SignInStrategy, cookie_transport, login_lifetime_seconds
-from faden_backend.services.sign_in import accounts, module
+from faden_backend.db.models.users import SignInStrategy, User, cookie_transport, login_lifetime_seconds
+from faden_backend.services.sign_in import accounts, link_requests, module
 from faden_backend.services.sign_in.contract import (
     KEY_PATTERN,
     ExternalIdentity,
@@ -287,3 +291,40 @@ async def metadata(key: Key) -> Response:
         content=upstream.content,
         media_type=upstream.headers.get("content-type", "application/samlmetadata+xml"),
     )
+
+
+class LinkToken(BaseModel):
+    """The token from a link an account's owner was sent (``services/sign_in/link_requests.py``)."""
+
+    token: str = Field(min_length=16, max_length=128)
+
+
+class LinkPreview(BaseModel):
+    """What confirming the link would link: shown before the owner confirms."""
+
+    provider_name: str
+    identity_email: str | None
+    account_email: str
+    expires_at: datetime
+
+
+@router.post("/link/preview", response_model=LinkPreview, name="sso_link_preview")
+async def link_preview(payload: LinkToken, session: AsyncSession = Depends(get_db_session)) -> LinkPreview:
+    """What the link would link; 404 once it is used or expired. Changes nothing."""
+    found = await link_requests.pending(session, payload.token)
+    user = await session.get(User, found.user_id) if found is not None else None
+    if found is None or user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=Refusal.SIGN_IN_EXPIRED.value)
+    return LinkPreview(
+        provider_name=found.provider_name, identity_email=found.identity_email, account_email=user.email,
+        expires_at=found.expires_at,
+    )
+
+
+@router.post("/link/confirm", status_code=status.HTTP_204_NO_CONTENT, name="sso_link_confirm")
+async def link_confirm(payload: LinkToken, session: AsyncSession = Depends(get_db_session)) -> None:
+    """The owner confirms: the identity is linked, once. A refusal is a 400 with the reason as ``detail``."""
+    linked = await link_requests.confirm(session, payload.token)
+    await session.commit()  # the token is used up, refused or not
+    if isinstance(linked, Refusal):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=linked.value)
