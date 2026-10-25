@@ -300,6 +300,9 @@ export const AGENTS_PAGE_KEYS = ["agents:read", "agents:create", "agents:manage"
 /** The feature with which the server offers auditors among an agent's members (`GET /api/about`). */
 export const AGENT_AUDITORS = "agent_auditors";
 
+/** The feature with which the server takes an agent's own token lifetimes (`extensions.token`). */
+export const AGENT_TOKEN_LIFETIMES = "agent_token_lifetimes";
+
 /** What the user may do with agents in general; each agent says itself whether they manage it (`can_manage`). */
 export function agentRights(can: (permission: string) => boolean) {
   return {

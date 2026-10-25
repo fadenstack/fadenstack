@@ -240,6 +240,12 @@ der Konsole oder auf ihrer Seite **Agenten**.
     Zugriffs wirkt innerhalb von zehn Minuten. Diese Werte sind **Agent sign-in lifetime (s)**,
     **Agent sign-in idle timeout (s)** und **Agent access token lifetime (s)** unter **Einstellungen → Allgemein**.
 
+    Mit Enterprise kann ein Agent kürzere haben: **Gültigkeit der Anmeldung** auf seinem Reiter **Definition**,
+    in Sekunden, mindestens 60; ein leeres Feld behält den Wert des Mandanten. Sie gelten mit der Version, die
+    Sie speichern und veröffentlichen. Längere als die des Mandanten werden abgelehnt, und wird der Wert des
+    Mandanten später gesenkt, verkürzt das auch die des Agenten. Bereits angemeldete Geräte erhalten die kürzere
+    Gültigkeit, wenn ihre Anmeldung das nächste Mal erneuert wird.
+
 ## Wenn es nicht funktioniert {#when-it-does-not-work}
 
 Der Agent zeigt in der Anwendung an, warum eine Anmeldung fehlgeschlagen ist:

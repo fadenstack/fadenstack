@@ -228,6 +228,11 @@ on their **Agents** page.
     takes effect within ten minutes. These are **Agent sign-in lifetime (s)**, **Agent sign-in idle timeout (s)**
     and **Agent access token lifetime (s)** under **Settings → General**.
 
+    With Enterprise, an agent can have shorter ones: **Sign-in lifetimes** on its **Definition** tab, in
+    seconds, at least 60; an empty field keeps the tenant's. They come with the version you save and publish.
+    Longer ones than the tenant's are refused, and lowering the tenant's setting later shortens the agent's too.
+    Devices already signed in get the shorter lifetime when their sign-in is next renewed.
+
 ## When it does not work
 
 The panel says why a sign-in failed:

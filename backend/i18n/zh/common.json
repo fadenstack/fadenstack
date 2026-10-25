@@ -4198,7 +4198,14 @@
       "pii_mode_allow_help": "对话可以在脱敏和令牌化之间切换（SDK 发送 X-Faden-PII-Mode），不受租户设置影响。",
       "pii_mode_refuse_help": "对话始终使用租户 PII 策略的模式。",
       "extensions": "企业版设置",
-      "extensions_help": "保持原样。请通过 API 更改。"
+      "extensions_help": "保持原样。请通过 API 更改。",
+      "token_title": "登录有效期",
+      "token_help": "为此智能体设置比租户（设置 → 常规）更短的有效期，单位为秒；留空：使用租户的设置。更长的值会被拒绝。",
+      "token_access_s": "访问令牌有效期（秒）",
+      "token_refresh_s": "登录有效期（秒）",
+      "token_idle_s": "登录空闲超时（秒）",
+      "token_tenant": "租户的设置",
+      "problem_token_short": "有效期至少为 60 秒。"
     },
     "contract": {
       "empty": "没有宿主工具：应用可以提供任何工具。",

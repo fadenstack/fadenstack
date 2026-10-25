@@ -108,6 +108,9 @@ export function definitionProblems(definition: AgentDefinition): string[] {
   const names = definition.host_tool_contract.map((t) => t.name.trim()).filter(Boolean);
   const problems: string[] = [];
   if (new Set(names).size !== names.length) problems.push("agents.definition.problem_duplicate_tools");
+  if (TOKEN_LIFETIMES.some((f) => (tokenLifetimeOf(definition, f) ?? MIN_TOKEN_LIFETIME_S) < MIN_TOKEN_LIFETIME_S)) {
+    problems.push("agents.definition.problem_token_short");
+  }
   return problems;
 }
 
@@ -160,6 +163,38 @@ export function withServerToolsMode(definition: AgentDefinition, mode: ServerToo
     ...definition,
     server_tools: mode === "default" ? null : mode === "none" ? [] : listed.length ? listed : [""],
   };
+}
+
+// ── Token lifetimes (`extensions.token`, offered by the server's agent_token_lifetimes) ─────────
+
+/** An agent's own token lifetimes, in seconds, each optional: shorter than the tenant's settings. */
+export const TOKEN_LIFETIMES = ["access_s", "refresh_s", "idle_s"] as const;
+export type TokenLifetime = (typeof TOKEN_LIFETIMES)[number];
+/** The key of the setting in `extensions`. */
+export const TOKEN_SETTING = "token";
+/** The shortest lifetime the server takes, in seconds. */
+export const MIN_TOKEN_LIFETIME_S = 60;
+
+function tokenSetting(definition: AgentDefinition): Record<string, unknown> {
+  const token = definition.extensions[TOKEN_SETTING];
+  return token && typeof token === "object" && !Array.isArray(token) ? (token as Record<string, unknown>) : {};
+}
+
+/** The agent's own lifetime in seconds, or null: the tenant's. */
+export function tokenLifetimeOf(definition: AgentDefinition, field: TokenLifetime): number | null {
+  const seconds = tokenSetting(definition)[field];
+  return typeof seconds === "number" ? seconds : null;
+}
+
+/** One lifetime set, or with null dropped; the setting goes once none is left. */
+export function withTokenLifetime(definition: AgentDefinition, field: TokenLifetime, seconds: number | null): AgentDefinition {
+  const token = { ...tokenSetting(definition) };
+  if (seconds === null) delete token[field];
+  else token[field] = seconds;
+  const extensions = { ...definition.extensions };
+  if (Object.keys(token).length > 0) extensions[TOKEN_SETTING] = token;
+  else delete extensions[TOKEN_SETTING];
+  return { ...definition, extensions };
 }
 
 // ── Agents ────────────────────────────────────────────────────────────────

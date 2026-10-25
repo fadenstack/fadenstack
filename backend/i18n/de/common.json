@@ -4198,7 +4198,14 @@
       "pii_mode_allow_help": "Eine Unterhaltung darf zwischen Schwärzen und Tokenisieren wechseln (das SDK sendet X-Faden-PII-Mode), unabhängig von der Einstellung des Mandanten.",
       "pii_mode_refuse_help": "Unterhaltungen bekommen immer den Modus der PII-Richtlinie des Mandanten.",
       "extensions": "Enterprise-Einstellungen",
-      "extensions_help": "Bleiben unverändert. Änderungen über die API."
+      "extensions_help": "Bleiben unverändert. Änderungen über die API.",
+      "token_title": "Gültigkeit der Anmeldung",
+      "token_help": "Kürzere Gültigkeiten für diesen Agenten als die des Mandanten (Einstellungen → Allgemein), in Sekunden; leer: die des Mandanten. Längere werden abgelehnt.",
+      "token_access_s": "Gültigkeit des Zugriffstokens (s)",
+      "token_refresh_s": "Gültigkeit der Anmeldung (s)",
+      "token_idle_s": "Leerlauf-Timeout der Anmeldung (s)",
+      "token_tenant": "Die des Mandanten",
+      "problem_token_short": "Eine Gültigkeit muss mindestens 60 Sekunden betragen."
     },
     "contract": {
       "empty": "Keine Host-Tools: Die Anwendung darf jedes Tool anbieten.",

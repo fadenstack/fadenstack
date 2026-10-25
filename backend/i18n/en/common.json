@@ -4196,7 +4196,14 @@
       "pii_mode_allow_help": "A conversation may switch between redact and tokenize (the SDK sends X-Faden-PII-Mode), whatever the tenant's setting.",
       "pii_mode_refuse_help": "Conversations always get the mode of the tenant's PII policy.",
       "extensions": "Enterprise settings",
-      "extensions_help": "Kept as they are. Change them through the API."
+      "extensions_help": "Kept as they are. Change them through the API.",
+      "token_title": "Sign-in lifetimes",
+      "token_help": "Shorter lifetimes for this agent than the tenant's (Settings → General), in seconds; empty: the tenant's. Longer ones are refused.",
+      "token_access_s": "Access token lifetime (s)",
+      "token_refresh_s": "Sign-in lifetime (s)",
+      "token_idle_s": "Sign-in idle timeout (s)",
+      "token_tenant": "The tenant's",
+      "problem_token_short": "A sign-in lifetime must be at least 60 seconds."
     },
     "contract": {
       "empty": "No host tools: the application may offer any tool.",

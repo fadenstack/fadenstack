@@ -13,8 +13,10 @@ import {
   serverToolsMode,
   slugFromName,
   suggestionsOf,
+  tokenLifetimeOf,
   withPiiModeSwitch,
   withServerToolsMode,
+  withTokenLifetime,
   withUi,
 } from "./agentDefinition";
 
@@ -133,5 +135,26 @@ describe("slugs", () => {
     expect(slugFromName("Excel Assistant (EPLAN) ")).toBe("excel-assistant-eplan");
     expect(slugFromName("Prüfung")).toBe("prufung");
     expect(slugFromName("x".repeat(80))).toHaveLength(64);
+  });
+});
+
+describe("an agent's own token lifetimes", () => {
+  it("are kept in extensions.token, beside the other settings, and go when none is left", () => {
+    const other = { ...EMPTY_DEFINITION, extensions: { pii: { local: true } } };
+    const short = withTokenLifetime(withTokenLifetime(other, "access_s", 120), "idle_s", 3600);
+    expect(short.extensions).toEqual({ pii: { local: true }, token: { access_s: 120, idle_s: 3600 } });
+    expect(tokenLifetimeOf(short, "access_s")).toBe(120);
+    expect(tokenLifetimeOf(short, "refresh_s")).toBeNull();
+
+    const back = withTokenLifetime(withTokenLifetime(short, "access_s", null), "idle_s", null);
+    expect(back.extensions).toEqual({ pii: { local: true } });
+    expect(changedFields(other, short)).toEqual(["extensions"]);
+  });
+
+  it("are at least a minute", () => {
+    expect(definitionProblems(withTokenLifetime(EMPTY_DEFINITION, "access_s", 30))).toEqual([
+      "agents.definition.problem_token_short",
+    ]);
+    expect(definitionProblems(withTokenLifetime(EMPTY_DEFINITION, "access_s", 60))).toEqual([]);
   });
 });

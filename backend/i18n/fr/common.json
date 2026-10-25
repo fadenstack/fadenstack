@@ -4198,7 +4198,14 @@
       "pii_mode_allow_help": "Une conversation peut passer de masquer à tokeniser (le SDK envoie X-Faden-PII-Mode), quel que soit le réglage du locataire.",
       "pii_mode_refuse_help": "Les conversations reçoivent toujours le mode de la politique PII du locataire.",
       "extensions": "Paramètres Enterprise",
-      "extensions_help": "Conservés tels quels. Modifiez-les par l'API."
+      "extensions_help": "Conservés tels quels. Modifiez-les par l'API.",
+      "token_title": "Durée des connexions",
+      "token_help": "Des durées plus courtes pour cet agent que celles du locataire (Paramètres → Général), en secondes ; vide : celles du locataire. Les durées plus longues sont refusées.",
+      "token_access_s": "Durée du jeton d'accès (s)",
+      "token_refresh_s": "Durée de la connexion (s)",
+      "token_idle_s": "Délai d'inactivité de la connexion (s)",
+      "token_tenant": "Celle du locataire",
+      "problem_token_short": "Une durée doit être d'au moins 60 secondes."
     },
     "contract": {
       "empty": "Aucun outil de l'hôte : l'application peut proposer n'importe quel outil.",

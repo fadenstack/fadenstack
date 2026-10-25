@@ -4198,7 +4198,14 @@
       "pii_mode_allow_help": "Una conversación puede cambiar entre redactar y tokenizar (el SDK envía X-Faden-PII-Mode), sea cual sea el ajuste del inquilino.",
       "pii_mode_refuse_help": "Las conversaciones siempre usan el modo de la política PII del inquilino.",
       "extensions": "Ajustes Enterprise",
-      "extensions_help": "Se mantienen tal cual. Cámbielos mediante la API."
+      "extensions_help": "Se mantienen tal cual. Cámbielos mediante la API.",
+      "token_title": "Duración del inicio de sesión",
+      "token_help": "Duraciones más cortas para este agente que las del inquilino (Configuración → General), en segundos; vacío: las del inquilino. Las más largas se rechazan.",
+      "token_access_s": "Duración del token de acceso (s)",
+      "token_refresh_s": "Duración del inicio de sesión (s)",
+      "token_idle_s": "Tiempo de inactividad del inicio de sesión (s)",
+      "token_tenant": "La del inquilino",
+      "problem_token_short": "Una duración debe ser de al menos 60 segundos."
     },
     "contract": {
       "empty": "Sin herramientas del anfitrión: la aplicación puede ofrecer cualquier herramienta.",
