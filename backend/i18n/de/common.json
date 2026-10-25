@@ -4340,7 +4340,8 @@
     "tab": {
       "rules": "Tool-Regeln",
       "classes": "Tool-Klassen",
-      "decisions": "Entscheidungen"
+      "decisions": "Entscheidungen",
+      "limits": "Grenzen für den Tool-Modus"
     },
     "pattern": "Tool-Muster",
     "pattern_help": "Ein Tool-Name oder ein Muster mit *: mcp.github.*, knowledge_search, *.",
@@ -4414,6 +4415,23 @@
         "rejected": "Abgelehnt",
         "expired": "Abgelaufen"
       }
+    },
+    "limits": {
+      "intro": "Der höchste Tool-Modus, den ein Chat haben darf. Für einen Chat können mehrere gelten (der für alle, die der Teams der Person, der des Agenten, der eigene der Person): Der engste gilt, und der Chat zeigt, dass er begrenzt ist. Änderungen wirken innerhalb von 30 Sekunden.",
+      "for": "Für",
+      "scope_tenant": "Alle",
+      "scope_team": "Ein Team",
+      "scope_agent": "Einen Agenten",
+      "scope_user": "Eine Person",
+      "pick_team": "Team suchen…",
+      "pick_user": "Person suchen…",
+      "pick_agent": "Agent",
+      "everyone_hint": "Jeder Chat, in der Konsole und über Agenten.",
+      "at_most": "Höchstens",
+      "set": "Grenze setzen",
+      "none": "Keine Grenzen: Jede Person wählt den Tool-Modus ihres Chats frei.",
+      "changed": "geändert von {{who}}, {{when}}",
+      "limit_of": "Grenze für {{who}}"
     }
   },
   "logviewer": {
@@ -4570,6 +4588,11 @@
     "licence_missing": "Enterprise ist installiert, hat aber keine Lizenz: Die Enterprise-Funktionen sind aus.",
     "licence_seats_over": "{{used}} aktive Konten bei {{seats}} Plätzen in der Lizenz. Gesperrt wird nichts; erweitern Sie die Lizenz oder schalten Sie nicht benötigte Konten ab.",
     "unknown": "Ein Hinweis für die Administration: {{code}}",
-    "hide": "Ausblenden, bis der Browser geschlossen wird"
+    "hide": "Ausblenden, bis der Browser geschlossen wird",
+    "restriction_tool_mode_ceilings": "Grenzen für den Tool-Modus benötigen Fadenstack Enterprise: Bis es zurück ist, sind Tools in jedem Chat nur lesend.",
+    "lift": "Aufheben",
+    "lift_title": "Diese Einschränkung aufheben?",
+    "lift_body": "Die Einschränkung gilt nicht mehr. Das wird im Audit-Protokoll festgehalten.",
+    "lift_tool_mode_ceilings": "Tools in jedem Chat folgen wieder dem Modus, den jede Person wählt. Die Grenzen bleiben gespeichert und gelten wieder, sobald Enterprise zurück ist. Wird im Audit-Protokoll festgehalten."
   }
 }

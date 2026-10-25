@@ -4338,7 +4338,8 @@
     "tab": {
       "rules": "Tool rules",
       "classes": "Tool classes",
-      "decisions": "Decisions"
+      "decisions": "Decisions",
+      "limits": "Tool mode limits"
     },
     "pattern": "Tool pattern",
     "pattern_help": "A tool name, or a pattern with *: mcp.github.*, knowledge_search, *.",
@@ -4412,6 +4413,23 @@
         "rejected": "Rejected",
         "expired": "Expired"
       }
+    },
+    "limits": {
+      "intro": "The most a chat's tool mode may be. Several can apply to one chat (everyone's, the person's teams', the agent's, the person's own): the narrowest wins, and the chat says it is capped. Changes apply within 30 seconds.",
+      "for": "For",
+      "scope_tenant": "Everyone",
+      "scope_team": "A team",
+      "scope_agent": "An agent",
+      "scope_user": "A person",
+      "pick_team": "Find a team…",
+      "pick_user": "Find a person…",
+      "pick_agent": "Agent",
+      "everyone_hint": "Every chat, in the console and through agents.",
+      "at_most": "At most",
+      "set": "Set limit",
+      "none": "No limits: people choose their chat's tool mode freely.",
+      "changed": "changed by {{who}}, {{when}}",
+      "limit_of": "Limit for {{who}}"
     }
   },
   "logviewer": {
@@ -4568,6 +4586,11 @@
     "licence_missing": "Enterprise is installed but has no licence: Enterprise features are off.",
     "licence_seats_over": "{{used}} active accounts, and the licence has {{seats}} seats. Nothing is blocked; extend the licence or switch off accounts that are not needed.",
     "unknown": "A notice for administrators: {{code}}",
-    "hide": "Hide until the browser is closed"
+    "hide": "Hide until the browser is closed",
+    "restriction_tool_mode_ceilings": "Tool mode limits need Fadenstack Enterprise: until it is back, tools in every chat are read-only.",
+    "lift": "Lift",
+    "lift_title": "Lift this restriction?",
+    "lift_body": "The restriction no longer applies. It is recorded in the audit log.",
+    "lift_tool_mode_ceilings": "Tools in every chat go back to the mode each person picks. The limits are kept and apply again when Enterprise is back. Recorded in the audit log."
   }
 }

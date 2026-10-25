@@ -209,6 +209,21 @@ Kein Modus führt ein zerstörendes oder nicht eingestuftes Tool aus, ohne nachz
 **Automatisch** läuft, stufen Sie es als **lesen** oder **schreiben** ein.
 Die eigenen Tools von Fadenstack (die Suche in der Wissensdatenbank, die Uhrzeit, die Tool-Suche) sind lesende Tools.
 
+### Grenzen für den Tool-Modus {#tool-mode-limits}
+
+Mit Enterprise legt **Agenten → Governance → Grenzen für den Tool-Modus** den höchsten Tool-Modus fest, den ein
+Chat haben darf, für **Alle**, **Ein Team**, **Einen Agenten** oder **Eine Person**: Wählen Sie unter **Für**, für
+wen, wählen Sie das Team, den Agenten oder die Person, dann **Höchstens**, und wählen Sie **Grenze setzen**.
+Ändern Sie eine Grenze in ihrer Zeile, oder entfernen Sie sie. Für einen Chat können mehrere Grenzen gelten (die
+für alle, die der Teams der Person, die des Agenten, die eigene der Person): Die engste gilt. Benutzer sehen, dass
+ihr Chat begrenzt ist, und die Anwendungen eines Agenten erhalten seine Grenze ebenfalls. Änderungen wirken
+innerhalb von 30 Sekunden und werden im Audit-Protokoll festgehalten.
+
+Ohne gültige Enterprise-Lizenz können die Grenzen nicht angewendet werden, daher sind Tools in jedem Chat nur
+lesend, bis die Lizenz zurück ist; ein Hinweis für Administratoren sagt das. **Aufheben** in diesem Hinweis gibt
+jedem Chat wieder den Modus, den jede Person wählt; die Grenzen bleiben gespeichert und gelten wieder, sobald die
+Lizenz gültig ist.
+
 ### Entscheidungen {#decisions}
 
 ![Agenten → Governance auf dem Reiter „Entscheidungen“: Filter für Phase, Ergebnis und Agent sowie drei Tool-Entscheidungen, Freigabe nötig, Abgelaufen und Freigegeben, jeweils mit dem, was der Nutzer erfuhr](../images/administer/governance-decisions-top.png)
@@ -241,7 +256,7 @@ Einzelheiten stehen auf der Website [Developers](https://developers.fadenstack.c
 | Personenbezogene Daten | PII-Richtlinien, Einstellungen pro Chat und pro Agent | |
 | Die Eingabe | | Inhaltsrichtlinien für die Eingabe <span class="fs-planned">Geplant</span> |
 | Die Antwort | | Inhaltsrichtlinien für die Antwort <span class="fs-planned">Geplant</span> |
-| Tools | Tool-Regeln, Tool-Klassen, Tool-Modi | Inhaltsrichtlinien für Tool-Argumente und Grenzen für den Tool-Modus, den Benutzer wählen dürfen, pro Team, Agent oder Person <span class="fs-planned">Geplant</span> |
+| Tools | Tool-Regeln, Tool-Klassen, Tool-Modi | Grenzen für den Tool-Modus für alle, ein Team, einen Agenten oder eine Person; Inhaltsrichtlinien für Tool-Argumente <span class="fs-planned">Geplant</span> |
 | Die Aufzeichnung | Entscheidungen, ohne den Text | Eine Ansicht für Prüfer mit den Namen der Richtlinien sowie Exporte <span class="fs-planned">Geplant</span> |
 
 Inhaltsrichtlinien werden eine Eingabe, eine Antwort oder einen Tool-Aufruf anhand ihres Inhalts ablehnen.

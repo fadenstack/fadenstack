@@ -4340,7 +4340,8 @@
     "tab": {
       "rules": "Reglas de herramientas",
       "classes": "Clases de herramientas",
-      "decisions": "Decisiones"
+      "decisions": "Decisiones",
+      "limits": "Límites del modo de herramientas"
     },
     "pattern": "Patrón de herramienta",
     "pattern_help": "Un nombre de herramienta, o un patrón con *: mcp.github.*, knowledge_search, *.",
@@ -4414,6 +4415,23 @@
         "rejected": "Rechazado",
         "expired": "Caducado"
       }
+    },
+    "limits": {
+      "intro": "El modo de herramientas más amplio que puede tener un chat. A un chat pueden aplicarse varios (el de todos, el de los equipos de la persona, el del agente, el de la propia persona): gana el más estrecho, y el chat indica que está limitado. Los cambios se aplican en 30 segundos.",
+      "for": "Para",
+      "scope_tenant": "Todos",
+      "scope_team": "Un equipo",
+      "scope_agent": "Un agente",
+      "scope_user": "Una persona",
+      "pick_team": "Buscar un equipo…",
+      "pick_user": "Buscar una persona…",
+      "pick_agent": "Agente",
+      "everyone_hint": "Todos los chats, en la consola y a través de agentes.",
+      "at_most": "Como máximo",
+      "set": "Fijar límite",
+      "none": "Sin límites: cada persona elige libremente el modo de herramientas de su chat.",
+      "changed": "cambiado por {{who}}, {{when}}",
+      "limit_of": "Límite para {{who}}"
     }
   },
   "logviewer": {
@@ -4570,6 +4588,11 @@
     "licence_missing": "Enterprise está instalado pero no tiene licencia: las funciones Enterprise están desactivadas.",
     "licence_seats_over": "{{used}} cuentas activas y la licencia tiene {{seats}} puestos. No se bloquea nada; conviene ampliar la licencia o desactivar las cuentas que no hagan falta.",
     "unknown": "Un aviso para administradores: {{code}}",
-    "hide": "Ocultar hasta cerrar el navegador"
+    "hide": "Ocultar hasta cerrar el navegador",
+    "restriction_tool_mode_ceilings": "Los límites del modo de herramientas necesitan Fadenstack Enterprise: hasta que vuelva, las herramientas de todos los chats son de solo lectura.",
+    "lift": "Levantar",
+    "lift_title": "¿Levantar esta restricción?",
+    "lift_body": "La restricción deja de aplicarse. Queda registrado en el registro de auditoría.",
+    "lift_tool_mode_ceilings": "Las herramientas de todos los chats vuelven al modo que elige cada persona. Los límites se conservan y vuelven a aplicarse cuando vuelva Enterprise. Queda registrado en el registro de auditoría."
   }
 }

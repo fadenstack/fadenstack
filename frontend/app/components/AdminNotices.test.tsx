@@ -1,5 +1,5 @@
 /** Notices above every admin page (AdminNotices.tsx): worded from their codes, errors not to be hidden. */
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 
 import * as admin from "~/api/admin";
@@ -69,5 +69,31 @@ describe("admin notices", () => {
     const other = render(<AdminNotices isSuperuser />);
     await waitFor(() => expect(list).toHaveBeenCalled());
     expect(other.container).toBeEmptyDOMElement();
+  });
+
+  it("lifts a restriction nothing enforces from its notice, after a confirmation", async () => {
+    list
+      .mockResolvedValueOnce([
+        { code: "restriction_tool_mode_ceilings", severity: "warning", params: { name: "tool_mode_ceilings" } },
+      ])
+      .mockResolvedValue([]);
+    const lift = vi.spyOn(admin.adminNotices, "liftRestriction").mockResolvedValue(undefined);
+    render(<AdminNotices isSuperuser />);
+    expect(await screen.findByTestId("admin-notice-restriction_tool_mode_ceilings")).toHaveTextContent(
+      "Tool mode limits need Fadenstack Enterprise: until it is back, tools in every chat are read-only.",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Lift" }));
+    expect(await screen.findByText(/Tools in every chat go back to the mode each person picks/)).toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Lift" }));
+    await waitFor(() => expect(lift).toHaveBeenCalledWith("tool_mode_ceilings"));
+    await waitFor(() => expect(screen.queryByTestId("admin-notice-restriction_tool_mode_ceilings")).toBeNull());
+  });
+
+  it("offers lifting only on restrictions", async () => {
+    list.mockResolvedValue([{ code: "licence_expiring", severity: "warning", params: { days: 3, date: "2026-11-05" } }]);
+    render(<AdminNotices isSuperuser />);
+    await screen.findByTestId("admin-notice-licence_expiring");
+    expect(screen.queryByRole("button", { name: "Lift" })).toBeNull();
   });
 });

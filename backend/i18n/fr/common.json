@@ -4340,7 +4340,8 @@
     "tab": {
       "rules": "Règles d'outils",
       "classes": "Classes d'outils",
-      "decisions": "Décisions"
+      "decisions": "Décisions",
+      "limits": "Limites du mode des outils"
     },
     "pattern": "Motif d'outil",
     "pattern_help": "Un nom d'outil, ou un motif avec * : mcp.github.*, knowledge_search, *.",
@@ -4414,6 +4415,23 @@
         "rejected": "Refusé",
         "expired": "Expiré"
       }
+    },
+    "limits": {
+      "intro": "Le mode des outils le plus large qu'un chat peut avoir. Plusieurs limites peuvent s'appliquer à un chat (celle de tous, celles des équipes de la personne, celle de l'agent, celle de la personne) : la plus étroite l'emporte, et le chat indique qu'il est limité. Les changements s'appliquent en 30 secondes.",
+      "for": "Pour",
+      "scope_tenant": "Tout le monde",
+      "scope_team": "Une équipe",
+      "scope_agent": "Un agent",
+      "scope_user": "Une personne",
+      "pick_team": "Rechercher une équipe…",
+      "pick_user": "Rechercher une personne…",
+      "pick_agent": "Agent",
+      "everyone_hint": "Chaque chat, dans la console et par les agents.",
+      "at_most": "Au plus",
+      "set": "Fixer la limite",
+      "none": "Aucune limite : chacun choisit librement le mode des outils de son chat.",
+      "changed": "modifié par {{who}}, {{when}}",
+      "limit_of": "Limite pour {{who}}"
     }
   },
   "logviewer": {
@@ -4570,6 +4588,11 @@
     "licence_missing": "Enterprise est installé mais n'a pas de licence : les fonctions Enterprise sont désactivées.",
     "licence_seats_over": "{{used}} comptes actifs pour {{seats}} places dans la licence. Rien n'est bloqué ; étendez la licence ou désactivez les comptes inutiles.",
     "unknown": "Un avis pour les administrateurs : {{code}}",
-    "hide": "Masquer jusqu'à la fermeture du navigateur"
+    "hide": "Masquer jusqu'à la fermeture du navigateur",
+    "restriction_tool_mode_ceilings": "Les limites du mode des outils nécessitent Fadenstack Enterprise : jusqu'à son retour, les outils de chaque chat sont en lecture seule.",
+    "lift": "Lever",
+    "lift_title": "Lever cette restriction ?",
+    "lift_body": "La restriction ne s'applique plus. C'est consigné dans le journal d'audit.",
+    "lift_tool_mode_ceilings": "Les outils de chaque chat reviennent au mode que chacun choisit. Les limites sont conservées et s'appliquent de nouveau au retour d'Enterprise. Consigné dans le journal d'audit."
   }
 }

@@ -20,6 +20,9 @@ Extension points for agents:
 - ``agent_restrictions``: the names of restrictions an installed extension enforces on agents beyond their
   grants (EE: ``exclusions``). An agent whose ``restricted_by`` names one not listed here is its maintainers'
   only: the restriction would go unenforced (core: none).
+- ``tenant_restrictions``: the names of restrictions on a whole tenant an installed extension enforces (EE:
+  ``tool_mode_ceilings``). One the tenant is marked with and nobody enforces fails closed as
+  ``services/tenant_restrictions.py`` says for it (core: none).
 
 Extension points for signing in:
 
@@ -125,6 +128,7 @@ class ExtensionRegistry:
     version_extensions: dict[str, VersionExtension] = field(default_factory=dict)
     member_roles: set[str] = field(default_factory=lambda: {"maintainer"})
     agent_restrictions: set[str] = field(default_factory=set)
+    tenant_restrictions: set[str] = field(default_factory=set)
     password_sign_in_checks: list[PasswordSignInCheck] = field(default_factory=list)
     mail_sender: MailSender | None = None
     admin_notices: list[AdminNoticeSource] = field(default_factory=list)

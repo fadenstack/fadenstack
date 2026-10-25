@@ -4340,7 +4340,8 @@
     "tab": {
       "rules": "工具规则",
       "classes": "工具类别",
-      "decisions": "决定"
+      "decisions": "决定",
+      "limits": "工具模式限制"
     },
     "pattern": "工具模式",
     "pattern_help": "工具名称，或带 * 的模式：mcp.github.*、knowledge_search、*。",
@@ -4414,6 +4415,23 @@
         "rejected": "已拒绝",
         "expired": "已过期"
       }
+    },
+    "limits": {
+      "intro": "聊天可使用的最高工具模式。一个聊天可能同时适用多个限制（所有人的、该人员所在团队的、智能体的、该人员自己的）：以最严格的为准，聊天会显示已受限。更改在 30 秒内生效。",
+      "for": "适用于",
+      "scope_tenant": "所有人",
+      "scope_team": "一个团队",
+      "scope_agent": "一个智能体",
+      "scope_user": "一个人员",
+      "pick_team": "查找团队…",
+      "pick_user": "查找人员…",
+      "pick_agent": "智能体",
+      "everyone_hint": "所有聊天，包括控制台中的和通过智能体的。",
+      "at_most": "最高",
+      "set": "设置限制",
+      "none": "没有限制：每个人自由选择其聊天的工具模式。",
+      "changed": "由 {{who}} 更改，{{when}}",
+      "limit_of": "{{who}} 的限制"
     }
   },
   "logviewer": {
@@ -4570,6 +4588,11 @@
     "licence_missing": "已安装 Enterprise，但没有许可证：Enterprise 功能已关闭。",
     "licence_seats_over": "有 {{used}} 个活跃账户，而许可证只有 {{seats}} 个席位。不会阻止任何操作；请扩展许可证或停用不需要的账户。",
     "unknown": "给管理员的提示：{{code}}",
-    "hide": "隐藏，直到关闭浏览器"
+    "hide": "隐藏，直到关闭浏览器",
+    "restriction_tool_mode_ceilings": "工具模式限制需要 Fadenstack Enterprise：在其恢复之前，所有聊天中的工具都是只读的。",
+    "lift": "解除",
+    "lift_title": "解除此限制？",
+    "lift_body": "该限制不再适用。此操作会记录在审计日志中。",
+    "lift_tool_mode_ceilings": "所有聊天中的工具恢复为每个人选择的模式。这些限制会被保留，并在 Enterprise 恢复后再次生效。此操作会记录在审计日志中。"
   }
 }

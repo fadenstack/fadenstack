@@ -3,7 +3,9 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { hasFeature } from "~/api/about";
 import { governanceApi, type ToolRule } from "~/api/governance";
+import { TOOL_MODE_CEILINGS, toolCeilingsApi } from "~/api/toolCeilings";
 import { renderPage } from "~/test/renderPage";
 
 import GovernancePage from "./GovernancePage";
@@ -21,7 +23,14 @@ vi.mock("~/api/agents", async (importOriginal) => {
   };
 });
 
+vi.mock("~/api/about", () => ({ hasFeature: vi.fn() }));
+vi.mock("~/api/toolCeilings", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/api/toolCeilings")>();
+  return { ...actual, toolCeilingsApi: { list: vi.fn(), set: vi.fn(), remove: vi.fn() } };
+});
+
 const api = vi.mocked(governanceApi, { deep: true });
+const ceilings = vi.mocked(toolCeilingsApi);
 
 const RULE: ToolRule = {
   id: "r-1",
@@ -45,6 +54,7 @@ beforeEach(() => {
   api.toolRules.list.mockResolvedValue([RULE]);
   api.toolClasses.list.mockResolvedValue([]);
   api.decisions.mockResolvedValue([]);
+  vi.mocked(hasFeature).mockResolvedValue(false);
 });
 
 describe("GovernancePage", () => {
@@ -86,5 +96,42 @@ describe("GovernancePage", () => {
     open("classes");
     expect(await screen.findByText(/No tool classes/)).toBeInTheDocument();
     expect(api.toolRules.list).not.toHaveBeenCalled();
+  });
+
+  it("has no tool mode limits where the server offers none", async () => {
+    open("limits");
+    expect(await screen.findByText("mcp.github.delete_*")).toBeInTheDocument(); // the first tab instead
+    expect(screen.queryByRole("tab", { name: "Tool mode limits" })).not.toBeInTheDocument();
+  });
+
+  it("sets, changes and removes tool mode limits where the server offers them", async () => {
+    vi.mocked(hasFeature).mockImplementation(async (f) => f === TOOL_MODE_CEILINGS);
+    const team = {
+      scope: "team" as const,
+      target_id: "g-1",
+      label: "Finance",
+      mode: "read_only" as const,
+      updated_at: "2026-10-26T09:00:00Z",
+      updated_by: "ada@example.com",
+    };
+    const everyone = { ...team, scope: "tenant" as const, target_id: "default", label: null, mode: "ask" as const };
+    ceilings.list.mockResolvedValueOnce([team]).mockResolvedValue([everyone, team]);
+    ceilings.set.mockResolvedValue(everyone);
+    ceilings.remove.mockResolvedValue(undefined);
+    open("limits");
+
+    expect(await screen.findByText("Finance")).toBeInTheDocument();
+    expect(screen.getByText(/changed by ada@example.com/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Set limit" }));
+    await waitFor(() => expect(ceilings.set).toHaveBeenCalledWith("tenant", "default", "ask"));
+    expect(await screen.findByText("Everyone", { selector: ".MuiListItemText-primary" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("combobox", { name: "Limit for Finance" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Off" }));
+    await waitFor(() => expect(ceilings.set).toHaveBeenCalledWith("team", "g-1", "off"));
+
+    const row = screen.getByText("Finance").closest("li") as HTMLElement;
+    await userEvent.click(within(row).getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(ceilings.remove).toHaveBeenCalledWith("team", "g-1"));
   });
 });

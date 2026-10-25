@@ -903,7 +903,16 @@ export const adminNotices = {
   list() {
     return request<AdminNotice[]>("/notices");
   },
+  /** Lift a restriction on the tenant nothing enforces (the action of its `restriction_<name>` notice). */
+  liftRestriction(name: string) {
+    return request<void>(`/notices/restrictions/${encodeURIComponent(name)}`, { method: "DELETE" });
+  },
 };
+
+/** The restriction a notice is about, for those (`restriction_<name>`) that can be lifted; else null. */
+export function liftableRestriction(notice: AdminNotice): string | null {
+  return notice.code.startsWith("restriction_") && typeof notice.params.name === "string" ? notice.params.name : null;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Auth Providers (SSO)
