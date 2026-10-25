@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link as RouterLink, useLocation, useNavigate, useSearchParams } from "react-router";
-import { auth } from "~/api/auth";
+import { auth, LoginRefused } from "~/api/auth";
 import { adminAuthProviders, SignInRefused, type AuthProviderPublic } from "~/api/admin";
 import { clearCachedAccess } from "~/lib/adminConstants";
 import { refusalText } from "~/lib/signInRefusals";
@@ -24,6 +24,14 @@ import { LinkConfirmation } from "~/components/LinkConfirmation";
 import Link from "@mui/material/Link";
 import { helpUrl } from "~/lib/pageHelp";
 import { EXTERNAL_LINK, websiteUrl } from "~/lib/vendorLinks";
+
+/** The texts for a refused password sign-in, by the backend's code; any other reads as a plain failure. */
+const LOGIN_REFUSALS: Record<string, string> = {
+  LOGIN_BAD_CREDENTIALS: "auth.login_refused.bad_credentials",
+  LOGIN_USER_NOT_VERIFIED: "auth.refused.account_not_verified",
+  LOGIN_USE_SIGN_IN_PROVIDER: "auth.login_refused.use_provider",
+  TOO_MANY: "auth.login_refused.too_many",
+};
 
 export default function LoginPage() {
   const { t, i18n } = useTranslation();
@@ -127,7 +135,8 @@ export default function LoginPage() {
     } catch (err: unknown) {
       if (err instanceof SignInRefused && err.reason === "link_confirmation_sent") setNotice(t("auth.link_sent"));
       else if (err instanceof SignInRefused) setError(refusalText(t, err.reason));
-      else setError(err instanceof Error ? err.message : t("common.login_failed"));
+      else if (err instanceof LoginRefused) setError(t(LOGIN_REFUSALS[err.code] ?? "common.login_failed"));
+      else setError(t("common.login_failed"));
     } finally {
       setLoading(false);
     }

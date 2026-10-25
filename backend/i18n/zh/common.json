@@ -157,9 +157,15 @@
       "sign_in_expired": "登录耗时过长或已被使用。请重新开始。",
       "needs_https": "此登录方式仅在 HTTPS 下可用。请联系管理员。",
       "license": "此服务器的许可证不包含此登录方式。请联系管理员。",
+      "not_offered": "此处已不再提供这种登录方式。请使用其他方式登录，或询问管理员。",
       "other": "登录未成功。",
       "link_needs_confirmation": "已存在使用此地址的账户。请联系管理员。",
       "link_confirmation_sent": "已存在使用此地址的账户。我们已向该地址发送了一个链接：请在那里确认此登录属于您，然后重新登录。"
+    },
+    "login_refused": {
+      "bad_credentials": "电子邮件或密码错误。",
+      "use_provider": "您的组织使用其自己的登录方式为您登录：请使用下方的按钮。",
+      "too_many": "尝试次数过多。请稍等一分钟后再试。"
     }
   },
   "root_mode": {
@@ -2051,7 +2057,9 @@
       "user_filter_help": "留空：使用目录类型的过滤器。{username} 会替换为用户输入的内容（已转义）",
       "ca_bundle": "CA 证书（可选）",
       "ca_bundle_help": "PEM 格式，用于证书由内部 CA 签发的目录",
-      "check_people": "每小时检查：在目录中被停用或已删除的用户在此处会被暂停"
+      "check_people": "每小时检查：在目录中被停用或已删除的用户在此处会被暂停",
+      "subject_attribute": "稳定 ID 属性（可选）",
+      "subject_attribute_help": "留空：使用目录类型的属性（Active Directory 为 objectGUID，其他为 entryUUID）。对于没有这些属性的目录，填写一个对某人永不改变的属性（uidNumber、nsUniqueId）。"
     },
     "policy": {
       "title": "谁可以登录，以及获得什么",

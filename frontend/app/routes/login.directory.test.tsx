@@ -3,7 +3,7 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 
 import * as admin from "~/api/admin";
-import { auth } from "~/api/auth";
+import { auth, LoginRefused } from "~/api/auth";
 import { renderPage } from "~/test/renderPage";
 
 import Login from "./login";
@@ -76,5 +76,23 @@ describe("refusals in the address", () => {
     renderPage(<Login />, { path: "/login", initialPath: "/login?error=Call%20%2B1%20555%200100%20now" });
     expect(await screen.findByText("The sign-in did not work.")).toBeInTheDocument();
     expect(screen.queryByText(/555 0100/)).not.toBeInTheDocument();
+  });
+});
+
+describe("a refused password", () => {
+  it.each([
+    ["LOGIN_BAD_CREDENTIALS", "The e-mail or password is wrong."],
+    ["LOGIN_USE_SIGN_IN_PROVIDER", "Your organisation signs you in with its own sign-in: use its button below."],
+    ["TOO_MANY", "Too many attempts. Wait a minute and try again."],
+    ["SOMETHING_NEW", "Sign-in failed."],
+  ])("reads %s in words, never as the server's code", async (code, text) => {
+    localLogin.mockRejectedValue(new LoginRefused(code));
+    renderPage(<Login />, { path: "/login" });
+    await screen.findByRole("button", { name: "Corp AD" });
+    fireEvent.change(screen.getByLabelText(/^Email/), { target: { value: "alex@example.com" } });
+    fireEvent.change(screen.getByLabelText(/^Password/), { target: { value: "pw" } });
+    fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
+    expect(await screen.findByText(text)).toBeInTheDocument();
+    expect(screen.queryByText(new RegExp(code))).not.toBeInTheDocument();
   });
 });

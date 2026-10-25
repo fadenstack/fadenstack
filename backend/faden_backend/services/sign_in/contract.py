@@ -124,6 +124,7 @@ class Refusal(StrEnum):
     SIGN_IN_EXPIRED = "sign_in_expired"
     NEEDS_HTTPS = "needs_https"
     LICENSE = "license"
+    NOT_OFFERED = "not_offered"
 
 
 class SignInAnswer(BaseModel):
@@ -133,6 +134,12 @@ class SignInAnswer(BaseModel):
     identity: ExternalIdentity | None = None
     refusal: Refusal | None = None
     detail: str = ""
+
+
+class SSOOnly(BaseModel):
+    """The e-mail domains whose people sign in with a provider only: the backend refuses their passwords."""
+
+    domains: list[str] = []
 
 
 class ProviderUpkeep(BaseModel):

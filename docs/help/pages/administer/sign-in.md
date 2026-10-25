@@ -38,7 +38,7 @@ says which one and why, in the dialog.
 | **Create an account at the first sign-in** | Off: only people who already have an account here can sign in with the provider. |
 | **Roles of new accounts** | The roles a new account gets. Empty: none until someone gives them. People who should chat need `default_user` (see [Users, groups and roles](users.md)). Nobody becomes a superuser this way. |
 | **Allowed e-mail domains** | Only people with an address in these domains may sign in, for example `example.com`. An address in one of them counts as verified. Empty: any. |
-| **People with an address in these domains may only sign in with this provider** | They can no longer sign in with a password here, so leaving your organisation ends their access here too. Superusers keep their password. |
+| **People with an address in these domains may only sign in with this provider** | They can no longer sign in with a password here, so leaving your organisation ends their access here too. Superusers keep their password; a superuser who mistypes it sees the same message as everyone in the domain, so the page never tells whether a password was right. |
 | **Group rules** | People in a group at the provider join a group here when they sign in. Name the group as the provider sends it: its name, its ID (Entra ID sends IDs), or its DN (directories). |
 | **Take memberships away that the provider no longer gives** | At each sign-in, people leave the groups here that a rule gave them before and no longer gives. Memberships set by hand stay as they are. |
 | **Sign-in lasts at most (hours)** | Then people sign in again. 12 unless you change it; the server's own **Sign-in lifetime** applies when it is shorter. |
@@ -88,5 +88,7 @@ What people see on the sign-in page, and what to do:
 | **"The provider did not give your e-mail address …"** | Have the provider send the e-mail address (the `email` scope, or the `mail` attribute). |
 | **"The sign-in took too long or was already used."** | Start again from the sign-in page. A sign-in not finished within 10 minutes expires. |
 | **"This sign-in only works over HTTPS."** | Open the console at its HTTPS address. |
+| **"This sign-in is not available with this server's licence."** | The Enterprise licence is missing or has expired, past its grace period; the admin pages say which. Renew it, then sign in with the provider again. Passwords keep working meanwhile. |
+| **"This sign-in is not offered here any more."** | The provider was removed or switched off, or no provider is offered (see the licence above), after the person opened the sign-in page. They sign in another way from a fresh sign-in page. |
 | **"The sign-in service cannot be reached right now."** | The sign-in module is not running, or cannot reach the provider. Check the **Sign-in** card under **Settings → Modules**. |
 | **"The sign-in did not work."** | The provider refused or answered something the module does not accept. Check the provider's settings on both sides; the sign-in module's log says more. |

@@ -157,9 +157,15 @@
       "sign_in_expired": "La connexion a pris trop de temps ou a déjà servi. Recommencez.",
       "needs_https": "Cette connexion ne fonctionne qu'en HTTPS. Demandez à un administrateur.",
       "license": "Cette connexion n'est pas disponible avec la licence de ce serveur. Demandez à un administrateur.",
+      "not_offered": "Cette connexion n'est plus proposée ici. Connectez-vous autrement ou demandez à un administrateur.",
       "other": "La connexion n'a pas abouti.",
       "link_needs_confirmation": "Un compte avec cette adresse existe déjà. Demandez à un administrateur.",
       "link_confirmation_sent": "Un compte avec cette adresse existe déjà. Nous avons envoyé un lien à cette adresse : confirmez-y que cette connexion est la vôtre, puis reconnectez-vous."
+    },
+    "login_refused": {
+      "bad_credentials": "L'e-mail ou le mot de passe est incorrect.",
+      "use_provider": "Votre organisation vous connecte avec sa propre connexion : utilisez son bouton ci-dessous.",
+      "too_many": "Trop de tentatives. Attendez une minute et réessayez."
     }
   },
   "root_mode": {
@@ -2194,7 +2200,9 @@
       "user_filter_help": "Vide : le filtre du type d'annuaire. {username} devient ce que la personne a saisi, échappé",
       "ca_bundle": "Certificats d'AC (facultatif)",
       "ca_bundle_help": "PEM, pour un annuaire dont le certificat vient d'une AC interne",
-      "check_people": "Vérifier toutes les heures : les personnes désactivées ou disparues de l'annuaire sont suspendues ici"
+      "check_people": "Vérifier toutes les heures : les personnes désactivées ou disparues de l'annuaire sont suspendues ici",
+      "subject_attribute": "Attribut de l'ID stable (facultatif)",
+      "subject_attribute_help": "Vide : celui du type d'annuaire (objectGUID pour Active Directory, sinon entryUUID). Un attribut qui ne change jamais pour une personne, pour les annuaires qui n'en ont pas (uidNumber, nsUniqueId)."
     },
     "policy": {
       "title": "Qui peut se connecter, et ce qu'il reçoit",

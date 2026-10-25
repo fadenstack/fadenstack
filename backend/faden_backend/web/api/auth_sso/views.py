@@ -80,11 +80,18 @@ def _to_login(refusal: Refusal) -> RedirectResponse:
     return response
 
 
-async def _provider(key: str) -> ProviderPublic:
-    found = await module.provider(key)
-    if found is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such sign-in provider")
-    return found
+async def _offered(key: str) -> ProviderPublic | Refusal:
+    """The provider with *key*, or why nobody can sign in with it now.
+
+    ``not_offered`` covers a provider that was removed or switched off, and every provider while the module
+    lists none (its licence); a browser that began on an older page is told so on the sign-in page.
+    """
+    try:
+        found = await module.provider(key)
+    except module.ModuleUnavailableError as exc:
+        log.warning("Sign-in with %s: the module cannot say which providers it offers: %s", key, exc)
+        return Refusal.PROVIDER_UNAVAILABLE
+    return found or Refusal.NOT_OFFERED
 
 
 def _return_url(request: Request, provider: ProviderPublic) -> str:
@@ -133,7 +140,9 @@ async def providers() -> list[ProviderPublic]:
 @router.get("/{key}/start", name="sso_start")
 async def start(key: Key, request: Request) -> RedirectResponse:
     """Off to the provider; the answer comes back to ``callback`` or ``acs``."""
-    provider = await _provider(key)
+    provider = await _offered(key)
+    if isinstance(provider, Refusal):
+        return _to_login(provider)
     if provider.kind is not ProviderKind.REDIRECT:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="This provider signs in on the page",
@@ -219,7 +228,9 @@ async def callback(
     key: Key, request: Request, session: AsyncSession = Depends(get_db_session),
 ) -> RedirectResponse:
     """The provider's answer as a query string (OIDC: ``code`` and ``state``, or ``error``)."""
-    provider = await _provider(key)
+    provider = await _offered(key)
+    if isinstance(provider, Refusal):
+        return _to_login(provider)
     params = dict(request.query_params)
     return await _finish(request, session, provider, params.get("state"), params)
 
@@ -229,7 +240,9 @@ async def acs(
     key: Key, request: Request, session: AsyncSession = Depends(get_db_session),
 ) -> RedirectResponse:
     """The provider's answer as a posted form (SAML: ``SAMLResponse`` and ``RelayState``)."""
-    provider = await _provider(key)
+    provider = await _offered(key)
+    if isinstance(provider, Refusal):
+        return _to_login(provider)
     if not provider.posts_back:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="This provider answers to callback")
     form = await request.form()
@@ -250,7 +263,13 @@ async def password(
     session: AsyncSession = Depends(get_db_session),
 ) -> None:
     """Sign in with a directory account; a refusal is a 400 with the reason as ``detail``."""
-    provider = await _provider(key)
+    provider = await _offered(key)
+    if isinstance(provider, Refusal):
+        gone = provider is Refusal.NOT_OFFERED
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND if gone else status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=provider.value,
+        )
     if provider.kind is not ProviderKind.PASSWORD:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="This provider signs in elsewhere")
     try:
@@ -278,7 +297,13 @@ async def password(
 @router.get("/{key}/metadata", name="sso_metadata")
 async def metadata(key: Key) -> Response:
     """The provider's service-provider metadata (SAML), for its administrator to set it up with."""
-    await _provider(key)
+    offered = await _offered(key)
+    if offered is Refusal.NOT_OFFERED:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such sign-in provider")
+    if isinstance(offered, Refusal):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Sign-in module unavailable",
+        )
     try:
         upstream = await module.metadata(key)
     except module.ModuleRefusedError as exc:

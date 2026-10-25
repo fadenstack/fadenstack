@@ -28,6 +28,7 @@ nie. Was für alle Anbieter gilt, steht unter [Anmeldeanbieter](sign-in.md).
 | **Passwort des Dienstkontos** | Wird nie wieder angezeigt; lassen Sie das Feld leer, wenn Sie etwas anderes ändern. |
 | **Wo Personen gesucht werden** | Der Teil des Verzeichnisses mit den Benutzern, die sich anmelden dürfen, z. B. `OU=Staff,DC=example,DC=com`, mit allem darunter. |
 | **Benutzerfilter (optional)** | Nur, wenn der Filter des Verzeichnistyps nicht passt. `{username}` steht für das, was die Person eingegeben hat. |
+| **Attribut der festen ID (optional)** | Nur für ein Verzeichnis ohne `objectGUID` (Active Directory) und ohne `entryUUID` (OpenLDAP): ein Attribut, das sich für eine Person nie ändert, z. B. `nsUniqueId` (389 Directory Server, FreeIPA). Ohne eines kann sich mit einem solchen Verzeichnis niemand anmelden. |
 | **CA-Zertifikate (optional)** | Das Zertifikat Ihrer Zertifizierungsstelle, in PEM. |
 | **Seine E-Mail-Adressen sind geprüft** | Setzen Sie das Häkchen, wenn das Verzeichnis das Ihrer Organisation ist. Sonst tragen Sie Ihre Domains unter **Erlaubte E-Mail-Domains** ein. |
 | **Stündlich prüfen** | Ein: Wer im Verzeichnis deaktiviert oder entfernt ist, wird hier innerhalb einer Stunde gesperrt, und die Mitgliedschaften folgen den Gruppen des Verzeichnisses. |

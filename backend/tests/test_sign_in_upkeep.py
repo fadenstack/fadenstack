@@ -222,6 +222,20 @@ async def test_groups_follow_the_directory(db: AsyncSession, fake: FakeModule) -
     assert groups == {kept.id, by_hand.id}
 
 
+async def test_without_manage_groups_the_directory_only_adds(db: AsyncSession, fake: FakeModule) -> None:
+    """As at a sign-in: the rules' groups are added; taking away is manage_groups' alone."""
+    given, earlier = (Group(id=uuid.uuid4(), name=f"g-{uuid.uuid4().hex[:6]}") for _ in range(2))
+    db.add_all([given, earlier])
+    user = await _linked(db, days_ago=1, provider="dir", subject="s-2")
+    db.add(UserGroup(user_id=user.id, group_id=earlier.id, source=accounts.membership_source("dir")))
+    await db.flush()
+    fake.providers = [ProviderUpkeep(key="dir", directory=True)]
+    fake.people, fake.manage_groups, fake.group_ids = {"s-2": "active"}, False, [given.id]
+    await upkeep.upkeep_once(db)
+    groups = set(await db.scalars(select(UserGroup.group_id).where(UserGroup.user_id == user.id)))
+    assert groups == {given.id, earlier.id}
+
+
 async def test_only_active_accounts_are_asked_about(db: AsyncSession, fake: FakeModule) -> None:
     """The upkeep reactivates nobody: suspended accounts are not even asked about."""
     fake.providers = [ProviderUpkeep(key="dir", directory=True)]

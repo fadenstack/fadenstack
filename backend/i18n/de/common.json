@@ -157,9 +157,15 @@
       "sign_in_expired": "Die Anmeldung hat zu lange gedauert oder wurde schon verwendet. Starten Sie sie neu.",
       "needs_https": "Diese Anmeldung funktioniert nur über HTTPS. Wenden Sie sich an die Administration.",
       "license": "Diese Anmeldung ist mit der Lizenz dieses Servers nicht verfügbar. Wenden Sie sich an die Administration.",
+      "not_offered": "Diese Anmeldung wird hier nicht mehr angeboten. Melden Sie sich anders an oder wenden Sie sich an die Administration.",
       "other": "Die Anmeldung hat nicht geklappt.",
       "link_needs_confirmation": "Es gibt bereits ein Konto mit dieser Adresse. Wenden Sie sich an die Administration.",
       "link_confirmation_sent": "Es gibt bereits ein Konto mit dieser Adresse. Wir haben einen Link an diese Adresse geschickt: Bestätigen Sie dort, dass diese Anmeldung Ihre ist, und melden Sie sich dann erneut an."
+    },
+    "login_refused": {
+      "bad_credentials": "E-Mail oder Passwort ist falsch.",
+      "use_provider": "Ihre Organisation meldet Sie über ihre eigene Anmeldung an: Verwenden Sie die Schaltfläche darunter.",
+      "too_many": "Zu viele Versuche. Warten Sie eine Minute und versuchen Sie es erneut."
     }
   },
   "root_mode": {
@@ -2051,7 +2057,9 @@
       "user_filter_help": "Leer: der Filter des Verzeichnistyps. {username} wird zu dem, was die Person eingegeben hat, maskiert",
       "ca_bundle": "CA-Zertifikate (optional)",
       "ca_bundle_help": "PEM, für ein Verzeichnis mit einem Zertifikat einer internen CA",
-      "check_people": "Stündlich prüfen: Wer im Verzeichnis deaktiviert oder entfernt ist, wird hier gesperrt"
+      "check_people": "Stündlich prüfen: Wer im Verzeichnis deaktiviert oder entfernt ist, wird hier gesperrt",
+      "subject_attribute": "Attribut der festen ID (optional)",
+      "subject_attribute_help": "Leer: das des Verzeichnistyps (objectGUID bei Active Directory, sonst entryUUID). Ein Attribut, das sich für eine Person nie ändert, für Verzeichnisse ohne diese (uidNumber, nsUniqueId)."
     },
     "policy": {
       "title": "Wer sich anmelden darf und was die Person erhält",

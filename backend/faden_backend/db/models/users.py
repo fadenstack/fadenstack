@@ -161,34 +161,44 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     async def authenticate(self, credentials: Any) -> User | None:
         """Sign-in by password; a refused one is recorded with the address that was tried.
 
-        The password checks of the extension registry (``password_sign_in_checks``) then apply to everyone
-        but a superuser, so an administrator can always get in. A check that fails counts as a refusal.
+        The password checks of the extension registry (``password_sign_in_checks``) are asked about the
+        address typed, whatever the password, so their refusal reads the same for a right and a wrong
+        password and for an address without an account (no password or account enumeration). Only a
+        superuser who typed the right password passes them, so an administrator can always get in.
         """
         from faden_backend.db.models.containers import AuditResult  # noqa: PLC0415
 
         user = await super().authenticate(credentials)
+        if user is not None and user.is_superuser:
+            return user
+        tried = str(getattr(credentials, "username", "") or "")[:320]
+        reason = await self._password_check_refusal(tried)
+        if reason:
+            await self._audit(
+                "auth.sign_in.failed", user, result=AuditResult.DENY, target=None if user else tried,
+                metadata={"email": tried, "reason": reason},
+            )
+            raise HTTPException(status_code=400, detail="LOGIN_USE_SIGN_IN_PROVIDER")
         if user is None:
-            tried = str(getattr(credentials, "username", "") or "")[:320]
             await self._audit(
                 "auth.sign_in.failed", None, result=AuditResult.DENY, target=tried, metadata={"email": tried},
             )
-            return None
-        if user.is_superuser:
-            return user
+        return user
+
+    @staticmethod
+    async def _password_check_refusal(email: str) -> str | None:
+        """The first reason a password check gives to refuse *email*; a check that fails counts as one."""
         from faden_backend.services.extensions import registry  # noqa: PLC0415
 
         for check in registry.password_sign_in_checks:
             try:
-                reason = await check(user.email)
+                reason = await check(email)
             except Exception:
                 log.exception("A password sign-in check failed; refusing the sign-in")
-                reason = "the sign-in check failed"
+                return "the sign-in check failed"
             if reason:
-                await self._audit(
-                    "auth.sign_in.failed", user, result=AuditResult.DENY, metadata={"reason": reason},
-                )
-                raise HTTPException(status_code=400, detail="LOGIN_USE_SIGN_IN_PROVIDER")
-        return user
+                return reason
+        return None
 
     async def on_after_login(
         self, user: User, request: Request | None = None, response: Any = None,

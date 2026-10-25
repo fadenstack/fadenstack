@@ -29,6 +29,7 @@ password; the password is checked by the directory and never stored here. For wh
 | **Service account password** | Never shown again; leave the field empty when you change something else. |
 | **Where people are searched** | The part of the directory with the people who may sign in, for example `OU=Staff,DC=example,DC=com`, and everything below it. |
 | **User filter (optional)** | Only when the directory type's filter does not fit. `{username}` stands for what the person typed. |
+| **Stable ID attribute (optional)** | Only for a directory with neither `objectGUID` (Active Directory) nor `entryUUID` (OpenLDAP): an attribute that never changes for a person, such as `nsUniqueId` (389 Directory Server, FreeIPA). Without one, nobody can sign in with such a directory. |
 | **CA certificates (optional)** | Your certificate authority's certificate, in PEM. |
 | **Its e-mail addresses are verified** | Tick it when the directory is your organisation's own. Otherwise list your domains under **Allowed e-mail domains**. |
 | **Check every hour** | On: people disabled or removed in the directory are suspended here within the hour, and their memberships follow the directory's groups. |

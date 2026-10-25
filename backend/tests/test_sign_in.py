@@ -41,6 +41,12 @@ class FakeModule:
         self.admin_calls: list[tuple[str, str, Any, dict[str, str]]] = []
         self.down = False
         self.start_refusal: str | None = None
+        #: What the module offers; none, as without a licence, when a test empties it.
+        self.offered: list[dict[str, Any]] = [
+            {"key": "corp", "name": "Corp", "kind": "redirect"},
+            {"key": "saml", "name": "Corp SAML", "kind": "redirect", "posts_back": True},
+            {"key": "dir", "name": "Directory", "kind": "password"},
+        ]
 
     def handler(self, request: httpx.Request) -> httpx.Response:  # noqa: C901, PLR0911 -- one answer per route
         """Answer *request* as the module would."""
@@ -50,11 +56,7 @@ class FakeModule:
         path = request.url.path
         body = json.loads(request.content) if request.content else None
         if path == "/api/v1/providers/public":
-            return httpx.Response(200, json=[
-                {"key": "corp", "name": "Corp", "kind": "redirect"},
-                {"key": "saml", "name": "Corp SAML", "kind": "redirect", "posts_back": True},
-                {"key": "dir", "name": "Directory", "kind": "password"},
-            ])
+            return httpx.Response(200, json=self.offered)
         if path == "/api/v1/sign-in/start":
             if self.start_refusal:
                 return httpx.Response(403, json={"detail": self.start_refusal})
@@ -70,6 +72,8 @@ class FakeModule:
             if self.refusal:
                 return httpx.Response(200, json={"outcome": "refused", "refusal": self.refusal})
             return httpx.Response(200, json={"outcome": "identity", "identity": self.identity})
+        if path == "/api/v1/sso-only":
+            return httpx.Response(200, json={"domains": ["corp.example"]})
         if path == "/api/v1/providers/saml/metadata":
             return httpx.Response(200, content=b"<EntityDescriptor/>", headers={"content-type": "application/xml"})
         if path.startswith("/api/v1/admin/providers"):
@@ -113,7 +117,8 @@ async def _start(client: AsyncClient, key: str = "corp") -> tuple[httpx.Response
 async def test_without_a_module_there_is_nothing_to_sign_in_with(client: AsyncClient) -> None:
     assert settings.auth_enabled is False
     assert (await client.get("/api/auth/sso/providers")).json() == []
-    assert (await client.get("/api/auth/sso/corp/start", follow_redirects=False)).status_code == 404
+    started = await client.get("/api/auth/sso/corp/start", follow_redirects=False)
+    assert started.headers["location"] == "/login?error=not_offered"
 
 
 @pytest.mark.anyio
@@ -198,7 +203,35 @@ async def test_the_modules_reason_for_not_starting_is_passed_on(client: AsyncCli
 async def test_a_module_that_is_down(client: AsyncClient, fake: FakeModule) -> None:
     fake.down = True
     assert (await client.get("/api/auth/sso/providers")).json() == []
-    assert (await client.get("/api/auth/sso/corp/start", follow_redirects=False)).status_code == 404
+    started = await client.get("/api/auth/sso/corp/start", follow_redirects=False)
+    assert started.headers["location"] == "/login?error=provider_unavailable"
+    directory = await client.post("/api/auth/sso/dir/password", json={"username": "b", "password": "c"})
+    assert (directory.status_code, directory.json()["detail"]) == (503, "provider_unavailable")
+    assert (await client.get("/api/auth/sso/saml/metadata")).status_code == 503
+
+
+@pytest.mark.anyio
+async def test_a_provider_no_longer_offered(client: AsyncClient, fake: FakeModule) -> None:
+    """Removed, switched off, or none offered (the licence) after the page was opened: the page says so."""
+    started, transaction = await _start(client)
+    saml_started, saml_transaction = await _start(client, "saml")
+    fake.offered = []
+    gone = "/login?error=not_offered"
+    assert (await client.get("/api/auth/sso/corp/start", follow_redirects=False)).headers["location"] == gone
+    answer = await client.get(
+        f"/api/auth/sso/corp/callback?code=c&state={transaction}",
+        cookies={"faden_sso": started.cookies["faden_sso"]}, follow_redirects=False,
+    )
+    assert answer.headers["location"] == gone
+    posted = await client.post(
+        "/api/auth/sso/saml/acs", data={"SAMLResponse": "PHNhbWw+", "RelayState": saml_transaction},
+        cookies={"faden_sso": saml_started.cookies["faden_sso"]}, follow_redirects=False,
+    )
+    assert posted.headers["location"] == gone
+    assert fake.finished == [], "nothing reaches the module for a provider it no longer offers"
+    directory = await client.post("/api/auth/sso/dir/password", json={"username": "b", "password": "c"})
+    assert (directory.status_code, directory.json()["detail"]) == (404, "not_offered")
+    assert (await client.get("/api/auth/sso/saml/metadata")).status_code == 404
 
 
 @pytest.mark.anyio
@@ -410,6 +443,27 @@ async def test_without_manage_groups_memberships_stay(dbsession: AsyncSession) -
 
 
 @pytest.mark.anyio
+async def test_without_manage_groups_the_rules_still_add(dbsession: AsyncSession) -> None:
+    """The rules' groups are the provider's answer; manage_groups decides only whether stale ones go."""
+    team, other = await _group(dbsession), await _group(dbsession)
+    signed = await accounts.sign_in(dbsession, _as_identity(subject="s-8", group_ids=[team.id]))
+    assert isinstance(signed, accounts.SignedIn) and signed.groups_added == [team.id]
+    again = await accounts.sign_in(dbsession, _as_identity(subject="s-8", group_ids=[other.id]))
+    assert isinstance(again, accounts.SignedIn)
+    assert again.groups_added == [other.id] and again.groups_removed == []
+    member_of = set(await dbsession.scalars(select(UserGroup.group_id).where(UserGroup.user_id == signed.user.id)))
+    assert member_of == {team.id, other.id}
+
+
+@pytest.mark.anyio
+async def test_the_sso_only_domains_from_the_module(fake: FakeModule) -> None:
+    assert (await module.sso_only()).domains == ["corp.example"]
+    fake.down = True
+    with pytest.raises(module.ModuleUnavailableError):
+        await module.sso_only()
+
+
+@pytest.mark.anyio
 async def test_the_link_confirmation_extension(dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch) -> None:
     person = await _person(dbsession)
     asked: list[uuid.UUID] = []
@@ -440,6 +494,31 @@ async def test_password_checks_apply_to_all_but_superusers(
     assert refused.status_code == 400 and refused.json()["detail"] == "LOGIN_USE_SIGN_IN_PROVIDER"
     allowed = await client.post("/api/auth/jwt/login", data={"username": admin.email, "password": PASSWORD})
     assert allowed.status_code == 200, allowed.text
+
+
+@pytest.mark.anyio
+async def test_a_checks_refusal_says_nothing_about_the_password_or_the_account(
+    client: AsyncClient, dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Asked before the password counts: a right password, a wrong one, no account, a superuser's typo."""
+    person, admin = await _person(dbsession), await _person(dbsession, admin=True)
+    asked: list[str] = []
+
+    async def provider_only(email: str) -> str | None:
+        asked.append(email)
+        return "signs in with its provider" if email.endswith("@example.com") else None
+
+    monkeypatch.setattr(registry, "password_sign_in_checks", [provider_only])
+    tries = [
+        (person.email, PASSWORD), (person.email, "not-the-password"),
+        ("nobody@example.com", "not-the-password"), (admin.email, "not-the-password"),
+    ]
+    for username, password in tries:
+        r = await client.post("/api/auth/jwt/login", data={"username": username, "password": password})
+        assert (r.status_code, r.json()["detail"]) == (400, "LOGIN_USE_SIGN_IN_PROVIDER"), username
+    assert asked == [username for username, _ in tries]
+    elsewhere = await client.post("/api/auth/jwt/login", data={"username": "nobody@elsewhere.example", "password": "x"})
+    assert (elsewhere.status_code, elsewhere.json()["detail"]) == (400, "LOGIN_BAD_CREDENTIALS")
 
 
 @pytest.mark.anyio

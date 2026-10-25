@@ -220,3 +220,17 @@ describe("the SAML entity ID", () => {
     expect(problems({ ...saml, spEntityId: "https://sp.example.com/saml" }, false)).toEqual([]);
   });
 });
+
+describe("a directory's stable ID", () => {
+  it("is sent when given, else left to the directory type, and read back", () => {
+    const form = {
+      ...blankForm("ldap"), key: "ldap", name: "LDAP", ldapUrl: "ldaps://ds.example.com", bindDn: "cn=svc",
+      bindPassword: "pw", baseDn: "dc=example,dc=com", preset: "generic" as const,
+    };
+    expect(toWrite(form).settings).toMatchObject({ subject_attribute: null });
+    const write = toWrite({ ...form, subjectAttribute: " nsUniqueId " });
+    expect(write.settings).toMatchObject({ subject_attribute: "nsUniqueId" });
+    const stored = { ...STORED, protocol: "ldap" as const, settings: write.settings as never };
+    expect(formFromProvider(stored).subjectAttribute).toBe("nsUniqueId");
+  });
+});

@@ -23,6 +23,22 @@ async function assertOk(res: Response): Promise<void> {
   }
 }
 
+/**
+ * A refused password sign-in: ``code`` is the backend's (``LOGIN_BAD_CREDENTIALS``,
+ * ``LOGIN_USE_SIGN_IN_PROVIDER``, ...), or ``TOO_MANY`` when the server is rate-limiting, or ``OTHER``.
+ */
+export class LoginRefused extends Error {
+  constructor(readonly code: string) {
+    super(code);
+  }
+}
+
+async function refusal(res: Response): Promise<LoginRefused> {
+  if (res.status === 429) return new LoginRefused("TOO_MANY");
+  const body = (await res.json().catch(() => ({}))) as { detail?: unknown };
+  return new LoginRefused(typeof body.detail === "string" ? body.detail : "OTHER");
+}
+
 export const auth = {
   async login(username: string, password: string): Promise<void> {
     const body = new URLSearchParams({ username, password });
@@ -32,6 +48,7 @@ export const auth = {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: body.toString(),
     });
+    if (res.status === 400 || res.status === 429) throw await refusal(res);
     await assertOk(res);
     clearMeCache();
   },

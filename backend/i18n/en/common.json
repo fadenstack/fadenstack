@@ -157,9 +157,15 @@
       "sign_in_expired": "The sign-in took too long or was already used. Start it again.",
       "needs_https": "This sign-in only works over HTTPS. Ask an administrator.",
       "license": "This sign-in is not available with this server's licence. Ask an administrator.",
+      "not_offered": "This sign-in is not offered here any more. Sign in another way, or ask an administrator.",
       "other": "The sign-in did not work.",
       "link_needs_confirmation": "An account with this address exists already. Ask an administrator.",
       "link_confirmation_sent": "An account with this address exists already. We sent a link to that address: confirm there that this sign-in is yours, then sign in again."
+    },
+    "login_refused": {
+      "bad_credentials": "The e-mail or password is wrong.",
+      "use_provider": "Your organisation signs you in with its own sign-in: use its button below.",
+      "too_many": "Too many attempts. Wait a minute and try again."
     }
   },
   "root_mode": {
@@ -2192,7 +2198,9 @@
       "user_filter_help": "Empty: the directory type's filter. {username} becomes what the person typed, escaped",
       "ca_bundle": "CA certificates (optional)",
       "ca_bundle_help": "PEM, for a directory whose certificate comes from an internal CA",
-      "check_people": "Check every hour: people disabled or gone in the directory are suspended here"
+      "check_people": "Check every hour: people disabled or gone in the directory are suspended here",
+      "subject_attribute": "Stable ID attribute (optional)",
+      "subject_attribute_help": "Empty: the directory type's (objectGUID for Active Directory, entryUUID otherwise). An attribute that never changes for a person, for directories without those (uidNumber, nsUniqueId)."
     },
     "policy": {
       "title": "Who may sign in, and what they get",

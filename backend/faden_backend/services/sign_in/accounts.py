@@ -144,9 +144,12 @@ async def _new_account(session: AsyncSession, identity: ExternalIdentity, email:
 
 
 async def sync_groups(
-    session: AsyncSession, user: User, provider: str, group_ids: list[uuid.UUID],
+    session: AsyncSession, user: User, provider: str, group_ids: list[uuid.UUID], *, remove: bool = True,
 ) -> tuple[list, list]:
-    """The memberships *provider* keeps for *user*, made to match *group_ids*; added and removed."""
+    """The memberships *provider* keeps for *user*, made to match *group_ids*; added and removed.
+
+    Without *remove* (the provider's ``manage_groups`` off) the rules' groups are added, none taken away.
+    """
     source = membership_source(provider)
     wanted: set[uuid.UUID] = set()
     if group_ids:
@@ -158,7 +161,7 @@ async def sync_groups(
     member_of = {group_id for group_id, _ in rows}
 
     added = sorted(wanted - member_of)
-    removed = sorted(kept_by_provider - wanted)
+    removed = sorted(kept_by_provider - wanted) if remove else []
     if added:
         await session.execute(
             pg_insert(UserGroup)
@@ -224,10 +227,10 @@ async def sign_in(session: AsyncSession, identity: ExternalIdentity) -> SignedIn
         return user
     created = found is None
 
-    added: list[uuid.UUID] = []
-    removed: list[uuid.UUID] = []
-    if identity.manage_groups:
-        added, removed = await sync_groups(session, user, identity.provider, identity.group_ids)
+    # The rules' groups always; those the provider gave before and no longer gives go only with manage_groups.
+    added, removed = await sync_groups(
+        session, user, identity.provider, identity.group_ids, remove=identity.manage_groups,
+    )
     await session.flush()
     await audit(
         session, "auth.sign_in", user, identity, method="provider", created=created,

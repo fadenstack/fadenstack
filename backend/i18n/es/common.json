@@ -157,9 +157,15 @@
       "sign_in_expired": "El inicio de sesión tardó demasiado o ya se usó. Empieza de nuevo.",
       "needs_https": "Este inicio de sesión solo funciona con HTTPS. Pide ayuda a un administrador.",
       "license": "Este inicio de sesión no está disponible con la licencia de este servidor. Pide ayuda a un administrador.",
+      "not_offered": "Este inicio de sesión ya no se ofrece aquí. Inicia sesión de otra forma o pide ayuda a un administrador.",
       "other": "El inicio de sesión no ha funcionado.",
       "link_needs_confirmation": "Ya existe una cuenta con esta dirección. Pide ayuda a un administrador.",
       "link_confirmation_sent": "Ya existe una cuenta con esta dirección. Hemos enviado un enlace a esa dirección: confirma allí que este inicio de sesión es tuyo y vuelve a iniciar sesión."
+    },
+    "login_refused": {
+      "bad_credentials": "El correo o la contraseña no son correctos.",
+      "use_provider": "Tu organización inicia tu sesión con su propio acceso: usa su botón de abajo.",
+      "too_many": "Demasiados intentos. Espera un minuto y vuelve a intentarlo."
     }
   },
   "root_mode": {
@@ -2051,7 +2057,9 @@
       "user_filter_help": "Vacío: el filtro del tipo de directorio. {username} se sustituye por lo que la persona escribió, escapado",
       "ca_bundle": "Certificados de CA (opcional)",
       "ca_bundle_help": "PEM, para un directorio cuyo certificado viene de una CA interna",
-      "check_people": "Comprobar cada hora: quien esté desactivado o ya no esté en el directorio queda suspendido aquí"
+      "check_people": "Comprobar cada hora: quien esté desactivado o ya no esté en el directorio queda suspendido aquí",
+      "subject_attribute": "Atributo del ID estable (opcional)",
+      "subject_attribute_help": "Vacío: el del tipo de directorio (objectGUID en Active Directory, si no entryUUID). Un atributo que nunca cambia para una persona, para directorios sin ellos (uidNumber, nsUniqueId)."
     },
     "policy": {
       "title": "Quién puede iniciar sesión y qué recibe",

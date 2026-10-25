@@ -54,6 +54,8 @@ export interface ProviderForm {
   baseDn: string;
   preset: LDAPSettings["preset"];
   userFilter: string;
+  /** The person's stable ID in the directory; empty: the directory type's (objectGUID, entryUUID). */
+  subjectAttribute: string;
   checkPeople: boolean;
   // What happens to people who sign in
   createAccount: boolean;
@@ -96,7 +98,7 @@ export function blankForm(protocol: Protocol = "oidc", serverAddress = ""): Prov
     metadataSource: "url", idpMetadataUrl: "", idpMetadataXml: "", spEntityId: "", emailVerifiedByIdp: false,
     signRequests: false,
     ldapUrl: "", startTls: false, caBundle: "", bindDn: "", bindPassword: "", baseDn: "", preset: "ad",
-    userFilter: "", checkPeople: true,
+    userFilter: "", subjectAttribute: "", checkPeople: true,
     createAccount: true, defaultRoleIds: [], allowedDomains: "", manageGroups: false, groupRules: [],
     sessionHours: "12", inactiveDays: "45", ssoOnly: false,
   };
@@ -143,7 +145,8 @@ export function formFromProvider(provider: SignInProvider): ProviderForm {
   } else {
     Object.assign(form, {
       ldapUrl: s.url, startTls: s.start_tls, caBundle: s.ca_bundle ?? "", bindDn: s.bind_dn, baseDn: s.base_dn,
-      preset: s.preset, userFilter: s.user_filter ?? "", emailVerifiedByIdp: s.email_verified_by_idp,
+      preset: s.preset, userFilter: s.user_filter ?? "", subjectAttribute: s.subject_attribute ?? "",
+      emailVerifiedByIdp: s.email_verified_by_idp,
       checkPeople: s.check_people,
     });
   }
@@ -192,6 +195,7 @@ function settingsOf(form: ProviderForm, stored?: ProviderSettings): ProviderWrit
     ...base, protocol: "ldap", url: form.ldapUrl.trim(), start_tls: form.startTls,
     ca_bundle: form.caBundle.trim() || null, bind_dn: form.bindDn.trim(), base_dn: form.baseDn.trim(),
     preset: form.preset, user_filter: form.userFilter.trim() || null,
+    subject_attribute: form.subjectAttribute.trim() || null,
     email_verified_by_idp: form.emailVerifiedByIdp, check_people: form.checkPeople,
   };
   return settings as ProviderWrite["settings"];

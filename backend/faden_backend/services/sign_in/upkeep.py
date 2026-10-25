@@ -126,8 +126,11 @@ async def _directory(session: AsyncSession, provider: ProviderUpkeep, report: Re
                                 provider.key, user.id, person.status)
                     continue
                 await _suspend(session, user, f"directory_{person.status}", provider.key, report)
-            elif person.status == "active" and answer.manage_groups:
-                added, removed = await accounts.sync_groups(session, user, provider.key, person.group_ids)
+            elif person.status == "active":
+                # As at a sign-in: the rules' groups, and taking away only with manage_groups.
+                added, removed = await accounts.sync_groups(
+                    session, user, provider.key, person.group_ids, remove=answer.manage_groups,
+                )
                 report.groups_changed += bool(added or removed)
 
 

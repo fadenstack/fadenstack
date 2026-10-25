@@ -310,6 +310,14 @@ function ProtocolFields({
       />
       <TextField
         size="small"
+        label={t("auth_providers.ldap.subject_attribute")}
+        value={form.subjectAttribute}
+        onChange={(e) => set({ subjectAttribute: e.target.value })}
+        helperText={t("auth_providers.ldap.subject_attribute_help")}
+        slotProps={{ htmlInput: { spellCheck: false, maxLength: 128 } }}
+      />
+      <TextField
+        size="small"
         multiline
         minRows={2}
         maxRows={8}

@@ -19,6 +19,7 @@ from faden_backend.services.sign_in.contract import (
     Refusal,
     SignInAnswer,
     SignInStart,
+    SSOOnly,
     StartRequest,
 )
 from faden_backend.services.tls import default_httpx_verify
@@ -77,21 +78,31 @@ async def request(method: str, path: str, *, json: Any = None, params: Any = Non
     return response
 
 
+async def _listed() -> list[ProviderPublic]:
+    """The providers the module lets people sign in with; ModuleUnavailableError when it cannot say."""
+    try:
+        response = await request("GET", "/api/v1/providers/public")
+        return [ProviderPublic.model_validate(item) for item in response.json()]
+    except (ModuleRefusedError, ValueError, ValidationError) as exc:
+        raise ModuleUnavailableError(f"no readable list of providers: {exc}") from exc
+
+
 async def public_providers() -> list[ProviderPublic]:
     """The providers people may sign in with; none when the module is off or cannot be reached."""
     if not enabled():
         return []
     try:
-        response = await request("GET", "/api/v1/providers/public")
-        return [ProviderPublic.model_validate(item) for item in response.json()]
-    except (ModuleUnavailableError, ModuleRefusedError, ValueError, ValidationError) as exc:
+        return await _listed()
+    except ModuleUnavailableError as exc:
         log.warning("No sign-in providers to show: %s", exc)
         return []
 
 
 async def provider(key: str) -> ProviderPublic | None:
-    """The provider with *key*, if people may sign in with it."""
-    return next((p for p in await public_providers() if p.key == key), None)
+    """The provider with *key*, if people may sign in with it; ModuleUnavailableError when that is unknown."""
+    if not enabled():
+        return None
+    return next((p for p in await _listed() if p.key == key), None)
 
 
 async def start(key: str, return_url: str) -> SignInStart:
@@ -136,6 +147,15 @@ async def password(key: str, username: str, secret: str) -> SignInAnswer:
 async def metadata(key: str) -> httpx.Response:
     """The service-provider metadata of *key* (SAML), as the module made it."""
     return await request("GET", f"/api/v1/providers/{key}/metadata")
+
+
+async def sso_only() -> SSOOnly:
+    """The domains whose people sign in with a provider only (``/api/v1/sso-only``)."""
+    response = await request("GET", "/api/v1/sso-only")
+    try:
+        return SSOOnly.model_validate(response.json())
+    except (ValueError, ValidationError) as exc:
+        raise ModuleUnavailableError(f"unreadable sso-only answer: {exc}") from exc
 
 
 async def upkeep() -> list[ProviderUpkeep]:

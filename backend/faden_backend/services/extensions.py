@@ -75,7 +75,8 @@ class TenantLifetimes:
 AccessRule = Callable[[uuid.UUID, uuid.UUID], Awaitable[str | None]]
 #: Validates one ``extensions`` key; raises ``ValueError`` when invalid.
 VersionExtension = Callable[[Any], None]
-#: ``(email) -> reason`` to refuse a password sign-in, or ``None`` to allow it.
+#: ``(email) -> reason`` to refuse a password sign-in, or ``None`` to allow it; *email* as typed, asked
+#: whatever the password and whether or not an account has it.
 PasswordSignInCheck = Callable[[str], Awaitable[str | None]]
 #: ``(session, user, identity) -> Refusal``: an outside sign-in met *user*'s account, not linked to it yet.
 LinkConfirmation = Callable[[Any, Any, Any], Awaitable[Any]]
