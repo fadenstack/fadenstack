@@ -165,7 +165,8 @@ async def test_an_answer_this_browser_did_not_start_is_refused(client: AsyncClie
 @pytest.mark.anyio
 async def test_a_forged_binding_is_refused(client: AsyncClient, fake: FakeModule) -> None:
     _, transaction = await _start(client)
-    forged = jwt.encode({"aud": "faden-sso-binding", "key": "corp", "tx": "x", "exp": 2**31}, "guess", "HS256")
+    claims = {"aud": "faden-sso-binding", "key": "corp", "tx": "x", "exp": 2**31}
+    forged = jwt.encode(claims, "a guessed key, as long as HS256 wants one", "HS256")
     r = await client.get(
         f"/api/auth/sso/corp/callback?state={transaction}", cookies={"faden_sso": forged}, follow_redirects=False,
     )

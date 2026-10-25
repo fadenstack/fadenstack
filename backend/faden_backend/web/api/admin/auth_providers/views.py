@@ -28,6 +28,8 @@ router = APIRouter()
     "/{path:path}",
     methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     name="auth_provider_settings",
+    # The shapes are the module's; one route for five methods would also give the schema five equal ids.
+    include_in_schema=False,
 )
 async def provider_settings(
     path: str,
