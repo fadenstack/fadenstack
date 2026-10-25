@@ -99,4 +99,15 @@ describe("a refused password", () => {
     expect(await screen.findByText(text)).toBeInTheDocument();
     expect(screen.queryByText(new RegExp(code))).not.toBeInTheDocument();
   });
+
+  it("links the vendor's site in the footer, unless the server switched the vendor's links off", async () => {
+    const shown = renderPage(<Login />, { path: "/login" });
+    expect(await screen.findByRole("link", { name: /^Fadenstack/ })).toBeInTheDocument();
+    shown.unmount();
+
+    vi.spyOn(auth, "options").mockResolvedValue({ password_reset: false, vendor_links: false });
+    renderPage(<Login />, { path: "/login" });
+    await waitFor(() => expect(screen.queryByRole("link", { name: /^Fadenstack/ })).not.toBeInTheDocument());
+    expect(screen.getByTestId("signin-footer")).toHaveTextContent("Help");
+  });
 });

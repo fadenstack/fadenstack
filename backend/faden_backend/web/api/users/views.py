@@ -19,6 +19,7 @@ from faden_backend.db.models.users import (
 from faden_backend.services import password_reset_links
 from faden_backend.services.extensions import mail_available
 from faden_backend.settings import settings
+from faden_backend.web.api import about
 
 router = APIRouter()
 
@@ -57,12 +58,14 @@ class SignInOptions(BaseModel):
 
     #: A forgotten password can be reset by mail (a mail sender is on); else an administrator sets a new one.
     password_reset: bool
+    #: The page links back to fadenstack.com (as ``GET /api/about`` says once signed in).
+    vendor_links: bool = True
 
 
 @router.get("/auth/options", response_model=SignInOptions, tags=["auth"])
 async def sign_in_options() -> SignInOptions:
     """What the sign-in page may offer, before anyone signs in."""
-    return SignInOptions(password_reset=mail_available())
+    return SignInOptions(password_reset=mail_available(), vendor_links=about.vendor_links())
 
 
 class ResetLinkToken(BaseModel):

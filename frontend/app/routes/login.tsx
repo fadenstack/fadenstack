@@ -42,6 +42,7 @@ export default function LoginPage() {
   const [linking, setLinking] = useState(() => params.get("error") === "link_needs_confirmation");
   // A forgotten password is reset by mail only while the server can send mail.
   const [passwordReset, setPasswordReset] = useState(false);
+  const [vendorLinks, setVendorLinks] = useState(true);
 
   function resolvePostLoginPath(
     user: { is_superuser: boolean },
@@ -93,7 +94,9 @@ export default function LoginPage() {
     auth
       .options()
       .then((options) => {
-        if (!cancelled) setPasswordReset(options.password_reset === true);
+        if (cancelled) return;
+        setPasswordReset(options.password_reset === true);
+        setVendorLinks(options.vendor_links !== false);
       })
       .catch(() => {
         // unknown: no reset offered
@@ -305,19 +308,23 @@ export default function LoginPage() {
           )}
         </CardContent>
       </Card>
-      {/* Small and muted, under the card: the vendor's site (tagged, no version: anyone sees this page) and
-          this server's own Help. */}
+      {/* Small and muted, under the card: the vendor's site (tagged, no version: anyone sees this page; not
+          where the server switched the vendor's links off) and this server's own Help. */}
       <Typography component="footer" variant="caption" color="text.secondary" data-testid="signin-footer">
-        <Link
-          href={websiteUrl("/", "console-signin")}
-          {...EXTERNAL_LINK}
-          color="inherit"
-          underline="hover"
-          aria-label={`Fadenstack ${t("about.new_tab")}`}
-        >
-          Fadenstack
-        </Link>
-        {" · "}
+        {vendorLinks && (
+          <>
+            <Link
+              href={websiteUrl("/", "console-signin")}
+              {...EXTERNAL_LINK}
+              color="inherit"
+              underline="hover"
+              aria-label={`Fadenstack ${t("about.new_tab")}`}
+            >
+              Fadenstack
+            </Link>
+            {" · "}
+          </>
+        )}
         <Link href={helpUrl(undefined, i18n.language)} target="_blank" rel="noopener" color="inherit" underline="hover">
           {t("about.help")}
         </Link>

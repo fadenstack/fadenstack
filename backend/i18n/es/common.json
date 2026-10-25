@@ -953,7 +953,8 @@
       "logging": "Registros",
       "observability": "Observabilidad",
       "updates": "Actualizaciones",
-      "chat": "Chat"
+      "chat": "Chat",
+      "branding": "Marca"
     },
     "groups": {
       "auth": "Auth",
@@ -975,7 +976,8 @@
       "skills": "Skills",
       "data_residency": "Residencia de datos",
       "update_check": "Comprobación de actualizaciones",
-      "retention": "Conservación"
+      "retention": "Conservación",
+      "vendor_links": "Enlaces a fadenstack.com"
     },
     "current_value": "(actual: {{value}})",
     "appearance": {

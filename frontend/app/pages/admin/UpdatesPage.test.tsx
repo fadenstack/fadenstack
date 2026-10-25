@@ -8,6 +8,7 @@ import { ThemeProvider } from "@mui/material/styles";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import * as about from "~/api/about";
 import { ApiError } from "~/api/http";
 import { updatesApi, type ReleaseInfo, type UpdatesOverview } from "~/api/updates";
 import { clearDashboardQueries } from "~/lib/dashboardQuery";
@@ -76,6 +77,11 @@ function overview(overrides: Partial<UpdatesOverview> = {}): UpdatesOverview {
   };
 }
 
+vi.mock("~/api/about", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/api/about")>();
+  return { ...actual, aboutInfo: vi.fn() };
+});
+
 function view() {
   return render(
     <ThemeProvider theme={getAppTheme("light")}>
@@ -87,6 +93,7 @@ function view() {
 }
 
 beforeEach(() => {
+  vi.mocked(about.aboutInfo).mockRejectedValue(new Error("not asked"));
   vi.spyOn(updatesApi, "notice").mockResolvedValue({
     current: "0.4.1",
     latest: "0.4.2",
@@ -203,5 +210,16 @@ describe("UpdatesPage", () => {
     view();
     expect(await screen.findByText("Not allowed.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+  });
+
+  it("leaves out the release notes where the server switched the vendor's links off", async () => {
+    vi.mocked(about.aboutInfo).mockResolvedValue({
+      product: "Fadenstack", edition: "enterprise", version: "0.4.1", licence: "", vendor_links: false,
+    });
+    vi.spyOn(updatesApi, "overview").mockResolvedValue(overview());
+    view();
+    const newer = await screen.findByRole("region", { name: "Newer releases" });
+    expect(within(newer).getByText("FSA-2026-001")).toBeInTheDocument();
+    await waitFor(() => expect(within(newer).queryByRole("link", { name: /^Release notes/ })).toBeNull());
   });
 });

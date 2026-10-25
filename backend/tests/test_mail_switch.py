@@ -37,14 +37,14 @@ async def test_core_sends_no_mail(client: AsyncClient, dbsession: AsyncSession) 
     sent = await client.post("/api/auth/forgot-password", json={"email": user.email})
     assert sent.status_code == 202, "the same answer for every address"
     assert await _resets(dbsession, user.email) == [], "nothing queued for a mailer that may never come"
-    assert (await client.get("/api/auth/options")).json() == {"password_reset": False}
+    assert (await client.get("/api/auth/options")).json()["password_reset"] is False
 
 
 async def test_with_a_sender_the_reset_mail_expires_with_its_link(
     client: AsyncClient, dbsession: AsyncSession, mail_on: RecordingMailSender,
 ) -> None:
     user = await _person(dbsession)
-    assert (await client.get("/api/auth/options")).json() == {"password_reset": True}
+    assert (await client.get("/api/auth/options")).json()["password_reset"] is True
     before = datetime.now(UTC)
     assert (await client.post("/api/auth/forgot-password", json={"email": user.email})).status_code == 202
     (mail,) = await _resets(dbsession, user.email)
@@ -54,7 +54,7 @@ async def test_with_a_sender_the_reset_mail_expires_with_its_link(
 async def test_a_sender_that_is_off_or_cannot_say(client: AsyncClient, mail_on: RecordingMailSender) -> None:
     mail_on.on = False
     assert not mail_available()
-    assert (await client.get("/api/auth/options")).json() == {"password_reset": False}
+    assert (await client.get("/api/auth/options")).json()["password_reset"] is False
 
     def broken() -> bool:
         raise RuntimeError("no answer")

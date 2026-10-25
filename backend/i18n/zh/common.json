@@ -953,7 +953,8 @@
       "logging": "日志",
       "observability": "可观测性",
       "updates": "更新",
-      "chat": "聊天"
+      "chat": "聊天",
+      "branding": "品牌"
     },
     "groups": {
       "auth": "认证",
@@ -975,7 +976,8 @@
       "skills": "技能",
       "data_residency": "数据驻留",
       "update_check": "更新检查",
-      "retention": "保留期限"
+      "retention": "保留期限",
+      "vendor_links": "指向 fadenstack.com 的链接"
     },
     "current_value": "（当前：{{value}}）",
     "appearance": {

@@ -953,7 +953,8 @@
       "logging": "Protokollierung",
       "observability": "Beobachtbarkeit",
       "updates": "Updates",
-      "chat": "Chat"
+      "chat": "Chat",
+      "branding": "Erscheinungsbild"
     },
     "groups": {
       "auth": "Auth",
@@ -975,7 +976,8 @@
       "skills": "Skills",
       "data_residency": "Datenresidenz",
       "update_check": "Update-Prüfung",
-      "retention": "Aufbewahrung"
+      "retention": "Aufbewahrung",
+      "vendor_links": "Links zu fadenstack.com"
     },
     "current_value": "(aktuell: {{value}})",
     "appearance": {

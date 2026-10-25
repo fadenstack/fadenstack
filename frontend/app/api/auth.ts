@@ -10,6 +10,8 @@ export interface AuthUser {
 export interface SignInOptions {
   /** A forgotten password is reset by mail; otherwise an administrator sets a new one. */
   password_reset: boolean;
+  /** The page links back to fadenstack.com (absent: it does). */
+  vendor_links?: boolean;
 }
 
 const ME_CACHE_TTL_MS = 30_000;

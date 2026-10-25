@@ -61,6 +61,9 @@ async def test_core_keeps_the_links_and_only_another_edition_switches_them_off(
     monkeypatch.setattr(settings, "vendor_links", False)
     r = await client.get(fastapi_app.url_path_for("about"))
     assert r.json()["vendor_links"] is True  # core ignores the switch
+    assert (await client.get("/api/auth/options")).json()["vendor_links"] is True, "the sign-in page too"
     monkeypatch.setattr(settings, "edition", "enterprise")
     r = await client.get(fastapi_app.url_path_for("about"))
     assert (r.json()["edition"], r.json()["vendor_links"], r.json()["licence"]) == ("enterprise", False, "")
+    fastapi_app.dependency_overrides.clear()  # the sign-in page asks before anyone signs in
+    assert (await client.get("/api/auth/options")).json()["vendor_links"] is False
