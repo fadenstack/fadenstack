@@ -4246,7 +4246,21 @@
       "check_help": "Ob ein Nutzer den Agenten nutzen darf, und warum.",
       "check_placeholder": "Nutzer suchen…",
       "allowed": "{{who}} darf diesen Agenten nutzen.",
-      "refused": "{{who}} darf diesen Agenten nicht nutzen."
+      "refused": "{{who}} darf diesen Agenten nicht nutzen.",
+      "unenforced_hint": "Nur seine Betreuer können diesen Agenten nutzen: Er verwendet Einstellungen, die Fadenstack Enterprise benötigen ({{names}}).",
+      "excluded_title": "Ausgeschlossene Personen",
+      "excluded_help": "Sie dürfen den Agenten nicht nutzen, auch nicht über ein Team, das ihn nutzen darf. Betreuer und Administratoren können es immer.",
+      "add_excluded": "Person ausschließen…",
+      "excluded_reason": "Begründung",
+      "excluded_reason_help": "Für die Verwalter des Agenten und das Audit-Protokoll. Die Person erfährt nur, dass sie ausgeschlossen ist.",
+      "exclude": "Ausschließen",
+      "nobody_excluded": "Niemand ist ausgeschlossen.",
+      "excluded_by": "ausgeschlossen von {{who}}, {{when}}",
+      "excluded_on": "ausgeschlossen {{when}}",
+      "lift": "Für alle Berechtigten öffnen",
+      "lift_title": "Den Agenten für alle Berechtigten öffnen?",
+      "lift_body": "Hebt {{names}} auf: Alle, denen der Agent freigegeben ist, können ihn wieder nutzen. Die Erweiterung, die das gesetzt hat, kann es wieder setzen, sobald sie zurück ist. Wird im Audit-Protokoll festgehalten.",
+      "lift_confirm": "Öffnen"
     },
     "activity": {
       "usage_title": "Nutzung",

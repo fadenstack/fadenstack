@@ -90,6 +90,11 @@ class AgentDTO(BaseModel):
     latest_version: int | None = None
     #: What the caller may do with it.
     can_manage: bool = False
+    #: Settings and restrictions no installed extension enforces: until one does, only the maintainers can use
+    #: the agent. Told to those who manage it.
+    unenforced: list[str] = Field(default_factory=list)
+    #: Those of them that are restrictions: lifted with ``DELETE .../restrictions/{name}``.
+    unenforced_restrictions: list[str] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 

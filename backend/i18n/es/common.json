@@ -4246,7 +4246,21 @@
       "check_help": "Si un usuario puede usar el agente, y por qué.",
       "check_placeholder": "Buscar un usuario…",
       "allowed": "{{who}} puede usar este agente.",
-      "refused": "{{who}} no puede usar este agente."
+      "refused": "{{who}} no puede usar este agente.",
+      "unenforced_hint": "Solo sus responsables pueden usar este agente: usa ajustes que necesitan Fadenstack Enterprise ({{names}}).",
+      "excluded_title": "Personas excluidas",
+      "excluded_help": "No pueden usar el agente, ni siquiera a través de un equipo que sí puede. Los responsables y los administradores siempre pueden.",
+      "add_excluded": "Excluir a una persona…",
+      "excluded_reason": "Motivo",
+      "excluded_reason_help": "Para quienes gestionan el agente y para el registro de auditoría. A la persona solo se le dice que está excluida.",
+      "exclude": "Excluir",
+      "nobody_excluded": "No hay nadie excluido.",
+      "excluded_by": "excluida por {{who}}, {{when}}",
+      "excluded_on": "excluida el {{when}}",
+      "lift": "Abrir a todos los autorizados",
+      "lift_title": "¿Abrir el agente a todos los autorizados?",
+      "lift_body": "Levanta {{names}}: todos a quienes se ha concedido el agente pueden volver a usarlo. La extensión que lo estableció puede volver a establecerlo cuando vuelva. Queda registrado en el registro de auditoría.",
+      "lift_confirm": "Abrir"
     },
     "activity": {
       "usage_title": "Uso",

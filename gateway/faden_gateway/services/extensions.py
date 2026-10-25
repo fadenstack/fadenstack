@@ -11,6 +11,9 @@ it.
   installed extension enforces. An agent carrying any other key is usable by
   its maintainers only -- those settings restrict access or data, and nothing
   here would enforce them.
+- ``agent_restrictions``: the names of restrictions an installed extension
+  enforces on agents beyond their grants (EE: ``exclusions``). An agent whose
+  ``restricted_by`` names one not listed here is usable by its maintainers only.
 - ``required_client_modules``: which SDK modules an agent needs, from its
   ``extensions`` (EE: ``pii.local`` for device-only PII). The SDK refuses to
   run an agent it lacks a module for.
@@ -47,6 +50,7 @@ class ExtensionRegistry:
 
     agent_access_rules: list[AgentAccessRule] = field(default_factory=list)
     agent_extensions: set[str] = field(default_factory=set)
+    agent_restrictions: set[str] = field(default_factory=set)
     required_client_modules: list[RequiredModules] = field(default_factory=list)
     features: set[str] = field(default_factory=lambda: set(CORE_FEATURES))
     edition: str = "community"
@@ -60,9 +64,10 @@ class ExtensionRegistry:
             needed.update(rule(extensions))
         return sorted(needed)
 
-    def unenforced(self, extensions: dict[str, Any]) -> list[str]:
-        """Keys of *extensions* no installed extension enforces."""
-        return sorted(key for key in extensions if key not in self.agent_extensions)
+    def unenforced(self, extensions: dict[str, Any], restricted_by: tuple[str, ...] = ()) -> list[str]:
+        """Keys of *extensions*, and restrictions in *restricted_by*, no installed extension enforces."""
+        keys = sorted(key for key in extensions if key not in self.agent_extensions)
+        return keys + sorted(name for name in restricted_by if name not in self.agent_restrictions)
 
 
 registry = ExtensionRegistry()

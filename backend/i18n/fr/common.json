@@ -4246,7 +4246,21 @@
       "check_help": "Si un utilisateur peut utiliser l'agent, et pourquoi.",
       "check_placeholder": "Rechercher un utilisateur…",
       "allowed": "{{who}} peut utiliser cet agent.",
-      "refused": "{{who}} ne peut pas utiliser cet agent."
+      "refused": "{{who}} ne peut pas utiliser cet agent.",
+      "unenforced_hint": "Seuls ses responsables peuvent utiliser cet agent : il utilise des réglages qui nécessitent Fadenstack Enterprise ({{names}}).",
+      "excluded_title": "Personnes exclues",
+      "excluded_help": "Elles ne peuvent pas utiliser l'agent, même par une équipe qui le peut. Les responsables et les administrateurs le peuvent toujours.",
+      "add_excluded": "Exclure une personne…",
+      "excluded_reason": "Motif",
+      "excluded_reason_help": "Pour ceux qui gèrent l'agent et pour le journal d'audit. La personne apprend seulement qu'elle est exclue.",
+      "exclude": "Exclure",
+      "nobody_excluded": "Personne n'est exclu.",
+      "excluded_by": "exclue par {{who}}, {{when}}",
+      "excluded_on": "exclue le {{when}}",
+      "lift": "Ouvrir à tous les autorisés",
+      "lift_title": "Ouvrir l'agent à tous les autorisés ?",
+      "lift_body": "Lève {{names}} : tous ceux à qui l'agent est accordé peuvent de nouveau l'utiliser. L'extension qui l'a posé peut le poser de nouveau à son retour. Consigné dans le journal d'audit.",
+      "lift_confirm": "Ouvrir"
     },
     "activity": {
       "usage_title": "Utilisation",

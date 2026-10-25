@@ -21,6 +21,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi import Path as FastAPIPath
 from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -129,6 +130,8 @@ async def _dto(dao: AgentsDAO, agent: Agent, *, can_manage: bool) -> AgentDTO:
         published_version=published.version if published else None,
         latest_version=latest.version if latest else None,
         can_manage=can_manage,
+        unenforced=access.unenforced(agent, published) if can_manage else [],
+        unenforced_restrictions=access.unenforced_restrictions(agent) if can_manage else [],
         created_at=agent.created_at,
         updated_at=agent.updated_at,
     )
@@ -168,6 +171,7 @@ async def _audit(
     action: str,
     target_id: str,
     metadata: dict[str, Any] | None = None,
+    severity: str = "normal",
 ) -> None:
     await audit.log(
         action=action,
@@ -175,6 +179,7 @@ async def _audit(
         target_id=target_id,
         result=AuditResult.ALLOW,
         actor_id=user.id,
+        severity=severity,
         metadata_json=json.dumps(metadata, default=str) if metadata else None,
     )
 
@@ -561,6 +566,33 @@ async def explain_access(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     decision = await access.decide(dao, agent, target)
     return AccessDTO(allowed=decision.allowed, code=decision.code, detail=decision.detail)
+
+
+@router.delete("/{agent_ref}/restrictions/{name}", response_model=AgentDTO, name="lift_agent_restriction")
+async def lift_restriction(
+    agent_ref: str,
+    name: Annotated[str, FastAPIPath(max_length=64)],
+    user: Annotated[User, Depends(current_active_user)],
+    dao: AgentsDAO = Depends(),
+    rbac: RbacDAO = Depends(),
+    audit: AuditDAO = Depends(),
+) -> AgentDTO:
+    """Lift a restriction nothing installed enforces: everyone granted can use the agent again.
+
+    Refused while an extension enforces it (it is changed there). The extension may set it again once back.
+    """
+    agent = await _managed_agent(dao, rbac, agent_ref, user)
+    if name not in (agent.restricted_by or []):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="The agent has no such restriction")
+    if name in registry.agent_restrictions:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This restriction is enforced; change it where it is kept.",
+        )
+    await access.set_restricted(dao.session, agent.id, name, on=False)
+    await _audit(audit, user, "agent.restriction.lift", str(agent.id), {"restriction": name}, severity="high")
+    await dao.session.refresh(agent)
+    return await _dto(dao, agent, can_manage=True)
 
 
 # -- usage and sign-ins -------------------------------------------------------------

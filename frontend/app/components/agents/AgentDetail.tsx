@@ -118,7 +118,7 @@ export function AgentDetail({ slug, basePath }: AgentDetailProps) {
           />
         );
       case "access":
-        return <AgentAccessPanel agent={agent} />;
+        return <AgentAccessPanel agent={agent} onChanged={() => void reload()} />;
       case "activity":
         return <AgentActivityPanel agent={agent} />;
     }

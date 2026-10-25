@@ -29,7 +29,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -105,6 +105,12 @@ class Agent(Base):
         nullable=False,
         server_default=func.now(),
         onupdate=func.now(),
+    )
+    #: Restrictions an extension keeps on the agent beyond its grants, by name (Enterprise: ``exclusions``),
+    #: set by the extension. One no installed extension enforces closes the agent to all but its maintainers,
+    #: as settings of its version do (``services/agents/access.py``).
+    restricted_by: Mapped[list[str]] = mapped_column(
+        ARRAY(String(64)), nullable=False, default=list, server_default="{}",
     )
 
 

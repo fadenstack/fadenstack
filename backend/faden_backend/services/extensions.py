@@ -15,6 +15,9 @@ Extension points for agents:
   ``AgentVersion.extensions``. A key nobody registered is refused, so no
   Enterprise setting is stored where nothing enforces it.
 - ``member_roles``: roles beside ``maintainer`` (EE: ``auditor``).
+- ``agent_restrictions``: the names of restrictions an installed extension enforces on agents beyond their
+  grants (EE: ``exclusions``). An agent whose ``restricted_by`` names one not listed here is its maintainers'
+  only: the restriction would go unenforced (core: none).
 
 Extension points for signing in:
 
@@ -119,6 +122,7 @@ class ExtensionRegistry:
     token_lifetimes: TokenLifetimePolicy = field(default_factory=TenantLifetimes)
     version_extensions: dict[str, VersionExtension] = field(default_factory=dict)
     member_roles: set[str] = field(default_factory=lambda: {"maintainer"})
+    agent_restrictions: set[str] = field(default_factory=set)
     password_sign_in_checks: list[PasswordSignInCheck] = field(default_factory=list)
     mail_sender: MailSender | None = None
     admin_notices: list[AdminNoticeSource] = field(default_factory=list)

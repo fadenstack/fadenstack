@@ -58,7 +58,7 @@ Die Seite des Agenten öffnet sich. Sein Status in der Liste ist **Entwurf**, **
 |---|---|
 | **Definition** | Die Version, die Benutzer erhalten: **Anweisungen**, **Modell**, **Wissen** (Sammlungen, die er durchsuchen darf), **Server-Tools** (**Wie im Chat**, **Nur diese** oder **Keine**), **Lokale MCP-Server**, **Host-Tools** (die Tools der Anwendung und ihre Klassen), **Darstellung** (Begrüßung und vorgeschlagene Prompts) und **Datenschutz**. |
 | **Versionen** | Jede Version. Mit **Veröffentlichen** eine Version veröffentlichen, mit **Zurücksetzen** zu einer früheren zurückkehren, unter **Änderungen** die Unterschiede sehen. |
-| **Zugriff** | **Wer ihn nutzen darf** und seine **Betreuer**. **Zugriff prüfen** zeigt, ob eine Person den Agenten nutzen darf, und warum. |
+| **Zugriff** | **Wer ihn nutzen darf**, die Liste **Ausgeschlossene Personen** (Enterprise) und seine **Betreuer**. **Zugriff prüfen** zeigt, ob eine Person den Agenten nutzen darf, und warum. |
 | **Aktivität** | Nutzung über einen Zeitraum (Anfragen, Fehler, Tokens, Benutzer, Unterhaltungen: nur Zahlen, nie Inhalte), was die Anwendungen gemeldet haben (ausgeführte Tools, Zustimmungen) und **Angemeldete Geräte**. |
 | **Apps** | Was die Anwendungen mitbringen, verglichen mit der Version des Agenten (siehe [Wenn eine Anwendung neue Tools mitbringt](#when-an-application-brings-new-tools)). |
 
@@ -89,6 +89,17 @@ nutzen, innerhalb einer Minute.
 **Betreuer** ändern den Agenten, veröffentlichen Versionen, entscheiden, wer ihn nutzen darf, und können ihn
 schon vor der Veröffentlichung nutzen. Das tun sie über **Agenten** im Benutzermenü des Chats; Zugriff auf die
 Konsole brauchen sie nicht.
+
+Mit Enterprise dürfen **Ausgeschlossene Personen** den Agenten nicht nutzen, auch nicht über ein Team, das ihn
+nutzen darf: Wählen Sie die Person, geben Sie eine **Begründung** an und wählen Sie **Ausschließen**. Das wirkt
+in den Anwendungen innerhalb einer Minute und wird im Audit-Protokoll festgehalten. Die Person erfährt nur,
+dass sie ausgeschlossen ist; die Begründung ist für die Betreuer und Administratoren des Agenten. Betreuer und
+Administratoren behalten den Agenten immer und können nicht ausgeschlossen werden.
+
+Ohne gültige Enterprise-Lizenz können einen Agenten mit ausgeschlossenen Personen nur seine Betreuer nutzen,
+damit niemand Ausgeschlossenes ihn zurückbekommt; der Reiter **Zugriff** sagt das.
+**Für alle Berechtigten öffnen** hebt das auf: Alle, denen der Agent freigegeben ist, können ihn wieder nutzen.
+Sobald die Lizenz wieder gültig ist, bleiben die noch aufgeführten ausgeschlossenen Personen wieder außen vor.
 
 ![Der Reiter „Aktivität“: Anfragen, Fehler, Tokens, Nutzer und Gespräche der letzten 30 Tage mit einem Diagramm, darunter, was die Anwendungen gemeldet haben, etwa ausgeführte Tools und Freigaben](../images/administer/agent-activity.png)
 
@@ -230,6 +241,6 @@ Der Agent zeigt in der Anwendung an, warum eine Anmeldung fehlgeschlagen ist:
 | Sie sehen | Was Sie tun |
 |---|---|
 | **Unter dieser Adresse gibt es keinen Agenten.** | Die Adresse in der Anwendung weicht von der des Agenten ab. Vergleichen Sie sie mit der Liste **Agenten**; ein Agent, der ohne **Von einer App ausgehen** erstellt wurde, hat eine aus seinem Namen abgeleitete Adresse. |
-| **Die Person hat keinen Zugriff.** | Fügen Sie sie oder ihre Gruppe auf dem Reiter **Zugriff** hinzu, und prüfen Sie, ob der Agent veröffentlicht ist. **Zugriff prüfen** zeigt, was sie daran hindert. |
+| **Die Person hat keinen Zugriff.** | Fügen Sie sie oder ihre Gruppe auf dem Reiter **Zugriff** hinzu, und prüfen Sie, ob der Agent veröffentlicht ist. **Zugriff prüfen** zeigt, was sie daran hindert, etwa ein Ausschluss. |
 | **Der Server antwortet nicht.** | Prüfen Sie die Serveradresse in der Anwendung und ob der Computer dem Zertifikat des Servers vertraut. |
 | Ein Tool, das die Anwendung anbietet, wird nicht genutzt | Es wird zurückgehalten: Übernehmen Sie es auf dem Reiter **Apps**. |

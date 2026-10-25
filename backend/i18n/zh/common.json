@@ -4246,7 +4246,21 @@
       "check_help": "某个用户能否使用该智能体，以及原因。",
       "check_placeholder": "查找用户…",
       "allowed": "{{who}} 可以使用此智能体。",
-      "refused": "{{who}} 不能使用此智能体。"
+      "refused": "{{who}} 不能使用此智能体。",
+      "unenforced_hint": "只有其维护者可以使用此智能体：它使用了需要 Fadenstack Enterprise 的设置（{{names}}）。",
+      "excluded_title": "被排除的人员",
+      "excluded_help": "他们不能使用此智能体，即使通过有权使用的团队也不行。维护者和管理员始终可以使用。",
+      "add_excluded": "排除一个人…",
+      "excluded_reason": "原因",
+      "excluded_reason_help": "供智能体的管理者和审计日志使用。该人员只会被告知其已被排除。",
+      "exclude": "排除",
+      "nobody_excluded": "没有被排除的人员。",
+      "excluded_by": "由 {{who}} 排除，{{when}}",
+      "excluded_on": "排除于 {{when}}",
+      "lift": "向所有已授权者开放",
+      "lift_title": "向所有已授权者开放此智能体？",
+      "lift_body": "解除 {{names}}：所有被授权使用此智能体的人都可以再次使用它。设置它的扩展回来后可能会再次设置。此操作会记录在审计日志中。",
+      "lift_confirm": "开放"
     },
     "activity": {
       "usage_title": "使用情况",

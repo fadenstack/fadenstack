@@ -24,10 +24,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette import status
 
 from faden_backend.db.dao.rbac_dao import RbacDAO
-from faden_backend.db.models.agents import AgentGrant, AgentMember, AgentRefreshToken, AgentVersion
+from faden_backend.db.models.agents import Agent, AgentGrant, AgentMember, AgentRefreshToken, AgentVersion
 from faden_backend.db.models.containers import AuditEvent
 from faden_backend.db.models.groups import Group, UserGroup
 from faden_backend.db.models.users import User, current_active_user
+from faden_backend.services.agents import access
 from faden_backend.services.extensions import registry
 from faden_backend.settings import settings
 
@@ -325,6 +326,57 @@ async def test_settings_nothing_enforces_close_the_agent_to_all_but_maintainers(
 
     assert (await _access(client, "was-enterprise", user))["code"] == "needs_enterprise"
     assert (await _access(client, "was-enterprise", admin))["allowed"] is True
+
+
+async def test_a_restriction_nothing_enforces_closes_the_agent_to_all_but_maintainers(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession, clean_registry: None,
+) -> None:
+    """An extension's restriction on the agent itself (Enterprise's exclusions), with the extension gone."""
+    signed_in.user = admin = await _user(dbsession, admin=True)
+    user = await _user(dbsession)
+    agent = await _agent(client, slug="restricted")
+    await _grant(client, "restricted", ("user", user.id))
+    agent_id = uuid.UUID(agent["id"])
+    await access.set_restricted(dbsession, agent_id, "exclusions", on=True)
+    await access.set_restricted(dbsession, agent_id, "exclusions", on=True)  # once is enough
+    row = await dbsession.get(Agent, agent_id)
+    await dbsession.refresh(row)
+    assert row.restricted_by == ["exclusions"]
+
+    decision = await _access(client, "restricted", user)
+    assert decision["code"] == "needs_enterprise" and "exclusions" in decision["detail"]
+    assert (await _access(client, "restricted", admin))["allowed"] is True
+    told = (await client.get("/api/agents/restricted")).json()
+    assert (told["unenforced"], told["unenforced_restrictions"]) == (["exclusions"], ["exclusions"]), "to managers"
+    lift = "/api/agents/restricted/restrictions/exclusions"
+    registry.agent_restrictions.add("exclusions")  # the extension is back and enforces it
+    try:
+        assert (await _access(client, "restricted", user))["allowed"] is True
+        assert (await client.get("/api/agents/restricted")).json()["unenforced"] == []
+        assert (await client.delete(lift)).status_code == status.HTTP_409_CONFLICT, "changed where it is kept"
+    finally:
+        registry.agent_restrictions.discard("exclusions")
+
+    # With the extension gone for good, a manager opens the agent again.
+    assert (await client.delete("/api/agents/restricted/restrictions/other")).status_code == 404
+    signed_in.user = user
+    assert (await client.delete(lift)).status_code == status.HTTP_403_FORBIDDEN
+    signed_in.user = admin
+    lifted = await client.delete(lift)
+    assert lifted.status_code == 200, lifted.text
+    assert (lifted.json()["unenforced"], lifted.json()["unenforced_restrictions"]) == ([], [])
+    await dbsession.refresh(row)
+    assert row.restricted_by == []
+    assert (await _access(client, "restricted", user))["allowed"] is True
+    event = await dbsession.scalar(select(AuditEvent).where(
+        AuditEvent.action == "agent.restriction.lift", AuditEvent.target_id == str(agent_id),
+    ))
+    assert event is not None and event.severity == "high" and json.loads(event.metadata_json) == {
+        "restriction": "exclusions",
+    }
+    await access.set_restricted(dbsession, agent_id, "exclusions", on=False)  # already off: nothing changes
+    await dbsession.refresh(row)
+    assert row.restricted_by == []
 
 
 async def test_a_user_lists_only_the_agents_they_can_use(

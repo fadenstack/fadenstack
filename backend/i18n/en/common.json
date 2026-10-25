@@ -4244,7 +4244,21 @@
       "check_help": "Whether a user may use the agent, and why.",
       "check_placeholder": "Find a user…",
       "allowed": "{{who}} may use this agent.",
-      "refused": "{{who}} may not use this agent."
+      "refused": "{{who}} may not use this agent.",
+      "unenforced_hint": "Only its maintainers can use this agent: it uses settings that need Fadenstack Enterprise ({{names}}).",
+      "excluded_title": "Excluded people",
+      "excluded_help": "They may not use the agent, even through a team that may. Maintainers and administrators always can.",
+      "add_excluded": "Exclude a person…",
+      "excluded_reason": "Reason",
+      "excluded_reason_help": "For the agent's managers and the audit log. The person is told only that they are excluded.",
+      "exclude": "Exclude",
+      "nobody_excluded": "Nobody is excluded.",
+      "excluded_by": "excluded by {{who}}, {{when}}",
+      "excluded_on": "excluded {{when}}",
+      "lift": "Open to everyone granted",
+      "lift_title": "Open the agent to everyone granted?",
+      "lift_body": "Lifts {{names}}: everyone the agent is granted to can use it again. The extension that set it may set it again when it is back. Recorded in the audit log.",
+      "lift_confirm": "Open it"
     },
     "activity": {
       "usage_title": "Usage",

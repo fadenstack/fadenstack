@@ -36,7 +36,7 @@ V = TypeVar("V")
 #: has none -- the newest draft, which only its maintainers may use.
 _AGENT_SQL = """
 SELECT a.id::text AS id, a.tenant_id, a.slug, a.name, a.status::text AS status,
-       (a.published_version_id IS NOT NULL) AS published,
+       (a.published_version_id IS NOT NULL) AS published, a.restricted_by,
        v.version, v.instructions, v.model_alias, v.knowledge, v.server_tools,
        v.host_tool_contract, v.local_mcp_mode::text AS local_mcp_mode, v.ui, v.pii, v.extensions,
        ARRAY(SELECT m.user_id::text FROM agent_members m
@@ -143,6 +143,8 @@ class AgentProfile:
     #: Whether the agent's conversations may switch the PII mode (``pii.allow_mode_override``
     #: of the version); ``None`` follows the tenant's setting.
     pii_allow_mode_override: bool | None = None
+    #: Restrictions an extension keeps on the agent beyond its grants (``agents.restricted_by``).
+    restricted_by: tuple[str, ...] = ()
 
     @property
     def host_tools(self) -> frozenset[str]:
@@ -174,6 +176,7 @@ class AgentProfile:
             grant_groups=frozenset(row["grant_groups"] or ()),
             instructions_sha256=hashlib.sha256(instructions.encode()).hexdigest(),
             pii_allow_mode_override=_tri_state(_json(row["pii"], {}), "allow_mode_override"),
+            restricted_by=tuple(row.get("restricted_by") or ()),
         )
 
 
@@ -529,7 +532,7 @@ def _closed(agent: AgentProfile, registry: ExtensionRegistry) -> AgentDecision |
     """Why *agent* is closed to all but its maintainers, if it is."""
     if not agent.published:
         return _deny(403, "agent_not_published", "The agent has no published version yet.")
-    missing = registry.unenforced(agent.extensions)
+    missing = registry.unenforced(agent.extensions, agent.restricted_by)
     if missing:
         return _deny(
             403,

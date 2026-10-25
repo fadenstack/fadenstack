@@ -69,6 +69,13 @@ export interface Agent {
   latest_version: number | null;
   /** The caller maintains it, or manages every agent. */
   can_manage: boolean;
+  /**
+   * Settings and restrictions no installed extension enforces: until one does, only the maintainers can use
+   * the agent. Told to those who manage it.
+   */
+  unenforced?: string[];
+  /** Those of them that are restrictions on the agent, which its managers can lift. */
+  unenforced_restrictions?: string[];
   created_at: string;
   updated_at: string;
 }
@@ -249,6 +256,9 @@ export const agentsApi = {
   /** Whether a user may use the agent, and why. */
   explainAccess: (agent: string, userId: string) =>
     request<AccessExplanation>(`${at(agent)}/access/${segment(userId)}`),
+  /** Lift a restriction nothing enforces: everyone granted can use the agent again. */
+  liftRestriction: (agent: string, name: string) =>
+    request<Agent>(`${at(agent)}/restrictions/${segment(name)}`, json("DELETE")),
 
   /** The apps that run the agent and what they bring, against its latest version. */
   apps: (agent: string) => request<AppsReview>(`${at(agent)}/apps`),
