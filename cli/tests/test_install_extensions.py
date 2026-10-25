@@ -132,3 +132,27 @@ def test_an_upgrade_runs_the_steps_after_the_env_and_before_pulling(
     result = CliRunner().invoke(upgrade_module.upgrade_cmd, ["-y", "--no-backup", "--skip-doctor"])
     assert result.exit_code == 0, result.output
     assert calls[:2] == ["step:fadenstack:True", "pull"], "after the .env is complete, before any pull"
+
+
+def test_an_addons_keys_are_written_as_files_like_cores(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from faden_cli.core import secret_files  # noqa: PLC0415
+
+    monkeypatch.setattr(registry, "SECRET_FILE_KEYS", [])
+    registry.extend_secret_files(["FADEN_ADDON_KEY", "FADEN_ADDON_KEY"])
+    (tmp_path / ".env").write_text("FADEN_ADDON_KEY=addon-secret\n", encoding="utf-8")
+    secret_files.write(tmp_path, tmp_path / ".env")
+    assert (tmp_path / "secrets" / "FADEN_ADDON_KEY").read_text(encoding="utf-8") == "addon-secret"
+    written = {p.name for p in (tmp_path / "secrets").iterdir()}
+    assert written == {*secret_files.SECRET_FILES, "FADEN_ADDON_KEY"}
+    (tmp_path / ".env").write_text("FADEN_ADDON_KEY=rotated\n", encoding="utf-8")
+    secret_files.write(tmp_path, tmp_path / ".env")
+    rotated = (tmp_path / "secrets" / "FADEN_ADDON_KEY").read_text(encoding="utf-8")
+    assert rotated == "rotated", "follows .env"
+
+
+@pytest.mark.parametrize("key", ["faden_lower", "FADEN-DASH", "../ESCAPE", ""])
+def test_only_env_keys_become_files(key: str) -> None:
+    with pytest.raises(ValueError, match=r"Not an \.env key"):
+        registry.extend_secret_files([key])

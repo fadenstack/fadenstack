@@ -552,6 +552,9 @@ COMPOSE_OVERLAYS: list[str] = []
 #: Files an add-on ships, by their name in the install: ``faden deploy`` and ``faden upgrade`` write them
 #: with the bundled deployment files (``bundle.unpack``), so an upgrade brings the add-on's copy too.
 BUNDLE_FILES: dict[str, Path] = {}
+#: Keys of ``.env`` written to ``secrets/<KEY>`` before every compose command, like core's own keys
+#: (``secret_files.SECRET_FILES``): an add-on's compose file mounts them under ``/run/secrets``.
+SECRET_FILE_KEYS: list[str] = []
 #: Called by ``faden deploy`` and ``faden upgrade`` with the install's directory once its ``.env`` is
 #: written and before any image is pulled or started: an add-on writes its settings and secrets, or logs in
 #: to the registry its images come from. One that raises stops the deploy or the upgrade.
@@ -577,6 +580,16 @@ def extend_bundle_files(files: dict[str, Path]) -> None:
             msg = f"Not a path inside the install: {name!r}"
             raise ValueError(msg)
         BUNDLE_FILES[name] = source
+
+
+def extend_secret_files(keys: list[str]) -> None:
+    """Add ``.env`` keys written as files under ``secrets/`` before every compose command (idempotent)."""
+    for key in keys:
+        if not key.isidentifier() or key.upper() != key:
+            msg = f"Not an .env key: {key!r}"
+            raise ValueError(msg)
+        if key not in SECRET_FILE_KEYS:
+            SECRET_FILE_KEYS.append(key)
 
 
 def extend_install_hooks(hooks: list[Callable[[Path], None]]) -> None:

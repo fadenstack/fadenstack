@@ -75,9 +75,11 @@ def _clear_docker_folder(path: Path) -> None:
 
 def write(project_dir: Path, env_file: Path) -> list[str]:
     """Write every key's file from *env_file* into ``<project_dir>/secrets/``; the required keys .env lacks."""
+    from faden_cli.core.registry import SECRET_FILE_KEYS  # noqa: PLC0415 -- an add-on's keys, added at start
+
     values = read_env_file(env_file) if env_file.is_file() else {}
     folder = private_dir(project_dir / FOLDER)
-    for name in SECRET_FILES:
+    for name in (*SECRET_FILES, *(key for key in SECRET_FILE_KEYS if key not in SECRET_FILES)):
         path = folder / name
         if path.is_dir():
             _clear_docker_folder(path)
