@@ -386,6 +386,10 @@ def upgrade_cmd(
     from faden_cli.commands.tls import refresh_edge_info  # noqa: PLC0415
 
     refresh_edge_info(shared_dir)
+    # Add-ons' steps (registry.extend_install_hooks): their settings, secrets, registry login.
+    from faden_cli.core.registry import run_install_hooks  # noqa: PLC0415
+
+    run_install_hooks(shared_dir)
 
     # ── 4. Images ─────────────────────────────────────────────
     if release is not None:

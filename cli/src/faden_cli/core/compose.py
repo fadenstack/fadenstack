@@ -121,6 +121,15 @@ class ComposeContext:
             error(f"The keys' files could not be written: {exc}")
             sys.exit(1)
 
+    def extension_overlays(self) -> list[Path]:
+        """The add-ons' compose files beside the main one that exist (``registry.extend_compose_files``)."""
+        from faden_cli.core.registry import COMPOSE_OVERLAYS  # noqa: PLC0415
+
+        if not self.compose_files:
+            return []
+        folder = Path(str(self.compose_files[0])).parent
+        return [folder / name for name in COMPOSE_OVERLAYS if (folder / name).is_file()]
+
     def base_cmd(self) -> list[str]:
         """Build the ``docker compose`` prefix with all file/profile flags."""
         docker = shutil.which("docker")
@@ -135,6 +144,7 @@ class ComposeContext:
         overlay = gpu_overlay(self.env_file, self.project_dir)
         if overlay is not None and overlay not in files:
             files.append(overlay)
+        files.extend(p for p in self.extension_overlays() if p not in files)
         for f in files:
             cmd.extend(["-f", str(f)])
         if self.env_file and Path(str(self.env_file)).exists():

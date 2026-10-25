@@ -840,6 +840,11 @@ def deploy_cmd(
         env_path, days=chat_retention_days, yes=yes, heading="Step 3f: Deleted chats…",
     )
 
+    # ── 3g. Add-ons' steps (registry.extend_install_hooks): their settings, secrets, registry login ──
+    from faden_cli.core.registry import run_install_hooks  # noqa: PLC0415
+
+    run_install_hooks(shared_dir)
+
     # ── 4. Save config ────────────────────────────────────────────
     cfg.install_dir = str(shared_dir)
     cfg.compose_file = compose_file.name
