@@ -1,9 +1,9 @@
-FROM node:24-alpine AS development-dependencies-env
+FROM node:26-alpine AS development-dependencies-env
 COPY . /app
 WORKDIR /app
 RUN npm ci
 
-FROM node:24-alpine AS production-dependencies-env
+FROM node:26-alpine AS production-dependencies-env
 COPY ./package.json package-lock.json /app/
 WORKDIR /app
 RUN npm ci --omit=dev
@@ -16,13 +16,13 @@ COPY --from=docs help /docs/help
 COPY --from=docs theme /docs/theme
 RUN python /docs/help/scripts/build.py --target console --out /help-build --build
 
-FROM node:24-alpine AS build-env
+FROM node:26-alpine AS build-env
 COPY . /app/
 COPY --from=development-dependencies-env /app/node_modules /app/node_modules
 WORKDIR /app
 RUN npm run build
 
-FROM node:24-alpine
+FROM node:26-alpine
 COPY ./package.json package-lock.json /app/
 COPY ./LICENSE ./NOTICE /app/
 COPY --from=production-dependencies-env /app/node_modules /app/node_modules
