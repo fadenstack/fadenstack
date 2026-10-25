@@ -318,12 +318,16 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
                     or request_id
                 )
             to_name = user.email.split("@", 1)[0] if user.email else None
+            from faden_backend.services.notifications.language import recipient_language  # noqa: PLC0415
+
+            accept_language = request.headers.get("accept-language") if request is not None else None
             service = NotificationService(session)
             await service.enqueue_password_reset(
                 to_email=user.email,
                 to_name=to_name,
                 reset_url=reset_url,
                 request_id=request_id,
+                language=await recipient_language(session, user.id, accept_language),
             )
         except Exception:
             # Keep forgot-password response enumeration-safe even if enqueue fails.

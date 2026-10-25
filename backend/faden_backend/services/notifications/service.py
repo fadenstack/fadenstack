@@ -109,8 +109,9 @@ class NotificationService:
         to_name: str | None,
         reset_url: str,
         request_id: str,
+        language: str | None = None,
     ) -> None:
-        """Enqueue a password-reset email for async delivery."""
+        """Enqueue a password-reset email for async delivery, in *language* (BCP 47) if given."""
         now = datetime.now(tz=UTC)
         payload = {
             "to_email": to_email,
@@ -118,6 +119,7 @@ class NotificationService:
             "reset_url": reset_url,
             "requested_at": now.isoformat(),
             "request_id": request_id,
+            "language": language,
         }
         self._session.add(
             NotificationOutbox(
@@ -138,6 +140,7 @@ class NotificationService:
         identity_email: str | None,
         confirm_url: str,
         expires_minutes: int,
+        language: str | None = None,
     ) -> None:
         """Enqueue the mail that asks an account's owner to confirm an outside identity is theirs."""
         payload = {
@@ -148,6 +151,7 @@ class NotificationService:
             "confirm_url": confirm_url,
             "expires_minutes": expires_minutes,
             "requested_at": datetime.now(tz=UTC).isoformat(),
+            "language": language,
         }
         self._session.add(
             NotificationOutbox(

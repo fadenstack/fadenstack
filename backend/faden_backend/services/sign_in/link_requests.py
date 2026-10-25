@@ -9,7 +9,7 @@ The link (OWASP Forgot Password Cheat Sheet; ASVS 5.0 6.5.1 and 6.5.3 ask the sa
 
 - a token of 256 random bits from the CSPRNG; only its SHA-256 is kept, so the table gives nobody a
   usable link;
-- it works once (the update that uses it is the check) and for ``TTL``;
+- it works once (the update that uses it is the check) and for ``TTL``, 10 minutes (ASVS 6.5.5);
 - it works only while the account's address is still the one it went to, and the account is active;
 - following it shows what would be linked; only an explicit confirmation (POST) links, so a mail
   scanner that opens links uses nothing up.
@@ -35,7 +35,8 @@ from faden_backend.services.sign_in.contract import ExternalIdentity, Refusal
 from faden_backend.settings import settings
 
 log = logging.getLogger(__name__)
-TTL = timedelta(minutes=30)
+#: ASVS 5.0 6.5.5: out-of-band requests live at most 10 minutes.
+TTL = timedelta(minutes=10)
 RESEND_AFTER = timedelta(minutes=5)
 
 
@@ -56,6 +57,7 @@ def confirm_url(token: str) -> str:
 async def ask_the_owner(session: AsyncSession, user: User, identity: ExternalIdentity) -> Refusal:
     """Send *user* a link to confirm *identity* is theirs; the sign-in waits for it."""
     from faden_backend.services.notifications import NotificationService  # noqa: PLC0415
+    from faden_backend.services.notifications.language import recipient_language  # noqa: PLC0415
 
     now = datetime.now(UTC)
     recent = await session.scalar(
@@ -82,6 +84,7 @@ async def ask_the_owner(session: AsyncSession, user: User, identity: ExternalIde
         identity_email=identity.email,
         confirm_url=confirm_url(token),
         expires_minutes=int(TTL.total_seconds() // 60),
+        language=await recipient_language(session, user.id),
     )
     await accounts.audit(session, "auth.identity.link_requested", user, identity, sent_to=user.email)
     return Refusal.LINK_CONFIRMATION_SENT

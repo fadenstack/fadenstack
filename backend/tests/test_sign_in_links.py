@@ -79,7 +79,7 @@ async def test_meeting_an_account_sends_its_owner_a_link(dbsession: AsyncSession
     mail = await _mail(dbsession, user)
     assert mail.payload_json["provider_name"] == "Corp"
     assert mail.payload_json["identity_email"] == user.email
-    assert mail.payload_json["expires_minutes"] == 30
+    assert mail.payload_json["expires_minutes"] == 10, "ASVS 5.0 6.5.5"
     url = urlsplit(mail.payload_json["confirm_url"])
     assert url.scheme.startswith("http") and url.path == "/login"
     assert not url.query and url.fragment.startswith("link="), "in the fragment: never sent, never logged"
@@ -151,7 +151,7 @@ async def test_a_link_works_once(client: AsyncClient, dbsession: AsyncSession, b
 
 
 async def test_an_expired_link(client: AsyncClient, dbsession: AsyncSession, by_mail: None) -> None:
-    """30 minutes."""
+    """10 minutes (ASVS 5.0 6.5.5)."""
     _, identity, token = await _requested(dbsession)
     await dbsession.execute(update(IdentityLinkRequest).values(expires_at=datetime.now(UTC) - timedelta(seconds=1)))
     assert (await client.post("/api/auth/sso/link/preview", json={"token": token})).status_code == 404
