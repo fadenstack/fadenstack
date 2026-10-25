@@ -34,7 +34,9 @@ Sie sehen **Passwort erfolgreich geändert. Ihre anderen Anmeldungen wurden been
 2. Geben Sie Ihre E-Mail-Adresse ein.
 3. Wählen Sie **Reset-Link senden**.
 
-Wenn der Server Ihrer Organisation E-Mails versendet, erhalten Sie einen Link, mit dem Sie ein neues Passwort festlegen. Wenn nichts ankommt, bitten Sie Ihren Administrator, ein neues Passwort für Sie festzulegen.
+Per E-Mail erhalten Sie einen Link, mit dem Sie ein neues Passwort festlegen. Wenn nichts ankommt, bitten Sie Ihren Administrator, ein neues Passwort für Sie festzulegen.
+
+Die Anmeldeseite bietet **Passwort vergessen?** nur an, wenn der Server Ihrer Organisation E-Mails versendet. Sonst steht dort **Passwort vergessen? Die Administration kann ein neues setzen.**: Wenden Sie sich an Ihren Administrator.
 
 ## Sprache und Design {#language-and-theme}
 

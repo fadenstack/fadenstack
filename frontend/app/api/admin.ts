@@ -919,23 +919,37 @@ export const adminAuthProviders = {
   async passwordSignIn(key: string, username: string, password: string): Promise<void> {
     await postSignIn(`/api/auth/sso/${encodeURIComponent(key)}/password`, { username, password });
   },
-  /** What the link an account's owner was sent would link; changes nothing (no sign-in needed). */
-  async linkPreview(token: string): Promise<LinkPreview> {
-    const res = await postSignIn("/api/auth/sso/link/preview", { token });
-    return (await res.json()) as LinkPreview;
+  /**
+   * The sign-in that met an existing account and waits, in this browser only (an httpOnly cookie), for the
+   * proof that the account is the person's; ``SignInRefused("sign_in_expired")`` when nothing waits.
+   */
+  async linkWaiting(): Promise<LinkWaiting> {
+    const res = await fetch("/api/auth/sso/link", { credentials: "include" });
+    if (!res.ok) throw await refusedBy(res);
+    return (await res.json()) as LinkWaiting;
   },
-  /** The account's owner confirms: the outside sign-in is linked to the account, once. */
-  async linkConfirm(token: string): Promise<void> {
-    await postSignIn("/api/auth/sso/link/confirm", { token });
+  /** Send a code to the account's address (``no_mail``, ``too_soon``, ``too_many`` when not). */
+  async linkSendCode(): Promise<void> {
+    await postSignIn("/api/auth/sso/link/code", {});
+  },
+  /** The account's password proves it: the outside sign-in is linked, and the person signed in. */
+  async linkWithPassword(password: string): Promise<void> {
+    await postSignIn("/api/auth/sso/link/with-password", { password });
+  },
+  /** The code sent to the account's address proves it: as {@link linkWithPassword}. */
+  async linkWithCode(code: string): Promise<void> {
+    await postSignIn("/api/auth/sso/link/with-code", { code });
   },
 };
 
-/** A sign-in that met an existing account, as its owner's link shows it. */
-export type LinkPreview = {
+/** A sign-in that met an existing account, waiting for the proof (``GET /api/auth/sso/link``). */
+export type LinkWaiting = {
   provider_name: string;
-  identity_email: string | null;
   account_email: string;
   expires_at: string;
+  /** A code can be sent to the account's address. */
+  mail: boolean;
+  code_sent: boolean;
 };
 
 /**
@@ -957,8 +971,12 @@ async function postSignIn(path: string, payload: Record<string, string>): Promis
     body: JSON.stringify(payload),
   });
   if (res.ok) return res;
+  throw await refusedBy(res);
+}
+
+async function refusedBy(res: Response): Promise<SignInRefused> {
   const body = (await res.json().catch(() => ({}))) as { detail?: unknown };
-  throw new SignInRefused(typeof body.detail === "string" ? body.detail : `status_${res.status}`);
+  return new SignInRefused(typeof body.detail === "string" ? body.detail : `status_${res.status}`);
 }
 
 /** Fadenstack's own containers: edited only in Root Mode. */

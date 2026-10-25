@@ -132,14 +132,6 @@
     "reset_password_mismatch": "Die Passwörter stimmen nicht überein.",
     "reset_password_too_short": "Das Passwort muss mindestens 8 Zeichen lang sein.",
     "reset_password_failed": "Passwort konnte nicht zurückgesetzt werden.",
-    "link_title": "Diese Anmeldung mit Ihrem Konto verknüpfen",
-    "link_body": "{{provider}} hat Sie als {{identity}} angemeldet. Mit Ihrem Fadenstack-Konto {{account}} verknüpfen? Danach melden Sie sich mit {{provider}} an.",
-    "link_confirm": "Verknüpfen",
-    "link_cancel": "Das war ich nicht",
-    "link_done": "Verknüpft. Sie können sich jetzt mit {{provider}} anmelden.",
-    "link_expired": "Dieser Link wurde schon verwendet oder ist abgelaufen. Melden Sie sich erneut bei Ihrem Anbieter an, um einen neuen zu erhalten.",
-    "link_refused": "Dieser Link kann nicht mehr bestätigt werden. Wenden Sie sich an einen Administrator.",
-    "link_sent": "Es gibt bereits ein Konto mit dieser Adresse. Wir haben einen Link an diese Adresse geschickt: Bestätigen Sie dort, dass diese Anmeldung Ihre ist, und melden Sie sich dann erneut an.",
     "account_kind": "Konto",
     "local_account": "Fadenstack-Konto",
     "account_name": "Kontoname",
@@ -159,14 +151,35 @@
       "license": "Diese Anmeldung ist mit der Lizenz dieses Servers nicht verfügbar. Wenden Sie sich an die Administration.",
       "not_offered": "Diese Anmeldung wird hier nicht mehr angeboten. Melden Sie sich anders an oder wenden Sie sich an die Administration.",
       "other": "Die Anmeldung hat nicht geklappt.",
-      "link_needs_confirmation": "Es gibt bereits ein Konto mit dieser Adresse. Wenden Sie sich an die Administration.",
-      "link_confirmation_sent": "Es gibt bereits ein Konto mit dieser Adresse. Wir haben einen Link an diese Adresse geschickt: Bestätigen Sie dort, dass diese Anmeldung Ihre ist, und melden Sie sich dann erneut an."
+      "link_needs_confirmation": "Es gibt bereits ein Konto mit dieser Adresse. Melden Sie sich einmal daran an, um diese Anmeldung zu verknüpfen."
     },
     "login_refused": {
       "bad_credentials": "E-Mail oder Passwort ist falsch.",
       "use_provider": "Ihre Organisation meldet Sie über ihre eigene Anmeldung an: Verwenden Sie die Schaltfläche darunter.",
       "too_many": "Zu viele Versuche. Warten Sie eine Minute und versuchen Sie es erneut."
-    }
+    },
+    "link": {
+      "title": "Ihre Anmeldung über {{provider}} verknüpfen",
+      "body": "Hier gibt es bereits ein Konto mit der Adresse {{account}}. Melden Sie sich einmal daran an, um {{provider}} damit zu verknüpfen; danach meldet {{provider}} Sie an diesem Konto an.",
+      "password_label": "Passwort von {{account}}",
+      "submit": "Verknüpfen und anmelden",
+      "send_code": "Passwort unbekannt? Code per E-Mail erhalten",
+      "use_code": "Code aus der E-Mail eingeben",
+      "code_sent": "Wir haben einen Code an {{account}} geschickt. Er gilt 10 Minuten.",
+      "code_label": "Code aus der E-Mail",
+      "resend": "Neuen Code senden",
+      "use_password": "Stattdessen das Passwort verwenden",
+      "no_password_hint": "Sie kennen das Passwort dieses Kontos nicht? Die Administration kann ein neues dafür setzen.",
+      "wrong": "Passwort oder Code ist falsch.",
+      "expired": "Diese Anmeldung hat zu lange gewartet oder wurde zu oft versucht. Melden Sie sich erneut über Ihren Anbieter an.",
+      "too_soon": "Warten Sie eine Minute, bevor Sie einen weiteren Code anfordern.",
+      "too_many": "Für diese Anmeldung gibt es keine weiteren Codes. Verwenden Sie den letzten, oder melden Sie sich erneut über Ihren Anbieter an.",
+      "no_mail": "Gerade kann kein Code gesendet werden. Verwenden Sie das Passwort, oder wenden Sie sich an die Administration.",
+      "cancel": "Abbrechen",
+      "back": "Zurück zur Anmeldung"
+    },
+    "forgot_password_ask_admin": "Passwort vergessen? Die Administration kann ein neues setzen.",
+    "forgot_password_unavailable": "Dieser Server versendet keine E-Mails, daher lässt sich ein vergessenes Passwort nicht per E-Mail zurücksetzen. Die Administration kann ein neues setzen."
   },
   "root_mode": {
     "active": "ROOT-MODUS AKTIV",

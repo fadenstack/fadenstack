@@ -132,14 +132,6 @@
     "reset_password_mismatch": "两次输入的密码不一致。",
     "reset_password_too_short": "密码长度至少为 8 个字符。",
     "reset_password_failed": "密码重置失败。",
-    "link_title": "将此登录关联到您的账户",
-    "link_body": "{{provider}} 已以 {{identity}} 的身份登录。要将其关联到您的 Fadenstack 账户 {{account}} 吗？之后您将使用 {{provider}} 登录。",
-    "link_confirm": "关联",
-    "link_cancel": "不是我",
-    "link_done": "已关联。您现在可以使用 {{provider}} 登录。",
-    "link_expired": "此链接已被使用或已过期。请重新通过您的身份提供方登录以获取新链接。",
-    "link_refused": "此链接已无法确认。请联系管理员。",
-    "link_sent": "已存在使用此地址的账户。我们已向该地址发送了一个链接：请在那里确认此登录属于您，然后重新登录。",
     "account_kind": "账户",
     "local_account": "Fadenstack 账户",
     "account_name": "账户名",
@@ -159,14 +151,35 @@
       "license": "此服务器的许可证不包含此登录方式。请联系管理员。",
       "not_offered": "此处已不再提供这种登录方式。请使用其他方式登录，或询问管理员。",
       "other": "登录未成功。",
-      "link_needs_confirmation": "已存在使用此地址的账户。请联系管理员。",
-      "link_confirmation_sent": "已存在使用此地址的账户。我们已向该地址发送了一个链接：请在那里确认此登录属于您，然后重新登录。"
+      "link_needs_confirmation": "已存在使用此地址的账户。请登录该账户一次以关联此次登录。"
     },
     "login_refused": {
       "bad_credentials": "电子邮件或密码错误。",
       "use_provider": "您的组织使用其自己的登录方式为您登录：请使用下方的按钮。",
       "too_many": "尝试次数过多。请稍等一分钟后再试。"
-    }
+    },
+    "link": {
+      "title": "关联您的 {{provider}} 登录",
+      "body": "此处已存在地址为 {{account}} 的账户。请登录该账户一次以关联 {{provider}}；之后 {{provider}} 会将您登录到该账户。",
+      "password_label": "{{account}} 的密码",
+      "submit": "关联并登录",
+      "send_code": "不知道密码？通过电子邮件获取验证码",
+      "use_code": "输入电子邮件中的验证码",
+      "code_sent": "我们已向 {{account}} 发送验证码，10 分钟内有效。",
+      "code_label": "电子邮件中的验证码",
+      "resend": "发送新的验证码",
+      "use_password": "改用密码",
+      "no_password_hint": "不知道此账户的密码？管理员可以为其设置新密码。",
+      "wrong": "密码或验证码错误。",
+      "expired": "此次登录等待时间过长或尝试次数过多。请重新通过您的提供商登录。",
+      "too_soon": "请等待一分钟后再请求新的验证码。",
+      "too_many": "此次登录已无法再获取验证码。请使用最后一个验证码，或重新通过您的提供商登录。",
+      "no_mail": "目前无法发送验证码。请使用密码，或联系管理员。",
+      "cancel": "取消",
+      "back": "返回登录"
+    },
+    "forgot_password_ask_admin": "忘记密码？管理员可以为您设置新密码。",
+    "forgot_password_unavailable": "此服务器不发送电子邮件，因此无法通过电子邮件重置忘记的密码。管理员可以为您设置新密码。"
   },
   "root_mode": {
     "active": "ROOT 模式已启用",

@@ -132,14 +132,6 @@
     "reset_password_mismatch": "Passwords do not match.",
     "reset_password_too_short": "Password must be at least 8 characters.",
     "reset_password_failed": "Failed to reset password.",
-    "link_title": "Link this sign-in to your account",
-    "link_body": "{{provider}} signed in as {{identity}}. Link it to your Fadenstack account {{account}}? Afterwards you sign in with {{provider}}.",
-    "link_confirm": "Link it",
-    "link_cancel": "Not me",
-    "link_done": "Linked. You can now sign in with {{provider}}.",
-    "link_expired": "This link has been used or has expired. Sign in with your provider again to get a new one.",
-    "link_refused": "This link can no longer be confirmed. Ask an administrator.",
-    "link_sent": "An account with this address exists already. We sent a link to that address: confirm there that this sign-in is yours, then sign in again.",
     "account_kind": "Account",
     "local_account": "Fadenstack account",
     "account_name": "Account name",
@@ -159,14 +151,35 @@
       "license": "This sign-in is not available with this server's licence. Ask an administrator.",
       "not_offered": "This sign-in is not offered here any more. Sign in another way, or ask an administrator.",
       "other": "The sign-in did not work.",
-      "link_needs_confirmation": "An account with this address exists already. Ask an administrator.",
-      "link_confirmation_sent": "An account with this address exists already. We sent a link to that address: confirm there that this sign-in is yours, then sign in again."
+      "link_needs_confirmation": "An account with this address exists already. Sign in to it once to link this sign-in."
     },
     "login_refused": {
       "bad_credentials": "The e-mail or password is wrong.",
       "use_provider": "Your organisation signs you in with its own sign-in: use its button below.",
       "too_many": "Too many attempts. Wait a minute and try again."
-    }
+    },
+    "link": {
+      "title": "Link your {{provider}} sign-in",
+      "body": "An account with the address {{account}} exists here already. Sign in to it once to link {{provider}}; afterwards {{provider}} signs you in to it.",
+      "password_label": "Password of {{account}}",
+      "submit": "Link and sign in",
+      "send_code": "Don't know the password? Get a code by e-mail",
+      "use_code": "Enter the code from the e-mail",
+      "code_sent": "We sent a code to {{account}}. It works for 10 minutes.",
+      "code_label": "Code from the e-mail",
+      "resend": "Send a new code",
+      "use_password": "Use the password instead",
+      "no_password_hint": "Don't know this account's password? An administrator can set a new one for it.",
+      "wrong": "The password or code is wrong.",
+      "expired": "This sign-in waited too long or was tried too often. Sign in with your provider again.",
+      "too_soon": "Wait a minute before asking for another code.",
+      "too_many": "No more codes for this sign-in. Use the last one, or sign in with your provider again.",
+      "no_mail": "No code can be sent right now. Use the password, or ask an administrator.",
+      "cancel": "Cancel",
+      "back": "Back to sign-in"
+    },
+    "forgot_password_ask_admin": "Forgot your password? An administrator can set a new one.",
+    "forgot_password_unavailable": "This server sends no mail, so a forgotten password cannot be reset by mail. An administrator can set a new one."
   },
   "root_mode": {
     "active": "ROOT MODE ACTIVE",

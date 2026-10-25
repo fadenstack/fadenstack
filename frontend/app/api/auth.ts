@@ -6,6 +6,12 @@ export interface AuthUser {
   is_verified: boolean;
 }
 
+/** What the sign-in page may offer (``GET /api/auth/options``). */
+export interface SignInOptions {
+  /** A forgotten password is reset by mail; otherwise an administrator sets a new one. */
+  password_reset: boolean;
+}
+
 const ME_CACHE_TTL_MS = 30_000;
 
 let meCache: { value: AuthUser; expiresAt: number } | null = null;
@@ -106,6 +112,16 @@ export const auth = {
     });
     await assertOk(res);
     clearMeCache();
+  },
+
+  /**
+   * What the sign-in page may offer: a reset of a forgotten password by mail only while this server can send
+   * mail. Unknown (an older server, no answer) reads as offered, as before.
+   */
+  async options(): Promise<SignInOptions> {
+    const res = await fetch("/api/auth/options", { credentials: "include" });
+    if (!res.ok) return { password_reset: true };
+    return (await res.json()) as SignInOptions;
   },
 
   async forgotPassword(email: string): Promise<void> {

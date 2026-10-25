@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import DateTime, Integer, String, Text, func
@@ -13,9 +13,17 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from faden_backend.db.base import Base
 
+#: How long a message without an expiry of its own is of use (an administrators' alert).
+DEFAULT_TTL = timedelta(days=1)
+
 
 class NotificationOutbox(Base):
-    """Reliable outbox for deferred notifications."""
+    """Reliable outbox for deferred notifications.
+
+    Each message expires with what it carries (a reset token, a code). One not sent by then is deleted, never
+    sent late: it holds an e-mail address, kept no longer than it is of use (GDPR Art. 5(1)(c, e)). Sent
+    ones go after a week (``services/notifications/retention.py``).
+    """
 
     __tablename__ = "notification_outbox"
 
@@ -42,6 +50,9 @@ class NotificationOutbox(Base):
         index=True,
     )
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True, default=lambda: datetime.now(UTC) + DEFAULT_TTL,
+    )
 
 
 class NotificationAlertState(Base):

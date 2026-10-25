@@ -57,12 +57,16 @@ describe("signing in with a directory account", () => {
     expect(await screen.findByText("The account name or password is wrong.")).toBeInTheDocument();
   });
 
-  it("explains a directory sign-in that waits for the account's owner", async () => {
-    passwordSignIn.mockRejectedValue(new admin.SignInRefused("link_confirmation_sent"));
+  it("asks for the proof when a directory sign-in meets an existing account", async () => {
+    passwordSignIn.mockRejectedValue(new admin.SignInRefused("link_needs_confirmation"));
+    vi.spyOn(admin.adminAuthProviders, "linkWaiting").mockResolvedValue({
+      provider_name: "Corp AD", account_email: "alex@corp.example", expires_at: "2026-10-25T13:00:00Z",
+      mail: false, code_sent: false,
+    });
     renderPage(<Login />, { path: "/login" });
     fireEvent.click(await screen.findByRole("button", { name: "Corp AD" }));
     signIn("alex", "pw");
-    expect(await screen.findByText(/We sent a link to that address/)).toBeInTheDocument();
+    expect(await screen.findByTestId("link-proof")).toHaveTextContent("alex@corp.example");
   });
 });
 

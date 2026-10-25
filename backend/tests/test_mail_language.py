@@ -17,10 +17,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from faden_backend.db.models.notifications import NotificationOutbox
 from faden_backend.db.models.user_preferences import UserPreference
 from faden_backend.db.models.users import User
-from faden_backend.services.extensions import registry
 from faden_backend.services.notifications.language import recipient_language
 from faden_backend.services.sign_in import accounts, link_requests
 from faden_backend.services.sign_in.contract import ExternalIdentity, Refusal
+from tests.conftest import RecordingMailSender
 from tests.test_account_hardening import _person
 
 pytestmark = pytest.mark.anyio
@@ -57,7 +57,9 @@ async def test_else_what_the_browser_asked_for(
     assert await recipient_language(dbsession, user.id, header) == language
 
 
-async def test_the_password_reset_in_the_browsers_language(client: AsyncClient, dbsession: AsyncSession) -> None:
+async def test_the_password_reset_in_the_browsers_language(
+    client: AsyncClient, dbsession: AsyncSession, mail_on: RecordingMailSender,
+) -> None:
     user = await _person(dbsession)
     sent = await client.post(
         "/api/auth/forgot-password", json={"email": user.email}, headers={"Accept-Language": "es-ES,es;q=0.9"},
@@ -66,7 +68,9 @@ async def test_the_password_reset_in_the_browsers_language(client: AsyncClient, 
     assert (await _mail(dbsession, "password_reset", user.email)).payload_json["language"] == "es-ES"
 
 
-async def test_the_password_reset_in_their_own_language(client: AsyncClient, dbsession: AsyncSession) -> None:
+async def test_the_password_reset_in_their_own_language(
+    client: AsyncClient, dbsession: AsyncSession, mail_on: RecordingMailSender,
+) -> None:
     user = await _person(dbsession)
     await _speaks(dbsession, user, "zh")
     sent = await client.post(
@@ -76,10 +80,7 @@ async def test_the_password_reset_in_their_own_language(client: AsyncClient, dbs
     assert (await _mail(dbsession, "password_reset", user.email)).payload_json["language"] == "zh"
 
 
-async def test_the_link_confirmation_in_their_language(
-    dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(registry, "link_confirmation", link_requests.ask_the_owner)
+async def test_the_link_code_in_their_language(dbsession: AsyncSession, mail_on: RecordingMailSender) -> None:
     user = await _person(dbsession)
     user.is_verified = True
     await _speaks(dbsession, user, "fr")
@@ -87,6 +88,8 @@ async def test_the_link_confirmation_in_their_language(
         provider="corp", provider_name="Corp", subject=f"s-{uuid.uuid4().hex[:8]}", email=user.email,
         email_trusted=True, create_account=True,
     )
-    assert await accounts.sign_in(dbsession, identity) == Refusal.LINK_CONFIRMATION_SENT
-    mail = (await _mail(dbsession, "link_confirmation", user.email)).payload_json
+    assert await accounts.sign_in(dbsession, identity) == Refusal.LINK_NEEDS_CONFIRMATION
+    token = await link_requests.begin(dbsession, identity)
+    assert await link_requests.send_code(dbsession, token) == "sent"
+    mail = (await _mail(dbsession, "link_code", user.email)).payload_json
     assert mail["language"] == "fr" and mail["expires_minutes"] == 10

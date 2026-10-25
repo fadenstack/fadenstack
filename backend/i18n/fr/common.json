@@ -132,14 +132,6 @@
     "reset_password_mismatch": "Les mots de passe ne correspondent pas.",
     "reset_password_too_short": "Le mot de passe doit comporter au moins 8 caractères.",
     "reset_password_failed": "Échec de la réinitialisation du mot de passe.",
-    "link_title": "Lier cette connexion à votre compte",
-    "link_body": "{{provider}} vous a connecté en tant que {{identity}}. La lier à votre compte Fadenstack {{account}} ? Ensuite, vous vous connecterez avec {{provider}}.",
-    "link_confirm": "Lier",
-    "link_cancel": "Ce n'était pas moi",
-    "link_done": "C'est lié. Vous pouvez maintenant vous connecter avec {{provider}}.",
-    "link_expired": "Ce lien a déjà servi ou a expiré. Reconnectez-vous avec votre fournisseur pour en recevoir un nouveau.",
-    "link_refused": "Ce lien ne peut plus être confirmé. Adressez-vous à un administrateur.",
-    "link_sent": "Un compte avec cette adresse existe déjà. Nous avons envoyé un lien à cette adresse : confirmez-y que cette connexion est la vôtre, puis reconnectez-vous.",
     "account_kind": "Compte",
     "local_account": "Compte Fadenstack",
     "account_name": "Nom de compte",
@@ -159,14 +151,35 @@
       "license": "Cette connexion n'est pas disponible avec la licence de ce serveur. Demandez à un administrateur.",
       "not_offered": "Cette connexion n'est plus proposée ici. Connectez-vous autrement ou demandez à un administrateur.",
       "other": "La connexion n'a pas abouti.",
-      "link_needs_confirmation": "Un compte avec cette adresse existe déjà. Demandez à un administrateur.",
-      "link_confirmation_sent": "Un compte avec cette adresse existe déjà. Nous avons envoyé un lien à cette adresse : confirmez-y que cette connexion est la vôtre, puis reconnectez-vous."
+      "link_needs_confirmation": "Un compte avec cette adresse existe déjà. Connectez-vous-y une fois pour associer cette connexion."
     },
     "login_refused": {
       "bad_credentials": "L'e-mail ou le mot de passe est incorrect.",
       "use_provider": "Votre organisation vous connecte avec sa propre connexion : utilisez son bouton ci-dessous.",
       "too_many": "Trop de tentatives. Attendez une minute et réessayez."
-    }
+    },
+    "link": {
+      "title": "Associer votre connexion {{provider}}",
+      "body": "Un compte avec l'adresse {{account}} existe déjà ici. Connectez-vous-y une fois pour y associer {{provider}} ; ensuite, {{provider}} vous y connectera.",
+      "password_label": "Mot de passe de {{account}}",
+      "submit": "Associer et se connecter",
+      "send_code": "Mot de passe inconnu ? Recevoir un code par e-mail",
+      "use_code": "Saisir le code reçu par e-mail",
+      "code_sent": "Nous avons envoyé un code à {{account}}. Il est valable 10 minutes.",
+      "code_label": "Code reçu par e-mail",
+      "resend": "Envoyer un nouveau code",
+      "use_password": "Utiliser plutôt le mot de passe",
+      "no_password_hint": "Vous ne connaissez pas le mot de passe de ce compte ? Un administrateur peut en définir un nouveau.",
+      "wrong": "Le mot de passe ou le code est incorrect.",
+      "expired": "Cette connexion a attendu trop longtemps ou a été tentée trop souvent. Reconnectez-vous avec votre fournisseur.",
+      "too_soon": "Attendez une minute avant de demander un autre code.",
+      "too_many": "Plus aucun code pour cette connexion. Utilisez le dernier, ou reconnectez-vous avec votre fournisseur.",
+      "no_mail": "Aucun code ne peut être envoyé pour le moment. Utilisez le mot de passe ou demandez à un administrateur.",
+      "cancel": "Annuler",
+      "back": "Retour à la connexion"
+    },
+    "forgot_password_ask_admin": "Mot de passe oublié ? Un administrateur peut en définir un nouveau.",
+    "forgot_password_unavailable": "Ce serveur n'envoie pas d'e-mails : un mot de passe oublié ne peut donc pas être réinitialisé par e-mail. Un administrateur peut en définir un nouveau."
   },
   "root_mode": {
     "active": "MODE ROOT ACTIF",

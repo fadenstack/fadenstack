@@ -47,6 +47,32 @@ def _no_gateway_erase(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, str]]:
     return calls
 
 
+class RecordingMailSender:
+    """A mail sender that is on and keeps what it was given (core has none; Enterprise registers its mailer)."""
+
+    def __init__(self) -> None:
+        self.on = True
+        self.sent: list[tuple[str, dict[str, Any]]] = []
+
+    def available(self) -> bool:
+        """Whether mail goes out: as the test sets ``on``."""
+        return self.on
+
+    async def send(self, kind: str, payload: dict[str, Any]) -> None:
+        """Keeps the message."""
+        self.sent.append((kind, payload))
+
+
+@pytest.fixture
+def mail_on(monkeypatch: pytest.MonkeyPatch) -> RecordingMailSender:
+    """Mail can be sent, as with Enterprise's mailer switched on."""
+    from faden_backend.services.extensions import registry  # noqa: PLC0415
+
+    sender = RecordingMailSender()
+    monkeypatch.setattr(registry, "mail_sender", sender)
+    return sender
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _run_from_the_repository_root() -> Generator[None]:
     """

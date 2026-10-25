@@ -38,7 +38,6 @@ from faden_backend.services.llm.gateway_sync import GatewaySyncService
 from faden_backend.services.llm.service import LLMService
 from faden_backend.services.notifications import (
     GatewayAlertMonitor,
-    MailerClient,
     NotificationDispatcher,
 )
 from faden_backend.services.rabbit.lifespan import init_rabbit, shutdown_rabbit
@@ -318,16 +317,13 @@ def _extract_setting_value(value_json: object) -> object:
 
 
 async def _start_notification_runtime(app: FastAPI) -> None:
-    """Start background notification dispatcher and gateway alert monitor."""
-    http_client = httpx.AsyncClient(verify=default_httpx_verify())
+    """Start background notification dispatcher and gateway alert monitor.
+
+    The dispatcher hands mail to ``registry.mail_sender``; without one (core) it only deletes what expired.
+    """
     try:
-        mailer_client = MailerClient(http_client=http_client)
-        dispatcher = NotificationDispatcher(
-            session_factory=app.state.db_session_factory,
-            mailer_client=mailer_client,
-        )
+        dispatcher = NotificationDispatcher(session_factory=app.state.db_session_factory)
         dispatcher.start()
-        app.state.notification_http_client = http_client
         app.state.notification_dispatcher = dispatcher
 
         gateway_session_factory = getattr(app.state, "llm_graph_trace_session_factory", None)
@@ -341,7 +337,6 @@ async def _start_notification_runtime(app: FastAPI) -> None:
         app.state.gateway_alert_monitor = monitor
     except Exception:
         log.exception("Failed to start notification runtime.")
-        await http_client.aclose()
 
 
 async def _node_command_reaper_loop(app: FastAPI) -> None:
@@ -852,10 +847,6 @@ async def _stop_notification_runtime(app: FastAPI) -> None:
     dispatcher: NotificationDispatcher | None = getattr(app.state, "notification_dispatcher", None)
     if dispatcher is not None:
         await dispatcher.stop()
-
-    http_client: httpx.AsyncClient | None = getattr(app.state, "notification_http_client", None)
-    if http_client is not None:
-        await http_client.aclose()
 
 
 def _init_rag_lite(app: FastAPI) -> None:

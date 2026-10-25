@@ -3,7 +3,7 @@ import json
 import logging
 import time
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import urlencode
 
@@ -304,7 +304,11 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         token: str,
         request: Request | None = None,
     ) -> None:
-        """Enqueue password-reset email delivery via notification outbox."""
+        """Enqueue password-reset email delivery via notification outbox; without mail nothing is queued.
+
+        The route answers the same either way (no account enumeration, ASVS 5.0 6.3.8); the sign-in page
+        offers the reset only while mail can be sent (``GET /api/auth/options``).
+        """
         try:
             from faden_backend.services.notifications import NotificationService  # noqa: PLC0415
         except Exception:
@@ -337,6 +341,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
                 to_name=to_name,
                 reset_url=reset_url,
                 request_id=request_id,
+                expires_in=timedelta(seconds=self.reset_password_token_lifetime_seconds),
                 language=await recipient_language(session, user.id, accept_language),
             )
         except Exception:

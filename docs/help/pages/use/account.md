@@ -34,7 +34,9 @@ You see **Password changed successfully. Your other sign-ins were ended.** Every
 2. Enter your e-mail address.
 3. Select **Send reset link**.
 
-If your organisation's server sends e-mail, a link to set a new password arrives. If nothing arrives, ask your administrator to set a new password for you.
+A link to set a new password arrives by e-mail. If nothing arrives, ask your administrator to set a new password for you.
+
+The sign-in page offers **Forgot password?** only when your organisation's server sends e-mail. Otherwise it says **Forgot your password? An administrator can set a new one.**: ask your administrator.
 
 ## Language and theme
 

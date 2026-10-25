@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from faden_backend.db.models.users import (
     UserRead,  # type: ignore
@@ -10,6 +11,7 @@ from faden_backend.db.models.users import (
     get_jwt_strategy,  # type: ignore
     login_lifetime_seconds,
 )
+from faden_backend.services.extensions import mail_available
 from faden_backend.settings import settings
 
 router = APIRouter()
@@ -42,6 +44,19 @@ users_router.routes[:] = [
 router.include_router(users_router, prefix="/users", tags=["users"])
 router.include_router(api_users.get_auth_router(auth_jwt), prefix="/auth/jwt", tags=["auth"])
 router.include_router(api_users.get_auth_router(auth_cookie), prefix="/auth/cookie", tags=["auth"])
+
+
+class SignInOptions(BaseModel):
+    """What the sign-in page may offer; no account is named."""
+
+    #: A forgotten password can be reset by mail (a mail sender is on); else an administrator sets a new one.
+    password_reset: bool
+
+
+@router.get("/auth/options", response_model=SignInOptions, tags=["auth"])
+async def sign_in_options() -> SignInOptions:
+    """What the sign-in page may offer, before anyone signs in."""
+    return SignInOptions(password_reset=mail_available())
 
 
 @router.post("/auth/dev-login", tags=["auth"])

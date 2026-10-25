@@ -13,7 +13,6 @@ export const REFUSALS = [
   "email_missing",
   "email_not_trusted",
   "link_needs_confirmation",
-  "link_confirmation_sent",
   "wrong_credentials",
   "not_allowed",
   "provider_error",

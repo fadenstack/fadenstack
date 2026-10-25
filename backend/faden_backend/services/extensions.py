@@ -20,8 +20,12 @@ Extension points for signing in:
 
 - ``password_sign_in_checks``: extra conditions on signing in with a password, for anyone but a
   superuser (EE: addresses whose organisation signs in through its provider only). Each may only deny.
-- ``link_confirmation``: what happens when an outside sign-in meets an existing account it is not linked
-  to yet (core: refused, an administrator links them; EE: the account's owner confirms by e-mail).
+
+Extension points for mail:
+
+- ``mail_sender``: delivers what the notification outbox holds (core: none, so core sends no mail and
+  queues none; EE: its mailer). Whatever needs mail asks ``mail_available()`` first: password resets by
+  mail, a code that links an outside sign-in to an account, administrators' alerts.
 
 Extension points for the console:
 
@@ -78,8 +82,18 @@ VersionExtension = Callable[[Any], None]
 #: ``(email) -> reason`` to refuse a password sign-in, or ``None`` to allow it; *email* as typed, asked
 #: whatever the password and whether or not an account has it.
 PasswordSignInCheck = Callable[[str], Awaitable[str | None]]
-#: ``(session, user, identity) -> Refusal``: an outside sign-in met *user*'s account, not linked to it yet.
-LinkConfirmation = Callable[[Any, Any, Any], Awaitable[Any]]
+
+
+class MailSender(Protocol):
+    """Delivers the outbox's mail."""
+
+    def available(self) -> bool:
+        """Whether mail goes out now (asked before anything is queued, and by the sign-in page)."""
+        ...
+
+    async def send(self, kind: str, payload: dict[str, Any]) -> None:
+        """Deliver one message of *kind* (``password_reset``, ``link_code``, ``admin_alert``), or raise."""
+        ...
 
 
 @dataclass(frozen=True)
@@ -104,12 +118,24 @@ class ExtensionRegistry:
     version_extensions: dict[str, VersionExtension] = field(default_factory=dict)
     member_roles: set[str] = field(default_factory=lambda: {"maintainer"})
     password_sign_in_checks: list[PasswordSignInCheck] = field(default_factory=list)
-    link_confirmation: LinkConfirmation | None = None
+    mail_sender: MailSender | None = None
     admin_notices: list[AdminNoticeSource] = field(default_factory=list)
 
 
 registry = ExtensionRegistry()
 _loaded: set[int] = set()
+
+
+def mail_available() -> bool:
+    """Whether this server can send mail now: a sender is registered and says it can."""
+    sender = registry.mail_sender
+    if sender is None:
+        return False
+    try:
+        return bool(sender.available())
+    except Exception:
+        log.exception("The mail sender could not say whether it is available; taking it as not")
+        return False
 
 
 def load_plugin(plugin: object | None) -> None:

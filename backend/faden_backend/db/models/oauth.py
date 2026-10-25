@@ -43,11 +43,12 @@ class OAuthAccount(Base):
 
 
 class IdentityLinkRequest(Base):
-    """An outside identity waiting for an existing account's owner to confirm it is theirs.
+    """An outside identity waiting for the person to prove an existing account is theirs.
 
-    Made when a sign-in with a provider meets an account with the same address that it is not linked to;
-    the owner gets a link at that address (``services/sign_in/link_requests.py``). Only the SHA-256 of the
-    link's token is kept; the token works once, until ``expires_at``.
+    Made when a sign-in with a provider meets an account with the same address that it is not linked to
+    (``services/sign_in/link_requests.py``). It belongs to the browser that signed in: its cookie holds a
+    token, of which only the SHA-256 is kept. It works once, until ``expires_at``, for ``MAX_TRIES``
+    wrong passwords or codes.
     """
 
     __tablename__ = "identity_link_requests"
@@ -63,9 +64,16 @@ class IdentityLinkRequest(Base):
     provider_name: Mapped[str] = mapped_column(String(128), nullable=False)
     subject: Mapped[str] = mapped_column(String(320), nullable=False)
     identity_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
-    # The account's address the link went to: it must still be the account's when the link is used.
+    # The account's address when the sign-in met it: it must still be the account's when the proof comes.
     sent_to: Mapped[str] = mapped_column(String(320), nullable=False)
     token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    # The identity as the module gave it (groups, the sign-in's lifetime): signed in with it once linked.
+    identity_json: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # The last code sent to the account's address, as an HMAC under the backend's secret.
+    code_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    codes_sent: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    code_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(),
     )

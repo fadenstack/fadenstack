@@ -63,11 +63,20 @@ Einstellung ab, sagt es im Dialog, welche und warum.
 
 Meldet sich jemand zum ersten Mal über einen Anbieter an und gibt es schon ein Konto mit dieser Adresse,
 werden die beiden nicht von selbst verbunden: Beim Anbieter könnte jemand anderes diese Adresse haben.
-Stattdessen erhält der Inhaber des Kontos eine E-Mail mit einem Link, um zu bestätigen, dass die Anmeldung
-seine ist. Der Link gilt einmal, 10 Minuten lang. Danach meldet er sich über den Anbieter an.
+Stattdessen bittet die Anmeldeseite darum, im selben Browser und innerhalb von 10 Minuten zu zeigen, dass das
+Konto der Person gehört:
 
-Für die E-Mail muss der Mail-Dienst eingeschaltet sein. Ohne ihn wird die Anmeldung mit „Es gibt bereits ein
-Konto mit dieser Adresse“ abgelehnt: Schalten Sie den Mail-Dienst ein, dann kann der Inhaber bestätigen.
+- mit dem **Passwort** des Kontos, oder
+- mit einem **Code**, der an die Adresse des Kontos geht: **Passwort unbekannt? Code per E-Mail erhalten**.
+  Das wird angeboten, solange der Server E-Mails versenden kann (Enterprise, mit eingeschaltetem Mail-Dienst).
+
+Dann wird die Anmeldung mit dem Konto verknüpft und die Person angemeldet; danach meldet sie sich über den
+Anbieter an. Nach fünf falschen Passwörtern oder Codes ist der Versuch beendet: Für einen neuen meldet sie sich
+erneut über den Anbieter an.
+
+Ein Konto, das bei der Anmeldung über einen Anbieter entstanden ist, hat kein Passwort, das jemand kennt. Ohne
+E-Mail setzen Sie auf dem Server eines dafür (`faden admin reset-password --email alex@example.com`) und geben
+es der Person; sie verknüpft damit und ändert es unter **Profil verwalten**.
 
 ## Einen Anbieter ändern oder entfernen {#change-or-remove-a-provider}
 

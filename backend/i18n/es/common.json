@@ -132,14 +132,6 @@
     "reset_password_mismatch": "Las contraseñas no coinciden.",
     "reset_password_too_short": "La contraseña debe tener al menos 8 caracteres.",
     "reset_password_failed": "No se pudo restablecer la contraseña.",
-    "link_title": "Vincular este inicio de sesión a tu cuenta",
-    "link_body": "{{provider}} ha iniciado sesión como {{identity}}. ¿Vincularlo a tu cuenta de Fadenstack {{account}}? Después iniciarás sesión con {{provider}}.",
-    "link_confirm": "Vincular",
-    "link_cancel": "No he sido yo",
-    "link_done": "Vinculado. Ya puedes iniciar sesión con {{provider}}.",
-    "link_expired": "Este enlace ya se ha usado o ha caducado. Vuelve a iniciar sesión con tu proveedor para recibir uno nuevo.",
-    "link_refused": "Este enlace ya no se puede confirmar. Consulta a un administrador.",
-    "link_sent": "Ya existe una cuenta con esta dirección. Hemos enviado un enlace a esa dirección: confirma allí que este inicio de sesión es tuyo y vuelve a iniciar sesión.",
     "account_kind": "Cuenta",
     "local_account": "Cuenta de Fadenstack",
     "account_name": "Nombre de cuenta",
@@ -159,14 +151,35 @@
       "license": "Este inicio de sesión no está disponible con la licencia de este servidor. Pide ayuda a un administrador.",
       "not_offered": "Este inicio de sesión ya no se ofrece aquí. Inicia sesión de otra forma o pide ayuda a un administrador.",
       "other": "El inicio de sesión no ha funcionado.",
-      "link_needs_confirmation": "Ya existe una cuenta con esta dirección. Pide ayuda a un administrador.",
-      "link_confirmation_sent": "Ya existe una cuenta con esta dirección. Hemos enviado un enlace a esa dirección: confirma allí que este inicio de sesión es tuyo y vuelve a iniciar sesión."
+      "link_needs_confirmation": "Ya existe una cuenta con esta dirección. Inicia sesión en ella una vez para vincular este inicio de sesión."
     },
     "login_refused": {
       "bad_credentials": "El correo o la contraseña no son correctos.",
       "use_provider": "Tu organización inicia tu sesión con su propio acceso: usa su botón de abajo.",
       "too_many": "Demasiados intentos. Espera un minuto y vuelve a intentarlo."
-    }
+    },
+    "link": {
+      "title": "Vincula tu inicio de sesión de {{provider}}",
+      "body": "Ya existe aquí una cuenta con la dirección {{account}}. Inicia sesión en ella una vez para vincular {{provider}}; después, {{provider}} te iniciará sesión en ella.",
+      "password_label": "Contraseña de {{account}}",
+      "submit": "Vincular e iniciar sesión",
+      "send_code": "¿No conoces la contraseña? Recibe un código por correo",
+      "use_code": "Introduce el código del correo",
+      "code_sent": "Hemos enviado un código a {{account}}. Sirve durante 10 minutos.",
+      "code_label": "Código del correo",
+      "resend": "Enviar un código nuevo",
+      "use_password": "Usar la contraseña",
+      "no_password_hint": "¿No conoces la contraseña de esta cuenta? Un administrador puede ponerle una nueva.",
+      "wrong": "La contraseña o el código no son correctos.",
+      "expired": "Este inicio de sesión esperó demasiado o se intentó demasiadas veces. Vuelve a iniciar sesión con tu proveedor.",
+      "too_soon": "Espera un minuto antes de pedir otro código.",
+      "too_many": "No hay más códigos para este inicio de sesión. Usa el último o vuelve a iniciar sesión con tu proveedor.",
+      "no_mail": "Ahora no se puede enviar ningún código. Usa la contraseña o pide ayuda a un administrador.",
+      "cancel": "Cancelar",
+      "back": "Volver al inicio de sesión"
+    },
+    "forgot_password_ask_admin": "¿Olvidaste tu contraseña? Un administrador puede ponerte una nueva.",
+    "forgot_password_unavailable": "Este servidor no envía correos, así que una contraseña olvidada no se puede restablecer por correo. Un administrador puede ponerte una nueva."
   },
   "root_mode": {
     "active": "MODO ROOT ACTIVO",

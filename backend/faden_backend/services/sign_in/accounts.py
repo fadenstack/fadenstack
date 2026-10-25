@@ -5,8 +5,8 @@ The rules, whatever the protocol:
 - A person is found again by provider and subject (``oauth_account``), never by e-mail alone.
 - A new account needs an address the module vouches for, and the provider's leave to create it; it gets
   the provider's default roles, never superuser rights.
-- An existing account the identity is not linked to yet is not taken over: the link waits for its owner
-  (``registry.link_confirmation``) or for an administrator.
+- An existing account the identity is not linked to yet is not taken over: the sign-in waits until the
+  person proves the account is theirs (``link_requests``).
 - With ``manage_groups``, the memberships the provider keeps follow its answer; those an administrator set
   stay as they are.
 """
@@ -30,7 +30,6 @@ from faden_backend.db.models.groups import Group, UserGroup
 from faden_backend.db.models.oauth import OAuthAccount
 from faden_backend.db.models.rbac import Role
 from faden_backend.db.models.users import User
-from faden_backend.services.extensions import registry
 from faden_backend.services.sign_in.contract import ExternalIdentity, Refusal
 
 log = logging.getLogger(__name__)
@@ -200,7 +199,7 @@ async def _unlinked(session: AsyncSession, identity: ExternalIdentity) -> User |
         return await refuse(session, Refusal.EMAIL_NOT_TRUSTED, identity)
     existing = await session.scalar(select(User).where(func.lower(User.email) == identity.email.lower()))
     if existing is not None:
-        return await refuse(session, await _meets_account(session, existing, identity), identity, existing)
+        return await refuse(session, _meets_account(existing), identity, existing)
     if not identity.create_account:
         return await refuse(session, Refusal.REGISTRATION_DISABLED, identity)
     user = await _new_account(session, identity, identity.email)
@@ -208,14 +207,15 @@ async def _unlinked(session: AsyncSession, identity: ExternalIdentity) -> User |
     return user
 
 
-async def _meets_account(session: AsyncSession, existing: User, identity: ExternalIdentity) -> Refusal:
-    """Why an identity does not simply sign in to an account with its address."""
+def _meets_account(existing: User) -> Refusal:
+    """Why an identity does not simply sign in to an account with its address.
+
+    ``link_needs_confirmation``: the browser routes let the sign-in wait for the proof (``link_requests``).
+    """
     if not existing.is_active:
         return Refusal.ACCOUNT_DISABLED
     if not existing.is_verified:
         return Refusal.ACCOUNT_NOT_VERIFIED
-    if registry.link_confirmation is not None:
-        return Refusal(await registry.link_confirmation(session, existing, identity))
     return Refusal.LINK_NEEDS_CONFIRMATION
 
 

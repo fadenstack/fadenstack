@@ -60,11 +60,18 @@ says which one and why, in the dialog.
 
 When someone signs in with a provider for the first time and an account with their address exists already,
 the two are not joined by themselves: someone else could hold that address at the provider. Instead, the
-account's owner gets an e-mail with a link to confirm that the sign-in is theirs. The link works once, for 10
-minutes. After that, they sign in with the provider.
+sign-in page asks them to prove the account is theirs, in the same browser, within 10 minutes:
 
-The e-mail needs the mail service to be switched on. Without it, the sign-in is refused with "An account with
-this address exists already": switch the mail service on, and the owner can confirm.
+- with the account's **password**, or
+- with a **code** sent to the account's address: **Don't know the password? Get a code by e-mail**. This is
+  offered while the server can send mail (Enterprise, with the mail service switched on).
+
+Then the sign-in is linked to the account and they are signed in; afterwards they sign in with the provider.
+Five wrong passwords or codes end the attempt: they sign in with the provider again to start over.
+
+An account made by a provider's sign-in has no password anyone knows. Without mail, set one for it on the
+server (`faden admin reset-password --email alex@example.com`) and give it to the person; they link with it
+and change it under **Manage Profile**.
 
 ## Change or remove a provider
 

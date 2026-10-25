@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { Link as RouterLink, useLocation, useNavigate, useSearchParams } from "react-router";
+import { Link as RouterLink, useNavigate, useSearchParams } from "react-router";
 import { auth, LoginRefused } from "~/api/auth";
 import { adminAuthProviders, SignInRefused, type AuthProviderPublic } from "~/api/admin";
 import { clearCachedAccess } from "~/lib/adminConstants";
@@ -20,7 +20,7 @@ import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
 import AppBrand from "~/components/AppBrand";
 import BrandMark from "~/components/BrandMark";
-import { LinkConfirmation } from "~/components/LinkConfirmation";
+import { LinkProof } from "~/components/LinkProof";
 import Link from "@mui/material/Link";
 import { helpUrl } from "~/lib/pageHelp";
 import { EXTERNAL_LINK, websiteUrl } from "~/lib/vendorLinks";
@@ -37,11 +37,11 @@ export default function LoginPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const location = useLocation();
   const next = params.get("next") || "/admin/dashboard";
-  // The token from an account owner's link (LinkConfirmation): in the fragment, which browsers never send
-  // to the server; kept here and dropped from the address bar.
-  const [linkToken] = useState(() => new URLSearchParams(location.hash.slice(1)).get("link"));
+  // A sign-in with an outside provider met an existing account: it waits for the proof (LinkProof).
+  const [linking, setLinking] = useState(() => params.get("error") === "link_needs_confirmation");
+  // A forgotten password is reset by mail only while the server can send mail.
+  const [passwordReset, setPasswordReset] = useState(false);
 
   function resolvePostLoginPath(
     user: { is_superuser: boolean },
@@ -57,7 +57,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [ssoProviders, setSsoProviders] = useState<AuthProviderPublic[]>([]);
   // A directory (LDAP, Active Directory) signs in on this page, with its own account names.
   const [directories, setDirectories] = useState<AuthProviderPublic[]>([]);
@@ -91,6 +90,15 @@ export default function LoginPage() {
         // SSO not available — ignore
       });
 
+    auth
+      .options()
+      .then((options) => {
+        if (!cancelled) setPasswordReset(options.password_reset === true);
+      })
+      .catch(() => {
+        // unknown: no reset offered
+      });
+
     // Check backend environment for dev mode features
     fetch("/api/health")
       .then((res) => res.json())
@@ -107,13 +115,8 @@ export default function LoginPage() {
 
     // A sign-in with an outside provider that came back refused
     const refusal = params.get("error");
-    if (refusal === "link_confirmation_sent") {
-      setNotice(t("auth.link_sent"));
-    } else if (refusal) {
+    if (refusal && refusal !== "link_needs_confirmation") {
       setError(refusalText(t, refusal));
-    }
-    if (linkToken) {
-      navigate({ pathname: location.pathname, search: location.search, hash: "" }, { replace: true });
     }
 
     return () => {
@@ -125,7 +128,6 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setNotice(null);
     try {
       if (directory) await adminAuthProviders.passwordSignIn(directory.key, username, password);
       else await auth.login(username, password);
@@ -133,13 +135,19 @@ export default function LoginPage() {
       const user = directory ? await auth.meFresh() : await auth.me();
       navigate(resolvePostLoginPath(user, next), { replace: true });
     } catch (err: unknown) {
-      if (err instanceof SignInRefused && err.reason === "link_confirmation_sent") setNotice(t("auth.link_sent"));
+      if (err instanceof SignInRefused && err.reason === "link_needs_confirmation") setLinking(true);
       else if (err instanceof SignInRefused) setError(refusalText(t, err.reason));
       else if (err instanceof LoginRefused) setError(t(LOGIN_REFUSALS[err.code] ?? "common.login_failed"));
       else setError(t("common.login_failed"));
     } finally {
       setLoading(false);
     }
+  }
+
+  /** The waiting sign-in is linked and the person signed in (LinkProof): on, as after any sign-in. */
+  async function finishLinking() {
+    const user = await auth.meFresh();
+    navigate(resolvePostLoginPath(user, next), { replace: true });
   }
 
   async function handleDevLogin() {
@@ -156,6 +164,18 @@ export default function LoginPage() {
     }
   }
 
+  const header = (
+    <>
+      <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 0.5 }}>
+        <BrandMark size={48} />
+        <AppBrand size={24} />
+      </Stack>
+      <Typography variant="h5" fontWeight={700}>
+        {t("auth.login_title")}
+      </Typography>
+    </>
+  );
+
   return (
     <Box
       sx={{
@@ -170,114 +190,119 @@ export default function LoginPage() {
     >
       <Card sx={{ width: "100%", maxWidth: 460 }}>
         <CardContent sx={{ p: 4 }}>
-          <Stack spacing={2.5} component="form" onSubmit={handleSubmit}>
-            <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 0.5 }}>
-              <BrandMark size={48} />
-              <AppBrand size={24} />
+          {linking ? (
+            <Stack spacing={2.5}>
+              {header}
+              <LinkProof onSignedIn={finishLinking} onCancel={() => setLinking(false)} />
             </Stack>
-            <Typography variant="h5" fontWeight={700}>
-              {t("auth.login_title")}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {t("auth.login_desc")}
-            </Typography>
+          ) : (
+            <Stack spacing={2.5} component="form" onSubmit={handleSubmit}>
+              {header}
+              <Typography variant="body2" color="text.secondary">
+                {t("auth.login_desc")}
+              </Typography>
 
-            {linkToken && <LinkConfirmation token={linkToken} />}
-            {notice && <Alert severity="info">{notice}</Alert>}
-            {error && <Alert severity="error">{error}</Alert>}
+              {error && <Alert severity="error">{error}</Alert>}
 
-            {directories.length > 0 && (
-              <ToggleButtonGroup
-                exclusive
-                fullWidth
-                size="small"
-                color="primary"
-                value={accountKind}
-                onChange={(_, kind: string | null) => kind && setAccountKind(kind)}
-                aria-label={t("auth.account_kind")}
-              >
-                <ToggleButton value="local">{t("auth.local_account")}</ToggleButton>
-                {directories.map((provider) => (
-                  <ToggleButton key={provider.key} value={provider.key}>
-                    {provider.name}
-                  </ToggleButton>
-                ))}
-              </ToggleButtonGroup>
-            )}
+              {directories.length > 0 && (
+                <ToggleButtonGroup
+                  exclusive
+                  fullWidth
+                  size="small"
+                  color="primary"
+                  value={accountKind}
+                  onChange={(_, kind: string | null) => kind && setAccountKind(kind)}
+                  aria-label={t("auth.account_kind")}
+                >
+                  <ToggleButton value="local">{t("auth.local_account")}</ToggleButton>
+                  {directories.map((provider) => (
+                    <ToggleButton key={provider.key} value={provider.key}>
+                      {provider.name}
+                    </ToggleButton>
+                  ))}
+                </ToggleButtonGroup>
+              )}
 
-            <TextField
-              label={directory ? t("auth.account_name") : t("auth.email")}
-              type={directory ? "text" : "email"}
-              required
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              autoComplete="username"
-              helperText={directory ? t("auth.account_name_help", { provider: directory.name }) : undefined}
-            />
-            <TextField
-              label={t("auth.password")}
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-            />
-            {/* A directory account's password is the organisation's to reset, not this server's. */}
-            {!directory && (
+              <TextField
+                label={directory ? t("auth.account_name") : t("auth.email")}
+                type={directory ? "text" : "email"}
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                autoComplete="username"
+                helperText={directory ? t("auth.account_name_help", { provider: directory.name }) : undefined}
+              />
+              <TextField
+                label={t("auth.password")}
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+              />
+              {/* A directory account's password is the organisation's to reset, not this server's; a local one is
+                  reset by mail only while the server can send mail, else by an administrator. */}
+              {!directory && passwordReset && (
+                <Button
+                  component={RouterLink}
+                  to="/forgot-password"
+                  size="small"
+                  sx={{ alignSelf: "flex-start", mt: -1 }}
+                >
+                  {t("auth.forgot_password")}
+                </Button>
+              )}
+              {!directory && !passwordReset && (
+                <Typography variant="caption" color="text.secondary" sx={{ mt: -1 }} data-testid="ask-admin">
+                  {t("auth.forgot_password_ask_admin")}
+                </Typography>
+              )}
+
               <Button
-                component={RouterLink}
-                to="/forgot-password"
-                size="small"
-                sx={{ alignSelf: "flex-start", mt: -1 }}
-              >
-                {t("auth.forgot_password")}
-              </Button>
-            )}
-
-            <Button
-              type="submit"
-              variant="contained"
-              size="large"
-              disabled={loading}
-            >
-              {t("auth.sign_in")}
-            </Button>
-            {isDevMode && (
-              <Button
-                variant="outlined"
+                type="submit"
+                variant="contained"
+                size="large"
                 disabled={loading}
-                onClick={handleDevLogin}
               >
-                {t("auth.dev_login")}
+                {t("auth.sign_in")}
               </Button>
-            )}
+              {isDevMode && (
+                <Button
+                  variant="outlined"
+                  disabled={loading}
+                  onClick={handleDevLogin}
+                >
+                  {t("auth.dev_login")}
+                </Button>
+              )}
 
-            {ssoProviders.length > 0 && (
-              <>
-                <Divider>{t("auth.or_sso")}</Divider>
-                {ssoProviders.map((provider) => (
-                  <Button
-                    key={provider.key}
-                    variant="outlined"
-                    disabled={loading}
-                    onClick={() => {
-                      if (typeof window !== "undefined") {
-                        window.location.href = adminAuthProviders.startUrl(
-                          provider.key,
-                        );
-                      }
-                    }}
-                  >
-                    {t("auth.sign_in_with", { provider: provider.name })}
-                  </Button>
-                ))}
-              </>
-            )}
+              {ssoProviders.length > 0 && (
+                <>
+                  <Divider>{t("auth.or_sso")}</Divider>
+                  {ssoProviders.map((provider) => (
+                    <Button
+                      key={provider.key}
+                      variant="outlined"
+                      disabled={loading}
+                      onClick={() => {
+                        if (typeof window !== "undefined") {
+                          window.location.href = adminAuthProviders.startUrl(
+                            provider.key,
+                          );
+                        }
+                      }}
+                    >
+                      {t("auth.sign_in_with", { provider: provider.name })}
+                    </Button>
+                  ))}
+                </>
+              )}
 
-            <Button component={RouterLink} to="/" size="small">
-              {t("auth.back_home")}
-            </Button>
-          </Stack>
+              <Button component={RouterLink} to="/" size="small">
+                {t("auth.back_home")}
+              </Button>
+            </Stack>
+          )}
         </CardContent>
       </Card>
       {/* Small and muted, under the card: the vendor's site (tagged, no version: anyone sees this page) and

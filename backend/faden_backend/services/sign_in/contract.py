@@ -116,7 +116,6 @@ class Refusal(StrEnum):
     EMAIL_MISSING = "email_missing"
     EMAIL_NOT_TRUSTED = "email_not_trusted"
     LINK_NEEDS_CONFIRMATION = "link_needs_confirmation"
-    LINK_CONFIRMATION_SENT = "link_confirmation_sent"
     WRONG_CREDENTIALS = "wrong_credentials"
     NOT_ALLOWED = "not_allowed"
     PROVIDER_ERROR = "provider_error"

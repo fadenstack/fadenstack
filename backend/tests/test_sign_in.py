@@ -463,20 +463,6 @@ async def test_the_sso_only_domains_from_the_module(fake: FakeModule) -> None:
         await module.sso_only()
 
 
-@pytest.mark.anyio
-async def test_the_link_confirmation_extension(dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch) -> None:
-    person = await _person(dbsession)
-    asked: list[uuid.UUID] = []
-
-    async def confirm(session: AsyncSession, user: User, identity: ExternalIdentity) -> Refusal:
-        asked.append(user.id)
-        return Refusal.LINK_CONFIRMATION_SENT
-
-    monkeypatch.setattr(registry, "link_confirmation", confirm)
-    assert await accounts.sign_in(dbsession, _as_identity(email=person.email)) is Refusal.LINK_CONFIRMATION_SENT
-    assert asked == [person.id]
-
-
 # ── Password sign-in checks ─────────────────────────────────────────────
 
 
