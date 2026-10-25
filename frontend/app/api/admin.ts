@@ -741,6 +741,16 @@ export const adminUsers = {
       body: JSON.stringify({ administrator, reason }),
     });
   },
+  /**
+   * A one-time link that sets a new password for the account (Root Mode; recorded with the reason). The token
+   * is in this answer only; the console makes the address from it.
+   */
+  createResetLink(userId: string, reason: string, validHours: 1 | 24) {
+    return request<{ token: string; expires_at: string }>(`/users/${userId}/password-reset-link`, {
+      method: "POST",
+      body: JSON.stringify({ reason, valid_hours: validHours }),
+    });
+  },
   /** Move the administrator right or the auditor role from this account to another, in one step. */
   handOver(userId: string, right: "administrator" | "auditor", toUserId: string, reason: string) {
     return request<AdminUser>(`/users/${userId}/hand-over`, {

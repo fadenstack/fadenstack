@@ -179,7 +179,11 @@
       "back": "Back to sign-in"
     },
     "forgot_password_ask_admin": "Forgot your password? An administrator can set a new one.",
-    "forgot_password_unavailable": "This server sends no mail, so a forgotten password cannot be reset by mail. An administrator can set a new one."
+    "forgot_password_unavailable": "This server sends no mail, so a forgotten password cannot be reset by mail. An administrator can set a new one.",
+    "reset_link": {
+      "for_account": "Choose a new password for {{email}}. Afterwards, sign in with it.",
+      "expired": "This link has been used, has expired, or was replaced by a newer one. Ask your administrator for a new one."
+    }
   },
   "root_mode": {
     "active": "ROOT MODE ACTIVE",
@@ -1051,6 +1055,23 @@
       "reason_help": "At least 10 characters. Needs Root Mode; recorded in the audit log with both names and the reason.",
       "hand_over_help": "The one who has the right loses it, the other gets it, in one step.",
       "failed": "Not done: {{error}}"
+    },
+    "reset_link": {
+      "action": "Password reset link",
+      "title": "Password reset link for {{email}}",
+      "body": "Creates a link with which {{email}} sets a new password. It works once; a newer link replaces it, and so does a password change. Whoever has it can take over the account: give it to the person yourself, through a channel only they read (in person, by phone, a chat you trust).",
+      "valid_for": "Works for",
+      "one_hour": "1 hour",
+      "one_day": "24 hours",
+      "reason": "Reason",
+      "reason_help": "At least 10 characters. Needs Root Mode; recorded in the audit log with your name.",
+      "create": "Create link",
+      "made": "The link for {{email}} works once, until {{until}}.",
+      "link": "Link",
+      "copy": "Copy link",
+      "copied": "Copied.",
+      "shown_once": "The link is shown only now. If it gets lost, create a new one: it replaces this one.",
+      "failed": "Could not create the link: {{error}}"
     }
   },
   "container_detail": {

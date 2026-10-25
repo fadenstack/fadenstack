@@ -145,6 +145,33 @@ funktionieren innerhalb einer Minute nicht mehr.
 Die Gültigkeitsdauern ändern Sie unter **Einstellungen → Allgemein**: **Sign-in lifetime (s)**, **API token
 lifetime (s)** und **Longest API token lifetime (s)**.
 
+## Ein vergessenes Passwort {#a-forgotten-password}
+
+Wenn Ihr Server keine E-Mails versendet oder die Person sie nicht erhält, geben Sie ihr einen **Link zum
+Zurücksetzen des Passworts**:
+
+1. Starten Sie den **Root-Modus**.
+2. Wählen Sie unter **Zugriffskontrolle → Benutzer** in ihrer Zeile **Link zum Zurücksetzen des Passworts**
+   (das Schloss-Symbol).
+3. Wählen Sie, wie lange er **Gültig für** ist (**1 Stunde**, oder **24 Stunden** für jemanden, den Sie später
+   erreichen), und geben Sie eine **Begründung** an (mindestens 10 Zeichen).
+4. Wählen Sie **Link erstellen**, dann **Link kopieren**, und geben Sie ihn der Person selbst, über einen Weg,
+   den nur sie liest: persönlich, am Telefon, in einem Chat, dem Sie vertrauen.
+
+Die Person öffnet ihn, sieht ihre Adresse und wählt ein neues Passwort; danach meldet sie sich damit an. Alle
+ihre anderen Anmeldungen enden.
+
+- Wer den Link hat, kann das Konto übernehmen. Deshalb braucht er den Root-Modus, und seine Begründung wird mit
+  Ihrem Namen im Audit-Protokoll festgehalten, ebenso seine Verwendung.
+- Er gilt einmal. Ein neuerer Link ersetzt ihn, ebenso eine Passwortänderung oder eine Sperre.
+- Er wird nur beim Erstellen angezeigt; geht er verloren, erstellen Sie einen neuen.
+- Nicht für Ihr eigenes Konto (ändern Sie es unter **Profil verwalten**) und nicht für ein gesperrtes.
+- Er gibt auch einem Konto, das bei der Anmeldung über einen Anbieter entstanden ist, ein Passwort; ein solches
+  Konto hat keines, das jemand kennt.
+
+Auf dem Server setzt `faden admin reset-password --email alex@example.com` direkt ein neues Passwort (etwa
+wenn sich kein Administrator anmelden kann).
+
 ## Jemandem den Zugang entziehen {#end-someones-access}
 
 ![Konto sperren: Die Person kann sich nicht mehr anmelden, nichts von ihr wird gelöscht, und Sie können sie wieder freigeben](../images/administer/user-suspend.png)
@@ -226,4 +253,5 @@ nie; es übersteht Upgrades, Sicherungen und Wiederherstellungen.
 | **„User with email '…' already exists“** | Es gibt bereits ein Konto für diese Adresse. Suchen Sie es stattdessen in der Liste. |
 | Jemand landet im Chat, wenn er die Konsole öffnet | Die Person ist kein Superuser. Rollen öffnen die Konsole nicht. |
 | Jemand kann nicht chatten, nachdem Sie ihm eine Rolle gegeben haben | Die angekreuzten Rollen haben `default_user` ersetzt. Bearbeiten Sie die Rollen der Person und kreuzen Sie zusätzlich `default_user` an. |
-| Jemand hat sein Passwort vergessen | Die Konsole kann das Passwort einer anderen Person nicht setzen. Wenn der Server keine E-Mails zum Zurücksetzen versendet, setzt die Person, die ihn betreibt, ein neues, z. B. mit `faden admin reset-password --email alex@example.com` (ohne Angabe wird eines erzeugt). Lassen Sie die Person es unter **Profil verwalten** ändern. |
+| Jemand hat sein Passwort vergessen | Ohne E-Mails zum Zurücksetzen geben Sie der Person einen Link zum Zurücksetzen des Passworts: siehe [Ein vergessenes Passwort](#a-forgotten-password). |
+| **„Start Root Mode first: a password reset link is recorded with its reason.“** | Starten Sie den **Root-Modus** und erstellen Sie den Link erneut. |

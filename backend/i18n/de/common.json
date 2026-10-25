@@ -179,7 +179,11 @@
       "back": "Zurück zur Anmeldung"
     },
     "forgot_password_ask_admin": "Passwort vergessen? Die Administration kann ein neues setzen.",
-    "forgot_password_unavailable": "Dieser Server versendet keine E-Mails, daher lässt sich ein vergessenes Passwort nicht per E-Mail zurücksetzen. Die Administration kann ein neues setzen."
+    "forgot_password_unavailable": "Dieser Server versendet keine E-Mails, daher lässt sich ein vergessenes Passwort nicht per E-Mail zurücksetzen. Die Administration kann ein neues setzen.",
+    "reset_link": {
+      "for_account": "Legen Sie ein neues Passwort für {{email}} fest. Melden Sie sich danach damit an.",
+      "expired": "Dieser Link wurde schon verwendet, ist abgelaufen oder wurde durch einen neueren ersetzt. Bitten Sie Ihren Administrator um einen neuen."
+    }
   },
   "root_mode": {
     "active": "ROOT-MODUS AKTIV",
@@ -1056,6 +1060,23 @@
       "reason_help": "Mindestens 10 Zeichen. Erfordert den Root-Modus; wird mit beiden Namen und der Begründung im Audit-Protokoll festgehalten.",
       "hand_over_help": "Wer das Recht hat, verliert es, die andere Person erhält es, in einem Schritt.",
       "failed": "Nicht ausgeführt: {{error}}"
+    },
+    "reset_link": {
+      "action": "Link zum Zurücksetzen des Passworts",
+      "title": "Link zum Zurücksetzen des Passworts für {{email}}",
+      "body": "Erstellt einen Link, mit dem {{email}} ein neues Passwort festlegt. Er gilt einmal; ein neuerer Link ersetzt ihn, ebenso eine Passwortänderung. Wer ihn hat, kann das Konto übernehmen: Geben Sie ihn der Person selbst, über einen Weg, den nur sie liest (persönlich, am Telefon, in einem Chat, dem Sie vertrauen).",
+      "valid_for": "Gültig für",
+      "one_hour": "1 Stunde",
+      "one_day": "24 Stunden",
+      "reason": "Begründung",
+      "reason_help": "Mindestens 10 Zeichen. Erfordert den Root-Modus; wird mit Ihrem Namen im Audit-Protokoll festgehalten.",
+      "create": "Link erstellen",
+      "made": "Der Link für {{email}} gilt einmal, bis {{until}}.",
+      "link": "Link",
+      "copy": "Link kopieren",
+      "copied": "Kopiert.",
+      "shown_once": "Der Link wird nur jetzt angezeigt. Geht er verloren, erstellen Sie einen neuen: Er ersetzt diesen.",
+      "failed": "Der Link konnte nicht erstellt werden: {{error}}"
     }
   },
   "container_detail": {

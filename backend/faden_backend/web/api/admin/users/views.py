@@ -29,6 +29,7 @@ from faden_backend.db.models.users import (
     get_jwt_strategy,
     set_sign_in_cookie,
 )
+from faden_backend.services import password_reset_links
 from faden_backend.services.password_policy import password_problem
 from faden_backend.services.skills.client import forget_principal
 from faden_backend.web.api.admin.dependencies import get_root_mode_active, require_superuser
@@ -40,11 +41,13 @@ from faden_backend.web.api.admin.users.schema import (
     ApiTokenDTO,
     ApiTokenResponse,
     ChangePasswordRequest,
+    CreatePasswordResetLinkRequest,
     CreateRoleRequest,
     CreateUserRequest,
     GenerateApiTokenRequest,
     HandOverRequest,
     MeAccessDTO,
+    PasswordResetLinkDTO,
     PermissionDTO,
     RoleDTO,
     SetAdministratorRequest,
@@ -595,6 +598,41 @@ async def hand_over_right(
         }),
     )
     return await _build_admin_user_dto(taker, rbac_dao)
+
+
+@router.post(
+    "/{user_id}/password-reset-link", response_model=PasswordResetLinkDTO,
+    status_code=status.HTTP_201_CREATED, name="create_password_reset_link",
+)
+async def create_password_reset_link(
+    user_id: uuid.UUID,
+    payload: CreatePasswordResetLinkRequest,
+    admin: Annotated[User, Depends(require_superuser)],
+    root_mode: Annotated[bool, Depends(get_root_mode_active)],
+    session: AsyncSession = Depends(get_db_session),
+) -> PasswordResetLinkDTO:
+    """A one-time link that sets a new password for an account (Root Mode, a reason).
+
+    Whoever holds the link gets the account, so it is made like a right is granted, and the token is shown
+    only in this answer. Not for one's own account (Manage Profile), nor for a suspended one.
+    """
+    await _require_root_mode(root_mode, "a password reset link")
+    target = await session.get(User, user_id)
+    if target is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if target.id == admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Change your own password under Manage Profile.",
+        )
+    if not target.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A suspended account gets no reset link: let it back in first.",
+        )
+    token, expires_at = await password_reset_links.create(
+        session, target, admin, valid_hours=payload.valid_hours, reason=payload.reason.strip(),
+    )
+    return PasswordResetLinkDTO(token=token, expires_at=expires_at)
 
 
 @router.put("/{user_id}/active", response_model=AdminUserDTO, name="set_user_active")

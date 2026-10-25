@@ -179,7 +179,11 @@
       "back": "Volver al inicio de sesión"
     },
     "forgot_password_ask_admin": "¿Olvidaste tu contraseña? Un administrador puede ponerte una nueva.",
-    "forgot_password_unavailable": "Este servidor no envía correos, así que una contraseña olvidada no se puede restablecer por correo. Un administrador puede ponerte una nueva."
+    "forgot_password_unavailable": "Este servidor no envía correos, así que una contraseña olvidada no se puede restablecer por correo. Un administrador puede ponerte una nueva.",
+    "reset_link": {
+      "for_account": "Elige una contraseña nueva para {{email}}. Después, inicia sesión con ella.",
+      "expired": "Este enlace ya se usó, caducó o fue sustituido por uno más reciente. Pide uno nuevo a tu administrador."
+    }
   },
   "root_mode": {
     "active": "MODO ROOT ACTIVO",
@@ -1056,6 +1060,23 @@
       "reason_help": "Al menos 10 caracteres. Requiere el modo root; se registra en el registro de auditoría con ambos nombres y el motivo.",
       "hand_over_help": "Quien tiene el derecho lo pierde y la otra persona lo recibe, en un solo paso.",
       "failed": "No realizado: {{error}}"
+    },
+    "reset_link": {
+      "action": "Enlace para restablecer la contraseña",
+      "title": "Enlace para restablecer la contraseña de {{email}}",
+      "body": "Crea un enlace con el que {{email}} establece una contraseña nueva. Sirve una sola vez; un enlace más reciente lo sustituye, y también un cambio de contraseña. Quien lo tenga puede hacerse con la cuenta: dáselo tú a la persona, por un canal que solo ella lea (en persona, por teléfono, un chat de confianza).",
+      "valid_for": "Válido durante",
+      "one_hour": "1 hora",
+      "one_day": "24 horas",
+      "reason": "Motivo",
+      "reason_help": "Al menos 10 caracteres. Requiere el modo root; se registra en el registro de auditoría con tu nombre.",
+      "create": "Crear enlace",
+      "made": "El enlace para {{email}} sirve una sola vez, hasta {{until}}.",
+      "link": "Enlace",
+      "copy": "Copiar enlace",
+      "copied": "Copiado.",
+      "shown_once": "El enlace solo se muestra ahora. Si se pierde, crea uno nuevo: sustituirá a este.",
+      "failed": "No se pudo crear el enlace: {{error}}"
     }
   },
   "container_detail": {

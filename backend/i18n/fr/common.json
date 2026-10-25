@@ -179,7 +179,11 @@
       "back": "Retour à la connexion"
     },
     "forgot_password_ask_admin": "Mot de passe oublié ? Un administrateur peut en définir un nouveau.",
-    "forgot_password_unavailable": "Ce serveur n'envoie pas d'e-mails : un mot de passe oublié ne peut donc pas être réinitialisé par e-mail. Un administrateur peut en définir un nouveau."
+    "forgot_password_unavailable": "Ce serveur n'envoie pas d'e-mails : un mot de passe oublié ne peut donc pas être réinitialisé par e-mail. Un administrateur peut en définir un nouveau.",
+    "reset_link": {
+      "for_account": "Choisissez un nouveau mot de passe pour {{email}}. Connectez-vous ensuite avec.",
+      "expired": "Ce lien a déjà été utilisé, a expiré ou a été remplacé par un plus récent. Demandez-en un nouveau à votre administrateur."
+    }
   },
   "root_mode": {
     "active": "MODE ROOT ACTIF",
@@ -1051,6 +1055,23 @@
       "reason_help": "Au moins 10 caractères. Nécessite le mode root ; consigné dans le journal d'audit avec les deux noms et le motif.",
       "hand_over_help": "Celui qui a le droit le perd, l'autre le reçoit, en une seule étape.",
       "failed": "Non effectué : {{error}}"
+    },
+    "reset_link": {
+      "action": "Lien de réinitialisation du mot de passe",
+      "title": "Lien de réinitialisation du mot de passe pour {{email}}",
+      "body": "Crée un lien avec lequel {{email}} définit un nouveau mot de passe. Il ne sert qu'une fois ; un lien plus récent le remplace, tout comme un changement de mot de passe. Quiconque l'a peut prendre le compte : donnez-le vous-même à la personne, par un canal qu'elle seule lit (en personne, par téléphone, une messagerie de confiance).",
+      "valid_for": "Valable",
+      "one_hour": "1 heure",
+      "one_day": "24 heures",
+      "reason": "Motif",
+      "reason_help": "Au moins 10 caractères. Nécessite le mode root ; consigné dans le journal d'audit avec votre nom.",
+      "create": "Créer le lien",
+      "made": "Le lien pour {{email}} ne sert qu'une fois, jusqu'à {{until}}.",
+      "link": "Lien",
+      "copy": "Copier le lien",
+      "copied": "Copié.",
+      "shown_once": "Le lien n'est affiché que maintenant. S'il se perd, créez-en un nouveau : il remplacera celui-ci.",
+      "failed": "Impossible de créer le lien : {{error}}"
     }
   },
   "container_detail": {

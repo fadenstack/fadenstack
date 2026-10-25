@@ -89,6 +89,21 @@ class SetAdministratorRequest(BaseModel):
     reason: str = Field(min_length=10, max_length=500)
 
 
+class CreatePasswordResetLinkRequest(BaseModel):
+    """A one-time link that sets a new password for the account; recorded with the reason."""
+
+    reason: str = Field(min_length=10, max_length=500)
+    #: How long the link works: an hour, or a day for a person reached later.
+    valid_hours: Literal[1, 24] = 1
+
+
+class PasswordResetLinkDTO(BaseModel):
+    """The link's token, shown this once (the console makes the address), and when it expires."""
+
+    token: str
+    expires_at: datetime
+
+
 class HandOverRequest(BaseModel):
     """Move a right from one person to another in one step; recorded with both names and the reason."""
 

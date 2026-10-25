@@ -75,8 +75,8 @@ Anbieter an. Nach fünf falschen Passwörtern oder Codes ist der Versuch beendet
 erneut über den Anbieter an.
 
 Ein Konto, das bei der Anmeldung über einen Anbieter entstanden ist, hat kein Passwort, das jemand kennt. Ohne
-E-Mail setzen Sie auf dem Server eines dafür (`faden admin reset-password --email alex@example.com`) und geben
-es der Person; sie verknüpft damit und ändert es unter **Profil verwalten**.
+E-Mail geben Sie der Person einen [Link zum Zurücksetzen des Passworts](users.md#a-forgotten-password) dafür;
+sie legt ein Passwort fest und verknüpft dann damit.
 
 ## Einen Anbieter ändern oder entfernen {#change-or-remove-a-provider}
 

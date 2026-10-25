@@ -69,9 +69,8 @@ sign-in page asks them to prove the account is theirs, in the same browser, with
 Then the sign-in is linked to the account and they are signed in; afterwards they sign in with the provider.
 Five wrong passwords or codes end the attempt: they sign in with the provider again to start over.
 
-An account made by a provider's sign-in has no password anyone knows. Without mail, set one for it on the
-server (`faden admin reset-password --email alex@example.com`) and give it to the person; they link with it
-and change it under **Manage Profile**.
+An account made by a provider's sign-in has no password anyone knows. Without mail, give the person a
+[password reset link](users.md#a-forgotten-password) for it; they set a password, then link with it.
 
 ## Change or remove a provider
 

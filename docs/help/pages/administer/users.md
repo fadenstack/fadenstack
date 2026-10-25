@@ -137,6 +137,30 @@ row, then **Revoke**. Applications using a revoked token stop working within a m
 To change the lifetimes: **Settings → General**, **Sign-in lifetime (s)**, **API token lifetime (s)** and
 **Longest API token lifetime (s)**.
 
+## A forgotten password
+
+When your server sends no e-mail, or the person cannot get it, give them a **password reset link**:
+
+1. Start **Root Mode**.
+2. In **Access Control → Users**, select **Password reset link** (the lock icon) in their row.
+3. Choose how long it **Works for** (**1 hour**, or **24 hours** for someone you reach later) and give a
+   **Reason** (at least 10 characters).
+4. Select **Create link**, then **Copy link**, and give it to the person yourself, through a channel only they
+   read: in person, by phone, a chat you trust.
+
+The person opens it, sees their address, and chooses a new password; then they sign in with it. All their other
+sign-ins end.
+
+- Whoever has the link can take over the account, which is why it needs Root Mode and its reason is recorded in
+  the audit log with your name, as is its use.
+- It works once. A newer link replaces it, and so does a password change or a suspension.
+- It is shown only when you create it; if it gets lost, create a new one.
+- Not for your own account (change it under **Manage Profile**), nor for a suspended one.
+- It also gives a password to an account made by a sign-in provider, which has none anyone knows.
+
+From the server, `faden admin reset-password --email alex@example.com` sets a new password directly (for
+example when no administrator can sign in).
+
 ## End someone's access
 
 ![Suspend account: the person can no longer sign in, nothing of theirs is deleted, and you can let them back in](../images/administer/user-suspend.png)
@@ -215,4 +239,5 @@ restores.
 | **"User with email '…' already exists"** | There is already an account for that address. Find it in the list instead. |
 | Someone lands in the chat when they open the console | They are not a superuser. Roles do not open the console. |
 | Someone cannot chat after you gave them a role | The roles you ticked replaced `default_user`. Edit their roles and tick `default_user` as well. |
-| Someone forgot their password | The console cannot set another person's password. If the server does not send reset e-mails, whoever runs it sets a new one, for example `faden admin reset-password --email alex@example.com` (it makes one up when none is given). Have the person change it under **Manage Profile**. |
+| Someone forgot their password | Without reset e-mails, give them a password reset link: see [A forgotten password](#a-forgotten-password). |
+| **"Start Root Mode first: a password reset link is recorded with its reason."** | Start **Root Mode**, then create the link again. |

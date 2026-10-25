@@ -179,7 +179,11 @@
       "back": "返回登录"
     },
     "forgot_password_ask_admin": "忘记密码？管理员可以为您设置新密码。",
-    "forgot_password_unavailable": "此服务器不发送电子邮件，因此无法通过电子邮件重置忘记的密码。管理员可以为您设置新密码。"
+    "forgot_password_unavailable": "此服务器不发送电子邮件，因此无法通过电子邮件重置忘记的密码。管理员可以为您设置新密码。",
+    "reset_link": {
+      "for_account": "请为 {{email}} 设置新密码，之后用它登录。",
+      "expired": "此链接已被使用、已过期或已被更新的链接替换。请向您的管理员索取新链接。"
+    }
   },
   "root_mode": {
     "active": "ROOT 模式已启用",
@@ -1056,6 +1060,23 @@
       "reason_help": "至少 10 个字符。需要 Root 模式；将连同双方姓名和原因记录在审计日志中。",
       "hand_over_help": "持有该权限的人失去它，另一人一步获得。",
       "failed": "未完成：{{error}}"
+    },
+    "reset_link": {
+      "action": "密码重置链接",
+      "title": "{{email}} 的密码重置链接",
+      "body": "创建一个链接，{{email}} 可用它设置新密码。该链接只能使用一次；更新的链接或修改密码都会使其失效。持有该链接的人可以接管该账户：请亲自交给本人，通过只有其本人能看到的渠道（当面、电话或您信任的聊天）。",
+      "valid_for": "有效期",
+      "one_hour": "1 小时",
+      "one_day": "24 小时",
+      "reason": "原因",
+      "reason_help": "至少 10 个字符。需要 Root 模式；将连同您的姓名记录在审计日志中。",
+      "create": "创建链接",
+      "made": "{{email}} 的链接只能使用一次，有效期至 {{until}}。",
+      "link": "链接",
+      "copy": "复制链接",
+      "copied": "已复制。",
+      "shown_once": "该链接仅在此时显示。如果丢失，请创建新链接：新链接会替换此链接。",
+      "failed": "无法创建链接：{{error}}"
     }
   },
   "container_detail": {

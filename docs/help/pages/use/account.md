@@ -36,7 +36,7 @@ You see **Password changed successfully. Your other sign-ins were ended.** Every
 
 A link to set a new password arrives by e-mail. If nothing arrives, ask your administrator to set a new password for you.
 
-The sign-in page offers **Forgot password?** only when your organisation's server sends e-mail. Otherwise it says **Forgot your password? An administrator can set a new one.**: ask your administrator.
+The sign-in page offers **Forgot password?** only when your organisation's server sends e-mail. Otherwise it says **Forgot your password? An administrator can set a new one.**: ask your administrator. They give you a link to set a new password, which works once and only for a while; open it, choose the new password, then sign in with it.
 
 ## Language and theme
 

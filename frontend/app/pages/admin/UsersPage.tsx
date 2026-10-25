@@ -6,6 +6,7 @@ import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { UserApiTokensDialog } from "./UserApiTokensDialog";
 import { FormDialog } from "~/components/FormDialog";
 import { DeveloperModeDialog } from "~/components/users/DeveloperModeDialog";
+import { ResetLinkDialog } from "~/components/users/ResetLinkDialog";
 import { RightsDialog } from "~/components/users/RightsDialog";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import { formatDateTime } from "~/lib/dates";
@@ -32,6 +33,7 @@ import CodeIcon from "@mui/icons-material/Code";
 import DeleteIcon from "@mui/icons-material/Delete";
 import HowToRegIcon from "@mui/icons-material/HowToReg";
 import KeyIcon from "@mui/icons-material/Key";
+import LockResetIcon from "@mui/icons-material/LockReset";
 import PersonOffIcon from "@mui/icons-material/PersonOff";
 
 export default function UsersPage() {
@@ -62,6 +64,7 @@ export default function UsersPage() {
   const [suspendTarget, setSuspendTarget] = useState<AdminUser | null>(null);
   const [tokensOf, setTokensOf] = useState<AdminUser | null>(null);
   const [rightsOf, setRightsOf] = useState<AdminUser | null>(null);
+  const [resetLinkOf, setResetLinkOf] = useState<AdminUser | null>(null);
   const [suspending, setSuspending] = useState(false);
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
   const [selectedUsageGroupId, setSelectedUsageGroupId] = useState<string>("");
@@ -297,6 +300,13 @@ export default function UsersPage() {
               <KeyIcon fontSize="small" />
             </IconButton>
           </Tooltip>
+          {u.is_active && (
+            <Tooltip title={t("users.reset_link.action")}>
+              <IconButton size="small" data-user-reset-link={u.id} onClick={() => setResetLinkOf(u)}>
+                <LockResetIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
           {u.is_active ? (
             <Tooltip title={t("users.suspend.action")}>
               <IconButton size="small" data-user-suspend={u.id} onClick={() => setSuspendTarget(u)}>
@@ -487,6 +497,7 @@ export default function UsersPage() {
 
       <UserApiTokensDialog user={tokensOf} onClose={() => setTokensOf(null)} />
       <RightsDialog user={rightsOf} users={users} onClose={() => setRightsOf(null)} onChanged={() => void load()} />
+      <ResetLinkDialog user={resetLinkOf} onClose={() => setResetLinkOf(null)} />
 
       {/* ── Suspend user dialog ── */}
       <ConfirmDialog

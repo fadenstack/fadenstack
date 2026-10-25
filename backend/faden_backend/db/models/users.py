@@ -321,9 +321,10 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
             return
 
         try:
+            # The token in the fragment, which browsers never send: not to the server, not as the Referer of
+            # the page's own requests, so it stays out of every access log (as an administrator's reset links).
             base = settings.mailer_frontend_base_url.rstrip("/")
-            query = urlencode({"token": token})
-            reset_url = f"{base}/reset-password?{query}"
+            reset_url = f"{base}/reset-password#{urlencode({'token': token})}"
             request_id = str(uuid.uuid4())
             if request is not None:
                 request_id = (

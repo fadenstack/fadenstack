@@ -39,6 +39,13 @@ export class LoginRefused extends Error {
   }
 }
 
+/** A refused reset by an administrator's link: ``expired``, or the password rule's words. */
+export class ResetRefused extends Error {
+  constructor(readonly reason: string) {
+    super(reason);
+  }
+}
+
 async function refusal(res: Response): Promise<LoginRefused> {
   if (res.status === 429) return new LoginRefused("TOO_MANY");
   const body = (await res.json().catch(() => ({}))) as { detail?: unknown };
@@ -134,6 +141,35 @@ export const auth = {
     if (res.status !== 202) {
       await assertOk(res);
     }
+  },
+
+  /** Whose password a link from an administrator sets; ``null`` once it no longer works. Changes nothing. */
+  async resetLinkPreview(token: string): Promise<{ email: string; expires_at: string } | null> {
+    const res = await fetch("/api/auth/reset-link/preview", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+    if (res.status === 404) return null;
+    await assertOk(res);
+    return (await res.json()) as { email: string; expires_at: string };
+  },
+
+  /**
+   * Set a new password with a link from an administrator, once; nobody is signed in. Throws
+   * ``ResetRefused("expired")``, or ``ResetRefused`` with the password rule's words.
+   */
+  async resetWithLink(token: string, password: string): Promise<void> {
+    const res = await fetch("/api/auth/reset-link/use", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, password }),
+    });
+    if (res.ok) return;
+    const body = (await res.json().catch(() => ({}))) as { detail?: unknown };
+    throw new ResetRefused(typeof body.detail === "string" ? body.detail : `status_${res.status}`);
   },
 
   async resetPassword(token: string, password: string): Promise<void> {
