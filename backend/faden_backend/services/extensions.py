@@ -31,6 +31,8 @@ Extension points for the console:
 
 - ``admin_notices``: what administrators should know now, shown above every admin page (core: none; EE:
   the licence running out). A source that fails is left out; the others still show.
+- ``features``: what this server adds beyond core, by name (core: none). The console shows a feature's
+  screens only while it is listed (``GET /api/about``).
 """
 
 from __future__ import annotations
@@ -120,6 +122,7 @@ class ExtensionRegistry:
     password_sign_in_checks: list[PasswordSignInCheck] = field(default_factory=list)
     mail_sender: MailSender | None = None
     admin_notices: list[AdminNoticeSource] = field(default_factory=list)
+    features: set[str] = field(default_factory=set)
 
 
 registry = ExtensionRegistry()

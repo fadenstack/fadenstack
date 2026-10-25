@@ -29,8 +29,21 @@ async def test_a_signed_in_user_reads_the_release(
     assert r.status_code == status.HTTP_200_OK
     assert r.json() == {
         "product": "Fadenstack", "edition": "core", "version": "0.4.5", "licence": "Apache-2.0",
-        "vendor_links": True,
+        "vendor_links": True, "features": [],
     }
+
+
+@pytest.mark.anyio
+async def test_the_features_an_extension_adds(
+    fastapi_app: FastAPI, client: AsyncClient, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The console shows a feature's screens only while it is listed."""
+    from faden_backend.services.extensions import registry
+
+    monkeypatch.setattr(registry, "features", {"tool_mode_ceilings", "agent_exclusions"})
+    _signed_in(fastapi_app)
+    r = await client.get(fastapi_app.url_path_for("about"))
+    assert r.json()["features"] == ["agent_exclusions", "tool_mode_ceilings"]
 
 
 @pytest.mark.anyio

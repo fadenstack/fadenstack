@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from faden_backend.db.models.users import User, current_active_user
+from faden_backend.services.extensions import registry
 from faden_backend.settings import settings
 
 router = APIRouter()
@@ -22,6 +23,8 @@ class AboutDTO(BaseModel):
     version: str
     licence: str
     vendor_links: bool
+    #: What this server adds beyond core, by name (``registry.features``); the console shows their screens.
+    features: list[str] = []
 
 
 @router.get("/about", response_model=AboutDTO, name="about")
@@ -35,4 +38,5 @@ async def about(_user: User = Depends(current_active_user)) -> AboutDTO:
         licence="Apache-2.0" if edition == "core" else "",
         # Only an edition other than core may switch them off.
         vendor_links=settings.vendor_links or edition == "core",
+        features=sorted(registry.features),
     )
