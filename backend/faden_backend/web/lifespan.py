@@ -814,6 +814,35 @@ def _start_update_check(app: FastAPI) -> None:
     app.state.update_check = asyncio.create_task(_update_check_loop(app), name="update_check")
 
 
+async def _sign_in_upkeep_loop(app: FastAPI) -> None:
+    """Hourly: suspend inactive accounts and those a directory no longer has (services/sign_in/upkeep.py).
+
+    Only with a sign-in module; ``run_pass`` lets one worker act at a time.
+    """
+    import random  # noqa: PLC0415
+
+    from faden_backend.services.sign_in import upkeep  # noqa: PLC0415
+
+    await asyncio.sleep(300 + random.uniform(0, 300))  # noqa: S311
+    while True:
+        try:
+            report = await upkeep.run_pass(app.state.db_session_factory)
+            if report is not None and (report.suspended or report.groups_changed):
+                log.info("Sign-in upkeep: %d suspended, %d group changes", len(report.suspended),
+                         report.groups_changed)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.exception("Sign-in upkeep failed.")
+        await asyncio.sleep(3600)
+
+
+def _start_sign_in_upkeep(app: FastAPI) -> None:
+    if broker.is_worker_process or not settings.auth_enabled:
+        return
+    app.state.sign_in_upkeep = asyncio.create_task(_sign_in_upkeep_loop(app), name="sign_in_upkeep")
+
+
 async def _stop_notification_runtime(app: FastAPI) -> None:
     """Stop notification background workers and close shared HTTP client."""
     monitor: GatewayAlertMonitor | None = getattr(app.state, "gateway_alert_monitor", None)
@@ -1022,6 +1051,9 @@ async def lifespan_setup(
     # ── Update check: the release feed, once a day (background) ──
     _start_update_check(app)
 
+    # ── Accounts from outside sign-ins: inactive, or gone from the directory (background) ──
+    _start_sign_in_upkeep(app)
+
     # ── Export catalogued runtime images for nodes (background) ──
     _start_runtime_image_exports(app)
 
@@ -1113,6 +1145,14 @@ async def lifespan_setup(
         update_check_task.cancel()
         try:
             await update_check_task
+        except (asyncio.CancelledError, Exception):
+            pass
+
+    sign_in_upkeep_task = getattr(app.state, "sign_in_upkeep", None)
+    if sign_in_upkeep_task is not None:
+        sign_in_upkeep_task.cancel()
+        try:
+            await sign_in_upkeep_task
         except (asyncio.CancelledError, Exception):
             pass
 

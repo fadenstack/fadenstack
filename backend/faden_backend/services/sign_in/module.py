@@ -10,9 +10,12 @@ import httpx
 from pydantic import ValidationError
 
 from faden_backend.services.sign_in.contract import (
+    DirectoryAnswer,
+    DirectoryRequest,
     FinishRequest,
     PasswordRequest,
     ProviderPublic,
+    ProviderUpkeep,
     Refusal,
     SignInAnswer,
     SignInStart,
@@ -133,3 +136,23 @@ async def password(key: str, username: str, secret: str) -> SignInAnswer:
 async def metadata(key: str) -> httpx.Response:
     """The service-provider metadata of *key* (SAML), as the module made it."""
     return await request("GET", f"/api/v1/providers/{key}/metadata")
+
+
+async def upkeep() -> list[ProviderUpkeep]:
+    """What the hourly upkeep does for each provider's people."""
+    response = await request("GET", "/api/v1/upkeep")
+    try:
+        return [ProviderUpkeep.model_validate(item) for item in response.json()]
+    except (ValueError, ValidationError) as exc:
+        raise ModuleUnavailableError(f"unreadable upkeep answer: {exc}") from exc
+
+
+async def directory(key: str, subjects: list[str]) -> DirectoryAnswer:
+    """Which of *subjects* the directory provider *key* still has, and how."""
+    response = await request("POST", "/api/v1/directory", json=DirectoryRequest(
+        provider=key, subjects=subjects,
+    ).model_dump())
+    try:
+        return DirectoryAnswer.model_validate(response.json())
+    except (ValueError, ValidationError) as exc:
+        raise ModuleUnavailableError(f"unreadable directory answer: {exc}") from exc

@@ -14,6 +14,10 @@ module is reached at ``settings.auth_service_url`` with ``Authorization: Bearer 
     A directory account's name and password, checked by the module.
 ``GET  /api/v1/providers/{key}/metadata``
     The service-provider metadata a provider is set up with (SAML), served as is.
+``GET  /api/v1/upkeep``
+    ``[ProviderUpkeep]``: what the hourly upkeep does for each provider's people.
+``POST /api/v1/directory``  ``DirectoryRequest`` -> ``DirectoryAnswer``
+    Which of a directory provider's people it still has, disabled or not, and their groups now.
 ``/api/v1/admin/...``
     Provider settings, forwarded unchanged for administrators.
 """
@@ -129,3 +133,38 @@ class SignInAnswer(BaseModel):
     identity: ExternalIdentity | None = None
     refusal: Refusal | None = None
     detail: str = ""
+
+
+class ProviderUpkeep(BaseModel):
+    """What the backend's hourly upkeep does for a provider's people."""
+
+    key: str
+    #: Accounts linked to this provider and not used this long are suspended (CIS v8 5.3).
+    inactive_days: int | None = None
+    #: The module can say which of the provider's people its directory still has (``/api/v1/directory``).
+    directory: bool = False
+
+
+class DirectoryRequest(BaseModel):
+    """Which of these people the provider's directory still has, and how."""
+
+    provider: str
+    subjects: list[str] = Field(max_length=500)
+
+
+class DirectoryPerson(BaseModel):
+    """One person as the directory has them now."""
+
+    subject: str
+    #: ``missing``: not found; ``unknown``: not judged, because so many were missing at once that the
+    #: directory, not the people, is likely wrong.
+    status: Literal["active", "disabled", "missing", "unknown"]
+    #: For an active person: the groups the provider's rules give them now.
+    group_ids: list[uuid.UUID] = Field(default_factory=list)
+
+
+class DirectoryAnswer(BaseModel):
+    """The directory's word on the people asked about."""
+
+    people: list[DirectoryPerson]
+    manage_groups: bool = False

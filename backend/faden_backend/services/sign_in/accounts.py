@@ -139,12 +139,14 @@ async def _new_account(session: AsyncSession, identity: ExternalIdentity, email:
     return user
 
 
-async def _sync_groups(session: AsyncSession, user: User, identity: ExternalIdentity) -> tuple[list, list]:
-    """The memberships *identity*'s provider keeps, made to match its answer."""
-    source = membership_source(identity.provider)
+async def sync_groups(
+    session: AsyncSession, user: User, provider: str, group_ids: list[uuid.UUID],
+) -> tuple[list, list]:
+    """The memberships *provider* keeps for *user*, made to match *group_ids*; added and removed."""
+    source = membership_source(provider)
     wanted: set[uuid.UUID] = set()
-    if identity.group_ids:
-        wanted = set(await session.scalars(select(Group.id).where(Group.id.in_(identity.group_ids))))
+    if group_ids:
+        wanted = set(await session.scalars(select(Group.id).where(Group.id.in_(group_ids))))
     rows = (await session.execute(
         select(UserGroup.group_id, UserGroup.source).where(UserGroup.user_id == user.id),
     )).all()
@@ -221,7 +223,7 @@ async def sign_in(session: AsyncSession, identity: ExternalIdentity) -> SignedIn
     added: list[uuid.UUID] = []
     removed: list[uuid.UUID] = []
     if identity.manage_groups:
-        added, removed = await _sync_groups(session, user, identity)
+        added, removed = await sync_groups(session, user, identity.provider, identity.group_ids)
     await session.flush()
     await _audit(
         session, "auth.sign_in", user, identity, method="provider", created=created,
