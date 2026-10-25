@@ -874,6 +874,24 @@ export const adminGroups = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Notices for administrators
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Something administrators should know now; worded by the console as ``notices.<code>`` with ``params``. */
+export interface AdminNotice {
+  code: string;
+  severity: "info" | "warning" | "error";
+  params: Record<string, string | number>;
+}
+
+export const adminNotices = {
+  /** What the registered sources have to say now (superusers only), errors first. */
+  list() {
+    return request<AdminNotice[]>("/notices");
+  },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Auth Providers (SSO)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -886,24 +904,6 @@ export interface AuthProviderPublic {
   posts_back?: boolean;
 }
 
-export interface AuthProviderDetail {
-  id: string;
-  name: string;
-  provider_type: string;
-  client_id: string;
-  discovery_url: string | null;
-  authorize_url: string | null;
-  token_url: string | null;
-  userinfo_url: string | null;
-  scopes: string;
-  enabled: boolean;
-  auto_register: boolean;
-  default_role_ids: string[];
-  group_mapping: Record<string, unknown>;
-  created_at: string;
-  updated_at: string;
-}
-
 export const adminAuthProviders = {
   /** The providers people may sign in with, for the sign-in page (no sign-in needed). */
   async listPublic(): Promise<AuthProviderPublic[]> {
@@ -911,69 +911,22 @@ export const adminAuthProviders = {
     if (!res.ok) throw new Error(`sign-in providers: ${res.status}`);
     return (await res.json()) as AuthProviderPublic[];
   },
-  /** List all providers (admin only). */
-  list() {
-    return request<AuthProviderDetail[]>("/auth-providers/");
-  },
-  get(providerId: string) {
-    return request<AuthProviderDetail>(`/auth-providers/${providerId}`);
-  },
-  create(payload: {
-    name: string;
-    provider_type: string;
-    client_id: string;
-    client_secret: string;
-    discovery_url?: string;
-    authorize_url?: string;
-    token_url?: string;
-    userinfo_url?: string;
-    scopes?: string;
-    enabled?: boolean;
-    auto_register?: boolean;
-    default_role_ids?: string[];
-  }) {
-    return request<AuthProviderDetail>("/auth-providers/", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-  },
-  update(
-    providerId: string,
-    payload: Partial<{
-      name: string;
-      provider_type: string;
-      client_id: string;
-      client_secret: string;
-      discovery_url: string;
-      authorize_url: string;
-      token_url: string;
-      userinfo_url: string;
-      scopes: string;
-      enabled: boolean;
-      auto_register: boolean;
-      default_role_ids: string[];
-    }>,
-  ) {
-    return request<AuthProviderDetail>(`/auth-providers/${providerId}`, {
-      method: "PATCH",
-      body: JSON.stringify(payload),
-    });
-  },
-  delete(providerId: string) {
-    return request<void>(`/auth-providers/${providerId}`, { method: "DELETE" });
-  },
   /** Where the browser goes to sign in with a redirect provider. */
   startUrl(key: string) {
     return `/api/auth/sso/${encodeURIComponent(key)}/start`;
   },
+  /** Sign in with a directory account (a ``password`` provider); the session cookie comes back. */
+  async passwordSignIn(key: string, username: string, password: string): Promise<void> {
+    await postSignIn(`/api/auth/sso/${encodeURIComponent(key)}/password`, { username, password });
+  },
   /** What the link an account's owner was sent would link; changes nothing (no sign-in needed). */
   async linkPreview(token: string): Promise<LinkPreview> {
-    const res = await postLink("/api/auth/sso/link/preview", token);
+    const res = await postSignIn("/api/auth/sso/link/preview", { token });
     return (await res.json()) as LinkPreview;
   },
   /** The account's owner confirms: the outside sign-in is linked to the account, once. */
   async linkConfirm(token: string): Promise<void> {
-    await postLink("/api/auth/sso/link/confirm", token);
+    await postSignIn("/api/auth/sso/link/confirm", { token });
   },
 };
 
@@ -985,24 +938,27 @@ export type LinkPreview = {
   expires_at: string;
 };
 
-/** A refused link; ``reason`` is the backend's refusal (``sign_in_expired`` once used or expired). */
-export class LinkRefused extends Error {
+/**
+ * A refused sign-in or link; ``reason`` is the backend's refusal (``wrong_credentials``, ``sign_in_expired``
+ * once a link is used or expired, ...), or ``status_<code>`` when it named none.
+ */
+export class SignInRefused extends Error {
   constructor(readonly reason: string) {
     super(reason);
   }
 }
 
-async function postLink(path: string, token: string): Promise<Response> {
-  // The token goes in the body, not the address, so it stays out of access logs.
+async function postSignIn(path: string, payload: Record<string, string>): Promise<Response> {
+  // Tokens and passwords go in the body, not the address, so they stay out of access logs.
   const res = await fetch(path, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token }),
+    body: JSON.stringify(payload),
   });
   if (res.ok) return res;
   const body = (await res.json().catch(() => ({}))) as { detail?: unknown };
-  throw new LinkRefused(typeof body.detail === "string" ? body.detail : `status_${res.status}`);
+  throw new SignInRefused(typeof body.detail === "string" ? body.detail : `status_${res.status}`);
 }
 
 /** Fadenstack's own containers: edited only in Root Mode. */

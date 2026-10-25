@@ -55,6 +55,11 @@ admin_router.include_router(
     tags=["admin-auth-providers"],
 )
 
+# --- Notices for administrators (what registered sources have to say) ---
+from faden_backend.web.api.admin.notices.views import router as notices_router  # noqa: E402
+
+admin_router.include_router(notices_router, prefix="/notices", tags=["admin-notices"])
+
 # --- PII dashboard routes (always registered) ----------------------------
 # The PII module is toggled at runtime via the services UI, so these proxy
 # routes must always be available.  They return 502 if the PII service is

@@ -67,9 +67,8 @@ Das Konto ist sofort aktiv. Geben Sie das erste Passwort persönlich oder telefo
 sich unter `https://ai.example.internal` an, landet im Chat und kann es unter **Profil verwalten** ändern.
 
 ??? info "Einladungen und Single Sign-on"
-    Es gibt keine Einladungen: Sie legen jedes Konto selbst an. Die Anmeldung mit dem Firmenkonto Ihrer
-    Organisation (Single Sign-on) ist <span class="fs-planned">Geplant</span>: Die Benutzer melden sich dann mit dem
-    Konto an, das sie bereits haben, und erhalten bei der ersten Anmeldung ein Fadenstack-Konto. Siehe auch
+    Es gibt keine Einladungen: Sie legen jedes Konto selbst an, oder die Benutzer erhalten eines, wenn sie sich
+    zum ersten Mal mit dem Konto Ihrer Organisation anmelden (siehe [Anmeldeanbieter](sign-in.md)). Siehe auch
     [Ihr Konto](../use/account.md).
 
 ## Ändern, was jemand darf {#change-what-someone-may-do}

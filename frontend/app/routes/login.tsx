@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link as RouterLink, useLocation, useNavigate, useSearchParams } from "react-router";
 import { auth } from "~/api/auth";
-import { adminAuthProviders, type AuthProviderPublic } from "~/api/admin";
+import { adminAuthProviders, SignInRefused, type AuthProviderPublic } from "~/api/admin";
 import { clearCachedAccess } from "~/lib/adminConstants";
+import { refusalText } from "~/lib/signInRefusals";
 import { useTranslation } from "react-i18next";
 
 import Alert from "@mui/material/Alert";
@@ -14,6 +15,8 @@ import CardContent from "@mui/material/CardContent";
 import Divider from "@mui/material/Divider";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
+import ToggleButton from "@mui/material/ToggleButton";
+import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
 import AppBrand from "~/components/AppBrand";
 import BrandMark from "~/components/BrandMark";
@@ -48,6 +51,10 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [ssoProviders, setSsoProviders] = useState<AuthProviderPublic[]>([]);
+  // A directory (LDAP, Active Directory) signs in on this page, with its own account names.
+  const [directories, setDirectories] = useState<AuthProviderPublic[]>([]);
+  const [accountKind, setAccountKind] = useState<string>("local");
+  const directory = directories.find((p) => p.key === accountKind);
   const [isDevMode, setIsDevMode] = useState(false);
 
   useEffect(() => {
@@ -68,7 +75,9 @@ export default function LoginPage() {
     adminAuthProviders
       .listPublic()
       .then((providers) => {
-        if (!cancelled) setSsoProviders(providers.filter((p) => p.kind === "redirect"));
+        if (cancelled) return;
+        setSsoProviders(providers.filter((p) => p.kind === "redirect"));
+        setDirectories(providers.filter((p) => p.kind === "password"));
       })
       .catch(() => {
         // SSO not available — ignore
@@ -89,13 +98,11 @@ export default function LoginPage() {
       });
 
     // A sign-in with an outside provider that came back refused
-    const oauthError = params.get("error");
-    if (oauthError === "link_confirmation_sent") {
+    const refusal = params.get("error");
+    if (refusal === "link_confirmation_sent") {
       setNotice(t("auth.link_sent"));
-    } else if (oauthError === "link_needs_confirmation") {
-      setError(t("auth.link_needs_admin"));
-    } else if (oauthError) {
-      setError(t("common.sso_failed", { error: oauthError }));
+    } else if (refusal) {
+      setError(refusalText(t, refusal));
     }
     if (linkToken) {
       navigate({ pathname: location.pathname, search: location.search, hash: "" }, { replace: true });
@@ -110,12 +117,17 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setNotice(null);
     try {
-      await auth.login(username, password);
-      const user = await auth.me();
+      if (directory) await adminAuthProviders.passwordSignIn(directory.key, username, password);
+      else await auth.login(username, password);
+      // auth.login drops the cached profile itself; a directory sign-in reads it afresh.
+      const user = directory ? await auth.meFresh() : await auth.me();
       navigate(resolvePostLoginPath(user, next), { replace: true });
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : t("common.login_failed"));
+      if (err instanceof SignInRefused && err.reason === "link_confirmation_sent") setNotice(t("auth.link_sent"));
+      else if (err instanceof SignInRefused) setError(refusalText(t, err.reason));
+      else setError(err instanceof Error ? err.message : t("common.login_failed"));
     } finally {
       setLoading(false);
     }
@@ -165,13 +177,33 @@ export default function LoginPage() {
             {notice && <Alert severity="info">{notice}</Alert>}
             {error && <Alert severity="error">{error}</Alert>}
 
+            {directories.length > 0 && (
+              <ToggleButtonGroup
+                exclusive
+                fullWidth
+                size="small"
+                color="primary"
+                value={accountKind}
+                onChange={(_, kind: string | null) => kind && setAccountKind(kind)}
+                aria-label={t("auth.account_kind")}
+              >
+                <ToggleButton value="local">{t("auth.local_account")}</ToggleButton>
+                {directories.map((provider) => (
+                  <ToggleButton key={provider.key} value={provider.key}>
+                    {provider.name}
+                  </ToggleButton>
+                ))}
+              </ToggleButtonGroup>
+            )}
+
             <TextField
-              label={t("auth.email")}
-              type="email"
+              label={directory ? t("auth.account_name") : t("auth.email")}
+              type={directory ? "text" : "email"}
               required
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
+              helperText={directory ? t("auth.account_name_help", { provider: directory.name }) : undefined}
             />
             <TextField
               label={t("auth.password")}
@@ -181,14 +213,17 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
             />
-            <Button
-              component={RouterLink}
-              to="/forgot-password"
-              size="small"
-              sx={{ alignSelf: "flex-start", mt: -1 }}
-            >
-              {t("auth.forgot_password")}
-            </Button>
+            {/* A directory account's password is the organisation's to reset, not this server's. */}
+            {!directory && (
+              <Button
+                component={RouterLink}
+                to="/forgot-password"
+                size="small"
+                sx={{ alignSelf: "flex-start", mt: -1 }}
+              >
+                {t("auth.forgot_password")}
+              </Button>
+            )}
 
             <Button
               type="submit"

@@ -480,9 +480,9 @@
     },
     "auth_providers": {
       "title": "Sign-in providers",
-      "description": "Let people sign in with their company account, through OpenID Connect or OAuth2.",
-      "action_add": "Add a provider with its client ID, secret and discovery URL",
-      "action_auto": "Choose whether people get an account the first time they sign in"
+      "description": "Let people sign in with their organisation's account: through OpenID Connect, SAML, or a directory (LDAP, Active Directory).",
+      "action_add": "Add a provider, and register this server with it using the addresses shown",
+      "action_auto": "Choose who may sign in, whether they get an account, and their roles and groups"
     },
     "pii_dashboard": {
       "title": "PII Dashboard",

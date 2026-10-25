@@ -479,10 +479,10 @@
       "action_members": "Añadir o quitar miembros"
     },
     "auth_providers": {
-      "title": "Proveedores de autenticación",
-      "description": "Permita que las personas inicien sesión con su cuenta de empresa, mediante OpenID Connect u OAuth2.",
-      "action_add": "Añadir un proveedor con su ID de cliente, su secreto y su URL de descubrimiento",
-      "action_auto": "Elegir si las personas reciben una cuenta la primera vez que inician sesión"
+      "title": "Proveedores de inicio de sesión",
+      "description": "Permite que las personas inicien sesión con la cuenta de su organización: mediante OpenID Connect, SAML o un directorio (LDAP, Active Directory).",
+      "action_add": "Añadir un proveedor y registrar allí este servidor con las direcciones que se muestran",
+      "action_auto": "Elegir quién puede iniciar sesión, si recibe una cuenta y qué roles y grupos obtiene"
     },
     "pii_dashboard": {
       "title": "Panel PII",

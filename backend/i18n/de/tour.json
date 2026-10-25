@@ -480,9 +480,9 @@
     },
     "auth_providers": {
       "title": "Anmeldeanbieter",
-      "description": "Anmeldung mit dem Firmenkonto über OpenID Connect oder OAuth2.",
-      "action_add": "Einen Anbieter mit Client-ID, Secret und Discovery-URL hinzufügen",
-      "action_auto": "Festlegen, ob Personen bei der ersten Anmeldung automatisch ein Konto erhalten"
+      "description": "Personen melden sich mit dem Konto ihrer Organisation an: über OpenID Connect, SAML oder ein Verzeichnis (LDAP, Active Directory).",
+      "action_add": "Einen Anbieter hinzufügen und diesen Server dort mit den angezeigten Adressen eintragen",
+      "action_auto": "Festlegen, wer sich anmelden darf, ob ein Konto entsteht und welche Rollen und Gruppen es erhält"
     },
     "pii_dashboard": {
       "title": "PII-Dashboard",

@@ -88,6 +88,25 @@
 "Wie lange gelten Anmeldungen und API-Token?" = "sign-ins-and-api-tokens"
 "Was ist der Entwicklermodus?" = "developer-mode"
 
+["administer/sign-in.md"]
+"Wie melden sich Benutzer mit ihrem Firmenkonto an (Single Sign-on)?" = ""
+"Wie füge ich Entra ID, Okta, Google oder einen anderen Anmeldeanbieter hinzu?" = "add-a-provider"
+"Wer erhält ein Konto, wenn er sich über einen Anbieter anmeldet?" = "who-may-sign-in-and-what-they-get"
+"Wie verhindere ich die Anmeldung mit Passwort?" = "who-may-sign-in-and-what-they-get"
+"Jemand mit Konto kann sich nicht über den Anbieter anmelden" = "someone-who-already-has-an-account-here"
+
+["administer/sign-in-oidc.md"]
+"Wie binde ich Entra ID oder einen anderen OpenID-Connect-Anbieter an?" = ""
+"Welche Weiterleitungs-URI trage ich ein?" = "register-fadenstack-at-the-provider"
+
+["administer/sign-in-saml.md"]
+"Wie binde ich AD FS oder einen anderen SAML-Identitätsanbieter an?" = ""
+"Wo finde ich die Metadaten des Dienstanbieters?" = "register-fadenstack-at-the-identity-provider"
+
+["administer/sign-in-ldap.md"]
+"Wie melden sich Benutzer mit Active Directory oder LDAP an?" = ""
+"Werden im Verzeichnis deaktivierte Benutzer hier gesperrt?" = "add-the-directory"
+
 ["administer/models.md"]
 "Wie finde und lade ich ein Modell herunter?" = "find-a-model"
 "Welche Modelle passen auf meine GPUs?" = "which-models-fit"

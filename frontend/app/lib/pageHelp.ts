@@ -208,7 +208,7 @@ const PAGES: PageHelpDef[] = [
     prefix: "/admin/auth-providers",
     id: "auth_providers",
     actions: ["add", "auto"],
-    doc: "administer/users",
+    doc: "administer/sign-in",
   },
 
   // Privacy

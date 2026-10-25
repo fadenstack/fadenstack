@@ -64,9 +64,8 @@ The account is active at once. Pass the first password on in person or by phone;
 `https://ai.example.internal`, land in the chat, and can change it under **Manage Profile**.
 
 ??? info "Invitations and single sign-on"
-    There are no invitations: you create each account. Signing in with your organisation's company account
-    (single sign-on) is <span class="fs-planned">Planned</span>: people will sign in with the account they
-    already have, and get a Fadenstack account the first time they do. See also [Your account](../use/account.md).
+    There are no invitations: you create each account, or people get one the first time they sign in with
+    your organisation's account (see [Sign-in providers](sign-in.md)). See also [Your account](../use/account.md).
 
 ## Change what someone may do
 

@@ -49,7 +49,10 @@ Eine Sprache, die Sie in den Einstellungen des Browser-Agenten oder eines Office
 
 Eine Anmeldung gilt sieben Tage, sofern Ihre Organisation keine andere Dauer festgelegt hat. Danach werden Sie gebeten, sich erneut anzumelden. Um sie früher zu beenden, wählen Sie Ihren Avatar und dann **Abmelden**: Diese Anmeldung ist sofort beendet, auch für jeden, der sie kopiert hat. Eine Passwortänderung oder ein Administrator, der Ihr Konto sperrt oder Ihnen eine Rolle entzieht, beendet alle Ihre Anmeldungen. Melden Sie sich an jedem Computer ab, den auch andere nutzen.
 
-Anmeldung mit Ihrem Firmenkonto (Single Sign-on) <span class="fs-planned">Geplant</span>
+Hat Ihre Organisation ihre eigene Anmeldung angebunden, bietet die Anmeldeseite sie an: **Anmelden mit** und
+den Namen Ihrer Organisation, oder eine Auswahl zwischen **Fadenstack-Konto** und dem Verzeichnis Ihrer
+Organisation, wo Sie Ihren **Kontonamen** und Ihr gewohntes Passwort eingeben. Eine so begonnene Anmeldung kann
+kürzer als sieben Tage gelten, wie Ihre Organisation es festgelegt hat.
 
 ## API-Tokens {#api-tokens}
 

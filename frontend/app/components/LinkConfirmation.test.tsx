@@ -41,14 +41,14 @@ describe("confirming a link", () => {
   });
 
   it("says so when the link was used or has expired", async () => {
-    linkPreview.mockRejectedValue(new admin.LinkRefused("sign_in_expired"));
+    linkPreview.mockRejectedValue(new admin.SignInRefused("sign_in_expired"));
     render(<LinkConfirmation token="spent" />);
     expect(await screen.findByTestId("link-expired")).toBeInTheDocument();
   });
 
   it("says so when confirming is refused", async () => {
     linkPreview.mockResolvedValue(PREVIEW);
-    linkConfirm.mockRejectedValue(new admin.LinkRefused("not_allowed"));
+    linkConfirm.mockRejectedValue(new admin.SignInRefused("not_allowed"));
     render(<LinkConfirmation token="t" />);
     fireEvent.click(await screen.findByRole("button", { name: "Link it" }));
     expect(await screen.findByTestId("link-refused")).toBeInTheDocument();
@@ -76,8 +76,8 @@ describe("the sign-in page", () => {
     expect(await screen.findByText(/We sent a link to that address/)).toBeInTheDocument();
   });
 
-  it("explains a sign-in that waits for an administrator", async () => {
+  it("explains a sign-in that met an account nobody can confirm by mail", async () => {
     renderPage(<Login />, { path: "/login", initialPath: "/login?error=link_needs_confirmation" });
-    expect(await screen.findByText(/An administrator has to link this sign-in/)).toBeInTheDocument();
+    expect(await screen.findByText(/An account with this address exists already\. Ask an administrator/)).toBeInTheDocument();
   });
 });

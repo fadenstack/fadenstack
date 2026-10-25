@@ -22,6 +22,11 @@ Extension points for signing in:
   superuser (EE: addresses whose organisation signs in through its provider only). Each may only deny.
 - ``link_confirmation``: what happens when an outside sign-in meets an existing account it is not linked
   to yet (core: refused, an administrator links them; EE: the account's owner confirms by e-mail).
+
+Extension points for the console:
+
+- ``admin_notices``: what administrators should know now, shown above every admin page (core: none; EE:
+  the licence running out). A source that fails is left out; the others still show.
 """
 
 from __future__ import annotations
@@ -30,7 +35,7 @@ import logging
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from faden_backend.settings import settings
 
@@ -76,6 +81,19 @@ PasswordSignInCheck = Callable[[str], Awaitable[str | None]]
 LinkConfirmation = Callable[[Any, Any, Any], Awaitable[Any]]
 
 
+@dataclass(frozen=True)
+class AdminNotice:
+    """Something administrators should know now. The console words it: ``notices.<code>``, with *params*."""
+
+    code: str
+    severity: Literal["info", "warning", "error"]
+    params: dict[str, str | int] = field(default_factory=dict)
+
+
+#: ``(session) -> notices``: what a source has to say now.
+AdminNoticeSource = Callable[[Any], Awaitable[list[AdminNotice]]]
+
+
 @dataclass
 class ExtensionRegistry:
     """What Enterprise adds; defaults are core's behaviour."""
@@ -86,6 +104,7 @@ class ExtensionRegistry:
     member_roles: set[str] = field(default_factory=lambda: {"maintainer"})
     password_sign_in_checks: list[PasswordSignInCheck] = field(default_factory=list)
     link_confirmation: LinkConfirmation | None = None
+    admin_notices: list[AdminNoticeSource] = field(default_factory=list)
 
 
 registry = ExtensionRegistry()

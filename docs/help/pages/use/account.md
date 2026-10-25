@@ -49,7 +49,10 @@ A language you pick in the settings of the browser agent or an Office add-in is 
 
 A sign-in lasts seven days, unless your organisation set another length. Then you are asked to sign in again. To end it sooner, select your avatar, then **Logout**: that sign-in is over at once, also for anyone who copied it. Changing your password, or an administrator suspending your account or taking a role away, ends all your sign-ins. Sign out on any computer others use.
 
-Signing in with your company account (single sign-on) <span class="fs-planned">Planned</span>
+If your organisation connected its own sign-in, the sign-in page offers it: **Sign in with** and your
+organisation's name, or a choice between **Fadenstack account** and your organisation's directory, where you
+type your **Account name** and your usual password. A sign-in that way may last less than seven days, as your
+organisation set it.
 
 ## API tokens
 

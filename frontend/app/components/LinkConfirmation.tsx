@@ -12,7 +12,7 @@ import Button from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 
-import { adminAuthProviders, LinkRefused, type LinkPreview } from "~/api/admin";
+import { adminAuthProviders, SignInRefused, type LinkPreview } from "~/api/admin";
 
 type Step = "loading" | "asking" | "linking" | "done" | "expired" | "refused" | "dismissed";
 
@@ -44,7 +44,7 @@ export function LinkConfirmation({ token }: { token: string }) {
       await adminAuthProviders.linkConfirm(token);
       setStep("done");
     } catch (err: unknown) {
-      setStep(err instanceof LinkRefused && err.reason === "sign_in_expired" ? "expired" : "refused");
+      setStep(err instanceof SignInRefused && err.reason === "sign_in_expired" ? "expired" : "refused");
     }
   }
 

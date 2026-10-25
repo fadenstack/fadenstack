@@ -39,6 +39,7 @@ import { ADMIN_NAV_ID, AdminSidebar } from "~/components/AdminSidebar";
 import { MobileNavButton } from "~/components/MobileNavButton";
 import { RootModeDialog } from "~/components/RootModeDialog";
 import { UpdateBanner } from "~/components/UpdateBanner";
+import { AdminNotices } from "~/components/AdminNotices";
 import { PageHelpDrawer } from "~/components/PageHelpDrawer";
 import { GuideRunner } from "~/components/guides/GuideRunner";
 import { HowToDialog } from "~/components/guides/HowToDialog";
@@ -411,6 +412,8 @@ function AdminLayoutInner() {
 
         {/* A critical or security release, or a release past its support. */}
         <UpdateBanner isSuperuser={isSuperuser} pathname={location.pathname} />
+        {/* What the backend's notice sources say (Enterprise: its licence). */}
+        <AdminNotices isSuperuser={isSuperuser} />
 
         <RootModeDialog
           open={showRootForm}
