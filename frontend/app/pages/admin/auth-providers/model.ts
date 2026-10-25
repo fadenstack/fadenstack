@@ -19,12 +19,18 @@ import type {
 
 /** A provider's key: what its addresses are made of (`/api/auth/sso/<key>/...`). */
 export const KEY_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
+/** The address people open this server at: scheme, host and port, nothing after them. */
+export const SERVER_ADDRESS_PATTERN = /^https?:\/\/[^\s/?#]+$/;
+/** A SAML entity ID: an absolute URI of at most 256 characters (SAML2Int SDP-G04). */
+const ENTITY_ID_PATTERN = /^(?:https?:\/\/|urn:)\S{1,250}$/;
 
 export interface ProviderForm {
   key: string;
   name: string;
   enabled: boolean;
   protocol: Protocol;
+  /** Where people open this server; the provider sends them back there (OIDC, SAML). */
+  serverAddress: string;
   // OIDC
   issuer: string;
   clientId: string;
@@ -35,6 +41,8 @@ export interface ProviderForm {
   metadataSource: "url" | "xml";
   idpMetadataUrl: string;
   idpMetadataXml: string;
+  /** Empty: the metadata address. */
+  spEntityId: string;
   emailVerifiedByIdp: boolean;
   signRequests: boolean;
   // LDAP
@@ -58,17 +66,35 @@ export interface ProviderForm {
   ssoOnly: boolean;
 }
 
+function server(address: string): string {
+  return address.trim().replace(/\/+$/, "");
+}
+
 /** The addresses the provider is set up with: the callback (OIDC), the ACS and the metadata (SAML). */
-export function addresses(key: string, origin: string) {
-  const base = `${origin}/api/auth/sso/${key || "<key>"}`;
+export function addresses(key: string, serverAddress: string) {
+  const base = `${server(serverAddress)}/api/auth/sso/${key || "<key>"}`;
   return { callback: `${base}/callback`, acs: `${base}/acs`, metadata: `${base}/metadata` };
 }
 
-export function blankForm(protocol: Protocol = "oidc"): ProviderForm {
+/** The server address in a stored callback or ACS address: what comes before `/api/auth/sso/`. */
+function serverOf(address: string | null | undefined): string {
+  if (!address) return "";
+  const at = address.indexOf("/api/auth/sso/");
+  if (at > 0) return address.slice(0, at);
+  try {
+    return new URL(address).origin;
+  } catch {
+    return "";
+  }
+}
+
+/** A new provider's form; *serverAddress* is where the console is open now, unless the admin changes it. */
+export function blankForm(protocol: Protocol = "oidc", serverAddress = ""): ProviderForm {
   return {
-    key: "", name: "", enabled: true, protocol,
+    key: "", name: "", enabled: true, protocol, serverAddress,
     issuer: "", clientId: "", clientSecret: "", scopes: "openid email profile", userinfo: "when_missing",
-    metadataSource: "url", idpMetadataUrl: "", idpMetadataXml: "", emailVerifiedByIdp: false, signRequests: false,
+    metadataSource: "url", idpMetadataUrl: "", idpMetadataXml: "", spEntityId: "", emailVerifiedByIdp: false,
+    signRequests: false,
     ldapUrl: "", startTls: false, caBundle: "", bindDn: "", bindPassword: "", baseDn: "", preset: "ad",
     userFilter: "", checkPeople: true,
     createAccount: true, defaultRoleIds: [], allowedDomains: "", manageGroups: false, groupRules: [],
@@ -101,12 +127,18 @@ export function formFromProvider(provider: SignInProvider): ProviderForm {
   });
   const s = provider.settings;
   if (s.protocol === "oidc") {
-    Object.assign(form, { issuer: s.issuer, clientId: s.client_id, scopes: s.scopes.join(" "), userinfo: s.userinfo });
-  } else if (s.protocol === "saml") {
     Object.assign(form, {
-      metadataSource: s.idp_metadata_url ? "url" : "xml", idpMetadataUrl: s.idp_metadata_url ?? "",
+      serverAddress: serverOf(s.redirect_uri), issuer: s.issuer, clientId: s.client_id, scopes: s.scopes.join(" "),
+      userinfo: s.userinfo,
+    });
+  } else if (s.protocol === "saml") {
+    const serverAddress = serverOf(s.acs_url);
+    Object.assign(form, {
+      serverAddress, metadataSource: s.idp_metadata_url ? "url" : "xml", idpMetadataUrl: s.idp_metadata_url ?? "",
       idpMetadataXml: s.idp_metadata_xml ?? "", emailVerifiedByIdp: s.email_verified_by_idp,
       signRequests: s.sign_requests,
+      // The default entity ID stays the default, so it follows a changed server address.
+      spEntityId: s.sp_entity_id === addresses(provider.key, serverAddress).metadata ? "" : s.sp_entity_id,
     });
   } else {
     Object.assign(form, {
@@ -133,14 +165,13 @@ function policyOf(form: ProviderForm): ProviderPolicy {
   };
 }
 
-function settingsOf(form: ProviderForm, origin: string, stored?: ProviderSettings): ProviderWrite["settings"] {
-  const here = addresses(form.key, origin);
+function settingsOf(form: ProviderForm, stored?: ProviderSettings): ProviderWrite["settings"] {
+  const here = addresses(form.key, form.serverAddress);
   if (form.protocol === "oidc") {
     const base = stored?.protocol === "oidc" ? stored : undefined;
     const settings: Partial<OIDCSettings> = {
       ...base, protocol: "oidc", issuer: form.issuer.trim(), client_id: form.clientId.trim(),
-      redirect_uri: base?.redirect_uri ?? here.callback,
-      scopes: form.scopes.split(/\s+/).filter(Boolean), userinfo: form.userinfo,
+      redirect_uri: here.callback, scopes: form.scopes.split(/\s+/).filter(Boolean), userinfo: form.userinfo,
     };
     return settings as ProviderWrite["settings"];
   }
@@ -151,7 +182,7 @@ function settingsOf(form: ProviderForm, origin: string, stored?: ProviderSetting
       ...base, protocol: "saml",
       idp_metadata_url: byUrl ? form.idpMetadataUrl.trim() : null,
       idp_metadata_xml: byUrl ? null : form.idpMetadataXml.trim(),
-      sp_entity_id: base?.sp_entity_id ?? here.metadata, acs_url: base?.acs_url ?? here.acs,
+      sp_entity_id: form.spEntityId.trim() || here.metadata, acs_url: here.acs,
       email_verified_by_idp: form.emailVerifiedByIdp, sign_requests: form.signRequests,
     };
     return settings as ProviderWrite["settings"];
@@ -167,14 +198,14 @@ function settingsOf(form: ProviderForm, origin: string, stored?: ProviderSetting
 }
 
 /** What the form sends: a new provider, or the changes to *stored*. Secrets only when typed. */
-export function toWrite(form: ProviderForm, origin: string, stored?: SignInProvider): ProviderWrite {
+export function toWrite(form: ProviderForm, stored?: SignInProvider): ProviderWrite {
   const secrets: ProviderWrite["secrets"] = {};
   if (form.protocol === "oidc" && form.clientSecret) secrets.client_secret = form.clientSecret;
   if (form.protocol === "ldap" && form.bindPassword) secrets.bind_password = form.bindPassword;
   const write: ProviderWrite = {
     name: form.name.trim(),
     enabled: form.enabled,
-    settings: settingsOf(form, origin, stored?.settings),
+    settings: settingsOf(form, stored?.settings),
     policy: policyOf(form),
   };
   if (!stored) write.key = form.key;
@@ -187,6 +218,7 @@ export function problems(form: ProviderForm, editing: boolean): string[] {
   const found: string[] = [];
   if (!form.name.trim()) found.push("name");
   if (!editing && !KEY_PATTERN.test(form.key)) found.push("key");
+  if (form.protocol !== "ldap" && !SERVER_ADDRESS_PATTERN.test(server(form.serverAddress))) found.push("server_address");
   if (form.protocol === "oidc") {
     if (!/^https?:\/\//.test(form.issuer.trim())) found.push("issuer");
     if (!form.clientId.trim()) found.push("client_id");
@@ -194,6 +226,7 @@ export function problems(form: ProviderForm, editing: boolean): string[] {
   } else if (form.protocol === "saml") {
     if (form.metadataSource === "url" && !/^https?:\/\//.test(form.idpMetadataUrl.trim())) found.push("metadata");
     if (form.metadataSource === "xml" && !form.idpMetadataXml.trim().startsWith("<")) found.push("metadata");
+    if (form.spEntityId.trim() && !ENTITY_ID_PATTERN.test(form.spEntityId.trim())) found.push("entity_id");
   } else {
     if (!/^ldaps?:\/\//.test(form.ldapUrl.trim())) found.push("ldap_url");
     if (!form.bindDn.trim()) found.push("bind_dn");
@@ -201,6 +234,11 @@ export function problems(form: ProviderForm, editing: boolean): string[] {
     if (!editing && !form.bindPassword) found.push("bind_password");
   }
   return found;
+}
+
+/** A server address without TLS: the sign-in module refuses to send people back over plain HTTP. */
+export function plainServerAddress(form: ProviderForm): boolean {
+  return form.protocol !== "ldap" && server(form.serverAddress).startsWith("http://");
 }
 
 /** Plain LDAP without StartTLS: the module refuses to send passwords over it (outside the test bench). */

@@ -15,13 +15,13 @@ kommen angemeldet zurück. Was für alle Anbieter gilt, steht unter [Anmeldeanbi
 
 1. Öffnen Sie in der Konsole **Zugriffskontrolle → Anmeldeanbieter**, wählen Sie **Anbieter hinzufügen** und
    unter **Art** **SAML 2.0**.
-2. Geben Sie den **Namen** ein und prüfen Sie den **Schlüssel**. Der Dialog zeigt nun drei Werte, jeden mit
-   einem Kopiersymbol:
+2. Geben Sie den **Namen** ein und prüfen Sie den **Schlüssel** und die **Serveradresse**. Der Dialog zeigt
+   nun drei Werte:
 
     | In der Konsole | Beim Identitätsanbieter |
     |---|---|
     | **Metadaten-Adresse** | Die Metadaten des Dienstanbieters. Die meisten Identitätsanbieter lesen alles daraus. |
-    | **Entity-ID** | Die Kennung (Entity-ID) des Dienstanbieters. |
+    | **Entity-ID** | Die Kennung (Entity-ID) des Dienstanbieters. Leer: die Metadaten-Adresse. Geben Sie nur dann eine andere an, wenn der Identitätsanbieter diesen Server schon darunter kennt. |
     | **Assertion Consumer Service (ACS)** | Die Antwort-URL; Antworten kommen per HTTP POST dorthin. |
 
 3. Fügen Sie beim Identitätsanbieter den Dienstanbieter mit der **Metadaten-Adresse** hinzu, oder mit

@@ -3,13 +3,15 @@ import { describe, expect, it } from "vitest";
 
 import type { SignInProvider } from "~/api/signInProviders";
 
-import { addresses, blankForm, formFromProvider, keyFromName, plainLdap, problems, toWrite } from "./model";
+import {
+  addresses, blankForm, formFromProvider, keyFromName, plainLdap, plainServerAddress, problems, toWrite,
+} from "./model";
 
 const ORIGIN = "https://ai.example.internal";
 
 function oidcForm() {
   return {
-    ...blankForm("oidc"),
+    ...blankForm("oidc", ORIGIN),
     key: "corp", name: "Example Corp", issuer: "https://login.example.com/v2.0 ", clientId: " app-1 ",
     clientSecret: "s3cret",
   };
@@ -55,7 +57,7 @@ describe("defaults", () => {
 
 describe("what a new provider sends", () => {
   it("an OIDC provider: trimmed fields, this server's callback, the secret", () => {
-    const write = toWrite(oidcForm(), ORIGIN);
+    const write = toWrite(oidcForm());
     expect(write).toMatchObject({
       key: "corp", name: "Example Corp", enabled: true,
       settings: {
@@ -67,12 +69,12 @@ describe("what a new provider sends", () => {
   });
 
   it("a SAML provider: its metadata one way only, this server's entity ID and ACS", () => {
-    const form = { ...blankForm("saml"), key: "idp", name: "IdP", idpMetadataUrl: "https://idp.example.com/md" };
-    expect(toWrite(form, ORIGIN).settings).toMatchObject({
+    const form = { ...blankForm("saml", ORIGIN), key: "idp", name: "IdP", idpMetadataUrl: "https://idp.example.com/md" };
+    expect(toWrite(form).settings).toMatchObject({
       protocol: "saml", idp_metadata_url: "https://idp.example.com/md", idp_metadata_xml: null,
       sp_entity_id: `${ORIGIN}/api/auth/sso/idp/metadata`, acs_url: `${ORIGIN}/api/auth/sso/idp/acs`,
     });
-    const pasted = toWrite({ ...form, metadataSource: "xml", idpMetadataXml: " <EntityDescriptor/> " }, ORIGIN);
+    const pasted = toWrite({ ...form, metadataSource: "xml", idpMetadataXml: " <EntityDescriptor/> " });
     expect(pasted.settings).toMatchObject({ idp_metadata_url: null, idp_metadata_xml: "<EntityDescriptor/>" });
   });
 
@@ -81,7 +83,7 @@ describe("what a new provider sends", () => {
       ...blankForm("ldap"), key: "ad", name: "AD", ldapUrl: "ldaps://dc1.example.com", bindDn: "svc@example.com",
       bindPassword: "pw", baseDn: "DC=example,DC=com",
     };
-    const write = toWrite(form, ORIGIN);
+    const write = toWrite(form);
     expect(write.settings).toMatchObject({ protocol: "ldap", ca_bundle: null, user_filter: null, preset: "ad" });
     expect(write.secrets).toEqual({ bind_password: "pw" });
   });
@@ -91,7 +93,7 @@ describe("what a new provider sends", () => {
       ...oidcForm(), allowedDomains: "@example.com, example.de;  ", sessionHours: "1.5", inactiveDays: "",
       groupRules: [{ external: "AI Users", group_id: "g1" }, { external: " ", group_id: "g2" }, { external: "x", group_id: "" }],
     };
-    expect(toWrite(form, ORIGIN).policy).toMatchObject({
+    expect(toWrite(form).policy).toMatchObject({
       allowed_domains: ["example.com", "example.de"], session_lifetime_s: 5400, inactive_days: null,
       group_rules: [{ external: "AI Users", group_id: "g1" }],
     });
@@ -102,7 +104,8 @@ describe("changing a provider", () => {
   it("reads the stored provider into the form, never a secret", () => {
     const form = formFromProvider(STORED);
     expect(form).toMatchObject({
-      key: "corp", issuer: "https://login.example.com/v2.0", clientId: "app-1", clientSecret: "",
+      key: "corp", serverAddress: "https://old.example.internal", issuer: "https://login.example.com/v2.0",
+      clientId: "app-1", clientSecret: "",
       scopes: "openid email", userinfo: "always", allowedDomains: "example.com, example.de", sessionHours: "8",
       inactiveDays: "", ssoOnly: true, manageGroups: true, createAccount: false,
     });
@@ -110,21 +113,23 @@ describe("changing a provider", () => {
 
   it("keeps what the form does not show, sends no key, and no secret unless one is typed", () => {
     const form = { ...formFromProvider(STORED), name: "Renamed" };
-    const write = toWrite(form, ORIGIN, STORED);
+    const write = toWrite(form, STORED);
     expect(write.key).toBeUndefined();
     expect(write.secrets).toBeUndefined();
     expect(write.settings).toMatchObject({
       redirect_uri: STORED.settings.protocol === "oidc" ? STORED.settings.redirect_uri : "",
       token_auth_method: "client_secret_post", email_claim: "upn", groups_claim: "roles",
     });
-    expect(toWrite({ ...form, clientSecret: "new" }, ORIGIN, STORED).secrets).toEqual({ client_secret: "new" });
+    expect(toWrite({ ...form, clientSecret: "new" }, STORED).secrets).toEqual({ client_secret: "new" });
   });
 });
 
 describe("what is still missing", () => {
   it("names each required field per protocol", () => {
-    expect(problems(blankForm("oidc"), false)).toEqual(["name", "key", "issuer", "client_id", "client_secret"]);
-    expect(problems(blankForm("saml"), false)).toEqual(["name", "key", "metadata"]);
+    expect(problems(blankForm("oidc"), false)).toEqual([
+      "name", "key", "server_address", "issuer", "client_id", "client_secret",
+    ]);
+    expect(problems(blankForm("saml", ORIGIN), false)).toEqual(["name", "key", "metadata"]);
     expect(problems(blankForm("ldap"), false)).toEqual(["name", "key", "ldap_url", "bind_dn", "base_dn", "bind_password"]);
     expect(problems(oidcForm(), false)).toEqual([]);
   });
@@ -144,5 +149,74 @@ describe("what is still missing", () => {
     expect(plainLdap(ldap)).toBe(true);
     expect(plainLdap({ ...ldap, startTls: true })).toBe(false);
     expect(plainLdap({ ...ldap, ldapUrl: "ldaps://dc1.example.com" })).toBe(false);
+  });
+});
+
+describe("the server address", () => {
+  it("is where the console is open, unless the admin changes it", () => {
+    expect(blankForm("oidc", ORIGIN).serverAddress).toBe(ORIGIN);
+    const moved = { ...oidcForm(), serverAddress: "https://ai.example.com/" };
+    expect(toWrite(moved).settings).toMatchObject({ redirect_uri: "https://ai.example.com/api/auth/sso/corp/callback" });
+  });
+
+  it("can be changed on a stored provider, keeping everything else", () => {
+    const form = { ...formFromProvider(STORED), serverAddress: "https://ai.example.com" };
+    expect(toWrite(form, STORED).settings).toMatchObject({
+      redirect_uri: "https://ai.example.com/api/auth/sso/corp/callback", email_claim: "upn",
+    });
+  });
+
+  it("is a scheme and a host, nothing after them", () => {
+    for (const serverAddress of ["https://ai.example.internal", "https://ai.example.internal/", "http://192.0.2.10:8080"]) {
+      expect(problems({ ...oidcForm(), serverAddress }, false)).toEqual([]);
+    }
+    for (const serverAddress of ["ai.example.internal", "https://ai.example.internal/console", "https://a b", "ftp://x"]) {
+      expect(problems({ ...oidcForm(), serverAddress }, false)).toContain("server_address");
+    }
+    expect(problems({ ...blankForm("ldap"), serverAddress: "" }, false)).not.toContain("server_address");
+  });
+
+  it("warns of a server address without HTTPS", () => {
+    expect(plainServerAddress({ ...oidcForm(), serverAddress: "http://ai.example.internal" })).toBe(true);
+    expect(plainServerAddress(oidcForm())).toBe(false);
+    expect(plainServerAddress({ ...blankForm("ldap"), serverAddress: "http://x" })).toBe(false);
+  });
+});
+
+describe("the SAML entity ID", () => {
+  const saml = { ...blankForm("saml", ORIGIN), key: "idp", name: "IdP", idpMetadataUrl: "https://idp.example.com/md" };
+
+  it("is the metadata address unless one is given", () => {
+    expect(toWrite(saml).settings).toMatchObject({ sp_entity_id: `${ORIGIN}/api/auth/sso/idp/metadata` });
+    expect(toWrite({ ...saml, spEntityId: " urn:example:fadenstack " }).settings).toMatchObject({
+      sp_entity_id: "urn:example:fadenstack",
+    });
+  });
+
+  it("follows a changed server address while it is the default, and stays when it was given", () => {
+    const stored: SignInProvider = {
+      ...STORED, key: "idp", protocol: "saml",
+      settings: {
+        protocol: "saml", idp_metadata_url: "https://idp.example.com/md", idp_metadata_xml: null, idp_entity_id: null,
+        sp_entity_id: `${ORIGIN}/api/auth/sso/idp/metadata`, acs_url: `${ORIGIN}/api/auth/sso/idp/acs`,
+        subject_attribute: null, email_verified_by_idp: false, sign_requests: false, want_response_signed: false,
+        sp_certificate: "-----BEGIN CERTIFICATE-----",
+      },
+    };
+    const form = formFromProvider(stored);
+    expect([form.serverAddress, form.spEntityId]).toEqual([ORIGIN, ""]);
+    expect(toWrite({ ...form, serverAddress: "https://ai.example.com" }, stored).settings).toMatchObject({
+      sp_entity_id: "https://ai.example.com/api/auth/sso/idp/metadata",
+      acs_url: "https://ai.example.com/api/auth/sso/idp/acs",
+      sp_certificate: "-----BEGIN CERTIFICATE-----",
+    });
+    const given = formFromProvider({ ...stored, settings: { ...stored.settings, sp_entity_id: "urn:example:old-sp" } as never });
+    expect(given.spEntityId).toBe("urn:example:old-sp");
+  });
+
+  it("is an absolute URI of at most 256 characters", () => {
+    expect(problems({ ...saml, spEntityId: "not a uri" }, false)).toContain("entity_id");
+    expect(problems({ ...saml, spEntityId: `urn:${"x".repeat(260)}` }, false)).toContain("entity_id");
+    expect(problems({ ...saml, spEntityId: "https://sp.example.com/saml" }, false)).toEqual([]);
   });
 });

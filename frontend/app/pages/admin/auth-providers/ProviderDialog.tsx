@@ -29,6 +29,7 @@ import {
   formFromProvider,
   keyFromName,
   plainLdap,
+  plainServerAddress,
   problems,
   toWrite,
   type ProviderForm,
@@ -68,30 +69,51 @@ function Address({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** What the provider is told about this server: its callback (OIDC), or its entity, ACS and metadata (SAML). */
-function Registration({ form, stored, origin }: { form: ProviderForm; stored: SignInProvider | null; origin: string }) {
+/**
+ * What the provider is told about this server: where people open it (editable), and the addresses made from
+ * it, to copy into the provider: its callback (OIDC), or its metadata, entity ID and ACS (SAML).
+ */
+function Registration({ form, set }: { form: ProviderForm; set: (change: Partial<ProviderForm>) => void }) {
   const { t } = useTranslation();
-  const here = addresses(form.key, origin);
-  const s = stored?.settings;
-  if (form.protocol === "oidc") {
-    return (
-      <Stack spacing={1.5}>
-        <Typography variant="body2" color="text.secondary">{t("auth_providers.oidc.register")}</Typography>
-        <Address label={t("auth_providers.oidc.redirect_uri")} value={s?.protocol === "oidc" ? s.redirect_uri : here.callback} />
-      </Stack>
-    );
-  }
-  if (form.protocol === "saml") {
-    return (
-      <Stack spacing={1.5}>
-        <Typography variant="body2" color="text.secondary">{t("auth_providers.saml.register")}</Typography>
-        <Address label={t("auth_providers.saml.metadata_url")} value={here.metadata} />
-        <Address label={t("auth_providers.saml.entity_id")} value={s?.protocol === "saml" ? s.sp_entity_id : here.metadata} />
-        <Address label={t("auth_providers.saml.acs_url")} value={s?.protocol === "saml" ? s.acs_url : here.acs} />
-      </Stack>
-    );
-  }
-  return null;
+  if (form.protocol === "ldap") return null;
+  const here = addresses(form.key, form.serverAddress);
+  return (
+    <Stack spacing={1.5}>
+      <TextField
+        size="small"
+        required
+        label={t("auth_providers.server_address")}
+        value={form.serverAddress}
+        onChange={(e) => set({ serverAddress: e.target.value })}
+        helperText={t("auth_providers.server_address_help")}
+        placeholder="https://ai.example.internal"
+        slotProps={{ htmlInput: { spellCheck: false } }}
+      />
+      {plainServerAddress(form) && <Alert severity="warning">{t("auth_providers.server_address_plain")}</Alert>}
+      {form.protocol === "oidc" ? (
+        <>
+          <Typography variant="body2" color="text.secondary">{t("auth_providers.oidc.register")}</Typography>
+          <Address label={t("auth_providers.oidc.redirect_uri")} value={here.callback} />
+        </>
+      ) : (
+        <>
+          <Typography variant="body2" color="text.secondary">{t("auth_providers.saml.register")}</Typography>
+          <Address label={t("auth_providers.saml.metadata_url")} value={here.metadata} />
+          <TextField
+            size="small"
+            fullWidth
+            label={t("auth_providers.saml.entity_id")}
+            value={form.spEntityId}
+            onChange={(e) => set({ spEntityId: e.target.value })}
+            placeholder={here.metadata}
+            helperText={t("auth_providers.saml.entity_id_help")}
+            slotProps={{ htmlInput: { spellCheck: false, maxLength: 256 } }}
+          />
+          <Address label={t("auth_providers.saml.acs_url")} value={here.acs} />
+        </>
+      )}
+    </Stack>
+  );
 }
 
 function SecretField({
@@ -330,17 +352,17 @@ export function ProviderDialog({
 }) {
   const { t } = useTranslation();
   const origin = typeof window === "undefined" ? "" : window.location.origin;
-  const [form, setForm] = useState<ProviderForm>(() => blankForm());
+  const [form, setForm] = useState<ProviderForm>(() => blankForm("oidc", origin));
   const [keyTouched, setKeyTouched] = useState(false);
   const [saving, setSaving] = useState(false);
   const [refused, setRefused] = useState<string[]>([]);
 
   useEffect(() => {
     if (!open) return;
-    setForm(stored ? formFromProvider(stored) : blankForm());
+    setForm(stored ? formFromProvider(stored) : blankForm("oidc", origin));
     setKeyTouched(false);
     setRefused([]);
-  }, [open, stored]);
+  }, [open, stored, origin]);
 
   const set = (change: Partial<ProviderForm>) =>
     setForm((current) => {
@@ -354,7 +376,7 @@ export function ProviderDialog({
     setSaving(true);
     setRefused([]);
     try {
-      const write = toWrite(form, origin, stored ?? undefined);
+      const write = toWrite(form, stored ?? undefined);
       if (stored) await signInProviders.update(stored.key, write);
       else await signInProviders.create(write);
       onSaved();
@@ -423,7 +445,7 @@ export function ProviderDialog({
           control={<Switch checked={form.enabled} onChange={(e) => set({ enabled: e.target.checked })} />}
           label={t("auth_providers.enabled_label")}
         />
-        <Registration form={form} stored={stored} origin={origin} />
+        <Registration form={form} set={set} />
         <ProtocolFields form={form} set={set} stored={stored} />
         <Divider />
         <PolicyFields form={form} set={set} roles={roles} groups={groups} />

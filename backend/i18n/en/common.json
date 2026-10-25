@@ -2146,7 +2146,9 @@
       "ldap_url": "the directory's address (ldaps:// or ldap://)",
       "bind_dn": "the service account",
       "base_dn": "where people are searched",
-      "bind_password": "the service account's password"
+      "bind_password": "the service account's password",
+      "server_address": "the server address (https:// and the host, nothing after it)",
+      "entity_id": "an entity ID (an absolute URI, at most 256 characters)"
     },
     "oidc": {
       "register": "Register this address at the provider as the redirect URI:",
@@ -2172,7 +2174,8 @@
       "metadata_pasted": "Pasted",
       "idp_metadata_url": "Metadata address of the identity provider",
       "idp_metadata_xml": "Metadata (XML)",
-      "sign_requests": "Sign the requests sent to the identity provider"
+      "sign_requests": "Sign the requests sent to the identity provider",
+      "entity_id_help": "Empty: the metadata address. Change it only if the identity provider knows this server by another entity ID."
     },
     "ldap": {
       "url": "Directory address",
@@ -2210,7 +2213,10 @@
       "session_hours": "Sign-in lasts at most (hours)",
       "inactive_days": "Suspend after days without sign-in",
       "inactive_days_help": "Empty: never"
-    }
+    },
+    "server_address": "Server address",
+    "server_address_help": "Where people open this server, for example https://ai.example.internal. The provider sends them back there; the addresses below are made from it.",
+    "server_address_plain": "Without HTTPS the sign-in module sends nobody back: use an https:// address."
   },
   "security_map": {
     "title": "Data Residency Map",

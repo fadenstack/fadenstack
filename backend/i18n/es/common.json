@@ -2005,7 +2005,9 @@
       "ldap_url": "la dirección del directorio (ldaps:// o ldap://)",
       "bind_dn": "la cuenta de servicio",
       "base_dn": "dónde se busca a las personas",
-      "bind_password": "la contraseña de la cuenta de servicio"
+      "bind_password": "la contraseña de la cuenta de servicio",
+      "server_address": "la dirección del servidor (https:// y el host, nada detrás)",
+      "entity_id": "un ID de entidad (una URI absoluta, de 256 caracteres como máximo)"
     },
     "oidc": {
       "register": "Registrar esta dirección en el proveedor como URI de redirección:",
@@ -2031,7 +2033,8 @@
       "metadata_pasted": "Pegados",
       "idp_metadata_url": "Dirección de metadatos del proveedor de identidad",
       "idp_metadata_xml": "Metadatos (XML)",
-      "sign_requests": "Firmar las solicitudes enviadas al proveedor de identidad"
+      "sign_requests": "Firmar las solicitudes enviadas al proveedor de identidad",
+      "entity_id_help": "Vacío: la dirección de metadatos. Cambiarlo solo si el proveedor de identidad conoce este servidor por otro ID de entidad."
     },
     "ldap": {
       "url": "Dirección del directorio",
@@ -2069,7 +2072,10 @@
       "session_hours": "El inicio de sesión dura como máximo (horas)",
       "inactive_days": "Suspender tras días sin iniciar sesión",
       "inactive_days_help": "Vacío: nunca"
-    }
+    },
+    "server_address": "Dirección del servidor",
+    "server_address_help": "Dónde abren las personas este servidor, por ejemplo https://ai.example.internal. El proveedor las devuelve allí; las direcciones de abajo se forman a partir de ella.",
+    "server_address_plain": "Sin HTTPS, el módulo de inicio de sesión no devuelve a nadie: usar una dirección https://."
   },
   "security_map": {
     "title": "Mapa de Residencia de Datos",

@@ -2148,7 +2148,9 @@
       "ldap_url": "l'adresse de l'annuaire (ldaps:// ou ldap://)",
       "bind_dn": "le compte de service",
       "base_dn": "où chercher les personnes",
-      "bind_password": "le mot de passe du compte de service"
+      "bind_password": "le mot de passe du compte de service",
+      "server_address": "l'adresse du serveur (https:// et l'hôte, rien après)",
+      "entity_id": "un ID d'entité (une URI absolue, 256 caractères au plus)"
     },
     "oidc": {
       "register": "Enregistrez cette adresse chez le fournisseur comme URI de redirection :",
@@ -2174,7 +2176,8 @@
       "metadata_pasted": "Collées",
       "idp_metadata_url": "Adresse des métadonnées du fournisseur d'identité",
       "idp_metadata_xml": "Métadonnées (XML)",
-      "sign_requests": "Signer les requêtes envoyées au fournisseur d'identité"
+      "sign_requests": "Signer les requêtes envoyées au fournisseur d'identité",
+      "entity_id_help": "Vide : l'adresse des métadonnées. Ne la changez que si le fournisseur d'identité connaît ce serveur sous un autre ID d'entité."
     },
     "ldap": {
       "url": "Adresse de l'annuaire",
@@ -2212,7 +2215,10 @@
       "session_hours": "La connexion dure au plus (heures)",
       "inactive_days": "Suspendre après des jours sans connexion",
       "inactive_days_help": "Vide : jamais"
-    }
+    },
+    "server_address": "Adresse du serveur",
+    "server_address_help": "Où les gens ouvrent ce serveur, par exemple https://ai.example.internal. Le fournisseur les y renvoie ; les adresses ci-dessous en sont formées.",
+    "server_address_plain": "Sans HTTPS, le module de connexion ne renvoie personne : utilisez une adresse https://."
   },
   "security_map": {
     "title": "Carte de résidence des données",

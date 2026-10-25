@@ -11,9 +11,9 @@ Gruppen, die Sie festlegen.
 - Das Modul **Sign-in** ist eingeschaltet (**Einstellungen → Module**). Dann erscheint die Seite
   **Zugriffskontrolle → Anmeldeanbieter**.
 - Der Server ist über HTTPS erreichbar, unter der Adresse, die die Benutzer verwenden (z. B.
-  `https://ai.example.internal`). Öffnen Sie die Konsole unter dieser Adresse, um einen Anbieter hinzuzufügen:
-  Die Adressen, mit denen der Anbieter eingetragen wird, werden daraus gebildet, und Identitätsanbieter
-  schicken die Benutzer dorthin zurück.
+  `https://ai.example.internal`). Jeder Anbieter hat eine **Serveradresse**: Identitätsanbieter schicken die
+  Benutzer dorthin zurück, und die Adressen, mit denen der Anbieter eingetragen wird, werden daraus gebildet.
+  Sie beginnt als die Adresse, unter der die Konsole geöffnet ist.
 
 ## Einen Anbieter hinzufügen {#add-a-provider}
 
@@ -26,8 +26,9 @@ Gruppen, die Sie festlegen.
 3. Geben Sie einen **Namen** ein: Die Benutzer sehen ihn auf der Anmeldeseite, z. B. „Example Corp“.
 4. Prüfen Sie den **Schlüssel**, den die Konsole aus dem Namen gebildet hat. Er ist Teil der Adressen, mit
    denen der Anbieter eingetragen wird, und lässt sich später nicht ändern.
-5. Füllen Sie die Felder des Anbieters aus und tragen Sie die oben angezeigten Adressen beim Anbieter ein
-   (siehe die Seite zu Ihrer Art). Legen Sie dann fest, wer sich anmelden darf (unten).
+5. Prüfen Sie die **Serveradresse**, füllen Sie die Felder des Anbieters aus und tragen Sie die angezeigten
+   Adressen beim Anbieter ein (siehe die Seite zu Ihrer Art). Legen Sie dann fest, wer sich anmelden darf
+   (unten).
 6. Wählen Sie **Anbieter hinzufügen**.
 
 Der Dialog zeigt unter **Noch nötig**, was fehlt, bevor er gesendet werden kann. Lehnt das Anmeldemodul eine
@@ -72,6 +73,8 @@ Konto mit dieser Adresse“ abgelehnt: Schalten Sie den Mail-Dienst ein, dann ka
 
 - **Ändern**: das Stiftsymbol in der Zeile des Anbieters. Secrets werden nie wieder angezeigt: Lassen Sie das
   Feld leer, um den gesetzten Wert zu behalten.
+- **Die Adresse des Servers hat sich geändert**: Ändern Sie die **Serveradresse**, speichern Sie und tragen Sie
+  die neuen Adressen beim Anbieter ein. Bis der Anbieter sie kennt, schlagen Anmeldungen darüber fehl.
 - **Vorübergehend abschalten**: Schalten Sie **Personen können sich damit anmelden** aus. Der Anbieter
   verschwindet von der Anmeldeseite.
 - **Löschen**: das Papierkorbsymbol. Wer sich damit angemeldet hat, behält das Konto, kann sich aber nicht mehr

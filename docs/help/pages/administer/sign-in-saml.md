@@ -14,12 +14,12 @@ what all providers share, see [Sign-in providers](sign-in.md).
 
 1. In the console, open **Access Control → Sign-in providers**, select **Add provider** and pick **SAML 2.0**
    under **Kind**.
-2. Enter the **Name** and check the **Key**. The dialog now shows three values, each with a copy icon:
+2. Enter the **Name**, check the **Key** and the **Server address**. The dialog now shows three values:
 
     | In the console | At the identity provider |
     |---|---|
     | **Metadata address** | The service provider's metadata. Most identity providers read everything from it. |
-    | **Entity ID** | The identifier (entity ID) of the service provider. |
+    | **Entity ID** | The identifier (entity ID) of the service provider. Empty: the metadata address. Give another one only when the identity provider knows this server by it already. |
     | **Assertion consumer service (ACS)** | The reply URL; answers come back to it by HTTP POST. |
 
 3. At the identity provider, add the service provider with the **Metadata address**, or with the **Entity ID**

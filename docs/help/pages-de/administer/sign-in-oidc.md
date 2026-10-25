@@ -15,9 +15,9 @@ dort an und kommen angemeldet zurück. Was für alle Anbieter gilt, steht unter
 
 1. Öffnen Sie in der Konsole **Zugriffskontrolle → Anmeldeanbieter**, wählen Sie **Anbieter hinzufügen** und
    unter **Art** **OpenID Connect**.
-2. Geben Sie den **Namen** ein und prüfen Sie den **Schlüssel**. Der Dialog zeigt nun die
-   **Weiterleitungs-URI**, z. B. `https://ai.example.internal/api/auth/sso/example-corp/callback`. Wählen Sie
-   das Kopiersymbol.
+2. Geben Sie den **Namen** ein und prüfen Sie den **Schlüssel** und die **Serveradresse**. Der Dialog zeigt
+   nun die **Weiterleitungs-URI**, z. B. `https://ai.example.internal/api/auth/sso/example-corp/callback`.
+   Wählen Sie das Kopiersymbol.
 3. Registrieren Sie beim Anbieter eine Webanwendung mit dieser Adresse als Weiterleitungs-URI (auch Callback-
    oder Antwort-URL genannt). Sie muss den Autorisierungscode-Ablauf (authorization code flow) erlauben.
 4. Legen Sie dort ein Client-Secret an und notieren Sie die Client-ID der Anwendung.
@@ -58,6 +58,6 @@ Legen Sie dann fest, wer sich anmelden darf (siehe
 |---|---|
 | **„Der Anmeldedienst ist gerade nicht erreichbar.“** | Das Anmeldemodul konnte die Einstellungen des Anbieters nicht vom **Aussteller** lesen. Prüfen Sie, ob der Server diese Adresse erreicht, und übernehmen Sie den `issuer` genau aus `/.well-known/openid-configuration` des Anbieters. |
 | Der Anbieter meldet, dass die Weiterleitungs-URI nicht passt | Tragen Sie die **Weiterleitungs-URI** genau so ein, wie der Dialog sie zeigt, mit `https://` und dem Schlüssel. |
-| **„Die Anmeldung hat nicht geklappt.“** direkt nach **Anmelden mit** | Die Anmeldeseite wurde unter einer anderen Adresse geöffnet als der in der **Weiterleitungs-URI**, z. B. über die IP-Adresse. Öffnen Sie sie unter der Adresse, die die Benutzer verwenden; hat sich diese Adresse geändert, löschen Sie den Anbieter und fügen Sie ihn von der neuen Adresse aus wieder hinzu. |
+| **„Die Anmeldung hat nicht geklappt.“** direkt nach **Anmelden mit** | Die Anmeldeseite wurde unter einer anderen Adresse geöffnet als der in der **Weiterleitungs-URI**, z. B. über die IP-Adresse. Öffnen Sie sie unter der Adresse, die die Benutzer verwenden. Hat sich diese Adresse geändert, ändern Sie die **Serveradresse** und tragen Sie die neue **Weiterleitungs-URI** beim Anbieter ein. |
 | **„Der Anbieter hat Ihre E-Mail-Adresse nicht bestätigt …“** | Tragen Sie Ihre Domains unter **Erlaubte E-Mail-Domains** ein. |
 | Benutzer kommen in keine Gruppe | Der Anbieter sendet keinen Claim `groups`. Fügen Sie beim Anbieter einen hinzu, und prüfen Sie, ob die Regeln die Gruppen so nennen, wie der Anbieter sie sendet. |

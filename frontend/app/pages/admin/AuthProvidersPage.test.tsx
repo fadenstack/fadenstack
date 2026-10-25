@@ -61,7 +61,10 @@ describe("the sign-in providers page", () => {
 
     fireEvent.change(field(/^Name/), { target: { value: "Example Corp" } });
     expect(field(/^Key/)).toHaveValue("example-corp");
+    expect(field(/^Server address/)).toHaveValue(window.location.origin);
     expect(screen.getByDisplayValue(`${window.location.origin}/api/auth/sso/example-corp/callback`)).toBeInTheDocument();
+    fireEvent.change(field(/^Server address/), { target: { value: "https://ai.example.internal" } });
+    expect(screen.getByDisplayValue("https://ai.example.internal/api/auth/sso/example-corp/callback")).toBeInTheDocument();
     expect(screen.getByTestId("provider-missing")).toHaveTextContent("the issuer");
 
     fireEvent.change(field(/^Issuer/), { target: { value: "https://login.example.com/v2.0" } });
@@ -73,7 +76,10 @@ describe("the sign-in providers page", () => {
     await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
     expect(create.mock.calls[0][0]).toMatchObject({
       key: "example-corp", name: "Example Corp",
-      settings: { protocol: "oidc", issuer: "https://login.example.com/v2.0", client_id: "app-1" },
+      settings: {
+        protocol: "oidc", issuer: "https://login.example.com/v2.0", client_id: "app-1",
+        redirect_uri: "https://ai.example.internal/api/auth/sso/example-corp/callback",
+      },
       secrets: { client_secret: "s3cret" },
       policy: { create_account: true, session_lifetime_s: 43_200, inactive_days: 45 },
     });

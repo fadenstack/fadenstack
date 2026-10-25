@@ -2005,7 +2005,9 @@
       "ldap_url": "目录地址（ldaps:// 或 ldap://）",
       "bind_dn": "服务账户",
       "base_dn": "搜索用户的位置",
-      "bind_password": "服务账户的密码"
+      "bind_password": "服务账户的密码",
+      "server_address": "服务器地址（https:// 加主机名，后面不带其他内容）",
+      "entity_id": "实体 ID（绝对 URI，最多 256 个字符）"
     },
     "oidc": {
       "register": "请在提供商处将此地址登记为重定向 URI：",
@@ -2031,7 +2033,8 @@
       "metadata_pasted": "粘贴",
       "idp_metadata_url": "身份提供商的元数据地址",
       "idp_metadata_xml": "元数据（XML）",
-      "sign_requests": "对发送给身份提供商的请求签名"
+      "sign_requests": "对发送给身份提供商的请求签名",
+      "entity_id_help": "留空：使用元数据地址。仅当身份提供商以其他实体 ID 识别本服务器时才更改。"
     },
     "ldap": {
       "url": "目录地址",
@@ -2069,7 +2072,10 @@
       "session_hours": "登录最长有效（小时）",
       "inactive_days": "多少天未登录后暂停",
       "inactive_days_help": "留空：从不"
-    }
+    },
+    "server_address": "服务器地址",
+    "server_address_help": "用户打开本服务器的地址，例如 https://ai.example.internal。提供商会把用户送回这里；下面的地址都由它生成。",
+    "server_address_plain": "没有 HTTPS，登录模块不会把任何人送回：请使用 https:// 地址。"
   },
   "security_map": {
     "title": "数据驻留地图",

@@ -2005,7 +2005,9 @@
       "ldap_url": "die Adresse des Verzeichnisses (ldaps:// oder ldap://)",
       "bind_dn": "das Dienstkonto",
       "base_dn": "wo Personen gesucht werden",
-      "bind_password": "das Passwort des Dienstkontos"
+      "bind_password": "das Passwort des Dienstkontos",
+      "server_address": "die Serveradresse (https:// und der Host, nichts danach)",
+      "entity_id": "eine Entity-ID (eine absolute URI, höchstens 256 Zeichen)"
     },
     "oidc": {
       "register": "Tragen Sie diese Adresse beim Anbieter als Weiterleitungs-URI ein:",
@@ -2031,7 +2033,8 @@
       "metadata_pasted": "Eingefügt",
       "idp_metadata_url": "Metadaten-Adresse des Identitätsanbieters",
       "idp_metadata_xml": "Metadaten (XML)",
-      "sign_requests": "Anfragen an den Identitätsanbieter signieren"
+      "sign_requests": "Anfragen an den Identitätsanbieter signieren",
+      "entity_id_help": "Leer: die Metadaten-Adresse. Ändern Sie sie nur, wenn der Identitätsanbieter diesen Server unter einer anderen Entity-ID kennt."
     },
     "ldap": {
       "url": "Adresse des Verzeichnisses",
@@ -2069,7 +2072,10 @@
       "session_hours": "Anmeldung gilt höchstens (Stunden)",
       "inactive_days": "Sperren nach Tagen ohne Anmeldung",
       "inactive_days_help": "Leer: nie"
-    }
+    },
+    "server_address": "Serveradresse",
+    "server_address_help": "Wo die Benutzer diesen Server öffnen, z. B. https://ai.example.internal. Der Anbieter schickt sie dorthin zurück; die Adressen darunter werden daraus gebildet.",
+    "server_address_plain": "Ohne HTTPS schickt das Anmeldemodul niemanden zurück: Verwenden Sie eine https://-Adresse."
   },
   "security_map": {
     "title": "Datenresidenz-Karte",

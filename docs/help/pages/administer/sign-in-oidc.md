@@ -14,8 +14,8 @@ signed in. For what all providers share, see [Sign-in providers](sign-in.md).
 
 1. In the console, open **Access Control → Sign-in providers**, select **Add provider** and pick
    **OpenID Connect** under **Kind**.
-2. Enter the **Name** and check the **Key**. The dialog now shows the **Redirect URI**, for example
-   `https://ai.example.internal/api/auth/sso/example-corp/callback`. Select the copy icon.
+2. Enter the **Name**, check the **Key** and the **Server address**. The dialog now shows the **Redirect
+   URI**, for example `https://ai.example.internal/api/auth/sso/example-corp/callback`. Select the copy icon.
 3. At the provider, register a web application with that address as its redirect URI (also called callback or
    reply URL). It must allow the authorization code flow.
 4. Create a client secret there, and note the application's client ID.
@@ -56,6 +56,6 @@ Then decide who may sign in (see [Sign-in providers](sign-in.md#who-may-sign-in-
 |---|---|
 | **"The sign-in service cannot be reached right now."** | The sign-in module could not read the provider's settings from the **Issuer**. Check that the server reaches that address, and copy the `issuer` exactly from the provider's `/.well-known/openid-configuration`. |
 | The provider says the redirect URI does not match | Register the **Redirect URI** exactly as the dialog shows it, including `https://` and the key. |
-| **"The sign-in did not work."** right after **Sign in with** | The sign-in page was opened at another address than the one in the **Redirect URI**, for example by IP address. Open it at the address people use; if that address has changed, delete the provider and add it again from the new one. |
+| **"The sign-in did not work."** right after **Sign in with** | The sign-in page was opened at another address than the one in the **Redirect URI**, for example by IP address. Open it at the address people use. If that address has changed, change the **Server address** and register the new **Redirect URI** at the provider. |
 | **"The provider did not confirm your e-mail address …"** | Add your domains to **Allowed e-mail domains**. |
 | People join no groups | The provider sends no `groups` claim. Add one at the provider, and check that the rules name groups as the provider sends them. |

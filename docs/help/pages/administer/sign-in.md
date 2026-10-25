@@ -10,8 +10,8 @@ They get a Fadenstack account the first time they do, with the roles and groups 
 - The **Sign-in** module is switched on (**Settings → Modules**). Then the page **Access Control → Sign-in
   providers** appears.
 - The server is reached over HTTPS, at the address people use (for example `https://ai.example.internal`).
-  Open the console at that address to add a provider: the addresses the provider is registered with are made
-  from it, and identity providers send people back to them.
+  Each provider has a **Server address**: identity providers send people back there, and the addresses the
+  provider is registered with are made from it. It starts as the address the console is open at.
 
 ## Add a provider
 
@@ -24,8 +24,8 @@ They get a Fadenstack account the first time they do, with the roles and groups 
 3. Give it a **Name**: people see it on the sign-in page, for example "Example Corp".
 4. Check the **Key** the console made from the name. It is part of the addresses the provider is registered
    with, and cannot be changed later.
-5. Fill in the provider's fields and the addresses shown at the top (see the page for your kind), then decide
-   who may sign in (below).
+5. Check the **Server address**, fill in the provider's fields, and register the addresses shown at the
+   provider (see the page for your kind). Then decide who may sign in (below).
 6. Select **Add provider**.
 
 The dialog lists what is **Still needed** before it can be sent. When the sign-in module refuses a setting, it
@@ -70,6 +70,8 @@ this address exists already": switch the mail service on, and the owner can conf
 
 - **Change**: the pencil icon in the provider's row. Secrets are never shown again: leave the field empty to
   keep the one that is set.
+- **The server's address changed**: change the **Server address**, save, and register the new addresses at
+  the provider. Until the provider knows them, sign-ins with it fail.
 - **Switch off** for a while: turn off **People can sign in with it**. It disappears from the sign-in page.
 - **Delete**: the bin icon. People who signed in with it keep their accounts, but can no longer sign in with
   it.
