@@ -4260,7 +4260,14 @@
       "lift": "Ouvrir à tous les autorisés",
       "lift_title": "Ouvrir l'agent à tous les autorisés ?",
       "lift_body": "Lève {{names}} : tous ceux à qui l'agent est accordé peuvent de nouveau l'utiliser. L'extension qui l'a posé peut le poser de nouveau à son retour. Consigné dans le journal d'audit.",
-      "lift_confirm": "Ouvrir"
+      "lift_confirm": "Ouvrir",
+      "members_title": "Responsables et auditeurs",
+      "auditors_help": "Les auditeurs voient ses versions, ses membres, ses réglages et son activité et ne modifient rien ; pour l'utiliser, il doit leur être accordé comme à tout le monde.",
+      "add_as": "Ajouter comme",
+      "add_member": "Ajouter une personne…",
+      "role_of": "Rôle de {{who}}",
+      "role_maintainer": "Responsable",
+      "role_auditor": "Auditeur"
     },
     "activity": {
       "usage_title": "Utilisation",

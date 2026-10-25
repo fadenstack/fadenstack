@@ -4260,7 +4260,14 @@
       "lift": "Abrir a todos los autorizados",
       "lift_title": "¿Abrir el agente a todos los autorizados?",
       "lift_body": "Levanta {{names}}: todos a quienes se ha concedido el agente pueden volver a usarlo. La extensión que lo estableció puede volver a establecerlo cuando vuelva. Queda registrado en el registro de auditoría.",
-      "lift_confirm": "Abrir"
+      "lift_confirm": "Abrir",
+      "members_title": "Responsables y auditores",
+      "auditors_help": "Los auditores ven sus versiones, miembros, ajustes y actividad y no cambian nada; para usarlo, necesitan que se les conceda como a cualquier otra persona.",
+      "add_as": "Añadir como",
+      "add_member": "Añadir una persona…",
+      "role_of": "Rol de {{who}}",
+      "role_maintainer": "Responsable",
+      "role_auditor": "Auditor"
     },
     "activity": {
       "usage_title": "Uso",

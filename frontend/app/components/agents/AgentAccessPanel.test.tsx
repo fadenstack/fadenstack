@@ -4,8 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { hasFeature } from "~/api/about";
-import { agentExclusionsApi } from "~/api/agentExclusions";
-import { agentsApi } from "~/api/agents";
+import { AGENT_EXCLUSIONS, agentExclusionsApi } from "~/api/agentExclusions";
+import { AGENT_AUDITORS, agentsApi } from "~/api/agents";
 import { agentFixture } from "~/test/agentFixtures";
 
 import { AgentAccessPanel } from "./AgentAccessPanel";
@@ -35,6 +35,8 @@ vi.mock("~/api/agentExclusions", async (importOriginal) => {
 
 const api = vi.mocked(agentsApi);
 const exclusions = vi.mocked(agentExclusionsApi);
+/** The server offers these features (`GET /api/about`). */
+const offers = (...features: string[]) => vi.mocked(hasFeature).mockImplementation(async (f) => features.includes(f));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -92,7 +94,7 @@ describe("AgentAccessPanel", () => {
   });
 
   it("excludes a person with a reason, and lets them back", async () => {
-    vi.mocked(hasFeature).mockResolvedValue(true);
+    offers(AGENT_EXCLUSIONS);
     const excluded = {
       user_id: "u-7",
       email: "carl@example.com",
@@ -134,10 +136,11 @@ describe("AgentAccessPanel", () => {
     render(<AgentAccessPanel agent={agentFixture()} />);
     expect(await screen.findByText("Finance")).toBeInTheDocument();
     expect(screen.queryByText("Excluded people")).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Add as" })).not.toBeInTheDocument(); // nor auditors
 
-    vi.mocked(hasFeature).mockResolvedValue(true);
+    offers(AGENT_EXCLUSIONS);
     render(<AgentAccessPanel agent={agentFixture({ can_manage: false })} />);
-    await waitFor(() => expect(hasFeature).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(hasFeature).toHaveBeenCalledWith(AGENT_EXCLUSIONS));
     expect(screen.queryByText("Excluded people")).not.toBeInTheDocument();
     expect(exclusions.list).not.toHaveBeenCalled();
   });
@@ -164,5 +167,51 @@ describe("AgentAccessPanel", () => {
     render(<AgentAccessPanel agent={agentFixture({ can_manage: false, unenforced: ["exclusions"] })} />);
     expect(await screen.findByText(/Only its maintainers can use this agent/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Open to everyone granted" })).not.toBeInTheDocument();
+  });
+
+  it("adds an auditor and changes a member's role, where the server offers auditors", async () => {
+    offers(AGENT_AUDITORS);
+    api.findPrincipals.mockResolvedValue([{ type: "user", id: "u-5", label: "eve@example.com" }]);
+    api.setMembers.mockResolvedValue([]);
+    render(<AgentAccessPanel agent={agentFixture()} />);
+
+    expect(await screen.findByText("Maintainers and auditors")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("combobox", { name: "Add as" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Auditor" }));
+    await userEvent.type(screen.getByPlaceholderText("Add a person…"), "eve");
+    await userEvent.click(await screen.findByRole("option", { name: "eve@example.com" }));
+
+    // ana stays a maintainer until her role is changed too.
+    await userEvent.click(screen.getByRole("combobox", { name: "Role of ana@example.com" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Auditor" }));
+    const saveMembers = screen.getAllByRole("button", { name: "Save" })[1];
+    await userEvent.click(saveMembers);
+    await waitFor(() =>
+      expect(api.setMembers).toHaveBeenCalledWith("excel-assistant", [
+        { user_id: "u-1", role: "auditor" },
+        { user_id: "u-5", role: "auditor" },
+      ]),
+    );
+  });
+
+  it("notices a change of role alone", async () => {
+    offers(AGENT_AUDITORS);
+    render(<AgentAccessPanel agent={agentFixture()} />);
+    const role = await screen.findByRole("combobox", { name: "Role of ana@example.com" });
+    // Held before the menu opens: an open menu hides the rest of the page from role queries.
+    const saveMembers = screen.getAllByRole("button", { name: "Save" })[1];
+    expect(saveMembers).toBeDisabled();
+    await userEvent.click(role);
+    await userEvent.click(await screen.findByRole("option", { name: "Auditor" }));
+    expect(saveMembers).toBeEnabled();
+  });
+
+  it("shows a member's role read-only to someone who does not manage the agent", async () => {
+    offers(AGENT_AUDITORS);
+    api.members.mockResolvedValue([{ user_id: "u-3", role: "auditor", label: "ida@example.com" }]);
+    render(<AgentAccessPanel agent={agentFixture({ can_manage: false })} />);
+    expect(await screen.findByText("Auditor")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Role of ida@example.com" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Add as" })).not.toBeInTheDocument();
   });
 });

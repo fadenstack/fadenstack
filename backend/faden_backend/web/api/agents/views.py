@@ -99,17 +99,26 @@ async def _managed_agent(dao: AgentsDAO, rbac: RbacDAO, ref: str, user: User) ->
     return agent
 
 
+async def _may_inspect(dao: AgentsDAO, rbac: RbacDAO, agent: Agent, user: User) -> bool:
+    """Whether the user may see the agent's details: ``agents:read``, managing it, or a seeing member role."""
+    return (
+        await _has(rbac, user, "read")
+        or await _can_manage(dao, rbac, agent, user)
+        or await access.inspects(dao, agent, user)
+    )
+
+
 async def _inspected_agent(dao: AgentsDAO, rbac: RbacDAO, ref: str, user: User) -> Agent:
-    """An agent whose details the user may see (``agents:read``) or manages."""
+    """An agent whose details the user may see (``agents:read``, managing it, or e.g. auditing it)."""
     agent = await _agent_or_404(dao, ref)
-    if not (await _has(rbac, user, "read") or await _can_manage(dao, rbac, agent, user)):
+    if not await _may_inspect(dao, rbac, agent, user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not maintain this agent.")
     return agent
 
 
 async def _visible_agent(dao: AgentsDAO, rbac: RbacDAO, ref: str, user: User) -> Agent:
     agent = await _agent_or_404(dao, ref)
-    if await _has(rbac, user, "read") or await _can_manage(dao, rbac, agent, user):
+    if await _may_inspect(dao, rbac, agent, user):
         return agent
     if (await access.decide(dao, agent, user)).allowed:
         return agent
@@ -193,9 +202,12 @@ async def list_agents(
     dao: AgentsDAO = Depends(),
     rbac: RbacDAO = Depends(),
 ) -> list[AgentDTO]:
-    """Every agent for readers and managers; otherwise those the user can use or maintains."""
+    """Every agent for readers and managers; otherwise those the user can use, maintains or e.g. audits."""
     see_all = await _has(rbac, user, "read") or await _has(rbac, user, "manage")
-    agents = await dao.list_all(TENANT) if see_all else await dao.list_for_user(TENANT, user.id)
+    if see_all:
+        agents = await dao.list_all(TENANT)
+    else:
+        agents = await dao.list_for_user(TENANT, user.id, registry.member_roles)
     manage_all = await _has(rbac, user, "manage")
     return [
         await _dto(dao, a, can_manage=manage_all or await access.is_maintainer(dao, a, user)) for a in agents
@@ -241,12 +253,13 @@ async def list_principals(
     q: Annotated[str | None, Query(min_length=2, max_length=100)] = None,
     ids: Annotated[str | None, Query(max_length=4000)] = None,
 ) -> list[PrincipalOption]:
-    """Users and teams to grant an agent to or make its maintainers, for those who manage agents.
+    """Users and teams to grant an agent to, make its members or check the access of.
 
+    For those who manage agents or are members of one (maintainers; e.g. auditors, for the access check).
     ``q`` searches e-mail addresses and group names; ``ids`` (``user:<id>,group:<id>``) names them.
     """
     rights = [await _has(rbac, user, action) for action in ("read", "create", "manage")]
-    if not any(rights) and not await dao.maintains_any(user.id):
+    if not any(rights) and not await dao.member_of_any(user.id, registry.member_roles):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not manage agents.")
     return await find_principals(dao.session, q=q, ids=ids)
 
@@ -531,7 +544,13 @@ async def replace_members(
 ) -> list[MemberDTO]:
     """The agent's maintainers (and, with Enterprise, auditors); replaces the list."""
     agent = await _managed_agent(dao, rbac, agent_ref, user)
-    bad_roles = {m.role for m in payload.members} - registry.member_roles
+    # A role nothing adds any more may stay where it is (it gives nothing); it is not given anew.
+    kept = {m.user_id: m.role for m in await dao.members(agent.id)}
+    bad_roles = {
+        m.role
+        for m in payload.members
+        if m.role not in registry.member_roles and kept.get(m.user_id) != m.role
+    }
     if bad_roles:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

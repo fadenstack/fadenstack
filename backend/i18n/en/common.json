@@ -4258,7 +4258,14 @@
       "lift": "Open to everyone granted",
       "lift_title": "Open the agent to everyone granted?",
       "lift_body": "Lifts {{names}}: everyone the agent is granted to can use it again. The extension that set it may set it again when it is back. Recorded in the audit log.",
-      "lift_confirm": "Open it"
+      "lift_confirm": "Open it",
+      "members_title": "Maintainers and auditors",
+      "auditors_help": "Auditors see its versions, members, settings and activity and change nothing; to use it, they need it granted like anyone else.",
+      "add_as": "Add as",
+      "add_member": "Add a person…",
+      "role_of": "Role of {{who}}",
+      "role_maintainer": "Maintainer",
+      "role_auditor": "Auditor"
     },
     "activity": {
       "usage_title": "Usage",

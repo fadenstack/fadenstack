@@ -68,6 +68,19 @@ async def is_maintainer(dao: AgentsDAO, agent: Agent, user: User) -> bool:
     return await dao.member_role(agent.id, user.id) == AgentMemberRole.MAINTAINER.value
 
 
+def inspecting_roles(reg: ExtensionRegistry = registry) -> set[str]:
+    """The member roles that see an agent's details and change nothing: those an installed extension adds."""
+    return reg.member_roles - {AgentMemberRole.MAINTAINER.value}
+
+
+async def inspects(dao: AgentsDAO, agent: Agent, user: User, reg: ExtensionRegistry = registry) -> bool:
+    """Whether *user* is a member of *agent* who sees its details without managing it (Enterprise: auditors).
+
+    A role nothing installed adds any more gives nothing. Using the agent still takes a grant.
+    """
+    return await dao.member_role(agent.id, user.id) in inspecting_roles(reg)
+
+
 async def _grant_path(dao: AgentsDAO, agent: Agent, user: User) -> str | None:
     """How *user* is granted *agent*, as a sentence; ``None`` when not at all."""
     groups = await dao.user_group_ids(user.id)

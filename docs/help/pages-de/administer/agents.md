@@ -58,7 +58,7 @@ Die Seite des Agenten öffnet sich. Sein Status in der Liste ist **Entwurf**, **
 |---|---|
 | **Definition** | Die Version, die Benutzer erhalten: **Anweisungen**, **Modell**, **Wissen** (Sammlungen, die er durchsuchen darf), **Server-Tools** (**Wie im Chat**, **Nur diese** oder **Keine**), **Lokale MCP-Server**, **Host-Tools** (die Tools der Anwendung und ihre Klassen), **Darstellung** (Begrüßung und vorgeschlagene Prompts) und **Datenschutz**. |
 | **Versionen** | Jede Version. Mit **Veröffentlichen** eine Version veröffentlichen, mit **Zurücksetzen** zu einer früheren zurückkehren, unter **Änderungen** die Unterschiede sehen. |
-| **Zugriff** | **Wer ihn nutzen darf**, die Liste **Ausgeschlossene Personen** (Enterprise) und seine **Betreuer**. **Zugriff prüfen** zeigt, ob eine Person den Agenten nutzen darf, und warum. |
+| **Zugriff** | **Wer ihn nutzen darf**, die Liste **Ausgeschlossene Personen** (Enterprise) und seine **Betreuer** (mit Enterprise: **Betreuer und Prüfer**). **Zugriff prüfen** zeigt, ob eine Person den Agenten nutzen darf, und warum. |
 | **Aktivität** | Nutzung über einen Zeitraum (Anfragen, Fehler, Tokens, Benutzer, Unterhaltungen: nur Zahlen, nie Inhalte), was die Anwendungen gemeldet haben (ausgeführte Tools, Zustimmungen) und **Angemeldete Geräte**. |
 | **Apps** | Was die Anwendungen mitbringen, verglichen mit der Version des Agenten (siehe [Wenn eine Anwendung neue Tools mitbringt](#when-an-application-brings-new-tools)). |
 
@@ -89,6 +89,12 @@ nutzen, innerhalb einer Minute.
 **Betreuer** ändern den Agenten, veröffentlichen Versionen, entscheiden, wer ihn nutzen darf, und können ihn
 schon vor der Veröffentlichung nutzen. Das tun sie über **Agenten** im Benutzermenü des Chats; Zugriff auf die
 Konsole brauchen sie nicht.
+
+Mit Enterprise kann ein Agent auch **Prüfer** haben: Wählen Sie **Hinzufügen als** → **Prüfer**, bevor Sie
+die Person auswählen, oder ändern Sie die Rolle eines Mitglieds in der Liste, und wählen Sie **Speichern**.
+Prüfer sehen die Versionen, Mitglieder, Einstellungen und Aktivität des Agenten und ändern nichts; nutzen
+können sie ihn nur, wenn er ihnen wie allen anderen freigegeben ist. Ohne gültige Enterprise-Lizenz sehen sie
+ihn nicht mehr.
 
 Mit Enterprise dürfen **Ausgeschlossene Personen** den Agenten nicht nutzen, auch nicht über ein Team, das ihn
 nutzen darf: Wählen Sie die Person, geben Sie eine **Begründung** an und wählen Sie **Ausschließen**. Das wirkt

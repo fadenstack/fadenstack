@@ -14,7 +14,9 @@ Extension points for agents:
 - ``version_extensions``: validators for the keys of
   ``AgentVersion.extensions``. A key nobody registered is refused, so no
   Enterprise setting is stored where nothing enforces it.
-- ``member_roles``: roles beside ``maintainer`` (EE: ``auditor``).
+- ``member_roles``: roles beside ``maintainer`` (EE: ``auditor``). A member in another role sees the agent's
+  details (versions, members, settings, activity) and changes nothing; using it still takes a grant. With the
+  role no longer listed, the membership gives nothing.
 - ``agent_restrictions``: the names of restrictions an installed extension enforces on agents beyond their
   grants (EE: ``exclusions``). An agent whose ``restricted_by`` names one not listed here is its maintainers'
   only: the restriction would go unenforced (core: none).

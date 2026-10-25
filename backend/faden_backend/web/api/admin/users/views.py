@@ -30,6 +30,7 @@ from faden_backend.db.models.users import (
     set_sign_in_cookie,
 )
 from faden_backend.services import password_reset_links
+from faden_backend.services.agents import access
 from faden_backend.services.password_policy import password_problem
 from faden_backend.services.skills.client import forget_principal
 from faden_backend.web.api.admin.dependencies import get_root_mode_active, require_superuser
@@ -151,6 +152,7 @@ async def me_access(
         roles=[_role_to_dto(role) for role in sorted(roles, key=lambda r: r.name)],
         permissions=_permissions_to_dto(permissions),
         maintains_agents=await agents_dao.maintains_any(user.id),
+        inspects_agents=await agents_dao.member_of_any(user.id, access.inspecting_roles()),
     )
 
 

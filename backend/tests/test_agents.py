@@ -440,6 +440,50 @@ async def test_me_access_says_whether_the_user_maintains_an_agent(
     assert (await client.get("/api/admin/users/me/access")).json()["maintains_agents"] is True
 
 
+async def test_a_member_in_an_added_role_sees_the_agent_and_changes_nothing(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession,
+) -> None:
+    """A role an extension adds (Enterprise's auditor): read-only; using the agent still takes a grant."""
+    signed_in.user = admin = await _user(dbsession, admin=True)
+    auditor = await _user(dbsession)
+    await _agent(client, slug="audited")
+    members = {"members": [{"user_id": str(admin.id)}, {"user_id": str(auditor.id), "role": "auditor"}]}
+    refused = await client.put("/api/agents/audited/members", json=members)
+    assert refused.status_code == status.HTTP_400_BAD_REQUEST and "auditor" in refused.text, "nothing adds it yet"
+
+    registry.member_roles.add("auditor")
+    try:
+        assert (await client.put("/api/agents/audited/members", json=members)).status_code == 200
+        signed_in.user = auditor
+        assert (await client.get("/api/admin/users/me/access")).json()["inspects_agents"] is True
+        assert [a["slug"] for a in (await client.get("/api/agents")).json()] == ["audited"]
+        detail = await client.get("/api/agents/audited")
+        assert detail.status_code == 200 and detail.json()["can_manage"] is False
+        for path in ("versions", "versions/1", "grants", "members", f"access/{auditor.id}", "usage", "apps"):
+            # Usage has no database of its own in these tests (503): past the check all the same.
+            assert (await client.get(f"/api/agents/audited/{path}")).status_code not in (401, 403, 404), path
+        assert (await client.patch("/api/agents/audited", json={"name": "Mine"})).status_code == 403
+        assert (await client.put("/api/agents/audited/grants", json={"grants": []})).status_code == 403
+        assert (await client.put("/api/agents/audited/members", json=members)).status_code == 403
+        assert (await client.post("/api/agents/audited/retire")).status_code == 403
+        assert (await _access(client, "audited", auditor))["allowed"] is False, "no grant, no use"
+        found = await client.get("/api/agents/principals", params={"q": auditor.email[:6]})
+        assert found.status_code == 200, "for the access check"
+    finally:
+        registry.member_roles.discard("auditor")
+
+    # The role no longer added: the membership gives nothing, and the maintainers can still edit the members.
+    assert (await client.get("/api/agents/audited/versions")).status_code == 403
+    assert (await client.get("/api/agents/principals", params={"q": auditor.email[:6]})).status_code == 403
+    assert (await client.get("/api/agents")).json() == []
+    assert (await client.get("/api/admin/users/me/access")).json()["inspects_agents"] is False
+    signed_in.user = admin
+    assert (await client.put("/api/agents/audited/members", json=members)).status_code == 200, "kept as it was"
+    other = await _user(dbsession)
+    given = {"members": [*members["members"], {"user_id": str(other.id), "role": "auditor"}]}
+    assert (await client.put("/api/agents/audited/members", json=given)).status_code == 400, "not given anew"
+
+
 async def test_grants_name_known_principals_only(
     signed_in: _As, client: AsyncClient, dbsession: AsyncSession,
 ) -> None:

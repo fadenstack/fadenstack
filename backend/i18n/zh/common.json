@@ -4260,7 +4260,14 @@
       "lift": "向所有已授权者开放",
       "lift_title": "向所有已授权者开放此智能体？",
       "lift_body": "解除 {{names}}：所有被授权使用此智能体的人都可以再次使用它。设置它的扩展回来后可能会再次设置。此操作会记录在审计日志中。",
-      "lift_confirm": "开放"
+      "lift_confirm": "开放",
+      "members_title": "维护者和审计员",
+      "auditors_help": "审计员可以查看其版本、成员、设置和活动，但不能更改任何内容；要使用它，他们需要像其他人一样获得授权。",
+      "add_as": "添加为",
+      "add_member": "添加人员…",
+      "role_of": "{{who}} 的角色",
+      "role_maintainer": "维护者",
+      "role_auditor": "审计员"
     },
     "activity": {
       "usage_title": "使用情况",

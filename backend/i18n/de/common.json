@@ -4260,7 +4260,14 @@
       "lift": "Für alle Berechtigten öffnen",
       "lift_title": "Den Agenten für alle Berechtigten öffnen?",
       "lift_body": "Hebt {{names}} auf: Alle, denen der Agent freigegeben ist, können ihn wieder nutzen. Die Erweiterung, die das gesetzt hat, kann es wieder setzen, sobald sie zurück ist. Wird im Audit-Protokoll festgehalten.",
-      "lift_confirm": "Öffnen"
+      "lift_confirm": "Öffnen",
+      "members_title": "Betreuer und Prüfer",
+      "auditors_help": "Prüfer sehen seine Versionen, Mitglieder, Einstellungen und Aktivität und ändern nichts; nutzen können sie ihn nur, wenn er ihnen wie allen anderen freigegeben ist.",
+      "add_as": "Hinzufügen als",
+      "add_member": "Person hinzufügen…",
+      "role_of": "Rolle von {{who}}",
+      "role_maintainer": "Betreuer",
+      "role_auditor": "Prüfer"
     },
     "activity": {
       "usage_title": "Nutzung",

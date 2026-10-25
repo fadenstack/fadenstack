@@ -7,7 +7,7 @@
  */
 
 import { clearCachedAccess } from "~/lib/adminConstants";
-import { AGENT_MAINTAINER } from "./agents";
+import { AGENT_INSPECTOR, AGENT_MAINTAINER } from "./agents";
 
 const BASE = "/api/admin";
 
@@ -651,12 +651,16 @@ export interface MeAccess {
   permissions: RbacPermission[];
   /** Maintains at least one agent. */
   maintains_agents?: boolean;
+  /** Sees the details of at least one agent as a member in another role (e.g. auditor). */
+  inspects_agents?: boolean;
 }
 
 /** The keys the UI gates on: `resource:action` per permission, and the rights that are not permissions. */
-export function accessKeys(access: Pick<MeAccess, "permissions" | "maintains_agents">): string[] {
+export function accessKeys(access: Pick<MeAccess, "permissions" | "maintains_agents" | "inspects_agents">): string[] {
   const keys = access.permissions.map((p) => `${p.resource}:${p.action}`);
-  return access.maintains_agents ? [...keys, AGENT_MAINTAINER] : keys;
+  if (access.maintains_agents) keys.push(AGENT_MAINTAINER);
+  if (access.inspects_agents) keys.push(AGENT_INSPECTOR);
+  return keys;
 }
 
 export const adminUsers = {

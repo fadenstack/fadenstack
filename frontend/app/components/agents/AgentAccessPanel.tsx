@@ -10,12 +10,20 @@ import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
+import MenuItem from "@mui/material/MenuItem";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 
 import { hasFeature } from "~/api/about";
 import { AGENT_EXCLUSIONS, agentExclusionsApi, type AgentExclusion } from "~/api/agentExclusions";
-import { agentsApi, type AccessExplanation, type Agent, type AgentGrant, type AgentMember } from "~/api/agents";
+import {
+  AGENT_AUDITORS,
+  agentsApi,
+  type AccessExplanation,
+  type Agent,
+  type AgentGrant,
+  type AgentMember,
+} from "~/api/agents";
 import { principalKey, type PrincipalOption } from "~/api/principals";
 import { AsyncSection } from "~/components/AsyncSection";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
@@ -46,22 +54,31 @@ const memberRow = (m: AgentMember): MemberRow => ({
 
 const keysOf = (rows: PrincipalOption[]) => new Set(rows.map((r) => principalKey(r.type, r.id)));
 
+const keyOf = (r: PrincipalOption) => principalKey(r.type, r.id);
+
 /**
  * A list edited in place and saved as a whole: the rows on screen, whether
- * they differ from what was loaded, and the save.
+ * they differ from what was loaded (`sameRow` compares what a row holds
+ * beside who it names, such as a role), and the save.
  */
-function useListDraft<T extends PrincipalOption>(loaded: T[]) {
+function useListDraft<T extends PrincipalOption>(loaded: T[], sameRow: (a: T, b: T) => boolean = () => true) {
   const [rows, setRows] = useState<T[]>(loaded);
   useEffect(() => setRows(loaded), [loaded]);
+  const was = useMemo(() => new Map(loaded.map((r) => [keyOf(r), r])), [loaded]);
   return {
     rows,
     taken: useMemo(() => keysOf(rows), [rows]),
-    dirty: !samePrincipals(rows, loaded),
+    dirty: !samePrincipals(rows, loaded) || rows.some((r) => !sameRow(r, was.get(keyOf(r)) ?? r)),
     add: (row: T) => setRows((prev) => [...prev, row]),
-    remove: (row: T) => setRows((prev) => prev.filter((r) => principalKey(r.type, r.id) !== principalKey(row.type, row.id))),
+    replace: (row: T) => setRows((prev) => prev.map((r) => (keyOf(r) === keyOf(row) ? row : r))),
+    remove: (row: T) => setRows((prev) => prev.filter((r) => keyOf(r) !== keyOf(row))),
     reset: () => setRows(loaded),
   };
 }
+
+/** The roles the console names; any other is shown as the server has it. */
+const AUDITOR_ROLE = "auditor";
+const NAMED_ROLES = [NEW_MEMBER_ROLE, AUDITOR_ROLE];
 
 export interface AgentAccessPanelProps {
   agent: Agent;
@@ -81,7 +98,11 @@ export function AgentAccessPanel({ agent, onChanged }: AgentAccessPanelProps) {
   });
 
   const grantDraft = useListDraft(grants.data);
-  const memberDraft = useListDraft(members.data);
+  const memberDraft = useListDraft(members.data, (a, b) => a.role === b.role);
+  const auditing = useAsyncData(() => hasFeature(AGENT_AUDITORS), [], { initialValue: false });
+  const roles = auditing.data ? NAMED_ROLES : [NEW_MEMBER_ROLE];
+  const [newRole, setNewRole] = useState(NEW_MEMBER_ROLE);
+  const roleLabel = (role: string) => (NAMED_ROLES.includes(role) ? t(`agents.access.role_${role}`) : role);
   const saveGrants = useAction();
   const saveMembers = useAction();
   const excluding = useAsyncData(() => hasFeature(AGENT_EXCLUSIONS), [], { initialValue: false });
@@ -169,25 +190,68 @@ export function AgentAccessPanel({ agent, onChanged }: AgentAccessPanelProps) {
 
       {editable && excluding.data && <ExcludedPeople agent={agent} maintainers={maintainers} />}
 
-      <SectionCard title={t("agents.access.maintainers_title")} description={t("agents.access.maintainers_help")}>
+      <SectionCard
+        title={t(auditing.data ? "agents.access.members_title" : "agents.access.maintainers_title")}
+        description={
+          auditing.data
+            ? `${t("agents.access.maintainers_help")} ${t("agents.access.auditors_help")}`
+            : t("agents.access.maintainers_help")
+        }
+      >
         {saveMembers.error && <Alert severity="error">{saveMembers.error}</Alert>}
         <AsyncSection loading={members.loading} error={members.error} empty={members.data.length === 0}>
           <Stack spacing={1}>
             {editable && (
-              <PrincipalPicker
-                search={search}
-                types={["user"]}
-                exclude={memberDraft.taken}
-                placeholder={t("agents.access.add_maintainers")}
-                onPick={(p) => memberDraft.add({ ...p, role: NEW_MEMBER_ROLE })}
-              />
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
+                {roles.length > 1 && (
+                  <TextField
+                    select
+                    size="small"
+                    label={t("agents.access.add_as")}
+                    value={newRole}
+                    onChange={(e) => setNewRole(e.target.value)}
+                    sx={{ minWidth: 160 }}
+                  >
+                    {roles.map((r) => (
+                      <MenuItem key={r} value={r}>
+                        {roleLabel(r)}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                )}
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <PrincipalPicker
+                    search={search}
+                    types={["user"]}
+                    exclude={memberDraft.taken}
+                    placeholder={t(roles.length > 1 ? "agents.access.add_member" : "agents.access.add_maintainers")}
+                    onPick={(p) => memberDraft.add({ ...p, role: roles.includes(newRole) ? newRole : NEW_MEMBER_ROLE })}
+                  />
+                </Box>
+              </Stack>
             )}
             <PrincipalList
               items={memberDraft.rows}
               emptyText={t("agents.access.no_maintainers")}
               onRemove={editable ? memberDraft.remove : undefined}
               renderControl={(m) =>
-                m.role !== NEW_MEMBER_ROLE && <Chip size="small" variant="outlined" label={m.role} />
+                editable && roles.length > 1 ? (
+                  <TextField
+                    select
+                    size="small"
+                    value={m.role}
+                    onChange={(e) => memberDraft.replace({ ...m, role: e.target.value })}
+                    slotProps={{ select: { SelectDisplayProps: { "aria-label": t("agents.access.role_of", { who: m.label }) } } }}
+                  >
+                    {[...new Set([...roles, m.role])].map((r) => (
+                      <MenuItem key={r} value={r}>
+                        {roleLabel(r)}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                ) : (
+                  m.role !== NEW_MEMBER_ROLE && <Chip size="small" variant="outlined" label={roleLabel(m.role)} />
+                )
               }
             />
           </Stack>

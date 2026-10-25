@@ -80,6 +80,8 @@ class MeAccessDTO(BaseModel):
     permissions: list[PermissionDTO] = Field(default_factory=list)
     #: Maintains at least one agent: a right on those agents, not an RBAC permission.
     maintains_agents: bool = False
+    #: Sees the details of at least one agent as a member in another role (e.g. auditor), without managing it.
+    inspects_agents: bool = False
 
 
 class SetAdministratorRequest(BaseModel):

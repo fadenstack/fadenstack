@@ -55,7 +55,7 @@ The agent's page opens. Its list status is **Draft**, **Published** or **Retired
 |---|---|
 | **Definition** | The version people get: **Instructions**, **Model**, **Knowledge** (collections it may search), **Server tools** (**What a chat gets**, **Only these**, or **None**), **Local MCP servers**, **Host tools** (the application's tools and their classes), **Appearance** (greeting and suggested prompts) and **Privacy**. |
 | **Versions** | Every version. **Publish** one, **Roll back** to an earlier one, see the **Changes**. |
-| **Access** | **Who may use it**, the **Excluded people** (Enterprise) and its **Maintainers**. **Check someone's access** says whether a person may use the agent, and why. |
+| **Access** | **Who may use it**, the **Excluded people** (Enterprise) and its **Maintainers** (with Enterprise: **Maintainers and auditors**). **Check someone's access** says whether a person may use the agent, and why. |
 | **Activity** | Usage over a time range (requests, errors, tokens, users, conversations: counts only, never content), what the applications reported (tools that ran, approvals), and the **Signed-in devices**. |
 | **Apps** | What the applications bring, compared with the agent's version (see [When an application brings new tools](#when-an-application-brings-new-tools)). |
 
@@ -84,6 +84,11 @@ change. Publishing a version reaches everyone who uses the agent within a minute
 
 **Maintainers** change the agent, publish versions and decide who may use it, and can use it before it is
 published. They do this from **Agents** in the chat's user menu; they need no access to the console.
+
+With Enterprise, an agent can also have **Auditors**: choose **Add as** → **Auditor** before picking the
+person, or change a member's role in the list, and select **Save**. Auditors see the agent's versions,
+members, settings and activity and change nothing; to use it, they need it granted like anyone else. Without
+a valid Enterprise licence they no longer see it.
 
 With Enterprise, **Excluded people** may not use the agent, even through a team that may: pick the person,
 give a **Reason** and select **Exclude**. It takes effect in the applications within a minute and is recorded

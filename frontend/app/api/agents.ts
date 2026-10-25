@@ -288,8 +288,17 @@ export const agentsApi = {
  */
 export const AGENT_MAINTAINER = "agents:maintain";
 
+/**
+ * Seeing an agent's details as a member in another role (with Enterprise: auditor), changing nothing;
+ * `/users/me/access` says so (`inspects_agents`).
+ */
+export const AGENT_INSPECTOR = "agents:inspect";
+
 /** Any of these opens the agents pages. */
-export const AGENTS_PAGE_KEYS = ["agents:read", "agents:create", "agents:manage", AGENT_MAINTAINER];
+export const AGENTS_PAGE_KEYS = ["agents:read", "agents:create", "agents:manage", AGENT_MAINTAINER, AGENT_INSPECTOR];
+
+/** The feature with which the server offers auditors among an agent's members (`GET /api/about`). */
+export const AGENT_AUDITORS = "agent_auditors";
 
 /** What the user may do with agents in general; each agent says itself whether they manage it (`can_manage`). */
 export function agentRights(can: (permission: string) => boolean) {
