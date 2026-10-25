@@ -12,7 +12,9 @@ import ChatSidebar, { dateGroupOf } from "./ChatSidebar";
 import ChatTopbar from "./ChatTopbar";
 
 const NOW = new Date();
-const daysAgo = (n: number) => new Date(NOW.getTime() - n * 86_400_000).toISOString();
+// Calendar days, not 24-hour steps: on the day the clocks change, 24 hours back can still be today.
+const daysAgo = (n: number) =>
+  new Date(NOW.getFullYear(), NOW.getMonth(), NOW.getDate() - n, NOW.getHours(), NOW.getMinutes()).toISOString();
 
 function chat(id: string, title: string | null, projectId: string | null, updated = daysAgo(0)): ChatSession {
   return {
