@@ -7,7 +7,7 @@
 import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useSearchParams } from "react-router";
+import { useLocation, useSearchParams } from "react-router";
 
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
@@ -52,6 +52,7 @@ function refused(t: TFunction, code: string): string {
 export function LinkedSignInsCard() {
   const { t } = useTranslation();
   const [params, setParams] = useSearchParams();
+  const back = useLocation().pathname.startsWith("/chat") ? "/chat" : "/admin/profile";
   const { data, error, refresh } = useAsyncData(load, [], { initialValue: { signIns: null, providers: [] } });
   const action = useAction();
   const [menu, setMenu] = useState<HTMLElement | null>(null);
@@ -85,7 +86,7 @@ export function LinkedSignInsCard() {
       setDirectory(provider);
       return;
     }
-    await action.run(() => signInsApi.startLink(provider.key), ({ redirect_url }) => {
+    await action.run(() => signInsApi.startLink(provider.key, back), ({ redirect_url }) => {
       window.location.assign(redirect_url);
     });
   }

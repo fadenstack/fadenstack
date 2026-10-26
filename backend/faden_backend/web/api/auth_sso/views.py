@@ -30,7 +30,7 @@ import logging
 import time
 import uuid
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response
@@ -95,14 +95,16 @@ def _to_login(refusal: Refusal) -> RedirectResponse:
     return response
 
 
-#: Where a link begun on My Profile comes back to.
-PROFILE = "/admin/profile"
+#: Where a link begun on My Profile may come back to: the console page, or the chat dialog (people who only
+#: chat have no console). Only these, so the answer never sends the browser anywhere else.
+PROFILES = ("/admin/profile", "/chat")
 
 
-def _to_profile(*, linked_key: str | None = None, refused: str | None = None) -> RedirectResponse:
+def _to_profile(back: str, *, linked_key: str | None = None, refused: str | None = None) -> RedirectResponse:
     """Back to My Profile, which says whether the provider was linked, or why not."""
     query = f"linked={linked_key}" if linked_key else f"link_refused={refused}"
-    response = RedirectResponse(f"{PROFILE}?{query}", status_code=status.HTTP_302_FOUND)
+    where = back if back in PROFILES else PROFILES[0]
+    response = RedirectResponse(f"{where}?{query}", status_code=status.HTTP_302_FOUND)
     response.delete_cookie(BINDING_COOKIE, path=BINDING_PATH)
     return response
 
@@ -181,7 +183,7 @@ async def providers() -> list[ProviderPublic]:
 
 
 async def _begin(
-    request: Request, key: str, *, link: User | None = None,
+    request: Request, key: str, *, link: User | None = None, back: str = PROFILES[0],
 ) -> tuple[ProviderPublic, str, str] | Refusal:
     """The provider, where to send the browser and the binding cookie for a sign-in; or why it cannot start.
 
@@ -210,7 +212,7 @@ async def _begin(
         "exp": now + BINDING_TTL_S,
     }
     if link is not None:
-        claims["link"] = str(link.id)
+        claims["link"], claims["back"] = str(link.id), back
     binding = jwt.encode(claims, settings.users_secret, algorithm="HS256")
     return provider, begun.redirect_url, binding
 
@@ -241,15 +243,22 @@ class LinkStart(BaseModel):
     redirect_url: str
 
 
+class LinkFrom(BaseModel):
+    """Where My Profile is open: the console's page, or the chat's dialog."""
+
+    back: Literal["/admin/profile", "/chat"] = "/admin/profile"
+
+
 @router.post("/{key}/link-start", response_model=LinkStart, name="sso_link_start")
 async def link_start(
     key: Key, request: Request, response: Response, user: Annotated[User, Depends(current_active_user)],
+    payload: LinkFrom | None = None,
 ) -> LinkStart:
-    """Begin linking *key* to the signed-in account; the answer comes back to My Profile.
+    """Begin linking *key* to the signed-in account; the answer comes back to My Profile, where it was open.
 
     Refused with 404 ``not_offered`` / 503 and the reason as ``detail``, as the sign-in page's are named.
     """
-    begun = await _begin(request, key, link=user)
+    begun = await _begin(request, key, link=user, back=(payload or LinkFrom()).back)
     if isinstance(begun, Refusal):
         gone = begun is Refusal.NOT_OFFERED
         raise HTTPException(
@@ -337,14 +346,15 @@ async def _finish_link(
     session: AsyncSession, claims: dict, identity: ExternalIdentity | Refusal, key: str,
 ) -> RedirectResponse:
     """A link begun on My Profile: the identity joins the binding's account, or My Profile says why not."""
+    back = str(claims.get("back", ""))
     user = await _linking(session, claims)
     if user is None:
-        return _to_profile(refused=Refusal.SIGN_IN_EXPIRED.value)
+        return _to_profile(back, refused=Refusal.SIGN_IN_EXPIRED.value)
     if isinstance(identity, Refusal):
-        return _to_profile(refused=identity.value)
+        return _to_profile(back, refused=identity.value)
     refused = await linked.link_signed_in(session, user, identity)
     await session.commit()
-    return _to_profile(refused=refused) if refused else _to_profile(linked_key=key)
+    return _to_profile(back, refused=refused) if refused else _to_profile(back, linked_key=key)
 
 
 @router.get("/{key}/callback", name="sso_callback")

@@ -60,7 +60,7 @@ describe("linked sign-ins on My Profile", () => {
     open();
     fireEvent.click(await screen.findByRole("button", { name: "Link a provider" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Corp" }));
-    await waitFor(() => expect(start).toHaveBeenCalledWith("corp"));
+    await waitFor(() => expect(start).toHaveBeenCalledWith("corp", "/admin/profile"));
     await waitFor(() => expect(window.location.hash).toBe("#idp"));
   });
 

@@ -22,6 +22,9 @@ export interface LinkedSignIn {
   last_sign_in_at: string | null;
 }
 
+/** Where My Profile can be open: the console's page, or the chat's dialog (people who only chat). */
+export type ProfileAt = "/admin/profile" | "/chat";
+
 export interface SignIns {
   links: LinkedSignIn[];
   /** The account's password is a way in: someone knows it, and no SSO-only domain refuses it. */
@@ -39,8 +42,12 @@ export const signInsApi = {
   of: (userId: string) => users<SignIns>(`/${segment(userId)}/sign-ins`),
   unlink: (userId: string, linkId: string) =>
     users<void>(`/${segment(userId)}/sign-ins/${segment(linkId)}`, json("DELETE")),
-  /** Where to send the browser to sign in with *key*, to link it to the signed-in account. */
-  startLink: (key: string) => sso<{ redirect_url: string }>(`/${segment(key)}/link-start`, json("POST")),
+  /**
+   * Where to send the browser to sign in with *key*, to link it to the signed-in account; the answer comes back
+   * to *back*, where My Profile is open (the console's page, or the chat's dialog).
+   */
+  startLink: (key: string, back: ProfileAt = "/admin/profile") =>
+    sso<{ redirect_url: string }>(`/${segment(key)}/link-start`, json("POST", { back })),
   /** Link a directory account: its name and password prove it. */
   linkDirectory: (key: string, username: string, password: string) =>
     sso<void>(`/${segment(key)}/link-password`, json("POST", { username, password })),

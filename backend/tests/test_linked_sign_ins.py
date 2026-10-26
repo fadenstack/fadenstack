@@ -184,6 +184,23 @@ async def test_an_identity_someone_else_has_stays_theirs(
     assert by_address.headers["location"] == "/admin/profile?link_refused=already_linked"
 
 
+async def test_a_link_begun_in_the_chat_comes_back_to_the_chat_and_nowhere_else(
+    client: AsyncClient, signed_in: _As, dbsession: AsyncSession, fake: FakeModule,  # noqa: F811
+) -> None:
+    """People who only chat have My Profile in the chat's dialog; the answer goes back there, never elsewhere."""
+    signed_in.user = await _person(dbsession)
+    started = await client.post("/api/auth/sso/corp/link-start", json={"back": "/chat"})
+    transaction = started.json()["redirect_url"].split("state=")[1]
+    fake.identity = _identity(subject="chat-1")
+    done = await client.get(
+        f"/api/auth/sso/corp/callback?code=abc&state={transaction}",
+        cookies={"faden_sso": started.cookies["faden_sso"]}, follow_redirects=False,
+    )
+    assert done.headers["location"] == "/chat?linked=corp"
+    elsewhere = await client.post("/api/auth/sso/corp/link-start", json={"back": "https://evil.example/"})
+    assert elsewhere.status_code == 422
+
+
 async def test_a_link_begun_before_the_sign_ins_ended_is_void(
     client: AsyncClient, signed_in: _As, dbsession: AsyncSession, fake: FakeModule,  # noqa: F811
 ) -> None:
