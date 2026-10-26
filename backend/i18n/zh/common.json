@@ -151,7 +151,8 @@
       "license": "此服务器的许可证不包含此登录方式。请联系管理员。",
       "not_offered": "此处已不再提供这种登录方式。请使用其他方式登录，或询问管理员。",
       "other": "登录未成功。",
-      "link_needs_confirmation": "已存在使用此地址的账户。请登录该账户一次以关联此次登录。"
+      "link_needs_confirmation": "已存在使用此地址的账户。请登录该账户一次以关联此次登录。",
+      "not_provisioned": "您在这里还没有访问权限：您所在组织的身份提供方尚未为您分配。请联系管理员。"
     },
     "login_refused": {
       "bad_credentials": "电子邮件或密码错误。",
@@ -2065,7 +2066,9 @@
       "userinfo": "查询 UserInfo 端点",
       "userinfo_when_missing": "当 ID 令牌缺少电子邮件或组时",
       "userinfo_always": "始终",
-      "userinfo_never": "从不"
+      "userinfo_never": "从不",
+      "subject_claim": "标识此人的声明",
+      "subject_claim_help": "通常为 sub。使用预配的 Entra ID：oid，即预配发送的 ID。以后更改会让所有人重新关联其账户。"
     },
     "saml": {
       "register": "请将本服务器的元数据地址或以下值提供给身份提供商：",
@@ -2117,7 +2120,10 @@
       "manage_groups_help": "手动设置的成员资格保持不变。",
       "session_hours": "登录最长有效（小时）",
       "inactive_days": "多少天未登录后暂停",
-      "inactive_days_help": "留空：从不"
+      "inactive_days_help": "留空：从不",
+      "provisioned_only": "仅允许由该提供方预配创建的人员通过它登录",
+      "provisioned_only_help": "其他人会被拒绝，登录也不会创建账户。超级用户不受此限制。",
+      "default_roles_help_provisioning": "用于首次登录时以及由预配创建的账户。留空：在有人分配之前没有任何角色"
     },
     "server_address": "服务器地址",
     "server_address_help": "用户打开本服务器的地址，例如 https://ai.example.internal。提供商会把用户送回这里；下面的地址都由它生成。",

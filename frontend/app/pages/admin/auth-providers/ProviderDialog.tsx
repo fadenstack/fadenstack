@@ -154,6 +154,14 @@ function ProtocolFields({
           helperText={t("auth_providers.oidc.scopes_help")}
         />
         <TextField
+          size="small"
+          label={t("auth_providers.oidc.subject_claim")}
+          value={form.subjectClaim}
+          onChange={(e) => set({ subjectClaim: e.target.value })}
+          helperText={t("auth_providers.oidc.subject_claim_help")}
+          slotProps={{ htmlInput: { spellCheck: false, maxLength: 256 } }}
+        />
+        <TextField
           select
           size="small"
           label={t("auth_providers.oidc.userinfo")}
@@ -314,6 +322,7 @@ export function ProviderDialog({
   stored,
   roles,
   groups,
+  provisioning = false,
   onClose,
   onSaved,
 }: {
@@ -322,6 +331,8 @@ export function ProviderDialog({
   stored: SignInProvider | null;
   roles: RbacRole[];
   groups: Group[];
+  /** The server offers provisioning (SCIM). */
+  provisioning?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -334,10 +345,12 @@ export function ProviderDialog({
 
   useEffect(() => {
     if (!open) return;
-    setForm(stored ? formFromProvider(stored) : blankForm("oidc", origin));
+    // A new provider's people get no roles unless some are named: the chat role is named to begin with.
+    const chat = roles.find((role) => role.name === "default_user");
+    setForm(stored ? formFromProvider(stored) : { ...blankForm("oidc", origin), defaultRoleIds: chat ? [chat.id] : [] });
     setKeyTouched(false);
     setRefused([]);
-  }, [open, stored, origin]);
+  }, [open, stored, origin, roles]);
 
   const set = (change: Partial<ProviderForm>) =>
     setForm((current) => {
@@ -423,7 +436,7 @@ export function ProviderDialog({
         <Registration form={form} set={set} />
         <ProtocolFields form={form} set={set} stored={stored} />
         <Divider />
-        <PolicyFields form={form} set={set} roles={roles} groups={groups} />
+        <PolicyFields form={form} set={set} roles={roles} groups={groups} provisioning={provisioning} />
         {missing.length > 0 && (
           <Typography variant="caption" color="text.secondary" data-testid="provider-missing">
             {t("auth_providers.still_needed", {

@@ -36,7 +36,8 @@ says which one and why, in the dialog.
 | Field | What it does |
 |---|---|
 | **Create an account at the first sign-in** | Off: only people who already have an account here can sign in with the provider. |
-| **Roles of new accounts** | The roles a new account gets. Empty: none until someone gives them. People who should chat need `default_user` (see [Users, groups and roles](users.md)). Nobody becomes a superuser this way. |
+| **Roles of new accounts** | The roles a new account gets, at its first sign-in or from [provisioning](sign-in-provisioning.md). A new provider starts with `default_user`, which people need to chat (see [Users, groups and roles](users.md)). Empty: none until someone gives them. Nobody becomes a superuser this way. |
+| **Only people the provider's provisioning added may sign in with it** | Shown with [provisioning](sign-in-provisioning.md). Everyone else is refused, and nobody gets an account by signing in. Superusers are not held to it. |
 | **Allowed e-mail domains** | Only people with an address in these domains may sign in, for example `example.com`. An address in one of them counts as verified. Empty: any. |
 | **People with an address in these domains may only sign in with this provider** | They can no longer sign in with a password here, so leaving your organisation ends their access here too. Superusers keep their password; a superuser who mistypes it sees the same message as everyone in the domain, so the page never tells whether a password was right. |
 | **Group rules** | People in a group at the provider join a group here when they sign in. Name the group as the provider sends it: its name, its ID (Entra ID sends IDs), or its DN (directories). |
@@ -90,6 +91,7 @@ What people see on the sign-in page, and what to do:
 |---|---|
 | **"There is no account for you here yet, and this provider does not create one."** | Turn on **Create an account at the first sign-in**, or create their account under **Access Control → Users**. |
 | **"You may not sign in with this provider."** | Their address is not in the **Allowed e-mail domains**. |
+| **"You have not been given access here yet …"** | Only people the provider's provisioning added may sign in, and this person was not added. Assign them to the application at the identity provider (see [Provisioning](sign-in-provisioning.md)). |
 | **"The provider did not confirm your e-mail address …"** | The provider does not say the address is verified. Add the domain to **Allowed e-mail domains**, or, for SAML and directories, tick **Its e-mail addresses are verified** if the provider is your organisation's own. |
 | **"The provider did not give your e-mail address …"** | Have the provider send the e-mail address (the `email` scope, or the `mail` attribute). |
 | **"The sign-in took too long or was already used."** | Start again from the sign-in page. A sign-in not finished within 10 minutes expires. |

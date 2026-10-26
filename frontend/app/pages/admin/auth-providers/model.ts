@@ -37,6 +37,8 @@ export interface ProviderForm {
   clientSecret: string;
   scopes: string;
   userinfo: OIDCSettings["userinfo"];
+  /** The claim that names the person; `sub` unless the provider keeps another across its apps. */
+  subjectClaim: string;
   // SAML
   metadataSource: "url" | "xml";
   idpMetadataUrl: string;
@@ -66,6 +68,7 @@ export interface ProviderForm {
   sessionHours: string;
   inactiveDays: string;
   ssoOnly: boolean;
+  provisionedOnly: boolean;
 }
 
 function server(address: string): string {
@@ -95,12 +98,13 @@ export function blankForm(protocol: Protocol = "oidc", serverAddress = ""): Prov
   return {
     key: "", name: "", enabled: true, protocol, serverAddress,
     issuer: "", clientId: "", clientSecret: "", scopes: "openid email profile", userinfo: "when_missing",
+    subjectClaim: "sub",
     metadataSource: "url", idpMetadataUrl: "", idpMetadataXml: "", spEntityId: "", emailVerifiedByIdp: false,
     signRequests: false,
     ldapUrl: "", startTls: false, caBundle: "", bindDn: "", bindPassword: "", baseDn: "", preset: "ad",
     userFilter: "", subjectAttribute: "", checkPeople: true,
     createAccount: true, defaultRoleIds: [], allowedDomains: "", manageGroups: false, groupRules: [],
-    sessionHours: "12", inactiveDays: "45", ssoOnly: false,
+    sessionHours: "12", inactiveDays: "45", ssoOnly: false, provisionedOnly: false,
   };
 }
 
@@ -126,12 +130,13 @@ export function formFromProvider(provider: SignInProvider): ProviderForm {
     groupRules: policy.group_rules,
     sessionHours: policy.session_lifetime_s ? String(policy.session_lifetime_s / 3600) : "",
     inactiveDays: policy.inactive_days ? String(policy.inactive_days) : "", ssoOnly: policy.sso_only,
+    provisionedOnly: policy.provisioned_only ?? false,
   });
   const s = provider.settings;
   if (s.protocol === "oidc") {
     Object.assign(form, {
       serverAddress: serverOf(s.redirect_uri), issuer: s.issuer, clientId: s.client_id, scopes: s.scopes.join(" "),
-      userinfo: s.userinfo,
+      userinfo: s.userinfo, subjectClaim: s.subject_claim ?? "sub",
     });
   } else if (s.protocol === "saml") {
     const serverAddress = serverOf(s.acs_url);
@@ -165,6 +170,7 @@ function policyOf(form: ProviderForm): ProviderPolicy {
     session_lifetime_s: Number.isFinite(hours) && hours > 0 ? Math.round(hours * 3600) : null,
     inactive_days: Number.isFinite(days) && days > 0 ? days : null,
     sso_only: form.ssoOnly,
+    provisioned_only: form.provisionedOnly,
   };
 }
 
@@ -175,6 +181,7 @@ function settingsOf(form: ProviderForm, stored?: ProviderSettings): ProviderWrit
     const settings: Partial<OIDCSettings> = {
       ...base, protocol: "oidc", issuer: form.issuer.trim(), client_id: form.clientId.trim(),
       redirect_uri: here.callback, scopes: form.scopes.split(/\s+/).filter(Boolean), userinfo: form.userinfo,
+      subject_claim: form.subjectClaim.trim() || "sub",
     };
     return settings as ProviderWrite["settings"];
   }

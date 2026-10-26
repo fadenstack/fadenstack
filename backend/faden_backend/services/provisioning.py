@@ -108,9 +108,11 @@ async def _audit(
 async def create_account(
     session: AsyncSession, email: str, *, role_ids: Iterable[uuid.UUID] = (), **audit: object,
 ) -> User:
-    """A new account for *email*: verified, no usable password, the given roles (else ``default_user``).
+    """A new account for *email*: verified, no usable password, the given roles; none given, none at all.
 
-    Never a superuser. *audit* is recorded with ``user.create``.
+    Denied by default: the roles are the ones a provider's policy names (an administrator picks
+    ``default_user`` there for people who should chat). Never a superuser. *audit* is recorded with
+    ``user.create``.
     """
     user = User(
         id=uuid.uuid4(), email=email, hashed_password=PasswordHelper().hash(secrets.token_urlsafe(32)),
@@ -118,15 +120,10 @@ async def create_account(
     )
     session.add(user)
     await session.flush()
-    rbac = RbacDAO(session)
     wanted = list(role_ids)
     found = list(await session.scalars(select(Role.id).where(Role.id.in_(wanted)))) if wanted else []
     if found:
-        await rbac.set_user_roles(user.id, found)
-    else:
-        default = await rbac.get_role_by_name("default_user")
-        if default is not None:
-            await rbac.assign_role(user.id, default.id)
+        await RbacDAO(session).set_user_roles(user.id, found)
     await session.flush()
     await _audit(session, "user.create", "user", str(user.id), severity="high", email=email, **audit)
     return user

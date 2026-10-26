@@ -46,7 +46,7 @@ The dialog then shows the **Last request from the provider** and the **Last refu
 
 | At the identity provider | Here |
 |---|---|
-| A person is assigned to the application | They get an account, with the role `default_user`. If an account with their address exists, it is linked, unless it is a superuser's or another sign-in provider keeps it. |
+| A person is assigned to the application | They get an account with the provider's **Roles of new accounts** (see [Sign-in providers](sign-in.md#who-may-sign-in-and-what-they-get)). If an account with their address exists, it is linked, unless it is a superuser's or another sign-in provider keeps it. |
 | A person's address or login name changes | The account's address changes. |
 | A person is unassigned, disabled or deleted | The account is suspended: no sign-in, and none of their agents active. Nothing is deleted. |
 | The same person is assigned again | The same account is let back in. |
@@ -56,6 +56,19 @@ The dialog then shows the **Last request from the provider** and the **Last refu
 
 Superusers are never changed or suspended by provisioning. A suspension made by an administrator, or after days
 without sign-in, is not lifted by the provider: **Let back in** on **Access Control → Users** does that.
+
+## The first sign-in
+
+People provisioning added sign in with the provider as anyone else does. At their first sign-in, their account
+is linked to the sign-in without the proof asked of other people who already have an account here:
+
+- by the ID the provider sends at sign-in, when it is the one provisioning sent (Entra ID: set
+  **Claim that names the person** to `oid`, see [OpenID Connect](sign-in-oidc.md));
+- else by their e-mail address, when the provider vouches for it.
+
+From then on provisioning keeps their address and groups: the sign-in changes neither, and the provider's group
+rules do not apply to them. To let only these people sign in with the provider, tick **Only people the
+provider's provisioning added may sign in with it** in the provider's settings.
 
 ## Entra ID
 

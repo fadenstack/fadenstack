@@ -6,9 +6,14 @@ The rules, whatever the protocol:
 - A new account needs an address the module vouches for, and the provider's leave to create it; it gets
   the provider's default roles, never superuser rights.
 - An existing account the identity is not linked to yet is not taken over: the sign-in waits until the
-  person proves the account is theirs (``link_requests``).
+  person proves the account is theirs (``link_requests``). Except an account the provider's own provisioning
+  made (``services/provisioning``): it is linked at the first sign-in, found by the subject when the
+  provider sends the same ID in both, else by the trusted address (round 3, decision 3).
 - With ``manage_groups``, the memberships the provider keeps follow its answer; those an administrator set
-  stay as they are.
+  stay as they are. For a person the provider provisions, the provisioning keeps the address and the
+  memberships; the sign-in changes neither.
+- With ``provisioned_only``, only people the provider provisioned sign in with it; superusers are never
+  provisioned, so they are not held to it.
 """
 
 from __future__ import annotations
@@ -129,6 +134,12 @@ async def sync_groups(
     )
 
 
+async def _kept(session: AsyncSession, identity: ExternalIdentity, user: User) -> bool:
+    """Whether *identity*'s provider provisions *user* (and so keeps their address and memberships)."""
+    source = provisioning.source_of(identity.provider)
+    return await provisioning.find_person(session, source, user_id=user.id) is not None
+
+
 async def _linked(session: AsyncSession, found: OAuthAccount, identity: ExternalIdentity) -> User | Refusal:
     """The account a known person is linked to, if they may still use it."""
     user = await session.get(User, found.user_id)
@@ -136,22 +147,43 @@ async def _linked(session: AsyncSession, found: OAuthAccount, identity: External
         return await refuse(session, Refusal.NOT_ALLOWED, identity)
     if not user.is_active:
         return await refuse(session, Refusal.ACCOUNT_DISABLED, identity, user)
+    if identity.provisioned_only and not user.is_superuser and not await _kept(session, identity, user):
+        return await refuse(session, Refusal.NOT_PROVISIONED, identity, user)
     found.last_sign_in_at = datetime.now(UTC)
     if identity.email:
         found.account_email = identity.email
-    await _follow_email(session, user, identity)
     return user
 
 
-async def _unlinked(session: AsyncSession, identity: ExternalIdentity) -> User | Refusal:
+async def _first_of_provisioned(
+    session: AsyncSession, user: User, identity: ExternalIdentity,
+) -> User | Refusal:
+    """The first sign-in to an account the provider's provisioning made: linked, without a proof."""
+    if not user.is_active:
+        return await refuse(session, Refusal.ACCOUNT_DISABLED, identity, user)
+    await link(session, user, identity, via="provisioning")
+    return user
+
+
+async def _unlinked(session: AsyncSession, identity: ExternalIdentity) -> User | Refusal:  # noqa: PLR0911
     """A new account for a person the provider has not signed in before, or why not."""
+    source = provisioning.source_of(identity.provider)
+    by_subject = await provisioning.find_person(session, source, external_id=identity.subject)
+    if by_subject is not None:
+        return await _first_of_provisioned(session, by_subject.user, identity)
     if not identity.email:
         return await refuse(session, Refusal.EMAIL_MISSING, identity)
     if not identity.email_trusted:
         return await refuse(session, Refusal.EMAIL_NOT_TRUSTED, identity)
     existing = await session.scalar(select(User).where(func.lower(User.email) == identity.email.lower()))
     if existing is not None:
+        if await _kept(session, identity, existing):
+            return await _first_of_provisioned(session, existing, identity)
+        if identity.provisioned_only and not existing.is_superuser:
+            return await refuse(session, Refusal.NOT_PROVISIONED, identity, existing)
         return await refuse(session, _meets_account(existing), identity, existing)
+    if identity.provisioned_only:
+        return await refuse(session, Refusal.NOT_PROVISIONED, identity)
     if not identity.create_account:
         return await refuse(session, Refusal.REGISTRATION_DISABLED, identity)
     user = await _new_account(session, identity, identity.email)
@@ -179,10 +211,15 @@ async def sign_in(session: AsyncSession, identity: ExternalIdentity) -> SignedIn
         return user
     created = found is None
 
-    # The rules' groups always; those the provider gave before and no longer gives go only with manage_groups.
-    added, removed = await sync_groups(
-        session, user, identity.provider, identity.group_ids, remove=identity.manage_groups,
-    )
+    if await _kept(session, identity, user):
+        added, removed = [], []  # the provisioning keeps their address and memberships
+    else:
+        if found is not None:
+            await _follow_email(session, user, identity)
+        # The rules' groups always; those it gave before and no longer gives go only with manage_groups.
+        added, removed = await sync_groups(
+            session, user, identity.provider, identity.group_ids, remove=identity.manage_groups,
+        )
     await session.flush()
     await audit(
         session, "auth.sign_in", user, identity, method="provider", created=created,

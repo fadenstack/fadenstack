@@ -17,9 +17,11 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from faden_backend.db.dao.rbac_dao import RbacDAO
 from faden_backend.db.models.groups import Group, UserGroup
 from faden_backend.db.models.oauth import OAuthAccount
 from faden_backend.db.models.users import User
+from faden_backend.services import provisioning
 from faden_backend.services.extensions import registry
 from faden_backend.services.sign_in import accounts, module
 from faden_backend.services.sign_in.contract import ExternalIdentity, Refusal
@@ -453,6 +455,107 @@ async def test_without_manage_groups_the_rules_still_add(dbsession: AsyncSession
     assert again.groups_added == [other.id] and again.groups_removed == []
     member_of = set(await dbsession.scalars(select(UserGroup.group_id).where(UserGroup.user_id == signed.user.id)))
     assert member_of == {team.id, other.id}
+
+
+@pytest.mark.anyio
+async def test_a_new_account_gets_the_roles_named_and_no_others(dbsession: AsyncSession) -> None:
+    """Denied by default: no roles named, none given (the console names ``default_user`` for a new provider)."""
+    rbac = RbacDAO(dbsession)
+    await rbac.seed_defaults()
+    chat = await rbac.get_role_by_name("default_user")
+    named = await accounts.sign_in(dbsession, _as_identity(default_role_ids=[chat.id]))
+    bare = await accounts.sign_in(dbsession, _as_identity(default_role_ids=[]))
+    assert isinstance(named, accounts.SignedIn) and isinstance(bare, accounts.SignedIn)
+    assert [r.name for r in await rbac.get_user_roles(named.user.id)] == ["default_user"]
+    assert await rbac.get_user_roles(bare.user.id) == []
+
+
+# ── People the provider provisions ──────────────────────────────────────
+
+
+async def _provisioned(db: AsyncSession, *, external_id: str | None = None, email: str | None = None) -> User:
+    """A person the provider "corp" provisioned (round 3: SCIM), never signed in yet."""
+    tag = uuid.uuid4().hex[:8]
+    email = email or f"p-{tag}@corp.example"
+    person = provisioning.Person(external_id=external_id or f"ext-{tag}", login=email, email=email)
+    found, _ = await provisioning.put_person(db, provisioning.source_of("corp"), person)
+    return found.user
+
+
+@pytest.mark.anyio
+async def test_a_provisioned_person_is_linked_by_subject(dbsession: AsyncSession) -> None:
+    """Decision 3: the provider names the person with the ID its provisioning sent; no proof is asked."""
+    made = await _provisioned(dbsession, external_id="oid-1")
+    signed = await accounts.sign_in(
+        dbsession, _as_identity(subject="oid-1", email="elsewhere@corp.example", email_trusted=False),
+    )
+    assert isinstance(signed, accounts.SignedIn) and signed.user.id == made.id
+    assert signed.user.email == made.email, "the provisioning keeps the address"
+    assert await accounts.find_link(dbsession, "corp", "oid-1") is not None
+    again = await accounts.sign_in(dbsession, _as_identity(subject="oid-1", email="elsewhere@corp.example"))
+    assert isinstance(again, accounts.SignedIn) and again.user.email == made.email
+
+
+@pytest.mark.anyio
+async def test_else_by_the_trusted_address_and_only_from_the_same_provider(dbsession: AsyncSession) -> None:
+    made = await _provisioned(dbsession)
+    untrusted = await accounts.sign_in(dbsession, _as_identity(subject="okta-1", email=made.email, email_trusted=False))
+    assert untrusted is Refusal.EMAIL_NOT_TRUSTED
+    other = await accounts.sign_in(dbsession, _as_identity(provider="other", subject="x-1", email=made.email))
+    assert other is Refusal.LINK_NEEDS_CONFIRMATION, "another provider did not provision them"
+    signed = await accounts.sign_in(dbsession, _as_identity(subject="okta-1", email=made.email))
+    assert isinstance(signed, accounts.SignedIn) and signed.user.id == made.id
+
+
+@pytest.mark.anyio
+async def test_a_provisioned_person_the_provider_suspended_stays_out(dbsession: AsyncSession) -> None:
+    made = await _provisioned(dbsession, external_id="oid-2")
+    await provisioning.remove_person(dbsession, provisioning.source_of("corp"), made.id)
+    refused = await accounts.sign_in(dbsession, _as_identity(subject="oid-2", email=made.email))
+    assert refused is Refusal.ACCOUNT_DISABLED
+
+
+@pytest.mark.anyio
+async def test_the_provisioning_keeps_the_memberships(dbsession: AsyncSession) -> None:
+    """The sign-in's group answer changes nothing for a provisioned person: the provisioning is the source."""
+    source = provisioning.source_of("corp")
+    made = await _provisioned(dbsession, external_id="oid-3")
+    team, _ = await provisioning.put_team(dbsession, source, provisioning.Team(name=f"t-{uuid.uuid4().hex[:8]}"))
+    await provisioning.change_members(dbsession, source, team.id, add=[made.id])
+    rule = await _group(dbsession)
+    signed = await accounts.sign_in(
+        dbsession, _as_identity(subject="oid-3", group_ids=[rule.id], manage_groups=True),
+    )
+    assert isinstance(signed, accounts.SignedIn)
+    assert signed.groups_added == [] and signed.groups_removed == []
+    member_of = set(await dbsession.scalars(select(UserGroup.group_id).where(UserGroup.user_id == made.id)))
+    assert member_of == {team.id}
+
+
+@pytest.mark.anyio
+async def test_provisioned_only_lets_in_the_provisioned_and_superusers(dbsession: AsyncSession) -> None:
+    strict = {"provisioned_only": True}
+    refused = await accounts.sign_in(dbsession, _as_identity(subject="new-1", **strict))
+    assert refused is Refusal.NOT_PROVISIONED, "nobody gets an account by signing in"
+    assert await accounts.find_link(dbsession, "corp", "new-1") is None
+
+    linked = await accounts.sign_in(dbsession, _as_identity(subject="old-1"))
+    assert isinstance(linked, accounts.SignedIn)
+    assert await accounts.sign_in(dbsession, _as_identity(subject="old-1", **strict)) is Refusal.NOT_PROVISIONED
+
+    person = await _person(dbsession)
+    by_address = await accounts.sign_in(dbsession, _as_identity(email=person.email, **strict))
+    assert by_address is Refusal.NOT_PROVISIONED
+
+    admin = await _person(dbsession, admin=True)
+    unlinked_admin = await accounts.sign_in(dbsession, _as_identity(email=admin.email, **strict))
+    assert unlinked_admin is Refusal.LINK_NEEDS_CONFIRMATION, "a superuser may still prove the account"
+    await accounts.link(dbsession, admin, _as_identity(subject="admin-1", email=admin.email))
+    assert isinstance(await accounts.sign_in(dbsession, _as_identity(subject="admin-1", **strict)), accounts.SignedIn)
+
+    made = await _provisioned(dbsession, external_id="oid-4")
+    signed = await accounts.sign_in(dbsession, _as_identity(subject="oid-4", **strict))
+    assert isinstance(signed, accounts.SignedIn) and signed.user.id == made.id
 
 
 @pytest.mark.anyio

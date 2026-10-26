@@ -30,6 +30,7 @@ dort an und kommen angemeldet zurück. Was für alle Anbieter gilt, steht unter
 | **Client-ID** | Die ID der Anwendung beim Anbieter. |
 | **Client-Secret** | Das angelegte Secret. Es wird nie wieder angezeigt; lassen Sie das Feld leer, wenn Sie etwas anderes ändern. |
 | **Scopes** | `openid email profile`, sofern der Anbieter keine anderen braucht, durch Leerzeichen getrennt. |
+| **Claim, der die Person benennt** | `sub`, außer der Anbieter hat eine andere ID, die in all seinen Anwendungen gleich bleibt. Entra ID mit [Provisionierung](sign-in-provisioning.md): `oid`, die ID, die die Provisionierung sendet. Legen Sie ihn fest, bevor sich die Benutzer zum ersten Mal anmelden: Eine spätere Änderung lässt alle ihr Konto neu verknüpfen. |
 | **UserInfo-Endpunkt fragen** | **Wenn dem ID-Token E-Mail oder Gruppen fehlen**, sofern der Anbieter nichts anderes sagt. |
 
 Legen Sie dann fest, wer sich anmelden darf (siehe
@@ -47,7 +48,8 @@ Legen Sie dann fest, wer sich anmelden darf (siehe
     3. Fügen Sie unter **Tokenkonfiguration** dem ID-Token den optionalen Claim `email` hinzu, und einen
        Gruppen-Claim, wenn Sie Gruppenregeln nutzen wollen.
     4. In der Konsole: **Aussteller** `https://login.microsoftonline.com/<Mandanten-ID>/v2.0`, die **Client-ID**
-       der Anwendung und das Secret.
+       der Anwendung und das Secret. Mit Provisionierung **Claim, der die Person benennt** `oid` (Entra ID sendet
+       ihn mit dem Scope `profile`).
 
     Entra ID sagt nicht, ob eine Adresse geprüft ist: Tragen Sie Ihre Domains unter **Erlaubte E-Mail-Domains**
     ein. Gruppen sendet es mit ihrer Objekt-ID; Gruppenregeln nennen daher die ID, nicht den Namen der Gruppe.

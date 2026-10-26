@@ -115,6 +115,8 @@
 "What does Fadenstack store about provisioned people?" = "switch-provisioning-on"
 "Where do I find the SCIM address and token?" = "switch-provisioning-on"
 "Why does the provider's provisioning test fail?" = "when-it-does-not-work"
+"How do provisioned people sign in the first time?" = "the-first-sign-in"
+"How do I let only provisioned people sign in?" = "the-first-sign-in"
 
 ["administer/models.md"]
 "How do I find and download a model?" = "find-a-model"

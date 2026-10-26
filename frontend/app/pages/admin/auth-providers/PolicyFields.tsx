@@ -1,4 +1,7 @@
-/** Who may sign in with a provider, and what they get: accounts, roles, domains, groups, lifetimes. */
+/**
+ * Who may sign in with a provider, and what they get: accounts, roles, domains, groups, lifetimes; with
+ * provisioning offered, whether only the people it made may sign in.
+ */
 import { useTranslation } from "react-i18next";
 
 import Button from "@mui/material/Button";
@@ -22,14 +25,18 @@ export function PolicyFields({
   set,
   roles,
   groups,
+  provisioning = false,
 }: {
   form: ProviderForm;
   set: (change: Partial<ProviderForm>) => void;
   roles: RbacRole[];
   groups: Group[];
+  /** The server offers provisioning (SCIM): its accounts get these roles too. */
+  provisioning?: boolean;
 }) {
   const { t } = useTranslation();
   const rules = form.groupRules;
+  const provisions = provisioning && form.protocol !== "ldap";
 
   return (
     <Stack spacing={2}>
@@ -40,7 +47,20 @@ export function PolicyFields({
         control={<Checkbox checked={form.createAccount} onChange={(e) => set({ createAccount: e.target.checked })} />}
         label={t("auth_providers.policy.create_account")}
       />
-      {form.createAccount && (
+      {provisions && (
+        <>
+          <FormControlLabel
+            control={
+              <Checkbox checked={form.provisionedOnly} onChange={(e) => set({ provisionedOnly: e.target.checked })} />
+            }
+            label={t("auth_providers.policy.provisioned_only")}
+          />
+          <Typography variant="caption" color="text.secondary" sx={{ mt: -1.5 }}>
+            {t("auth_providers.policy.provisioned_only_help")}
+          </Typography>
+        </>
+      )}
+      {(form.createAccount || provisions) && (
         <TextField
           select
           size="small"
@@ -54,7 +74,9 @@ export function PolicyFields({
             },
           }}
           onChange={(e) => set({ defaultRoleIds: e.target.value as unknown as string[] })}
-          helperText={t("auth_providers.policy.default_roles_help")}
+          helperText={t(
+            provisions ? "auth_providers.policy.default_roles_help_provisioning" : "auth_providers.policy.default_roles_help",
+          )}
         >
           {roles.map((role) => (
             <MenuItem key={role.id} value={role.id}>

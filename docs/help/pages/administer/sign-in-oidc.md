@@ -28,6 +28,7 @@ signed in. For what all providers share, see [Sign-in providers](sign-in.md).
 | **Client ID** | The application's ID at the provider. |
 | **Client secret** | The secret you created. It is never shown again; leave the field empty when you change something else. |
 | **Scopes** | `openid email profile` unless the provider needs others, separated by spaces. |
+| **Claim that names the person** | `sub` unless the provider keeps another ID the same in all its applications. Entra ID with [provisioning](sign-in-provisioning.md): `oid`, the ID provisioning sends. Set it before people first sign in: a change later makes everyone link their account again. |
 | **Ask the UserInfo endpoint** | **When the ID token lacks the e-mail or groups**, unless the provider says otherwise. |
 
 Then decide who may sign in (see [Sign-in providers](sign-in.md#who-may-sign-in-and-what-they-get)) and select
@@ -45,7 +46,8 @@ Then decide who may sign in (see [Sign-in providers](sign-in.md#who-may-sign-in-
     3. Under **Token configuration**, add the optional claim `email` to the ID token, and add a groups claim
        if you want group rules.
     4. In the console: **Issuer** `https://login.microsoftonline.com/<tenant ID>/v2.0`, the application's
-       **Client ID** and the secret.
+       **Client ID** and the secret. With provisioning, **Claim that names the person** `oid` (Entra ID sends it
+       with the scope `profile`).
 
     Entra ID does not say whether an address is verified: list your domains under **Allowed e-mail domains**.
     It sends groups by their object ID, so group rules name the ID, not the group's name.

@@ -113,6 +113,8 @@
 "Was speichert Fadenstack über provisionierte Personen?" = "switch-provisioning-on"
 "Wo finde ich die SCIM-Adresse und das Token?" = "switch-provisioning-on"
 "Warum scheitert der Provisionierungstest des Anbieters?" = "when-it-does-not-work"
+"Wie melden sich provisionierte Personen zum ersten Mal an?" = "the-first-sign-in"
+"Wie lasse ich nur provisionierte Personen sich anmelden?" = "the-first-sign-in"
 
 ["administer/models.md"]
 "Wie finde und lade ich ein Modell herunter?" = "find-a-model"

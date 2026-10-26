@@ -34,6 +34,9 @@ const STORED: SignInProvider = {
   secrets_set: ["bind_password"], created_at: "", updated_at: "",
 };
 
+/** A test that types through the whole provider dialog: ~2 s alone, past the default 20 s in a loaded full run. */
+const FILLS_THE_DIALOG = 60_000;
+
 const ENTRA: SignInProvider = {
   ...STORED, id: "p2", key: "entra", name: "Entra ID", protocol: "oidc",
   settings: {
@@ -111,7 +114,7 @@ describe("the sign-in providers page", () => {
     });
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(list).toHaveBeenCalledTimes(2);
-  });
+  }, FILLS_THE_DIALOG);
 
   it("shows what the module refused, as it said it, and keeps the dialog open", async () => {
     create.mockRejectedValue(new ProviderApiError(422, [{ loc: ["body", "key"], msg: "String should match pattern" }]));
@@ -142,6 +145,23 @@ describe("the sign-in providers page", () => {
     expect(body).not.toHaveProperty("secrets");
     expect(body.settings).toMatchObject({ base_dn: "OU=Staff,DC=example,DC=com", timeout_s: 10, email_verified_by_idp: true });
   });
+
+  it("names the chat role for a new provider's people, and nothing else", async () => {
+    const chat = { id: "r-chat", name: "default_user" } as admin.RbacRole;
+    vi.spyOn(admin.adminUsers, "listRoles").mockResolvedValue([{ id: "r-admin", name: "admin" } as admin.RbacRole, chat]);
+    create.mockResolvedValue({ ...STORED, key: "example-corp" });
+    renderPage(<AuthProvidersPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Add provider" }));
+    fireEvent.change(field(/^Name/), { target: { value: "Example Corp" } });
+    fireEvent.change(field(/^Issuer/), { target: { value: "https://login.example.com/v2.0" } });
+    fireEvent.change(field(/^Client ID/), { target: { value: "app-1" } });
+    fireEvent.change(screen.getByLabelText(/^Client secret/), { target: { value: "s3cret" } });
+    expect(field(/^Claim that names the person/)).toHaveValue("sub");
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Add provider" }));
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    expect(create.mock.calls[0][0].policy.default_role_ids).toEqual(["r-chat"]);
+    expect(create.mock.calls[0][0].settings).toMatchObject({ subject_claim: "sub" });
+  }, FILLS_THE_DIALOG);
 
   it("warns of a directory without TLS", async () => {
     renderPage(<AuthProvidersPage />);
@@ -228,6 +248,21 @@ describe("provisioning (Enterprise)", () => {
     confirm("Switch provisioning off");
     await waitFor(() => expect(removeConnection).toHaveBeenCalledWith("entra"));
     expect(await screen.findByRole("button", { name: "Switch provisioning on" })).toBeInTheDocument();
+  });
+
+  it("offers only provisioned people for identity providers, not for directories", async () => {
+    update.mockResolvedValue(ENTRA);
+    renderPage(<AuthProvidersPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Change Corp AD" }));
+    expect(screen.queryByLabelText(/^Only people the provider's provisioning added/)).not.toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Change Entra ID" }));
+    fireEvent.click(screen.getByLabelText(/^Only people the provider's provisioning added/));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+    expect(update.mock.calls[0][1].policy.provisioned_only).toBe(true);
   });
 
   it("ends a provider's provisioning when the provider is deleted", async () => {

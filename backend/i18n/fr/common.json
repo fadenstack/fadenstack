@@ -151,7 +151,8 @@
       "license": "Cette connexion n'est pas disponible avec la licence de ce serveur. Demandez à un administrateur.",
       "not_offered": "Cette connexion n'est plus proposée ici. Connectez-vous autrement ou demandez à un administrateur.",
       "other": "La connexion n'a pas abouti.",
-      "link_needs_confirmation": "Un compte avec cette adresse existe déjà. Connectez-vous-y une fois pour associer cette connexion."
+      "link_needs_confirmation": "Un compte avec cette adresse existe déjà. Connectez-vous-y une fois pour associer cette connexion.",
+      "not_provisioned": "Vous n'avez pas encore accès ici : le fournisseur d'identité de votre organisation ne vous a pas attribué l'accès. Demandez à un administrateur."
     },
     "login_refused": {
       "bad_credentials": "L'e-mail ou le mot de passe est incorrect.",
@@ -2208,7 +2209,9 @@
       "userinfo": "Interroger le point de terminaison UserInfo",
       "userinfo_when_missing": "Quand le jeton d'ID n'a pas l'e-mail ou les groupes",
       "userinfo_always": "Toujours",
-      "userinfo_never": "Jamais"
+      "userinfo_never": "Jamais",
+      "subject_claim": "Claim qui identifie la personne",
+      "subject_claim_help": "En général sub. Entra ID avec provisionnement : oid, l'identifiant que le provisionnement envoie. Le changer plus tard oblige chacun à relier de nouveau son compte."
     },
     "saml": {
       "register": "Donnez au fournisseur d'identité l'adresse des métadonnées de ce serveur, ou ces valeurs :",
@@ -2260,7 +2263,10 @@
       "manage_groups_help": "Les appartenances définies à la main restent telles quelles.",
       "session_hours": "La connexion dure au plus (heures)",
       "inactive_days": "Suspendre après des jours sans connexion",
-      "inactive_days_help": "Vide : jamais"
+      "inactive_days_help": "Vide : jamais",
+      "provisioned_only": "Seules les personnes créées par le provisionnement du fournisseur peuvent se connecter avec lui",
+      "provisioned_only_help": "Les autres sont refusées, et personne n'obtient de compte en se connectant. Ne s'applique pas aux superutilisateurs.",
+      "default_roles_help_provisioning": "Pour les comptes créés à la première connexion et par le provisionnement. Vide : aucun rôle tant que personne n'en attribue"
     },
     "server_address": "Adresse du serveur",
     "server_address_help": "Où les gens ouvrent ce serveur, par exemple https://ai.example.internal. Le fournisseur les y renvoie ; les adresses ci-dessous en sont formées.",

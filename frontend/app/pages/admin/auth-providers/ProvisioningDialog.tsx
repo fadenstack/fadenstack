@@ -102,7 +102,9 @@ export function ProvisioningDialog({
               <Alert severity="success" data-testid="provisioning-token">
                 <Stack spacing={1.5}>
                   <span>
-                    {t(made.replaced ? "auth_providers.provisioning.token_replaced" : "auth_providers.provisioning.token_made")}
+                    {made.replaced
+                      ? t("auth_providers.provisioning.token_replaced")
+                      : t("auth_providers.provisioning.token_made")}
                   </span>
                   <Address label={t("auth_providers.provisioning.token")} value={made.token.token} />
                 </Stack>

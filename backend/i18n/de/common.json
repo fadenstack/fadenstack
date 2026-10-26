@@ -151,7 +151,8 @@
       "license": "Diese Anmeldung ist mit der Lizenz dieses Servers nicht verfügbar. Wenden Sie sich an die Administration.",
       "not_offered": "Diese Anmeldung wird hier nicht mehr angeboten. Melden Sie sich anders an oder wenden Sie sich an die Administration.",
       "other": "Die Anmeldung hat nicht geklappt.",
-      "link_needs_confirmation": "Es gibt bereits ein Konto mit dieser Adresse. Melden Sie sich einmal daran an, um diese Anmeldung zu verknüpfen."
+      "link_needs_confirmation": "Es gibt bereits ein Konto mit dieser Adresse. Melden Sie sich einmal daran an, um diese Anmeldung zu verknüpfen.",
+      "not_provisioned": "Sie haben hier noch keinen Zugang: Der Identitätsanbieter Ihrer Organisation hat Sie nicht zugewiesen. Wenden Sie sich an die Administration."
     },
     "login_refused": {
       "bad_credentials": "E-Mail oder Passwort ist falsch.",
@@ -2065,7 +2066,9 @@
       "userinfo": "UserInfo-Endpunkt fragen",
       "userinfo_when_missing": "Wenn dem ID-Token E-Mail oder Gruppen fehlen",
       "userinfo_always": "Immer",
-      "userinfo_never": "Nie"
+      "userinfo_never": "Nie",
+      "subject_claim": "Claim, der die Person benennt",
+      "subject_claim_help": "Meist sub. Entra ID mit Provisionierung: oid, die ID, die die Provisionierung sendet. Eine spätere Änderung lässt alle ihr Konto neu verknüpfen."
     },
     "saml": {
       "register": "Geben Sie dem Identitätsanbieter die Metadaten-Adresse dieses Servers oder diese Werte:",
@@ -2117,7 +2120,10 @@
       "manage_groups_help": "Von Hand gesetzte Mitgliedschaften bleiben, wie sie sind.",
       "session_hours": "Anmeldung gilt höchstens (Stunden)",
       "inactive_days": "Sperren nach Tagen ohne Anmeldung",
-      "inactive_days_help": "Leer: nie"
+      "inactive_days_help": "Leer: nie",
+      "provisioned_only": "Nur Personen, die die Provisionierung des Anbieters angelegt hat, dürfen sich damit anmelden",
+      "provisioned_only_help": "Alle anderen werden abgewiesen, und durch die Anmeldung entsteht kein Konto. Für Superuser gilt das nicht.",
+      "default_roles_help_provisioning": "Für Konten, die bei der ersten Anmeldung und durch die Provisionierung entstehen. Leer: keine Rollen, bis jemand sie vergibt"
     },
     "server_address": "Serveradresse",
     "server_address_help": "Wo die Benutzer diesen Server öffnen, z. B. https://ai.example.internal. Der Anbieter schickt sie dorthin zurück; die Adressen darunter werden daraus gebildet.",

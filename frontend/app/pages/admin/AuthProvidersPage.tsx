@@ -75,7 +75,9 @@ export default function AuthProvidersPage() {
   });
 
   // Apart from the providers: when the connections cannot be listed, the providers can still be managed.
-  const scim = useAsyncData(loadProvisioning, [], { initialValue: { offered: false, connections: [] } as Provisioning });
+  const scim = useAsyncData(loadProvisioning, [], {
+    initialValue: { offered: false, connections: [] } as Provisioning,
+  });
   const connectionOf = (key: string) => scim.data.connections.find((c) => c.provider_key === key) ?? null;
 
   const [editorOpen, setEditorOpen] = useState(false);
@@ -239,6 +241,7 @@ export default function AuthProvidersPage() {
         stored={editing}
         roles={data.roles}
         groups={data.groups}
+        provisioning={scim.data.offered}
         onClose={() => setEditorOpen(false)}
         onSaved={() => {
           setEditorOpen(false);

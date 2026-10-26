@@ -39,7 +39,8 @@ Einstellung ab, sagt es im Dialog, welche und warum.
 | Feld | Was es bewirkt |
 |---|---|
 | **Bei der ersten Anmeldung ein Konto anlegen** | Aus: Nur wer hier schon ein Konto hat, kann sich über den Anbieter anmelden. |
-| **Rollen neuer Konten** | Die Rollen, die ein neues Konto erhält. Leer: keine, bis sie jemand vergibt. Wer chatten soll, braucht `default_user` (siehe [Benutzer, Gruppen und Rollen](users.md)). Superuser wird auf diesem Weg niemand. |
+| **Rollen neuer Konten** | Die Rollen, die ein neues Konto erhält, bei der ersten Anmeldung oder durch die [Provisionierung](sign-in-provisioning.md). Ein neuer Anbieter beginnt mit `default_user`, das braucht, wer chatten soll (siehe [Benutzer, Gruppen und Rollen](users.md)). Leer: keine, bis sie jemand vergibt. Superuser wird auf diesem Weg niemand. |
+| **Nur Personen, die die Provisionierung des Anbieters angelegt hat, dürfen sich damit anmelden** | Erscheint mit der [Provisionierung](sign-in-provisioning.md). Alle anderen werden abgewiesen, und durch die Anmeldung entsteht kein Konto. Für Superuser gilt das nicht. |
 | **Erlaubte E-Mail-Domains** | Nur Benutzer mit einer Adresse in diesen Domains dürfen sich anmelden, z. B. `example.com`. Eine Adresse in einer davon gilt als geprüft. Leer: alle. |
 | **Personen mit einer Adresse in diesen Domains dürfen sich nur über diesen Anbieter anmelden** | Sie können sich hier nicht mehr mit Passwort anmelden; wer Ihre Organisation verlässt, verliert damit auch den Zugang hier. Superuser behalten ihr Passwort; vertippt sich ein Superuser, sieht er dieselbe Meldung wie alle in der Domain, damit die Seite nie verrät, ob ein Passwort stimmte. |
 | **Gruppenregeln** | Wer beim Anbieter in einer Gruppe ist, kommt bei der Anmeldung in eine Gruppe hier. Nennen Sie die Gruppe so, wie der Anbieter sie sendet: mit Namen, mit ID (Entra ID sendet IDs) oder mit DN (Verzeichnisse). |
@@ -97,6 +98,7 @@ Was die Benutzer auf der Anmeldeseite sehen, und was zu tun ist:
 |---|---|
 | **„Hier gibt es noch kein Konto für Sie, und dieser Anbieter legt keines an.“** | Schalten Sie **Bei der ersten Anmeldung ein Konto anlegen** ein, oder legen Sie das Konto unter **Zugriffskontrolle → Benutzer** an. |
 | **„Sie dürfen sich mit diesem Anbieter nicht anmelden.“** | Die Adresse liegt in keiner der **Erlaubten E-Mail-Domains**. |
+| **„Sie haben hier noch keinen Zugang …“** | Nur Personen, die die Provisionierung des Anbieters angelegt hat, dürfen sich anmelden, und diese Person gehört nicht dazu. Weisen Sie sie beim Identitätsanbieter der Anwendung zu (siehe [Provisionierung](sign-in-provisioning.md)). |
 | **„Der Anbieter hat Ihre E-Mail-Adresse nicht bestätigt …“** | Der Anbieter sagt nicht, dass die Adresse geprüft ist. Nehmen Sie die Domain unter **Erlaubte E-Mail-Domains** auf, oder setzen Sie bei SAML und Verzeichnissen das Häkchen bei **Seine E-Mail-Adressen sind geprüft**, wenn der Anbieter der Ihrer Organisation ist. |
 | **„Der Anbieter hat Ihre E-Mail-Adresse nicht genannt …“** | Lassen Sie den Anbieter die E-Mail-Adresse senden (den Scope `email` oder das Attribut `mail`). |
 | **„Die Anmeldung hat zu lange gedauert oder wurde schon verwendet.“** | Beginnen Sie auf der Anmeldeseite neu. Eine Anmeldung, die nicht innerhalb von 10 Minuten abgeschlossen ist, verfällt. |

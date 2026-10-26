@@ -20,6 +20,8 @@ export interface ProviderPolicy {
   session_lifetime_s: number | null;
   inactive_days: number | null;
   sso_only: boolean;
+  /** Only people the provider's provisioning (SCIM) made sign in with it; superusers excepted. */
+  provisioned_only?: boolean;
 }
 
 export interface OIDCSettings {
@@ -30,6 +32,8 @@ export interface OIDCSettings {
   scopes: string[];
   token_auth_method: "client_secret_basic" | "client_secret_post" | "none";
   userinfo: "never" | "when_missing" | "always";
+  /** The claim that names the person: `sub`, or one the provider keeps across its apps (Entra ID's `oid`). */
+  subject_claim?: string;
   email_claim: string;
   email_verified_claim: string;
   name_claim: string;

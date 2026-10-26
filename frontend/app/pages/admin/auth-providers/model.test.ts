@@ -234,3 +234,23 @@ describe("a directory's stable ID", () => {
     expect(formFromProvider(stored).subjectAttribute).toBe("nsUniqueId");
   });
 });
+
+describe("provisioning (SCIM)", () => {
+  it("the claim that names the person: sub unless given, and read back", () => {
+    expect(blankForm("oidc").subjectClaim).toBe("sub");
+    const blank = toWrite({ ...oidcForm(), subjectClaim: "  " });
+    expect(blank.settings).toMatchObject({ subject_claim: "sub" });
+    const oid = toWrite({ ...oidcForm(), subjectClaim: " oid " });
+    expect(oid.settings).toMatchObject({ subject_claim: "oid" });
+    expect(formFromProvider({ ...STORED, settings: { ...STORED.settings, subject_claim: "oid" } as never }).subjectClaim)
+      .toBe("oid");
+    expect(formFromProvider(STORED).subjectClaim).toBe("sub");
+  });
+
+  it("only provisioned people: off unless chosen, and read back", () => {
+    expect(toWrite(oidcForm()).policy.provisioned_only).toBe(false);
+    expect(toWrite({ ...oidcForm(), provisionedOnly: true }).policy.provisioned_only).toBe(true);
+    expect(formFromProvider({ ...STORED, policy: { ...STORED.policy, provisioned_only: true } }).provisionedOnly).toBe(true);
+    expect(formFromProvider(STORED).provisionedOnly).toBe(false);
+  });
+});

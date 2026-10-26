@@ -100,9 +100,11 @@ class ExternalIdentity(BaseModel):
     #: gave before and no longer gives are taken away; memberships an administrator set are never touched.
     group_ids: list[uuid.UUID] = Field(default_factory=list)
     manage_groups: bool = False
-    #: For a new account: whether one may be made, and with which roles.
+    #: For a new account: whether one may be made, and with which roles (none: no roles).
     create_account: bool = False
     default_role_ids: list[uuid.UUID] = Field(default_factory=list)
+    #: Only people the provider provisions (``services/provisioning``) sign in with it; superusers excepted.
+    provisioned_only: bool = False
     #: How long this sign-in lasts at most; the shorter of this and the backend's own lifetime applies.
     session_lifetime_s: int | None = Field(default=None, ge=60)
 
@@ -124,6 +126,7 @@ class Refusal(StrEnum):
     NEEDS_HTTPS = "needs_https"
     LICENSE = "license"
     NOT_OFFERED = "not_offered"
+    NOT_PROVISIONED = "not_provisioned"
 
 
 class SignInAnswer(BaseModel):

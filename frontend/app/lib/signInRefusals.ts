@@ -21,6 +21,7 @@ export const REFUSALS = [
   "needs_https",
   "license",
   "not_offered",
+  "not_provisioned",
 ] as const;
 
 export type RefusalCode = (typeof REFUSALS)[number];

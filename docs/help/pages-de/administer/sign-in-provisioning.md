@@ -48,7 +48,7 @@ Der Dialog zeigt dann die **Letzte Anfrage des Anbieters** und die **Letzte abge
 
 | Beim Identitätsanbieter | Hier |
 |---|---|
-| Eine Person wird der Anwendung zugewiesen | Sie erhält ein Konto mit der Rolle `default_user`. Gibt es ein Konto mit ihrer Adresse, wird es verknüpft, außer es gehört einem Superuser oder ein anderer Anmeldeanbieter pflegt es. |
+| Eine Person wird der Anwendung zugewiesen | Sie erhält ein Konto mit den **Rollen neuer Konten** des Anbieters (siehe [Anmeldeanbieter](sign-in.md#who-may-sign-in-and-what-they-get)). Gibt es ein Konto mit ihrer Adresse, wird es verknüpft, außer es gehört einem Superuser oder ein anderer Anmeldeanbieter pflegt es. |
 | Adresse oder Anmeldename einer Person ändern sich | Die Adresse des Kontos ändert sich. |
 | Eine Person wird entfernt, deaktiviert oder gelöscht | Das Konto wird gesperrt: keine Anmeldung, und keiner ihrer Agenten ist aktiv. Nichts wird gelöscht. |
 | Dieselbe Person wird wieder zugewiesen | Dasselbe Konto wird wieder freigegeben. |
@@ -59,6 +59,22 @@ Der Dialog zeigt dann die **Letzte Anfrage des Anbieters** und die **Letzte abge
 Superuser werden durch die Provisionierung nie geändert oder gesperrt. Eine Sperre durch einen Administrator
 oder nach Tagen ohne Anmeldung hebt der Anbieter nicht auf: Das tut **Wieder freigeben** unter
 **Zugriffskontrolle → Benutzer**.
+
+## Die erste Anmeldung {#the-first-sign-in}
+
+Personen, die die Provisionierung angelegt hat, melden sich über den Anbieter an wie alle anderen. Bei ihrer
+ersten Anmeldung wird ihr Konto mit der Anmeldung verknüpft, ohne den Nachweis, der von anderen verlangt wird,
+die hier schon ein Konto haben:
+
+- über die ID, die der Anbieter bei der Anmeldung sendet, wenn es dieselbe ist, die die Provisionierung
+  gesendet hat (Entra ID: **Claim, der die Person benennt** auf `oid` setzen, siehe
+  [OpenID Connect](sign-in-oidc.md));
+- sonst über ihre E-Mail-Adresse, wenn der Anbieter für sie bürgt.
+
+Danach pflegt die Provisionierung ihre Adresse und ihre Gruppen: Die Anmeldung ändert beides nicht, und die
+Gruppenregeln des Anbieters gelten für sie nicht. Damit sich nur diese Personen über den Anbieter anmelden, setzen
+Sie in den Einstellungen des Anbieters das Häkchen bei **Nur Personen, die die Provisionierung des Anbieters
+angelegt hat, dürfen sich damit anmelden**.
 
 ## Entra ID {#entra-id}
 

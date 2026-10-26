@@ -151,7 +151,8 @@
       "license": "This sign-in is not available with this server's licence. Ask an administrator.",
       "not_offered": "This sign-in is not offered here any more. Sign in another way, or ask an administrator.",
       "other": "The sign-in did not work.",
-      "link_needs_confirmation": "An account with this address exists already. Sign in to it once to link this sign-in."
+      "link_needs_confirmation": "An account with this address exists already. Sign in to it once to link this sign-in.",
+      "not_provisioned": "You have not been given access here yet: your organisation's identity provider has not assigned you. Ask an administrator."
     },
     "login_refused": {
       "bad_credentials": "The e-mail or password is wrong.",
@@ -2206,7 +2207,9 @@
       "userinfo": "Ask the UserInfo endpoint",
       "userinfo_when_missing": "When the ID token lacks the e-mail or groups",
       "userinfo_always": "Always",
-      "userinfo_never": "Never"
+      "userinfo_never": "Never",
+      "subject_claim": "Claim that names the person",
+      "subject_claim_help": "Usually sub. Entra ID with provisioning: oid, the ID provisioning sends. Changing it later makes everyone link their account again."
     },
     "saml": {
       "register": "Give the identity provider this server's metadata address, or these values:",
@@ -2258,7 +2261,10 @@
       "manage_groups_help": "Memberships set by hand stay as they are.",
       "session_hours": "Sign-in lasts at most (hours)",
       "inactive_days": "Suspend after days without sign-in",
-      "inactive_days_help": "Empty: never"
+      "inactive_days_help": "Empty: never",
+      "provisioned_only": "Only people the provider's provisioning added may sign in with it",
+      "provisioned_only_help": "Others are refused, and nobody gets an account by signing in. Superusers are not held to it.",
+      "default_roles_help_provisioning": "For accounts made at the first sign-in and by provisioning. Empty: no roles until someone gives them"
     },
     "server_address": "Server address",
     "server_address_help": "Where people open this server, for example https://ai.example.internal. The provider sends them back there; the addresses below are made from it.",

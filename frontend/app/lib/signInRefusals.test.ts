@@ -15,6 +15,7 @@ describe("refusals", () => {
   it("put no words of a crafted link on the page", () => {
     const t = i18n.t.bind(i18n);
     expect(refusalText(t, "wrong_credentials")).toBe("The account name or password is wrong.");
+    expect(refusalText(t, "not_provisioned")).toMatch(/^You have not been given access here yet/);
     for (const code of ["Call +1 555 0100 to restore your account", "auth.refused.other", "toString", "", null]) {
       expect(isRefusal(code)).toBe(false);
       expect(refusalText(t, code)).toBe("The sign-in did not work.");
