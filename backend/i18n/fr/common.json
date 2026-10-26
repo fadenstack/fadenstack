@@ -2138,7 +2138,9 @@
     "delete_title": "Supprimer le groupe",
     "delete_confirm": "Êtes-vous sûr de vouloir supprimer le groupe \"{{name}}\" ?",
     "delete_warning_members": "{{count}} utilisateur(s) sont actuellement dans ce groupe.",
-    "failed_delete": "Échec de la suppression du groupe."
+    "failed_delete": "Échec de la suppression du groupe.",
+    "kept_by": "Géré par {{provider}}",
+    "kept_by_help": "Ce fournisseur de connexion nomme l'équipe et gère qui en fait partie ; les membres ajoutés par un administrateur restent. Attribuez-lui des rôles et des agents ici."
   },
   "auth_providers": {
     "title": "Fournisseurs de connexion",

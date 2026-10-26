@@ -15,21 +15,16 @@ from __future__ import annotations
 
 import json
 import logging
-import secrets
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
-from fastapi_users.password import PasswordHelper
-from sqlalchemy import delete, func, select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from faden_backend.db.dao.rbac_dao import RbacDAO
-from faden_backend.db.models.groups import Group, UserGroup
 from faden_backend.db.models.oauth import OAuthAccount
-from faden_backend.db.models.rbac import Role
 from faden_backend.db.models.users import User
+from faden_backend.services import provisioning
 from faden_backend.services.sign_in.contract import ExternalIdentity, Refusal
 
 log = logging.getLogger(__name__)
@@ -47,7 +42,7 @@ class SignedIn:
 
 def membership_source(provider: str) -> str:
     """How a membership kept by *provider* is marked (``user_groups.source``)."""
-    return f"provider:{provider}"
+    return provisioning.source_of(provider)
 
 
 async def audit(
@@ -116,30 +111,10 @@ async def link(
 
 
 async def _new_account(session: AsyncSession, identity: ExternalIdentity, email: str) -> User:
-    user = User(
-        id=uuid.uuid4(),
-        email=email,
-        hashed_password=PasswordHelper().hash(secrets.token_urlsafe(32)),
-        is_active=True,
-        is_superuser=False,
-        is_verified=True,
+    return await provisioning.create_account(
+        session, email, role_ids=identity.default_role_ids, via="sign_in_provider",
+        provider=identity.provider,
     )
-    session.add(user)
-    await session.flush()
-    rbac = RbacDAO(session)
-    role_ids: list[uuid.UUID] = []
-    if identity.default_role_ids:
-        found = await session.scalars(select(Role.id).where(Role.id.in_(identity.default_role_ids)))
-        role_ids = list(found)
-    if role_ids:
-        await rbac.set_user_roles(user.id, role_ids)
-    else:
-        default = await rbac.get_role_by_name("default_user")
-        if default is not None:
-            await rbac.assign_role(user.id, default.id)
-    await session.flush()
-    await audit(session, "user.create", user, identity, via="sign_in_provider")
-    return user
 
 
 async def sync_groups(
@@ -149,32 +124,9 @@ async def sync_groups(
 
     Without *remove* (the provider's ``manage_groups`` off) the rules' groups are added, none taken away.
     """
-    source = membership_source(provider)
-    wanted: set[uuid.UUID] = set()
-    if group_ids:
-        wanted = set(await session.scalars(select(Group.id).where(Group.id.in_(group_ids))))
-    rows = (await session.execute(
-        select(UserGroup.group_id, UserGroup.source).where(UserGroup.user_id == user.id),
-    )).all()
-    kept_by_provider = {group_id for group_id, row_source in rows if row_source == source}
-    member_of = {group_id for group_id, _ in rows}
-
-    added = sorted(wanted - member_of)
-    removed = sorted(kept_by_provider - wanted) if remove else []
-    if added:
-        await session.execute(
-            pg_insert(UserGroup)
-            .values([{"user_id": user.id, "group_id": group_id, "source": source} for group_id in added])
-            .on_conflict_do_nothing(),
-        )
-    if removed:
-        await session.execute(
-            delete(UserGroup).where(
-                UserGroup.user_id == user.id, UserGroup.source == source, UserGroup.group_id.in_(removed),
-            ),
-        )
-    await session.flush()
-    return added, removed
+    return await provisioning.sync_memberships(
+        session, user, membership_source(provider), group_ids, remove=remove,
+    )
 
 
 async def _linked(session: AsyncSession, found: OAuthAccount, identity: ExternalIdentity) -> User | Refusal:

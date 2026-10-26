@@ -1995,7 +1995,9 @@
     "delete_title": "Gruppe löschen",
     "delete_confirm": "Sind Sie sicher, dass Sie die Gruppe \"{{name}}\" löschen möchten?",
     "delete_warning_members": "{{count}} Benutzer sind derzeit in dieser Gruppe.",
-    "failed_delete": "Gruppe konnte nicht gelöscht werden."
+    "failed_delete": "Gruppe konnte nicht gelöscht werden.",
+    "kept_by": "Gepflegt von {{provider}}",
+    "kept_by_help": "Dieser Anmeldeanbieter benennt das Team und pflegt, wer dazugehört; Mitglieder, die ein Administrator hinzugefügt hat, bleiben. Rollen und Agenten geben Sie ihm hier."
   },
   "auth_providers": {
     "title": "Anmeldeanbieter",

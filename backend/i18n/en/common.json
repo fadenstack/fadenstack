@@ -2136,7 +2136,9 @@
     "delete_title": "Delete Group",
     "delete_confirm": "Are you sure you want to delete group \"{{name}}\"?",
     "delete_warning_members": "{{count}} user(s) are currently in this group.",
-    "failed_delete": "Failed to delete group."
+    "failed_delete": "Failed to delete group.",
+    "kept_by": "Kept by {{provider}}",
+    "kept_by_help": "This sign-in provider names the team and keeps who is in it; members an administrator added stay. Give it roles and agents here."
   },
   "auth_providers": {
     "title": "Sign-in providers",

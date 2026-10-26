@@ -17,7 +17,6 @@ at a time. A module that cannot be reached changes nothing.
 
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -27,7 +26,8 @@ from sqlalchemy import func, select, text
 
 from faden_backend.db.models.agents import AgentRefreshToken
 from faden_backend.db.models.oauth import OAuthAccount
-from faden_backend.db.models.users import User, end_sign_ins
+from faden_backend.db.models.users import User
+from faden_backend.services import provisioning
 from faden_backend.services.sign_in import accounts, module
 
 if TYPE_CHECKING:
@@ -52,25 +52,20 @@ class Report:
     errors: list[str] = field(default_factory=list)
 
 
-async def _suspend(session: AsyncSession, user: User, reason: str, provider: str, report: Report) -> None:
-    from faden_backend.db.models.containers import AuditResult  # noqa: PLC0415
-    from faden_backend.services.audit import chain  # noqa: PLC0415
+async def _suspend(
+    session: AsyncSession, user: User, reason: str, provider: str, report: Report, *, directory: bool = False,
+) -> None:
+    """Suspend *user*.
 
-    user.is_active = False
-    end_sign_ins(user)
-    await session.flush()
-    report.suspended.append((user.id, reason))
-    log.info("Suspended %s: %s (provider %s)", user.id, reason, provider)
-    await chain.append(
-        chain.NewEvent(
-            action="user.suspend", target_type="user", target_id=str(user.id), result=AuditResult.ALLOW,
-            severity="high", source="system",
-            metadata_json=json.dumps({
-                "by": "sign_in_upkeep", "reason": reason, "provider": provider, "email": user.email,
-            }),
-        ),
-        request_session=session,
-    )
+    What the directory says is the provider's own suspension (it may lift it); inactivity is the upkeep's,
+    which no source lifts (CIS v8 5.3).
+    """
+    source = provisioning.source_of(provider) if directory else None
+    if await provisioning.suspend(
+        session, user, reason=reason, source=source, by="sign_in_upkeep", provider=provider,
+    ):
+        report.suspended.append((user.id, reason))
+        log.info("Suspended %s: %s (provider %s)", user.id, reason, provider)
 
 
 async def _inactive(session: AsyncSession, provider: ProviderUpkeep, report: Report) -> None:
@@ -125,7 +120,9 @@ async def _directory(session: AsyncSession, provider: ProviderUpkeep, report: Re
                     log.warning("The directory of %s says %s is %s; a superuser, left to an administrator",
                                 provider.key, user.id, person.status)
                     continue
-                await _suspend(session, user, f"directory_{person.status}", provider.key, report)
+                await _suspend(
+                    session, user, f"directory_{person.status}", provider.key, report, directory=True,
+                )
             elif person.status == "active":
                 # As at a sign-in: the rules' groups, and taking away only with manage_groups.
                 added, removed = await accounts.sync_groups(

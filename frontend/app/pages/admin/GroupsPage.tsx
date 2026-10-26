@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import {
   adminGroups,
   adminUsers,
+  teamKeeper,
   type Group,
   type GroupMember,
   type RbacRole,
@@ -29,6 +30,7 @@ import ListItem from "@mui/material/ListItem";
 import ListItemText from "@mui/material/ListItemText";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 
 import AddIcon from "@mui/icons-material/Add";
@@ -201,9 +203,19 @@ export default function GroupsPage() {
       key: "name",
       label: t("groups.name"),
       sortable: true,
-      render: (row) => (
-        <Typography fontWeight={600}>{row.name}</Typography>
-      ),
+      render: (row) => {
+        const keeper = teamKeeper(row);
+        return (
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography fontWeight={600}>{row.name}</Typography>
+            {keeper && (
+              <Tooltip title={t("groups.kept_by_help")}>
+                <Chip size="small" variant="outlined" label={t("groups.kept_by", { provider: keeper })} />
+              </Tooltip>
+            )}
+          </Stack>
+        );
+      },
     },
     {
       key: "description",

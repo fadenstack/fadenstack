@@ -1995,7 +1995,9 @@
     "delete_title": "Eliminar grupo",
     "delete_confirm": "¿Está seguro de que desea eliminar el grupo \"{{name}}\"?",
     "delete_warning_members": "{{count}} usuario(s) están actualmente en este grupo.",
-    "failed_delete": "Error al eliminar grupo."
+    "failed_delete": "Error al eliminar grupo.",
+    "kept_by": "Gestionado por {{provider}}",
+    "kept_by_help": "Este proveedor de inicio de sesión da nombre al equipo y gestiona quién forma parte; los miembros que añadió un administrador se mantienen. Asígnele roles y agentes aquí."
   },
   "auth_providers": {
     "title": "Proveedores de inicio de sesión",

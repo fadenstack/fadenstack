@@ -19,6 +19,9 @@ class GroupDTO(BaseModel):
     created_at: datetime
     roles: list[RoleDTO] = Field(default_factory=list)
     member_count: int = 0
+    #: Who keeps the team: ``None``, an administrator; ``provider:<key>``, that sign-in provider, which names
+    #: it and keeps its memberships (services/provisioning.py).
+    source: str | None = None
 
 
 class GroupMemberDTO(BaseModel):

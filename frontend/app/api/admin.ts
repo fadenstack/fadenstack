@@ -833,6 +833,13 @@ export interface Group {
   created_at: string;
   roles: GroupRole[];
   member_count: number;
+  /** Who keeps the team: absent or null, an administrator; `provider:<key>`, that sign-in provider. */
+  source?: string | null;
+}
+
+/** The provider that keeps a team (`provider:<key>` → `<key>`), or null for an administrator's. */
+export function teamKeeper(group: Pick<Group, "source">): string | null {
+  return group.source?.startsWith("provider:") ? group.source.slice("provider:".length) : null;
 }
 
 export interface GroupMember {

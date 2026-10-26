@@ -52,6 +52,7 @@ def _group_to_dto(group: Group, member_count: int = 0) -> GroupDTO:
         created_at=group.created_at,
         roles=[_role_to_dto(role) for role in sorted(group.roles, key=lambda r: r.name)],
         member_count=member_count,
+        source=group.source,
     )
 
 

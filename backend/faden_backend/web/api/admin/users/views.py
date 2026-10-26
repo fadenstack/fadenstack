@@ -29,7 +29,7 @@ from faden_backend.db.models.users import (
     get_jwt_strategy,
     set_sign_in_cookie,
 )
-from faden_backend.services import password_reset_links
+from faden_backend.services import password_reset_links, provisioning
 from faden_backend.services.agents import access
 from faden_backend.services.password_policy import password_problem
 from faden_backend.services.skills.client import forget_principal
@@ -657,20 +657,12 @@ async def set_user_active(
         if target.id == admin.id:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="You cannot suspend yourself.")
         await _refuse_last_superuser(session, target)
-    if target.is_active != payload.active:
-        target.is_active = payload.active
-        if not payload.active:
-            # Reactivating must not bring back what they had open before: those sign-ins stay over.
-            end_sign_ins(target)
-        await session.flush()
-        await AuditDAO(session).log(
-            action="user.reactivate" if payload.active else "user.suspend",
-            target_type="user",
-            target_id=str(target.id),
-            result=AuditResult.ALLOW,
-            actor_id=admin.id,
-            metadata_json=json.dumps({"email": target.email}),
-        )
+    # Core's one way to suspend and let back in (services/provisioning.py): an administrator's suspension is
+    # never lifted by a provider, and reactivating does not bring back the sign-ins that were open.
+    if payload.active:
+        await provisioning.reactivate(session, target, actor_id=admin.id)
+    else:
+        await provisioning.suspend(session, target, reason="administrator", actor_id=admin.id)
     return await _build_admin_user_dto(target, RbacDAO(session))
 
 

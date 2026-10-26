@@ -1995,7 +1995,9 @@
     "delete_title": "删除组",
     "delete_confirm": "确定要删除组 \"{{name}}\" 吗？",
     "delete_warning_members": "当前有 {{count}} 个用户在此组中。",
-    "failed_delete": "删除组失败。"
+    "failed_delete": "删除组失败。",
+    "kept_by": "由 {{provider}} 维护",
+    "kept_by_help": "此登录提供方为团队命名并维护其成员；管理员添加的成员会保留。可在此为其分配角色和智能体。"
   },
   "auth_providers": {
     "title": "登录提供商",
