@@ -420,7 +420,7 @@ async def _node_command_reaper_loop(app: FastAPI) -> None:
                     days = settings.api_token_use_retention_days
                     if dropped := await api_token_uses.delete_older_than(session, days):
                         await session.commit()
-                        log.info("Deleted %d API token use(s) older than %d days", dropped, days)
+                        log.info("Deleted %d API token use(s) past their retention period", dropped)
         except asyncio.CancelledError:
             raise
         except Exception:
