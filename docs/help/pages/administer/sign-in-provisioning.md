@@ -118,6 +118,9 @@ Entra ID's **Provisioning logs** show what it sent and what this server answered
    is dropped here.
 7. Assign people and groups on **Assignments**; push groups on **Push Groups**.
 
+For sign-ins with SAML, have Okta send its ID for each person as `subject-id` (see
+[SAML](sign-in-saml.md)): a person's first sign-in then finds the account provisioning made by that ID.
+
 ## Replace the token or switch off
 
 - **Replace token**: makes a new token at once. The old one stops working, so the provider's changes are
@@ -135,6 +138,7 @@ Entra ID's **Provisioning logs** show what it sent and what this server answered
 | The provider's test fails with **403**, "Provisioning needs an active Fadenstack Enterprise licence.", or **Last refused request** shows `403 licence` | The licence is missing or has expired; the admin pages say which. Accounts keep their last state meanwhile. |
 | The provider cannot connect at all | It cannot reach the server, or does not trust its certificate. See [Before you start](#before-you-start). |
 | Okta's test says no users were returned | Nobody is provisioned yet. Save, then assign people. |
+| A group pushed from Okta does not appear under **Groups** | Okta could not reach the server when it pushed. On **Push Groups**, select the group's **Push Status → Push Now**, or **Retry** under **Dashboard → Tasks**. |
 | **Last refused request** shows `409 UniquenessException` | Two people at the provider have the same login name or address, or another sign-in provider keeps the account with this address. Fix it at the provider. |
 | **Last refused request** shows `403 ForbiddenException` | The address is a superuser's here, and superusers are never provisioned. Leave that person unassigned at the provider. |
 | **Last refused request** shows `400 InvalidFilterException` | The provider asked in a way this server does not answer. Map `userName` as the unique identifier. |

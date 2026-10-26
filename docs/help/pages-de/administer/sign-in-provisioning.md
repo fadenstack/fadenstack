@@ -131,6 +131,10 @@ Die Bezeichnungen folgen der deutschen Oberfläche von Microsoft; in der englisc
    gesendet wird, wird hier verworfen.
 7. Weisen Sie Personen und Gruppen unter **Assignments** zu; senden Sie Gruppen unter **Push Groups**.
 
+Für Anmeldungen mit SAML lassen Sie Okta seine ID jeder Person als `subject-id` senden (siehe
+[SAML](sign-in-saml.md)): Die erste Anmeldung einer Person findet dann das Konto, das die Provisionierung angelegt
+hat, über diese ID.
+
 ## Token ersetzen oder ausschalten {#replace-the-token-or-switch-off}
 
 - **Token ersetzen**: erstellt sofort ein neues Token. Das alte gilt nicht mehr, daher werden die Änderungen des
@@ -148,6 +152,7 @@ Die Bezeichnungen folgen der deutschen Oberfläche von Microsoft; in der englisc
 | Der Test des Anbieters scheitert mit **403**, „Provisioning needs an active Fadenstack Enterprise licence.“, oder **Letzte abgelehnte Anfrage** zeigt `403 licence` | Die Lizenz fehlt oder ist abgelaufen; die Admin-Seiten sagen, was davon. Die Konten behalten so lange ihren letzten Stand. |
 | Der Anbieter kann gar keine Verbindung aufbauen | Er erreicht den Server nicht oder vertraut seinem Zertifikat nicht. Siehe [Bevor Sie beginnen](#before-you-start). |
 | Der Test von Okta meldet, dass keine Benutzer zurückkamen | Es ist noch niemand provisioniert. Speichern Sie und weisen Sie dann Personen zu. |
+| Eine von Okta gesendete Gruppe erscheint nicht unter **Gruppen** | Okta konnte den Server beim Senden nicht erreichen. Wählen Sie unter **Push Groups** beim **Push Status** der Gruppe **Push Now**, oder **Retry** unter **Dashboard → Tasks**. |
 | **Letzte abgelehnte Anfrage** zeigt `409 UniquenessException` | Zwei Personen beim Anbieter haben denselben Anmeldenamen oder dieselbe Adresse, oder ein anderer Anmeldeanbieter pflegt das Konto mit dieser Adresse. Beheben Sie es beim Anbieter. |
 | **Letzte abgelehnte Anfrage** zeigt `403 ForbiddenException` | Die Adresse gehört hier einem Superuser, und Superuser werden nie provisioniert. Weisen Sie diese Person beim Anbieter nicht zu. |
 | **Letzte abgelehnte Anfrage** zeigt `400 InvalidFilterException` | Der Anbieter hat auf eine Art gefragt, die dieser Server nicht beantwortet. Ordnen Sie `userName` als eindeutigen Bezeichner zu. |

@@ -53,11 +53,26 @@ Then decide who may sign in (see [Sign-in providers](sign-in.md#who-may-sign-in-
 
     Entra ID sends groups by their object ID: group rules name the ID, not the group's name.
 
+??? info "Okta"
+    1. In the Okta Admin Console, select **Applications → Create App Integration**, pick **SAML 2.0**, and name
+       the application.
+    2. Under **Configure SAML**, enter the **ACS** address as the **Single sign-on URL** and the **Entity ID** as
+       the **Audience URI (SP Entity ID)**.
+    3. Under **Attribute Statements**, add two:
+        - Name `urn:oasis:names:tc:SAML:attribute:subject-id`, name format **URI Reference**, value
+          `user.getInternalProperty("id")`: Okta's ID for the person, the same one its provisioning sends. Okta's
+          NameID is the e-mail address, which can change, so it is no ID.
+        - Name `email`, value `user.email`.
+
+        In newer consoles, they are on the **Sign On** tab under **Attribute Statements → Show legacy
+        configuration**.
+    4. In the console, pick **From its address** and paste the **Metadata URL** from Okta's **Sign On** tab.
+
 ## When it does not work
 
 | You see | What to do |
 |---|---|
 | **"The sign-in service cannot be reached right now."** | The sign-in module could not read the identity provider's metadata from its address. Check that the server reaches it over HTTPS, or paste the XML instead. |
 | The identity provider says the reply URL or entity is unknown | Register the **Entity ID** and the **ACS** address exactly as the dialog shows them. |
-| **"The sign-in did not work."** after the identity provider | The answer was unsigned, for another service provider, too old, or had a transient NameID. Check the identity provider's settings for this service provider. |
+| **"The sign-in did not work."** after the identity provider | The answer was unsigned, for another service provider, too old, or named the person by nothing that stays the same. **Logs → Audit** says which: `auth.sign_in.refused` for the provider, with the reason (`no_stable_subject`: send a persistent NameID or `subject-id`, see Okta above). Check the identity provider's settings for this service provider. |
 | **"The provider did not give your e-mail address …"** | Have the identity provider send the `mail` or `email` attribute. |

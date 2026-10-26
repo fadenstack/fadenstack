@@ -55,11 +55,27 @@ Legen Sie dann fest, wer sich anmelden darf (siehe
 
     Entra ID sendet Gruppen mit ihrer Objekt-ID: Gruppenregeln nennen die ID, nicht den Namen der Gruppe.
 
+??? info "Okta"
+    1. Wählen Sie in der Okta Admin Console **Applications → Create App Integration**, dann **SAML 2.0**, und
+       benennen Sie die Anwendung.
+    2. Tragen Sie unter **Configure SAML** die **ACS**-Adresse als **Single sign-on URL** und die **Entity-ID**
+       als **Audience URI (SP Entity ID)** ein.
+    3. Fügen Sie unter **Attribute Statements** zwei hinzu:
+        - Name `urn:oasis:names:tc:SAML:attribute:subject-id`, Namensformat **URI Reference**, Wert
+          `user.getInternalProperty("id")`: die ID der Person bei Okta, dieselbe, die seine Provisionierung
+          sendet. Die NameID von Okta ist die E-Mail-Adresse, die sich ändern kann, also keine ID.
+        - Name `email`, Wert `user.email`.
+
+        In neueren Konsolen stehen sie auf dem Reiter **Sign On** unter **Attribute Statements → Show legacy
+        configuration**.
+    4. Wählen Sie in der Konsole **Von seiner Adresse** und fügen Sie die **Metadata URL** vom Reiter **Sign On**
+       bei Okta ein.
+
 ## Wenn es nicht funktioniert {#when-it-does-not-work}
 
 | Sie sehen | Was zu tun ist |
 |---|---|
 | **„Der Anmeldedienst ist gerade nicht erreichbar.“** | Das Anmeldemodul konnte die Metadaten des Identitätsanbieters nicht von seiner Adresse lesen. Prüfen Sie, ob der Server sie über HTTPS erreicht, oder fügen Sie stattdessen das XML ein. |
 | Der Identitätsanbieter meldet, Antwort-URL oder Entity seien unbekannt | Tragen Sie **Entity-ID** und **ACS**-Adresse genau so ein, wie der Dialog sie zeigt. |
-| **„Die Anmeldung hat nicht geklappt.“** nach dem Identitätsanbieter | Die Antwort war unsigniert, für einen anderen Dienstanbieter, zu alt, oder hatte eine vorübergehende NameID. Prüfen Sie die Einstellungen des Identitätsanbieters für diesen Dienstanbieter. |
+| **„Die Anmeldung hat nicht geklappt.“** nach dem Identitätsanbieter | Die Antwort war unsigniert, für einen anderen Dienstanbieter, zu alt, oder nannte die Person mit nichts, das gleich bleibt. **Protokolle → Audit** sagt, was davon: `auth.sign_in.refused` für den Anbieter, mit dem Grund (`no_stable_subject`: Senden Sie eine persistente NameID oder `subject-id`, siehe Okta oben). Prüfen Sie die Einstellungen des Identitätsanbieters für diesen Dienstanbieter. |
 | **„Der Anbieter hat Ihre E-Mail-Adresse nicht genannt …“** | Lassen Sie den Identitätsanbieter das Attribut `mail` oder `email` senden. |
