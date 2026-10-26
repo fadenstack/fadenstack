@@ -79,6 +79,9 @@ provider's provisioning added may sign in with it** in the provider's settings.
 An application you registered under **App registrations** for OpenID Connect cannot provision. Add a second
 application for provisioning, and assign it the same people and groups.
 
+Each person needs an e-mail address in Entra ID: their **Email** under **Properties → Contact information**.
+People without a mailbox have none until it is set, and Fadenstack takes nobody without an address.
+
 1. In the Microsoft Entra admin center, open **Entra ID → Enterprise apps → New application → Create your own
    application**, name it, choose **Integrate any other application you don't find in the gallery
    (Non-gallery)** and select **Create**. (For a SAML provider you can use the application people sign in with.)

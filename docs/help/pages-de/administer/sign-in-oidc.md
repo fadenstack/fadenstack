@@ -45,9 +45,12 @@ Legen Sie dann fest, wer sich anmelden darf (siehe
     1. Öffnen Sie im Microsoft Entra Admin Center **App-Registrierungen** und wählen Sie **Neue Registrierung**.
        Wählen Sie unter **Umleitungs-URI** **Web** und fügen Sie die **Weiterleitungs-URI** aus der Konsole ein.
     2. Fügen Sie unter **Zertifikate & Geheimnisse** ein Client-Secret hinzu.
-    3. Fügen Sie unter **Tokenkonfiguration** dem ID-Token den optionalen Claim `email` hinzu, und einen
+    3. Fügen Sie unter **API-Berechtigungen** die delegierten Microsoft-Graph-Berechtigungen `openid`, `email`
+       und `profile` hinzu und wählen Sie **Administratorzustimmung erteilen**: Sonst wird jede Person bei ihrer
+       ersten Anmeldung um Zustimmung gebeten.
+    4. Fügen Sie unter **Tokenkonfiguration** dem ID-Token den optionalen Claim `email` hinzu, und einen
        Gruppen-Claim, wenn Sie Gruppenregeln nutzen wollen.
-    4. In der Konsole: **Aussteller** `https://login.microsoftonline.com/<Mandanten-ID>/v2.0`, die **Client-ID**
+    5. In der Konsole: **Aussteller** `https://login.microsoftonline.com/<Mandanten-ID>/v2.0`, die **Client-ID**
        der Anwendung und das Secret. Mit Provisionierung **Claim, der die Person benennt** `oid` (Entra ID sendet
        ihn mit dem Scope `profile`).
 

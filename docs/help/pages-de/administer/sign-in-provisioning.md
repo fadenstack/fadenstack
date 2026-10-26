@@ -86,6 +86,10 @@ Eine Anwendung, die Sie für OpenID Connect unter **App-Registrierungen** angele
 provisionieren. Legen Sie eine zweite Anwendung für die Provisionierung an und weisen Sie ihr dieselben Personen
 und Gruppen zu.
 
+Jede Person braucht in Entra ID eine E-Mail-Adresse: ihre **E-Mail** unter **Eigenschaften →
+Kontaktinformationen**. Personen ohne Postfach haben keine, bis sie eingetragen ist, und Fadenstack nimmt niemanden
+ohne Adresse an.
+
 1. Öffnen Sie im Microsoft Entra Admin Center **Entra ID → Unternehmensanwendungen → Neue Anwendung → Eigene
    Anwendung erstellen**, geben Sie einen Namen ein, wählen Sie die Option für eine Anwendung, die nicht im
    Katalog ist (Nicht-Katalog), und wählen Sie **Erstellen**. (Für einen SAML-Anbieter können Sie die Anwendung

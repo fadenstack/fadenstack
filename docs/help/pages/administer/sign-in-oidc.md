@@ -43,9 +43,11 @@ Then decide who may sign in (see [Sign-in providers](sign-in.md#who-may-sign-in-
     1. In the Microsoft Entra admin center, open **App registrations** and select **New registration**.
        Under **Redirect URI**, pick **Web** and paste the **Redirect URI** from the console.
     2. Under **Certificates & secrets**, add a client secret.
-    3. Under **Token configuration**, add the optional claim `email` to the ID token, and add a groups claim
+    3. Under **API permissions**, add the Microsoft Graph delegated permissions `openid`, `email` and `profile`,
+       and select **Grant admin consent**: otherwise everyone is asked to consent at their first sign-in.
+    4. Under **Token configuration**, add the optional claim `email` to the ID token, and add a groups claim
        if you want group rules.
-    4. In the console: **Issuer** `https://login.microsoftonline.com/<tenant ID>/v2.0`, the application's
+    5. In the console: **Issuer** `https://login.microsoftonline.com/<tenant ID>/v2.0`, the application's
        **Client ID** and the secret. With provisioning, **Claim that names the person** `oid` (Entra ID sends it
        with the scope `profile`).
 
