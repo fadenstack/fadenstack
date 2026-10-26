@@ -18,6 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_backend.db.dao.rbac_dao import RbacDAO
+from faden_backend.db.models.containers import AuditEvent
 from faden_backend.db.models.groups import Group, UserGroup
 from faden_backend.db.models.oauth import OAuthAccount
 from faden_backend.db.models.users import User
@@ -38,6 +39,7 @@ class FakeModule:
     def __init__(self) -> None:
         self.identity: dict[str, Any] | None = None
         self.refusal: str | None = None
+        self.refusal_detail = ""
         self.started: list[dict[str, Any]] = []
         self.finished: list[dict[str, Any]] = []
         self.admin_calls: list[tuple[str, str, Any, dict[str, str]]] = []
@@ -72,7 +74,9 @@ class FakeModule:
             if path.endswith("password") and body["password"] != "right":  # noqa: S105
                 return httpx.Response(200, json={"outcome": "refused", "refusal": "wrong_credentials"})
             if self.refusal:
-                return httpx.Response(200, json={"outcome": "refused", "refusal": self.refusal})
+                return httpx.Response(200, json={
+                    "outcome": "refused", "refusal": self.refusal, "detail": self.refusal_detail,
+                })
             return httpx.Response(200, json={"outcome": "identity", "identity": self.identity})
         if path == "/api/v1/sso-only":
             return httpx.Response(200, json={"domains": ["corp.example"]})
@@ -189,6 +193,27 @@ async def test_the_modules_refusal_is_passed_on(client: AsyncClient, fake: FakeM
         cookies={"faden_sso": started.cookies["faden_sso"]}, follow_redirects=False,
     )
     assert r.headers["location"] == "/login?error=not_allowed"
+
+
+@pytest.mark.anyio
+async def test_an_answer_the_module_refuses_is_recorded_with_its_reason(
+    client: AsyncClient, fake: FakeModule, dbsession: AsyncSession,
+) -> None:
+    """An identity provider that sends no stable ID (Okta's default SAML app): the administrator finds why."""
+    started, transaction = await _start(client, "saml")
+    fake.refusal, fake.refusal_detail = "provider_error", "no_stable_subject"
+    r = await client.post(
+        "/api/auth/sso/saml/acs", data={"SAMLResponse": "PHNhbWw+", "RelayState": transaction},
+        cookies={"faden_sso": started.cookies["faden_sso"]}, follow_redirects=False,
+    )
+    assert r.headers["location"] == "/login?error=provider_error"
+    event = (await dbsession.execute(select(AuditEvent).where(
+        AuditEvent.action == "auth.sign_in.refused", AuditEvent.target_id == "saml",
+    ))).scalar_one()
+    assert event.target_type == "sign_in_provider"
+    assert json.loads(event.metadata_json) == {
+        "provider": "saml", "reason": "provider_error", "detail": "no_stable_subject",
+    }
 
 
 @pytest.mark.anyio

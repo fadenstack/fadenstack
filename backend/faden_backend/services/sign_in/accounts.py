@@ -89,6 +89,33 @@ async def refuse(
     return refusal
 
 
+async def refuse_answer(session: AsyncSession, provider: str, refusal: Refusal, detail: str) -> Refusal:
+    """*refusal* of a provider's answer the module could not read, so without a person.
+
+    Recorded in the audit trail and the log with the module's reason: a short code, ``no_stable_subject``.
+    """
+    from faden_backend.db.models.containers import AuditResult  # noqa: PLC0415
+    from faden_backend.services.audit import chain  # noqa: PLC0415
+
+    detail = detail[:200]
+    log.warning("Sign-in with %s refused: %s (%s)", provider, refusal.value, detail or "no reason given")
+    try:
+        await chain.append(
+            chain.NewEvent(
+                action="auth.sign_in.refused",
+                target_type="sign_in_provider",
+                target_id=provider,
+                result=AuditResult.DENY,
+                severity="high",
+                metadata_json=json.dumps({"provider": provider, "reason": refusal.value, "detail": detail}),
+            ),
+            request_session=session,
+        )
+    except Exception:
+        log.exception("Could not record auth.sign_in.refused in the audit trail")
+    return refusal
+
+
 async def find_link(session: AsyncSession, provider: str, subject: str) -> OAuthAccount | None:
     """The link of *subject* at *provider*, if there is one."""
     return await session.scalar(

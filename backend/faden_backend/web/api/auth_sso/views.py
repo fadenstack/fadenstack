@@ -286,9 +286,10 @@ def _answer_is_ours(request: Request, provider: ProviderPublic, transaction: str
 
 
 async def _identity(
-    request: Request, provider: ProviderPublic, transaction: str, params: dict[str, str],
+    request: Request, session: AsyncSession, provider: ProviderPublic, transaction: str,
+    params: dict[str, str],
 ) -> ExternalIdentity | Refusal:
-    """The module's reading of the provider's answer."""
+    """The module's reading of the provider's answer; a refused one is recorded (ASVS 5.0 V16.3.1)."""
     try:
         answer = await module.finish(provider.key, transaction, _return_url(request, provider), params)
     except module.ModuleRefusedError as exc:
@@ -298,7 +299,11 @@ async def _identity(
         log.warning("Sign-in with %s could not finish: %s", provider.key, exc)
         return Refusal.PROVIDER_UNAVAILABLE
     if answer.outcome == "refused" or answer.identity is None:
-        return answer.refusal or Refusal.PROVIDER_ERROR
+        refusal = await accounts.refuse_answer(
+            session, provider.key, answer.refusal or Refusal.PROVIDER_ERROR, answer.detail,
+        )
+        await session.commit()  # the refusal's audit entry
+        return refusal
     return answer.identity
 
 
@@ -312,7 +317,7 @@ async def _finish(
     claims = _answer_is_ours(request, provider, transaction)
     if transaction is None or claims is None:
         return _to_login(Refusal.SIGN_IN_EXPIRED)
-    identity = await _identity(request, provider, transaction, params)
+    identity = await _identity(request, session, provider, transaction, params)
     if claims.get("link"):
         return await _finish_link(session, claims, identity, provider.key)
     if isinstance(identity, Refusal):
