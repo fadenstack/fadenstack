@@ -145,7 +145,7 @@ async def test_a_redirect_sign_in_from_start_to_signed_in(
         f"/api/auth/sso/corp/callback?code=abc&state={transaction}", cookies={"faden_sso": binding},
         follow_redirects=False,
     )
-    assert done.status_code == 302 and done.headers["location"] == "/"
+    assert done.status_code == 302 and done.headers["location"] == "/login"
     assert fake.finished[-1]["params"] == {"code": "abc", "state": transaction}
     assert done.cookies.get("fapiauth")
     user = (await dbsession.execute(select(User).where(User.email == "alice@corp.example"))).scalar_one()
@@ -251,7 +251,7 @@ async def test_a_posted_answer_signs_in(client: AsyncClient, fake: FakeModule) -
         "/api/auth/sso/saml/acs", data={"SAMLResponse": "PHNhbWw+", "RelayState": transaction},
         cookies={"faden_sso": started.cookies["faden_sso"]}, follow_redirects=False,
     )
-    assert done.status_code == 302 and done.headers["location"] == "/"
+    assert done.status_code == 302 and done.headers["location"] == "/login"
     assert fake.finished[-1]["params"]["SAMLResponse"] == "PHNhbWw+"
 
 

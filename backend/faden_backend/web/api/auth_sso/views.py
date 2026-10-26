@@ -325,7 +325,9 @@ async def _finish(
         if token:
             _set_link_cookie(request, response, token)
         return response
-    response = RedirectResponse("/", status_code=status.HTTP_302_FOUND)
+    # The sign-in page sends whoever is signed in on to where they belong (the chat, or the console); "/" is
+    # the landing page, which would ask them to sign in again.
+    response = RedirectResponse("/login", status_code=status.HTTP_302_FOUND)
     await _issue(request, response, signed, identity)
     response.delete_cookie(BINDING_COOKIE, path=BINDING_PATH)
     return response
