@@ -147,6 +147,8 @@ lifetime (s)** und **Longest API token lifetime (s)**.
 
 ### Verknüpfte Anmeldungen {#linked-sign-ins}
 
+![Verknüpfte Anmeldungen einer Person: Example Corp, wann sie sich zuletzt damit angemeldet hat, und dass ihr Passwort sie nicht anmeldet](../images/administer/user-sign-ins.png)
+
 Unter **Zugriffskontrolle → Benutzer** zeigt **Verknüpfte Anmeldungen** (das Ketten-Symbol) in der Zeile einer
 Person die Anmeldeanbieter, mit denen ihr Konto verknüpft ist, und ob auch ihr Passwort sie anmeldet.
 **Trennen** beendet eine Verknüpfung: Die Person kann sich damit nicht mehr anmelden, bis sie sie unter **Mein

@@ -4,6 +4,8 @@ People sign in with the account they already have at your organisation: through 
 speaks OpenID Connect or SAML, or with their name and password from your directory (LDAP, Active Directory).
 They get a Fadenstack account the first time they do, with the roles and groups you choose.
 
+![Sign-in providers: Example Corp, an OpenID Connect provider that is on](../images/administer/sign-in-providers.png)
+
 ## Before you start
 
 - You are signed in to the console as a **Superuser**.

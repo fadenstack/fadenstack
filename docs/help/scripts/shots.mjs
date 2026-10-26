@@ -162,6 +162,15 @@ const asReleaseInstall = (p) =>
     }
   });
 
+/** Pictures as an install reached over HTTPS shows them: the console warns about plain HTTP, which the install
+ *  the pictures are taken from may use and Help's readers do not. */
+const asHttpsInstall = (p) =>
+  p.evaluate((warning) => {
+    for (const alert of document.querySelectorAll(".MuiAlert-root")) {
+      if (alert.textContent?.includes(warning)) alert.style.display = "none";
+    }
+  }, K("auth_providers.provisioning.needs_https"));
+
 // name: the file under pages/images/; path: where to go; act: what to open first (never a confirm button);
 // clip: a locator to picture instead of the whole window; region: a fixed part of the window.
 const SHOTS = [
@@ -249,6 +258,28 @@ const SHOTS = [
   { name: "administer/users-create", path: "/admin/users", act: async (p) => p.getByRole("button", { name: L("Create User") }).click(), clip: (p) => p.getByRole("dialog") },
   { name: "administer/users-edit-roles", path: "/admin/users", act: async (p) => p.getByRole("button", { name: L("Edit Roles") }).first().click(), clip: (p) => p.getByRole("dialog") },
   { name: "administer/users-developer-mode", path: "/admin/users", act: async (p) => p.getByRole("button", { name: L("Developer mode") }).first().click(), clip: (p) => p.getByRole("dialog") },
+  // Sign-in providers, provisioning (SCIM) and linked sign-ins: an install with a provider whose provisioning is
+  // on, IDS.provisioned_user one of the people it provisioned, and the admin's own account linked to it.
+  {
+    name: "administer/sign-in-providers", path: "/admin/auth-providers", act: asHttpsInstall,
+    region: { x: 240, y: 0, width: 1200, height: 300 },
+  },
+  {
+    name: "administer/sign-in-provisioning", path: "/admin/auth-providers", clip: (p) => p.getByRole("dialog"),
+    act: async (p) => {
+      await p.getByRole("button", { name: new RegExp(`^${K("auth_providers.provisioning.column")}: `) }).first().click();
+      await p.getByTestId("provisioning-state").waitFor({ timeout: 20000 });
+      await asHttpsInstall(p);
+    },
+  },
+  {
+    name: "administer/user-sign-ins", path: "/admin/users", clip: (p) => p.getByRole("dialog"),
+    act: async (p) => {
+      await p.locator(`[data-user-sign-ins="${IDS.provisioned_user}"]`).click();
+      await p.getByTestId("linked-sign-ins").waitFor({ timeout: 20000 });
+    },
+  },
+  { name: "use/profile-linked-sign-ins", path: "/admin/profile", clip: (p) => p.getByTestId("linked-sign-ins-card") },
   { name: "administer/skill-sharing", path: () => `/admin/skills/${IDS.skill}`, act: async (p) => p.getByRole("tab", { name: L("Sharing") }).click() },
   { name: "administer/skill-versions", path: () => `/admin/skills/${IDS.skill}`, act: async (p) => p.getByRole("tab", { name: L("Versions") }).click() },
   {

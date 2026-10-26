@@ -58,6 +58,8 @@ organisation set it.
 
 ## Linked sign-ins
 
+![Linked sign-ins in My Profile: Example Corp with Unlink, and that your password also signs you in](../images/use/profile-linked-sign-ins.png)
+
 **My Profile** shows, under **Linked sign-ins**, the sign-in providers you sign in with, and whether your
 password also signs you in. It appears when your organisation connected its own sign-in.
 

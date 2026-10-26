@@ -5,6 +5,8 @@ it happens there, without waiting for them to sign in. Each of its groups become
 members. It works with Entra ID, Okta and other providers that speak SCIM 2.0, for OpenID Connect and SAML
 providers, and needs Fadenstack Enterprise.
 
+![Sign-in providers: Example Corp, with Provisioning On](../images/administer/sign-in-providers.png)
+
 ## Before you start
 
 - You are signed in to the console as a **Superuser**.
@@ -16,6 +18,8 @@ providers, and needs Fadenstack Enterprise.
   **On-premises SCIM app**).
 
 ## Switch provisioning on
+
+![Provisioning for Example Corp: the SCIM address, the token's last characters, the last request from the provider and the last refused one](../images/administer/sign-in-provisioning.png)
 
 1. Open **Access Control → Sign-in providers** and select the **Provisioning** icon (two arrows) in the
    provider's row.

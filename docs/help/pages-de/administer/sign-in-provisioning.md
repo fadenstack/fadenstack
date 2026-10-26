@@ -5,6 +5,8 @@ dort geschieht, ohne auf eine Anmeldung zu warten. Jede seiner Gruppen wird hier
 Mitgliedern. Das funktioniert mit Entra ID, Okta und anderen Anbietern, die SCIM 2.0 sprechen, für Anbieter mit
 OpenID Connect und SAML, und setzt Fadenstack Enterprise voraus.
 
+![Anmeldeanbieter: Example Corp, mit Provisionierung An](../images/administer/sign-in-providers.png)
+
 ## Bevor Sie beginnen {#before-you-start}
 
 - Sie sind als **Superuser** an der Konsole angemeldet.
@@ -17,6 +19,8 @@ OpenID Connect und SAML, und setzt Fadenstack Enterprise voraus.
   **On-premises SCIM app**).
 
 ## Provisionierung einschalten {#switch-provisioning-on}
+
+![Provisionierung für Example Corp: die SCIM-Adresse, die letzten Zeichen des Tokens, die letzte Anfrage des Anbieters und die letzte abgelehnte](../images/administer/sign-in-provisioning.png)
 
 1. Öffnen Sie **Zugriffskontrolle → Anmeldeanbieter** und wählen Sie in der Zeile des Anbieters das Symbol
    **Provisionierung** (zwei Pfeile).

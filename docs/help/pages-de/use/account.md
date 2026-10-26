@@ -58,6 +58,8 @@ kürzer als sieben Tage gelten, wie Ihre Organisation es festgelegt hat.
 
 ## Verknüpfte Anmeldungen {#linked-sign-ins}
 
+![Verknüpfte Anmeldungen in Mein Profil: Example Corp mit Trennen, und dass auch Ihr Passwort Sie anmeldet](../images/use/profile-linked-sign-ins.png)
+
 **Mein Profil** zeigt unter **Verknüpfte Anmeldungen** die Anmeldeanbieter, mit denen Sie sich anmelden, und ob
 auch Ihr Passwort Sie anmeldet. Der Abschnitt erscheint, wenn Ihre Organisation ihre eigene Anmeldung angebunden
 hat.

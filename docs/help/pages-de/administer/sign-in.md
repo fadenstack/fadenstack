@@ -5,6 +5,8 @@ Identitätsanbieter, der OpenID Connect oder SAML spricht, oder mit Name und Pas
 (LDAP, Active Directory). Bei der ersten Anmeldung erhalten sie ein Fadenstack-Konto, mit den Rollen und
 Gruppen, die Sie festlegen.
 
+![Anmeldeanbieter: Example Corp, ein eingeschalteter OpenID-Connect-Anbieter](../images/administer/sign-in-providers.png)
+
 ## Bevor Sie beginnen {#before-you-start}
 
 - Sie sind als **Superuser** an der Konsole angemeldet.

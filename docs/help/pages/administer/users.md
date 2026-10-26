@@ -139,6 +139,8 @@ To change the lifetimes: **Settings → General**, **Sign-in lifetime (s)**, **A
 
 ### Linked sign-ins
 
+![Linked sign-ins of one person: Example Corp, when they last signed in with it, and that their password does not sign them in](../images/administer/user-sign-ins.png)
+
 In **Access Control → Users**, **Linked sign-ins** (the link icon) in someone's row shows the sign-in providers
 their account is linked to, and whether their password also signs them in. **Unlink** ends one: they can no
 longer sign in with it until they link it again from **My Profile**. It is recorded in the audit log with your
