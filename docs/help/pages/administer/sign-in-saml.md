@@ -37,6 +37,19 @@ what all providers share, see [Sign-in providers](sign-in.md).
 | **Identity provider's metadata** | **From its address**: the address it publishes its metadata at (`https://`). **Pasted**: the XML of its metadata. |
 | **Its e-mail addresses are verified** | Tick it when the identity provider is your organisation's own: SAML does not say whether an address is verified. Otherwise list your domains under **Allowed e-mail domains**. |
 | **Sign the requests sent to the identity provider** | Only when the identity provider asks for signed requests. The certificate is in the **Metadata address**. |
+| **From a federation's metadata service (MDQ)** | Instead of an address or pasted XML: the federation's metadata query service, and the identity provider's **Entity ID**. Fadenstack asks the service for that one provider. |
+| **Certificate the metadata is signed with** | When your federation signs its metadata: its signing certificate (PEM). Then only metadata signed with that certificate's key, and with a `validUntil` date, is accepted. Required with a metadata service. |
+| **Sign out at the identity provider too** | Signing out of Fadenstack signs the person out at the identity provider as well, when its metadata names a single logout service. |
+| **End sign-ins when the identity provider signs someone out** | When the identity provider signs a person out, all their Fadenstack sign-ins end, in every browser and app. Only sign-ins made while this is on are found. |
+
+With either logout switch on, register the **Single logout service (SLO)** address the dialog shows at the
+identity provider, as you did the ACS. Logout messages must be signed by the identity provider; unsigned or
+altered ones are refused.
+
+Metadata is read up to 2 MiB, pasted or fetched (`FADEN_AUTH_SAML_METADATA_MAX_BYTES` on the sign-in module).
+Metadata past its `validUntil` date is refused. Fetched metadata is fetched again when its `cacheDuration`
+ends, after an hour at the latest, or when it expires; while it cannot be fetched, signing in with that
+provider is refused. A change to a provider holds at the next sign-in, in every worker of the sign-in module.
 
 Then decide who may sign in (see [Sign-in providers](sign-in.md#who-may-sign-in-and-what-they-get)) and select
 **Add provider**.
@@ -76,3 +89,5 @@ Then decide who may sign in (see [Sign-in providers](sign-in.md#who-may-sign-in-
 | The identity provider says the reply URL or entity is unknown | Register the **Entity ID** and the **ACS** address exactly as the dialog shows them. |
 | **"The sign-in did not work."** after the identity provider | The answer was unsigned, for another service provider, too old, or named the person by nothing that stays the same. **Logs → Audit** says which: `auth.sign_in.refused` for the provider, with the reason (`no_stable_subject`: send a persistent NameID or `subject-id`, see Okta above). Check the identity provider's settings for this service provider. |
 | **"The provider did not give your e-mail address …"** | Have the identity provider send the `mail` or `email` attribute. |
+| Signing out leaves people signed in at the identity provider | Switch on **Sign out at the identity provider too**; it holds for sign-ins made after that. The sign-in service's log says why it did not go on (`no_slo_endpoint`: the provider's metadata names no logout service). |
+| The identity provider's logout does not end the sign-ins here | Switch on **End sign-ins when the identity provider signs someone out** and register the **Single logout service (SLO)** address there. **Logs → Audit** shows `auth.sign_out.provider` for each sign-out, and `auth.sign_out.refused` with the reason for a message refused (`signature`, `destination`, `stale`, ...). |

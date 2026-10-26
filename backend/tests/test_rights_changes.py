@@ -195,3 +195,18 @@ async def test_a_providers_team_changes_end_sign_ins(dbsession: AsyncSession) ->
     await provisioning.change_members(dbsession, source, team.id, remove=[joins.id])
     assert await _ended(dbsession, joins) == [True]
     assert await _causes(dbsession, joins) == ["team.members", "team.members"]
+
+
+def test_a_sign_in_a_moment_before_the_change_ends_one_after_it_stands() -> None:
+    """To the millisecond: the second they share does not keep the older one (sign-ins carry ``iat_ms``)."""
+    from datetime import UTC, datetime, timedelta  # noqa: PLC0415
+
+    from faden_backend.db.models.users import sign_in_ended_for_all  # noqa: PLC0415
+
+    ended = datetime(2026, 10, 27, 9, 0, 0, 500_000, tzinfo=UTC)
+    second = int(ended.timestamp())
+    before = {"iat": second, "iat_ms": int((ended - timedelta(milliseconds=200)).timestamp() * 1000)}
+    after = {"iat": second, "iat_ms": int((ended + timedelta(milliseconds=200)).timestamp() * 1000)}
+    assert sign_in_ended_for_all(before, ended)
+    assert not sign_in_ended_for_all(after, ended)
+    assert not sign_in_ended_for_all({"iat": second}, ended), "without iat_ms: whole seconds, as before"

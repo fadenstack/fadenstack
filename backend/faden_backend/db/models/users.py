@@ -418,11 +418,15 @@ def is_current_sign_in(claims: dict[str, Any]) -> bool:
 def sign_in_ended_for_all(claims: dict[str, Any], sessions_valid_after: datetime | None) -> bool:
     """Whether the account's sign-ins were ended (``end_sign_ins``) after this one was made.
 
-    ``iat`` has whole seconds: a sign-in made in the second the others were ended still stands.
+    To the millisecond when the sign-in says (``iat_ms``): one made a moment before, in the same second, ends
+    too, and the one a sign-in makes right after its own change (a provider's group rules) stands. Older ones
+    have whole seconds only (``iat``), and one made in the second the others were ended still stands.
     """
     if sessions_valid_after is None:
         return False
     try:
+        if "iat_ms" in claims:
+            return int(claims["iat_ms"]) < int(sessions_valid_after.timestamp() * 1000)
         return int(claims["iat"]) < int(sessions_valid_after.timestamp())
     except (KeyError, TypeError, ValueError):
         return True
@@ -457,14 +461,24 @@ class SignInStrategy(JWTStrategy):
         super().__init__(*args, **kwargs)
         self._session = session
 
-    async def write_token(self, user: Any) -> str:
-        """A sign-in for *user*, with ``iat`` and a ``jti`` to end it by."""
+    async def write_token(self, user: Any, *, provider: str | None = None) -> str:
+        """A sign-in for *user*, with ``iat`` and a ``jti`` to end it by.
+
+        *provider*: the sign-in provider it came through (``sso``), so signing out can go on to the
+        provider's logout (SAML Single Logout).
+        """
+        now = time.time()
         data = {
             "sub": str(user.id),
             "aud": self.token_audience,
-            "iat": int(time.time()),
+            "iat": int(now),
+            # To the millisecond: one made just before the account's sign-ins were ended, in the same second,
+            # ends with them (``sign_in_ended_for_all``).
+            "iat_ms": int(now * 1000),
             "jti": uuid.uuid4().hex,
         }
+        if provider:
+            data["sso"] = provider
         return generate_jwt(data, self.encode_key, self.lifetime_seconds, algorithm=self.algorithm)
 
     async def read_token(self, token: str | None, user_manager: Any) -> Any:

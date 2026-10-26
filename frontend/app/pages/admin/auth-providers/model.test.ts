@@ -51,6 +51,7 @@ describe("defaults", () => {
       callback: `${ORIGIN}/api/auth/sso/corp/callback`,
       acs: `${ORIGIN}/api/auth/sso/corp/acs`,
       metadata: `${ORIGIN}/api/auth/sso/corp/metadata`,
+      sls: `${ORIGIN}/api/auth/sso/corp/sls`,
     });
   });
 });
@@ -252,5 +253,30 @@ describe("provisioning (SCIM)", () => {
     expect(toWrite({ ...oidcForm(), provisionedOnly: true }).policy.provisioned_only).toBe(true);
     expect(formFromProvider({ ...STORED, policy: { ...STORED.policy, provisioned_only: true } }).provisionedOnly).toBe(true);
     expect(formFromProvider(STORED).provisionedOnly).toBe(false);
+  });
+});
+
+describe("a SAML provider with a metadata service and Single Logout", () => {
+  it("sends the service, the entity ID, the pinned certificate and the logout settings", () => {
+    const form = {
+      ...blankForm("saml", ORIGIN), key: "fed", name: "Federation",
+      metadataSource: "mdq" as const, idpMdqUrl: " https://mdq.example.org ", idpEntityId: "https://idp.example.org/idp",
+      metadataSigningCert: "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----", logoutAtIdp: true,
+    };
+    expect(problems(form, false)).toEqual([]);
+    const settings = toWrite(form).settings as Record<string, unknown>;
+    expect(settings).toMatchObject({
+      idp_metadata_url: null, idp_metadata_xml: null, idp_mdq_url: "https://mdq.example.org",
+      idp_entity_id: "https://idp.example.org/idp", logout_at_idp: true, logout_from_idp: false,
+      slo_url: `${ORIGIN}/api/auth/sso/fed/sls`,
+    });
+  });
+
+  it("asks for the entity ID and the certificate with a metadata service", () => {
+    const form = {
+      ...blankForm("saml", ORIGIN), key: "fed", name: "Federation",
+      metadataSource: "mdq" as const, idpMdqUrl: "https://mdq.example.org",
+    };
+    expect(problems(form, false)).toEqual(expect.arrayContaining(["idp_entity_id", "signing_certificate"]));
   });
 });

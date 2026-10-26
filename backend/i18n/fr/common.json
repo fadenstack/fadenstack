@@ -185,7 +185,9 @@
     "reset_link": {
       "for_account": "Choisissez un nouveau mot de passe pour {{email}}. Connectez-vous ensuite avec.",
       "expired": "Ce lien a déjà été utilisé, a expiré ou a été remplacé par un plus récent. Demandez-en un nouveau à votre administrateur."
-    }
+    },
+    "signed_out_provider": "Vous êtes déconnecté, aussi auprès de votre fournisseur d'identité.",
+    "signed_out_here_only": "Vous êtes déconnecté de Fadenstack. Votre fournisseur d'identité n'a pas pu confirmer la déconnexion : fermez le navigateur pour mettre fin à cette session."
   },
   "root_mode": {
     "active": "MODE ROOT ACTIF",
@@ -2196,7 +2198,9 @@
       "base_dn": "où chercher les personnes",
       "bind_password": "le mot de passe du compte de service",
       "server_address": "l'adresse du serveur (https:// et l'hôte, rien après)",
-      "entity_id": "un ID d'entité (une URI absolue, 256 caractères au plus)"
+      "entity_id": "un ID d'entité (une URI absolue, 256 caractères au plus)",
+      "idp_entity_id": "l'ID d'entité du fournisseur d'identité (une URI absolue)",
+      "signing_certificate": "le certificat avec lequel les métadonnées sont signées (PEM)"
     },
     "oidc": {
       "register": "Enregistrez cette adresse chez le fournisseur comme URI de redirection :",
@@ -2225,7 +2229,16 @@
       "idp_metadata_url": "Adresse des métadonnées du fournisseur d'identité",
       "idp_metadata_xml": "Métadonnées (XML)",
       "sign_requests": "Signer les requêtes envoyées au fournisseur d'identité",
-      "entity_id_help": "Vide : l'adresse des métadonnées. Ne la changez que si le fournisseur d'identité connaît ce serveur sous un autre ID d'entité."
+      "entity_id_help": "Vide : l'adresse des métadonnées. Ne la changez que si le fournisseur d'identité connaît ce serveur sous un autre ID d'entité.",
+      "metadata_mdq": "Depuis le service de métadonnées d'une fédération (MDQ)",
+      "mdq_url": "Adresse du service de métadonnées (MDQ)",
+      "mdq_url_help": "Le service de requête de métadonnées de la fédération ; il est interrogé pour le fournisseur d'identité ci-dessous.",
+      "idp_entity_id": "ID d'entité du fournisseur d'identité",
+      "signing_certificate": "Certificat avec lequel les métadonnées sont signées",
+      "signing_certificate_help": "Épinglé : seules les métadonnées signées avec la clé de ce certificat sont acceptées. Obligatoire avec un service de métadonnées ; facultatif sinon.",
+      "logout_at_idp": "Se déconnecter aussi auprès du fournisseur d'identité",
+      "logout_from_idp": "Mettre fin aux connexions quand le fournisseur d'identité déconnecte quelqu'un",
+      "sls_url": "Service de déconnexion unique (SLO)"
     },
     "ldap": {
       "url": "Adresse de l'annuaire",

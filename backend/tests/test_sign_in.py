@@ -40,6 +40,10 @@ class FakeModule:
         self.identity: dict[str, Any] | None = None
         self.refusal: str | None = None
         self.refusal_detail = ""
+        self.signed_out: list[dict[str, Any]] = []
+        self.logout_url: str | None = None
+        self.logout_messages: list[dict[str, Any]] = []
+        self.logout_answer: dict[str, Any] = {"outcome": "refused", "detail": "unsigned"}
         self.started: list[dict[str, Any]] = []
         self.finished: list[dict[str, Any]] = []
         self.admin_calls: list[tuple[str, str, Any, dict[str, str]]] = []
@@ -52,7 +56,7 @@ class FakeModule:
             {"key": "dir", "name": "Directory", "kind": "password"},
         ]
 
-    def handler(self, request: httpx.Request) -> httpx.Response:  # noqa: C901, PLR0911 -- one answer per route
+    def handler(self, request: httpx.Request) -> httpx.Response:  # noqa: C901, PLR0911, PLR0912 -- one answer per route
         """Answer *request* as the module would."""
         if self.down:
             raise httpx.ConnectError("down", request=request)
@@ -78,6 +82,12 @@ class FakeModule:
                     "outcome": "refused", "refusal": self.refusal, "detail": self.refusal_detail,
                 })
             return httpx.Response(200, json={"outcome": "identity", "identity": self.identity})
+        if path == "/api/v1/sign-out/start":
+            self.signed_out.append(body)
+            return httpx.Response(200, json={"redirect_url": self.logout_url, "detail": "" if self.logout_url else "single_logout_off"})
+        if path == "/api/v1/sign-out/sls":
+            self.logout_messages.append(body)
+            return httpx.Response(200, json=self.logout_answer)
         if path == "/api/v1/sso-only":
             return httpx.Response(200, json={"domains": ["corp.example"]})
         if path == "/api/v1/providers/saml/metadata":
@@ -647,3 +657,79 @@ async def test_a_failing_password_check_refuses(
     monkeypatch.setattr(registry, "password_sign_in_checks", [broken])
     r = await client.post("/api/auth/jwt/login", data={"username": person.email, "password": PASSWORD})
     assert r.status_code == 400 and r.json()["detail"] == "LOGIN_USE_SIGN_IN_PROVIDER"
+
+
+# ── Single Logout (SAML) ────────────────────────────────────────────────
+
+
+async def _signed_in_with_saml(client: AsyncClient, fake: FakeModule, subject: str) -> str:
+    started, transaction = await _start(client, "saml")
+    fake.identity = _identity(provider="saml", subject=subject, email=f"{subject}@corp.example")
+    done = await client.post(
+        "/api/auth/sso/saml/acs", data={"SAMLResponse": "PHNhbWw+", "RelayState": transaction},
+        cookies={"faden_sso": started.cookies["faden_sso"]}, follow_redirects=False,
+    )
+    assert done.headers["location"] == "/login", done.headers
+    return done.cookies["fapiauth"]
+
+
+@pytest.mark.anyio
+async def test_signing_out_ends_the_sign_in_here_then_goes_on_to_the_provider(
+    client: AsyncClient, fake: FakeModule,
+) -> None:
+    """SAML2Int SDP-SP34: this sign-in ends first, whatever the provider says; SDP-SP27: then the browser goes."""
+    cookie = await _signed_in_with_saml(client, fake, "slo-1")
+    assert jwt.decode(cookie, options={"verify_signature": False})["sso"] == "saml", "the provider it came through"
+    fake.logout_url = "https://idp.example/slo?SAMLRequest=x"
+    out = await client.post("/api/auth/sso/sign-out", cookies={"fapiauth": cookie})
+    assert out.status_code == 200 and out.json() == {"redirect_url": "https://idp.example/slo?SAMLRequest=x"}
+    assert fake.signed_out == [{"provider": "saml", "subject": "slo-1"}]
+    assert (await client.get("/api/users/me", cookies={"fapiauth": cookie})).status_code == 401, "ended here"
+
+
+@pytest.mark.anyio
+async def test_a_sign_in_without_a_provider_signs_out_here_only(
+    client: AsyncClient, fake: FakeModule,
+) -> None:
+    cookie = await _signed_in_with_saml(client, fake, "slo-2")
+    fake.logout_url = None
+    out = await client.post("/api/auth/sso/sign-out", cookies={"fapiauth": cookie})
+    assert out.json() == {"redirect_url": None}, "the provider asks for no logout"
+
+
+@pytest.mark.anyio
+async def test_the_providers_logout_ends_every_sign_in_and_only_then_answers(
+    client: AsyncClient, fake: FakeModule, dbsession: AsyncSession,
+) -> None:
+    cookie = await _signed_in_with_saml(client, fake, "slo-3")
+    fake.logout_answer = {
+        "outcome": "end_sign_ins", "subjects": ["slo-3", "nobody-here"],
+        "redirect_url": "https://idp.example/slo?SAMLResponse=y",
+    }
+    raw = "SAMLRequest=fZ%2bx&RelayState=abc&SigAlg=http%3A%2F%2Fx&Signature=s%2Fg%3d%3d"
+    done = await client.get(f"/api/auth/sso/saml/sls?{raw}", follow_redirects=False)
+    assert done.headers["location"] == "https://idp.example/slo?SAMLResponse=y"
+    message = fake.logout_messages[-1]
+    assert (message["binding"], message["query"]) == ("redirect", raw), "passed on octet for octet"
+    assert message["return_url"] == "http://test/api/auth/sso/saml/sls"
+    assert (await client.get("/api/users/me", cookies={"fapiauth": cookie})).status_code == 401
+    ended = (await dbsession.execute(select(AuditEvent).where(AuditEvent.action == "auth.sign_out.provider"))).scalars()
+    assert [json.loads(e.metadata_json or "{}")["provider"] for e in ended] == ["saml"]
+
+
+@pytest.mark.anyio
+async def test_the_providers_answer_to_ours_and_a_refused_message(
+    client: AsyncClient, fake: FakeModule, dbsession: AsyncSession,
+) -> None:
+    fake.logout_answer = {"outcome": "signed_out"}
+    posted = await client.post("/api/auth/sso/saml/sls", data={"SAMLResponse": "x"}, follow_redirects=False)
+    assert posted.headers["location"] == "/login?signed_out=provider"
+    assert fake.logout_messages[-1]["params"] == {"SAMLResponse": "x"}
+    fake.logout_answer = {"outcome": "not_signed_out", "detail": "urn:oasis:names:tc:SAML:2.0:status:Responder"}
+    posted = await client.post("/api/auth/sso/saml/sls", data={"SAMLResponse": "x"}, follow_redirects=False)
+    assert posted.headers["location"] == "/login?signed_out=here_only"
+    fake.logout_answer = {"outcome": "refused", "detail": "signature"}
+    refused = await client.get("/api/auth/sso/saml/sls?SAMLRequest=z", follow_redirects=False)
+    assert refused.headers["location"] == "/login?error=provider_error"
+    event = (await dbsession.execute(select(AuditEvent).where(AuditEvent.action == "auth.sign_out.refused"))).scalar_one()
+    assert json.loads(event.metadata_json or "{}") == {"provider": "saml", "detail": "signature"}

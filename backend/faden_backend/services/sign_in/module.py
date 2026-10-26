@@ -13,12 +13,16 @@ from faden_backend.services.sign_in.contract import (
     DirectoryAnswer,
     DirectoryRequest,
     FinishRequest,
+    LogoutAnswer,
+    LogoutMessage,
     PasswordRequest,
     ProviderPublic,
     ProviderUpkeep,
     Refusal,
     SignInAnswer,
     SignInStart,
+    SignOutRequest,
+    SignOutStart,
     SSOOnly,
     StartRequest,
 )
@@ -176,3 +180,23 @@ async def directory(key: str, subjects: list[str]) -> DirectoryAnswer:
         return DirectoryAnswer.model_validate(response.json())
     except (ValueError, ValidationError) as exc:
         raise ModuleUnavailableError(f"unreadable directory answer: {exc}") from exc
+
+
+async def sign_out_start(key: str, subject: str) -> SignOutStart:
+    """Where to send a person signing out of a sign-in made with *key*, to be signed out there too."""
+    response = await request("POST", "/api/v1/sign-out/start", json=SignOutRequest(
+        provider=key, subject=subject,
+    ).model_dump())
+    try:
+        return SignOutStart.model_validate(response.json())
+    except (ValueError, ValidationError) as exc:
+        raise ModuleUnavailableError(f"unreadable sign-out answer: {exc}") from exc
+
+
+async def logout_message(message: LogoutMessage) -> LogoutAnswer:
+    """The module's reading of a logout message a provider sent (SAML Single Logout)."""
+    response = await request("POST", "/api/v1/sign-out/sls", json=message.model_dump())
+    try:
+        return LogoutAnswer.model_validate(response.json())
+    except (ValueError, ValidationError) as exc:
+        raise ModuleUnavailableError(f"unreadable logout answer: {exc}") from exc

@@ -331,3 +331,10 @@ def test_the_route_is_the_pattern_not_its_values() -> None:
         "POST /v1/agents/{agent}/chat/completions"
     )
     assert request_route({"path": "/v1/models"}, "GET") == "GET /v1/models"
+
+
+def test_to_the_millisecond_when_the_token_says() -> None:
+    ended = 1_800_000_000.5
+    user = UserFlags(is_active=True, is_superuser=False, sessions_valid_after=ended)
+    assert sign_in_ended_before({"iat": int(ended), "iat_ms": int(ended * 1000) - 200}, user)
+    assert not sign_in_ended_before({"iat": int(ended), "iat_ms": int(ended * 1000) + 200}, user)

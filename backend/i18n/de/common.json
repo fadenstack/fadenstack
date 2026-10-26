@@ -185,7 +185,9 @@
     "reset_link": {
       "for_account": "Legen Sie ein neues Passwort für {{email}} fest. Melden Sie sich danach damit an.",
       "expired": "Dieser Link wurde schon verwendet, ist abgelaufen oder wurde durch einen neueren ersetzt. Bitten Sie Ihren Administrator um einen neuen."
-    }
+    },
+    "signed_out_provider": "Sie sind abgemeldet, auch bei Ihrem Identitätsanbieter.",
+    "signed_out_here_only": "Sie sind bei Fadenstack abgemeldet. Ihr Identitätsanbieter konnte die Abmeldung dort nicht bestätigen: Schließen Sie den Browser, um diese Anmeldung zu beenden."
   },
   "root_mode": {
     "active": "ROOT-MODUS AKTIV",
@@ -2053,7 +2055,9 @@
       "base_dn": "wo Personen gesucht werden",
       "bind_password": "das Passwort des Dienstkontos",
       "server_address": "die Serveradresse (https:// und der Host, nichts danach)",
-      "entity_id": "eine Entity-ID (eine absolute URI, höchstens 256 Zeichen)"
+      "entity_id": "eine Entity-ID (eine absolute URI, höchstens 256 Zeichen)",
+      "idp_entity_id": "die Entity-ID des Identitätsanbieters (ein absoluter URI)",
+      "signing_certificate": "das Zertifikat, mit dem die Metadaten signiert sind (PEM)"
     },
     "oidc": {
       "register": "Tragen Sie diese Adresse beim Anbieter als Weiterleitungs-URI ein:",
@@ -2082,7 +2086,16 @@
       "idp_metadata_url": "Metadaten-Adresse des Identitätsanbieters",
       "idp_metadata_xml": "Metadaten (XML)",
       "sign_requests": "Anfragen an den Identitätsanbieter signieren",
-      "entity_id_help": "Leer: die Metadaten-Adresse. Ändern Sie sie nur, wenn der Identitätsanbieter diesen Server unter einer anderen Entity-ID kennt."
+      "entity_id_help": "Leer: die Metadaten-Adresse. Ändern Sie sie nur, wenn der Identitätsanbieter diesen Server unter einer anderen Entity-ID kennt.",
+      "metadata_mdq": "Vom Metadatendienst einer Föderation (MDQ)",
+      "mdq_url": "Adresse des Metadatendienstes (MDQ)",
+      "mdq_url_help": "Der Metadaten-Abfragedienst der Föderation; er wird nach dem Identitätsanbieter unten gefragt.",
+      "idp_entity_id": "Entity-ID des Identitätsanbieters",
+      "signing_certificate": "Zertifikat, mit dem die Metadaten signiert sind",
+      "signing_certificate_help": "Festgelegt: Nur Metadaten, die mit dem Schlüssel dieses Zertifikats signiert sind, werden angenommen. Pflicht mit einem Metadatendienst, sonst freiwillig.",
+      "logout_at_idp": "Auch beim Identitätsanbieter abmelden",
+      "logout_from_idp": "Anmeldungen beenden, wenn der Identitätsanbieter jemanden abmeldet",
+      "sls_url": "Single-Logout-Dienst (SLO)"
     },
     "ldap": {
       "url": "Adresse des Verzeichnisses",

@@ -77,6 +77,7 @@ function Registration({ form, set }: { form: ProviderForm; set: (change: Partial
             slotProps={{ htmlInput: { spellCheck: false, maxLength: 256 } }}
           />
           <Address label={t("auth_providers.saml.acs_url")} value={here.acs} />
+          <Address label={t("auth_providers.saml.sls_url")} value={here.sls} />
         </>
       )}
     </Stack>
@@ -190,8 +191,30 @@ function ProtocolFields({
         >
           <MenuItem value="url">{t("auth_providers.saml.metadata_from_url")}</MenuItem>
           <MenuItem value="xml">{t("auth_providers.saml.metadata_pasted")}</MenuItem>
+          <MenuItem value="mdq">{t("auth_providers.saml.metadata_mdq")}</MenuItem>
         </TextField>
-        {form.metadataSource === "url" ? (
+        {form.metadataSource === "mdq" ? (
+          <>
+            <TextField
+              size="small"
+              required
+              label={t("auth_providers.saml.mdq_url")}
+              value={form.idpMdqUrl}
+              onChange={(e) => set({ idpMdqUrl: e.target.value })}
+              helperText={t("auth_providers.saml.mdq_url_help")}
+              placeholder="https://mdq.example.org"
+              slotProps={{ htmlInput: { spellCheck: false, maxLength: 1024 } }}
+            />
+            <TextField
+              size="small"
+              required
+              label={t("auth_providers.saml.idp_entity_id")}
+              value={form.idpEntityId}
+              onChange={(e) => set({ idpEntityId: e.target.value })}
+              slotProps={{ htmlInput: { spellCheck: false, maxLength: 256 } }}
+            />
+          </>
+        ) : form.metadataSource === "url" ? (
           <TextField
             size="small"
             required
@@ -219,9 +242,34 @@ function ProtocolFields({
           }
           label={t("auth_providers.email_verified_by_idp")}
         />
+        <TextField
+          size="small"
+          required={form.metadataSource === "mdq"}
+          multiline
+          minRows={2}
+          maxRows={8}
+          label={t("auth_providers.saml.signing_certificate")}
+          value={form.metadataSigningCert}
+          onChange={(e) => set({ metadataSigningCert: e.target.value })}
+          helperText={t("auth_providers.saml.signing_certificate_help")}
+          placeholder="-----BEGIN CERTIFICATE-----"
+          slotProps={{
+            htmlInput: { spellCheck: false, maxLength: 20000, style: { fontFamily: "monospace", fontSize: 12 } },
+          }}
+        />
         <FormControlLabel
           control={<Checkbox checked={form.signRequests} onChange={(e) => set({ signRequests: e.target.checked })} />}
           label={t("auth_providers.saml.sign_requests")}
+        />
+        <FormControlLabel
+          control={<Checkbox checked={form.logoutAtIdp} onChange={(e) => set({ logoutAtIdp: e.target.checked })} />}
+          label={t("auth_providers.saml.logout_at_idp")}
+        />
+        <FormControlLabel
+          control={
+            <Checkbox checked={form.logoutFromIdp} onChange={(e) => set({ logoutFromIdp: e.target.checked })} />
+          }
+          label={t("auth_providers.saml.logout_from_idp")}
         />
       </Stack>
     );

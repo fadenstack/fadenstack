@@ -40,9 +40,16 @@ export interface ProviderForm {
   /** The claim that names the person; `sub` unless the provider keeps another across its apps. */
   subjectClaim: string;
   // SAML
-  metadataSource: "url" | "xml";
+  metadataSource: "url" | "xml" | "mdq";
   idpMetadataUrl: string;
   idpMetadataXml: string;
+  /** MDQ: the service's address and the identity provider's entity ID. */
+  idpMdqUrl: string;
+  idpEntityId: string;
+  /** The certificate the metadata must be signed with; empty: none pinned (required with MDQ). */
+  metadataSigningCert: string;
+  logoutAtIdp: boolean;
+  logoutFromIdp: boolean;
   /** Empty: the metadata address. */
   spEntityId: string;
   emailVerifiedByIdp: boolean;
@@ -78,7 +85,9 @@ function server(address: string): string {
 /** The addresses the provider is set up with: the callback (OIDC), the ACS and the metadata (SAML). */
 export function addresses(key: string, serverAddress: string) {
   const base = `${server(serverAddress)}/api/auth/sso/${key || "<key>"}`;
-  return { callback: `${base}/callback`, acs: `${base}/acs`, metadata: `${base}/metadata` };
+  return {
+    callback: `${base}/callback`, acs: `${base}/acs`, metadata: `${base}/metadata`, sls: `${base}/sls`,
+  };
 }
 
 /** The server address in a stored callback or ACS address: what comes before `/api/auth/sso/`. */
@@ -100,7 +109,8 @@ export function blankForm(protocol: Protocol = "oidc", serverAddress = ""): Prov
     issuer: "", clientId: "", clientSecret: "", scopes: "openid email profile", userinfo: "when_missing",
     subjectClaim: "sub",
     metadataSource: "url", idpMetadataUrl: "", idpMetadataXml: "", spEntityId: "", emailVerifiedByIdp: false,
-    signRequests: false,
+    signRequests: false, idpMdqUrl: "", idpEntityId: "", metadataSigningCert: "", logoutAtIdp: false,
+    logoutFromIdp: false,
     ldapUrl: "", startTls: false, caBundle: "", bindDn: "", bindPassword: "", baseDn: "", preset: "ad",
     userFilter: "", subjectAttribute: "", checkPeople: true,
     createAccount: true, defaultRoleIds: [], allowedDomains: "", manageGroups: false, groupRules: [],
@@ -141,9 +151,12 @@ export function formFromProvider(provider: SignInProvider): ProviderForm {
   } else if (s.protocol === "saml") {
     const serverAddress = serverOf(s.acs_url);
     Object.assign(form, {
-      serverAddress, metadataSource: s.idp_metadata_url ? "url" : "xml", idpMetadataUrl: s.idp_metadata_url ?? "",
+      serverAddress, idpMetadataUrl: s.idp_metadata_url ?? "",
+      metadataSource: s.idp_mdq_url ? "mdq" : s.idp_metadata_url ? "url" : "xml",
       idpMetadataXml: s.idp_metadata_xml ?? "", emailVerifiedByIdp: s.email_verified_by_idp,
-      signRequests: s.sign_requests,
+      signRequests: s.sign_requests, idpMdqUrl: s.idp_mdq_url ?? "", idpEntityId: s.idp_entity_id ?? "",
+      metadataSigningCert: s.idp_metadata_signing_certificate ?? "", logoutAtIdp: s.logout_at_idp ?? false,
+      logoutFromIdp: s.logout_from_idp ?? false,
       // The default entity ID stays the default, so it follows a changed server address.
       spEntityId: s.sp_entity_id === addresses(provider.key, serverAddress).metadata ? "" : s.sp_entity_id,
     });
@@ -187,13 +200,17 @@ function settingsOf(form: ProviderForm, stored?: ProviderSettings): ProviderWrit
   }
   if (form.protocol === "saml") {
     const base = stored?.protocol === "saml" ? stored : undefined;
-    const byUrl = form.metadataSource === "url";
+    const source = form.metadataSource;
     const settings: Partial<SAMLSettings> = {
       ...base, protocol: "saml",
-      idp_metadata_url: byUrl ? form.idpMetadataUrl.trim() : null,
-      idp_metadata_xml: byUrl ? null : form.idpMetadataXml.trim(),
+      idp_metadata_url: source === "url" ? form.idpMetadataUrl.trim() : null,
+      idp_metadata_xml: source === "xml" ? form.idpMetadataXml.trim() : null,
+      idp_mdq_url: source === "mdq" ? form.idpMdqUrl.trim() : null,
+      idp_entity_id: source === "mdq" ? form.idpEntityId.trim() : (base?.idp_entity_id ?? null),
+      idp_metadata_signing_certificate: form.metadataSigningCert.trim() || null,
       sp_entity_id: form.spEntityId.trim() || here.metadata, acs_url: here.acs,
       email_verified_by_idp: form.emailVerifiedByIdp, sign_requests: form.signRequests,
+      logout_at_idp: form.logoutAtIdp, logout_from_idp: form.logoutFromIdp, slo_url: here.sls,
     };
     return settings as ProviderWrite["settings"];
   }
@@ -237,6 +254,13 @@ export function problems(form: ProviderForm, editing: boolean): string[] {
   } else if (form.protocol === "saml") {
     if (form.metadataSource === "url" && !/^https?:\/\//.test(form.idpMetadataUrl.trim())) found.push("metadata");
     if (form.metadataSource === "xml" && !form.idpMetadataXml.trim().startsWith("<")) found.push("metadata");
+    if (form.metadataSource === "mdq") {
+      if (!/^https?:\/\//.test(form.idpMdqUrl.trim())) found.push("metadata");
+      if (!ENTITY_ID_PATTERN.test(form.idpEntityId.trim())) found.push("idp_entity_id");
+      if (!form.metadataSigningCert.includes("BEGIN CERTIFICATE")) found.push("signing_certificate");
+    } else if (form.metadataSigningCert.trim() && !form.metadataSigningCert.includes("BEGIN CERTIFICATE")) {
+      found.push("signing_certificate");
+    }
     if (form.spEntityId.trim() && !ENTITY_ID_PATTERN.test(form.spEntityId.trim())) found.push("entity_id");
   } else {
     if (!/^ldaps?:\/\//.test(form.ldapUrl.trim())) found.push("ldap_url");

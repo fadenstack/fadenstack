@@ -185,7 +185,9 @@
     "reset_link": {
       "for_account": "Elige una contraseña nueva para {{email}}. Después, inicia sesión con ella.",
       "expired": "Este enlace ya se usó, caducó o fue sustituido por uno más reciente. Pide uno nuevo a tu administrador."
-    }
+    },
+    "signed_out_provider": "Ha cerrado la sesión, también en su proveedor de identidad.",
+    "signed_out_here_only": "Ha cerrado la sesión en Fadenstack. Su proveedor de identidad no pudo confirmar el cierre allí: cierre el navegador para terminar esa sesión."
   },
   "root_mode": {
     "active": "MODO ROOT ACTIVO",
@@ -2053,7 +2055,9 @@
       "base_dn": "dónde se busca a las personas",
       "bind_password": "la contraseña de la cuenta de servicio",
       "server_address": "la dirección del servidor (https:// y el host, nada detrás)",
-      "entity_id": "un ID de entidad (una URI absoluta, de 256 caracteres como máximo)"
+      "entity_id": "un ID de entidad (una URI absoluta, de 256 caracteres como máximo)",
+      "idp_entity_id": "el ID de entidad del proveedor de identidad (una URI absoluta)",
+      "signing_certificate": "el certificado con el que se firman los metadatos (PEM)"
     },
     "oidc": {
       "register": "Registrar esta dirección en el proveedor como URI de redirección:",
@@ -2082,7 +2086,16 @@
       "idp_metadata_url": "Dirección de metadatos del proveedor de identidad",
       "idp_metadata_xml": "Metadatos (XML)",
       "sign_requests": "Firmar las solicitudes enviadas al proveedor de identidad",
-      "entity_id_help": "Vacío: la dirección de metadatos. Cambiarlo solo si el proveedor de identidad conoce este servidor por otro ID de entidad."
+      "entity_id_help": "Vacío: la dirección de metadatos. Cambiarlo solo si el proveedor de identidad conoce este servidor por otro ID de entidad.",
+      "metadata_mdq": "Del servicio de metadatos de una federación (MDQ)",
+      "mdq_url": "Dirección del servicio de metadatos (MDQ)",
+      "mdq_url_help": "El servicio de consulta de metadatos de la federación; se le pide el proveedor de identidad de abajo.",
+      "idp_entity_id": "ID de entidad del proveedor de identidad",
+      "signing_certificate": "Certificado con el que se firman los metadatos",
+      "signing_certificate_help": "Fijado: solo se aceptan metadatos firmados con la clave de este certificado. Obligatorio con un servicio de metadatos; opcional en otro caso.",
+      "logout_at_idp": "Cerrar sesión también en el proveedor de identidad",
+      "logout_from_idp": "Terminar los inicios de sesión cuando el proveedor de identidad cierra la sesión de alguien",
+      "sls_url": "Servicio de cierre de sesión único (SLO)"
     },
     "ldap": {
       "url": "Dirección del directorio",

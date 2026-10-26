@@ -70,7 +70,8 @@ def developer_mode(user: User, now: datetime) -> bool:
 
 
 def _access_token(*, secret: str, user: User, agent: Agent, device_id: uuid.UUID, ttl: int) -> str:
-    now = int(time.time())
+    moment = time.time()
+    now = int(moment)
     claims = {
         "sub": str(user.id),
         "tenant_id": agent.tenant_id,
@@ -82,6 +83,8 @@ def _access_token(*, secret: str, user: User, agent: Agent, device_id: uuid.UUID
         "email": user.email,
         "jti": uuid.uuid4().hex,
         "iat": now,
+        # To the millisecond, as console sign-ins: ends with the person's sign-ins made a moment later.
+        "iat_ms": int(moment * 1000),
         "exp": now + ttl,
     }
     return jwt.encode(claims, secret, algorithm="HS256")

@@ -39,6 +39,20 @@ kommen angemeldet zurück. Was für alle Anbieter gilt, steht unter [Anmeldeanbi
 | **Metadaten des Identitätsanbieters** | **Von seiner Adresse**: die Adresse, unter der er seine Metadaten veröffentlicht (`https://`). **Eingefügt**: das XML seiner Metadaten. |
 | **Seine E-Mail-Adressen sind geprüft** | Setzen Sie das Häkchen, wenn der Identitätsanbieter der Ihrer Organisation ist: SAML sagt nicht, ob eine Adresse geprüft ist. Sonst tragen Sie Ihre Domains unter **Erlaubte E-Mail-Domains** ein. |
 | **Anfragen an den Identitätsanbieter signieren** | Nur, wenn der Identitätsanbieter signierte Anfragen verlangt. Das Zertifikat steht in der **Metadaten-Adresse**. |
+| **Vom Metadatendienst einer Föderation (MDQ)** | Statt einer Adresse oder eingefügtem XML: der Metadaten-Abfragedienst der Föderation und die **Entity-ID** des Identitätsanbieters. Fadenstack fragt den Dienst nach genau diesem Anbieter. |
+| **Zertifikat, mit dem die Metadaten signiert sind** | Wenn Ihre Föderation ihre Metadaten signiert: ihr Signaturzertifikat (PEM). Dann werden nur Metadaten angenommen, die mit dem Schlüssel dieses Zertifikats signiert sind und ein `validUntil`-Datum haben. Pflicht mit einem Metadatendienst. |
+| **Auch beim Identitätsanbieter abmelden** | Die Abmeldung bei Fadenstack meldet die Person auch beim Identitätsanbieter ab, wenn seine Metadaten einen Single-Logout-Dienst nennen. |
+| **Anmeldungen beenden, wenn der Identitätsanbieter jemanden abmeldet** | Meldet der Identitätsanbieter eine Person ab, enden alle ihre Fadenstack-Anmeldungen, in jedem Browser und jeder Anwendung. Gefunden werden nur Anmeldungen, die entstanden, während dies eingeschaltet war. |
+
+Ist einer der beiden Abmelde-Schalter an, tragen Sie die Adresse des **Single-Logout-Dienstes (SLO)**, die der
+Dialog zeigt, beim Identitätsanbieter ein, wie die ACS. Abmeldenachrichten müssen vom Identitätsanbieter signiert
+sein; unsignierte oder veränderte werden abgelehnt.
+
+Metadaten werden bis 2 MiB gelesen, eingefügt oder abgerufen (`FADEN_AUTH_SAML_METADATA_MAX_BYTES` im
+Anmeldemodul). Metadaten nach ihrem `validUntil`-Datum werden abgelehnt. Abgerufene Metadaten werden erneut
+abgerufen, wenn ihre `cacheDuration` endet, spätestens nach einer Stunde, oder wenn sie ablaufen; solange sie nicht
+abgerufen werden können, wird die Anmeldung mit diesem Anbieter abgelehnt. Eine Änderung an einem Anbieter gilt ab
+der nächsten Anmeldung, in jedem Prozess des Anmeldemoduls.
 
 Legen Sie dann fest, wer sich anmelden darf (siehe
 [Anmeldeanbieter](sign-in.md#who-may-sign-in-and-what-they-get)), und wählen Sie **Anbieter hinzufügen**.
@@ -79,3 +93,5 @@ Legen Sie dann fest, wer sich anmelden darf (siehe
 | Der Identitätsanbieter meldet, Antwort-URL oder Entity seien unbekannt | Tragen Sie **Entity-ID** und **ACS**-Adresse genau so ein, wie der Dialog sie zeigt. |
 | **„Die Anmeldung hat nicht geklappt.“** nach dem Identitätsanbieter | Die Antwort war unsigniert, für einen anderen Dienstanbieter, zu alt, oder nannte die Person mit nichts, das gleich bleibt. **Protokolle → Audit** sagt, was davon: `auth.sign_in.refused` für den Anbieter, mit dem Grund (`no_stable_subject`: Senden Sie eine persistente NameID oder `subject-id`, siehe Okta oben). Prüfen Sie die Einstellungen des Identitätsanbieters für diesen Dienstanbieter. |
 | **„Der Anbieter hat Ihre E-Mail-Adresse nicht genannt …“** | Lassen Sie den Identitätsanbieter das Attribut `mail` oder `email` senden. |
+| Die Abmeldung lässt Personen beim Identitätsanbieter angemeldet | Schalten Sie **Auch beim Identitätsanbieter abmelden** ein; es gilt für Anmeldungen danach. Das Protokoll des Anmeldedienstes sagt, warum es nicht weiterging (`no_slo_endpoint`: Die Metadaten des Anbieters nennen keinen Abmeldedienst). |
+| Die Abmeldung beim Identitätsanbieter beendet die Anmeldungen hier nicht | Schalten Sie **Anmeldungen beenden, wenn der Identitätsanbieter jemanden abmeldet** ein und tragen Sie dort die Adresse des **Single-Logout-Dienstes (SLO)** ein. **Protokolle → Audit** zeigt `auth.sign_out.provider` für jede Abmeldung und `auth.sign_out.refused` mit dem Grund für eine abgelehnte Nachricht (`signature`, `destination`, `stale`, ...). |

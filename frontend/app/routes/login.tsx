@@ -58,6 +58,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [ssoProviders, setSsoProviders] = useState<AuthProviderPublic[]>([]);
   // A directory (LDAP, Active Directory) signs in on this page, with its own account names.
   const [directories, setDirectories] = useState<AuthProviderPublic[]>([]);
@@ -115,6 +116,10 @@ export default function LoginPage() {
       .catch(() => {
         // health endpoint unavailable — stay in production mode
       });
+
+    // Back from the identity provider's logout (SAML Single Logout).
+    const signedOut = params.get("signed_out");
+    if (signedOut === "provider" || signedOut === "here_only") setNotice(t(`auth.signed_out_${signedOut}`));
 
     // A sign-in with an outside provider that came back refused
     const refusal = params.get("error");
@@ -206,6 +211,7 @@ export default function LoginPage() {
               </Typography>
 
               {error && <Alert severity="error">{error}</Alert>}
+              {notice && !error && <Alert severity="info">{notice}</Alert>}
 
               {directories.length > 0 && (
                 <ToggleButtonGroup

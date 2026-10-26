@@ -177,3 +177,48 @@ class DirectoryAnswer(BaseModel):
 
     people: list[DirectoryPerson]
     manage_groups: bool = False
+
+
+# ── Single Logout (SAML) ──────────────────────────────────────────────────
+
+
+class SignOutRequest(BaseModel):
+    """A person signing out of a sign-in made with *provider*: whether to send them to its logout too."""
+
+    provider: str
+    #: Their subject at the provider (the linked account's ``account_id``).
+    subject: str = Field(min_length=1, max_length=320)
+
+
+class SignOutStart(BaseModel):
+    """Where the browser goes to be signed out at the provider; ``None``: nowhere (``detail`` says why)."""
+
+    redirect_url: str | None = None
+    detail: str = ""
+
+
+class LogoutMessage(BaseModel):
+    """A logout message the provider sent to ``/api/auth/sso/{key}/sls``, exactly as it came."""
+
+    provider: str
+    #: The logout service's address as the provider knows it (``{origin}/api/auth/sso/{key}/sls``).
+    return_url: str
+    binding: Literal["redirect", "post"]
+    #: HTTP-Redirect: the query string as received, octet for octet (its signature covers it).
+    query: str = Field(default="", max_length=1_048_576)
+    #: HTTP-POST: the form's fields.
+    params: dict[str, str] = Field(default_factory=dict)
+
+
+class LogoutAnswer(BaseModel):
+    """What the module made of a logout message, and what core does next.
+
+    ``end_sign_ins``: the provider signed these *subjects* out; end their sign-ins, then send the browser to
+    *redirect_url* (the signed answer for the provider). ``signed_out`` / ``not_signed_out``: the provider's
+    answer to a logout this server asked for. ``refused``: nothing is ended (*detail* says why).
+    """
+
+    outcome: Literal["end_sign_ins", "signed_out", "not_signed_out", "refused"]
+    subjects: list[str] = Field(default_factory=list)
+    redirect_url: str | None = None
+    detail: str = ""

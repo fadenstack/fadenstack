@@ -54,6 +54,16 @@ export interface SAMLSettings {
   sign_requests: boolean;
   want_response_signed: boolean;
   sp_certificate: string | null;
+  /** A federation's metadata query service (MDQ): asked for `idp_entity_id`'s metadata. */
+  idp_mdq_url?: string | null;
+  /** The certificate the metadata must be signed with (required with MDQ). */
+  idp_metadata_signing_certificate?: string | null;
+  /** Sign out at the identity provider too, when someone signs out here (Single Logout). */
+  logout_at_idp?: boolean;
+  /** End a person's sign-ins here when the identity provider signs them out. */
+  logout_from_idp?: boolean;
+  /** This server's single logout service (`/api/auth/sso/{key}/sls`). */
+  slo_url?: string | null;
 }
 
 export interface LDAPSettings {

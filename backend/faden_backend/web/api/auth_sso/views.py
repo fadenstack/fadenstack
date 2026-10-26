@@ -16,6 +16,10 @@
   to that account and signs nobody in. A SAML answer is posted across sites and brings no sign-in cookie,
   so the binding, signed and tied to this one transaction, is what names the account; it is void once the
   account's sign-ins were ended.
+- ``POST /api/auth/sso/sign-out``: sign out here, then at the provider the sign-in came through, when it asks
+  for that (SAML Single Logout): the answer says where the browser goes.
+- ``GET|POST /api/auth/sso/{key}/sls``: a provider's logout message (SAML): its sign-out of someone, which
+  ends their sign-ins here, or its answer to ours.
 
 The binding cookie ties an answer to the browser that began the sign-in, so an answer someone else started
 cannot sign this browser in. It holds a hash of the sign-in's transaction, signed, for ten minutes. An answer
@@ -26,6 +30,7 @@ such providers therefore need HTTPS, except in development.
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import time
 import uuid
@@ -36,15 +41,20 @@ import jwt
 from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
+from faden_backend.db.dao.audit_dao import AuditDAO
 from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.containers import AuditResult
+from faden_backend.db.models.oauth import OAuthAccount
 from faden_backend.db.models.users import (
     SignInStrategy,
     User,
     cookie_transport,
     current_active_user,
+    end_sign_ins,
     login_lifetime_seconds,
     sign_in_ended_for_all,
 )
@@ -52,6 +62,7 @@ from faden_backend.services.sign_in import accounts, link_requests, linked, modu
 from faden_backend.services.sign_in.contract import (
     KEY_PATTERN,
     ExternalIdentity,
+    LogoutMessage,
     ProviderKind,
     ProviderPublic,
     Refusal,
@@ -164,7 +175,7 @@ async def _issue(
         limit = identity.session_lifetime_s
         lifetime = min(lifetime, limit) if lifetime else limit
     strategy = SignInStrategy(secret=settings.users_secret, lifetime_seconds=lifetime)
-    token = await strategy.write_token(signed.user)
+    token = await strategy.write_token(signed.user, provider=identity.provider)
     response.set_cookie(
         key=cookie_transport.cookie_name,
         value=token,
@@ -602,3 +613,139 @@ async def _signed_in_by_link(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=linked.value)
     await _issue(request, response, linked.signed, linked.identity)
     response.delete_cookie(link_requests.COOKIE, path=link_requests.COOKIE_PATH)
+
+
+# ── Single Logout (SAML) ────────────────────────────────────────────────────────────────────────────────────
+
+#: The most a logout message may be: the module reads at most this much of a query, a form a little more.
+LOGOUT_MAX_BYTES = 1_048_576
+
+
+class SignedOut(BaseModel):
+    """Signed out here; *redirect_url*: where the browser goes to be signed out at the provider too."""
+
+    redirect_url: str | None = None
+
+
+@router.post("/sign-out", response_model=SignedOut, name="sso_sign_out")
+async def sign_out(
+    request: Request,
+    response: Response,
+    user: Annotated[User, Depends(current_active_user)],
+    session: AsyncSession = Depends(get_db_session),
+) -> SignedOut:
+    """Sign out here, then, for a sign-in that came through a provider asking for it, at the provider too.
+
+    Only on the person's own sign-out, never on expiry (SAML2Int SDP-SP35). This sign-in ends first and for
+    good, whatever the provider says (SDP-SP34): its ``jti`` is kept as logged out and the cookie goes. The
+    browser then goes to the provider's logout with a top-level navigation (SDP-SP27); the provider sends it
+    back to ``/{key}/sls``.
+    """
+    token = request.cookies.get(cookie_transport.cookie_name) or ""
+    claims: dict[str, object] = {}
+    if token:
+        try:
+            claims = jwt.decode(token, options={"verify_signature": False})
+        except jwt.PyJWTError:
+            claims = {}
+        strategy = SignInStrategy(
+            secret=settings.users_secret, lifetime_seconds=login_lifetime_seconds(), session=session,
+        )
+        await strategy.destroy_token(token, user)
+    await session.commit()
+    response.delete_cookie(cookie_transport.cookie_name, path="/")
+    provider = str(claims.get("sso") or "")
+    if not provider or not module.enabled():
+        return SignedOut()
+    subject = await session.scalar(select(OAuthAccount.account_id).where(
+        OAuthAccount.user_id == user.id, OAuthAccount.oauth_name == provider,
+    ))
+    if subject is None:
+        return SignedOut()
+    try:
+        started = await module.sign_out_start(provider, subject)
+    except (module.ModuleUnavailableError, module.ModuleRefusedError) as exc:
+        log.warning("Signing out at %s could not start: %s", provider, exc)
+        return SignedOut()
+    if started.redirect_url is None and started.detail:
+        log.info("No sign-out at %s for this sign-in: %s", provider, started.detail)
+    return SignedOut(redirect_url=started.redirect_url)
+
+
+@router.get("/{key}/sls", name="sso_sls_redirect")
+async def sls_redirect(
+    key: Key, request: Request, session: AsyncSession = Depends(get_db_session),
+) -> RedirectResponse:
+    """A logout message over HTTP-Redirect, passed on octet for octet (its signature covers the query)."""
+    query = request.scope.get("query_string", b"").decode("latin-1")
+    if len(query) > LOGOUT_MAX_BYTES:
+        return _to_login(Refusal.PROVIDER_ERROR)
+    return await _logout(session, key, LogoutMessage(
+        provider=key, return_url=_sls_url(request, key), binding="redirect", query=query,
+    ))
+
+
+@router.post("/{key}/sls", name="sso_sls_post")
+async def sls_post(
+    key: Key, request: Request, session: AsyncSession = Depends(get_db_session),
+) -> RedirectResponse:
+    """A logout message over HTTP-POST."""
+    if int(request.headers.get("content-length") or 0) > LOGOUT_MAX_BYTES:
+        return _to_login(Refusal.PROVIDER_ERROR)
+    form = await request.form()
+    params = {name: value for name, value in form.items() if isinstance(value, str)}
+    return await _logout(session, key, LogoutMessage(
+        provider=key, return_url=_sls_url(request, key), binding="post", params=params,
+    ))
+
+
+def _sls_url(request: Request, key: str) -> str:
+    """The logout service's address; the module refuses a message unless it is the one the provider knows."""
+    return f"{public_origin(request)}/api/auth/sso/{key}/sls"
+
+
+async def _logout(session: AsyncSession, key: str, message: LogoutMessage) -> RedirectResponse:
+    """What a provider's logout message comes to: sign-ins ended, or this server's own sign-out completed.
+
+    Reached across sites without a sign-in or a binding cookie, like ``/acs``, and passed on whether or not
+    the provider is offered for signing in: a logout only ends sign-ins.
+    """
+    if not module.enabled():
+        return _to_login(Refusal.NOT_OFFERED)
+    try:
+        answer = await module.logout_message(message)
+    except (module.ModuleUnavailableError, module.ModuleRefusedError) as exc:
+        log.warning("Logout message from %s not read: %s", key, exc)
+        return _to_login(Refusal.PROVIDER_UNAVAILABLE)
+    audit = AuditDAO(session)
+    if answer.outcome == "end_sign_ins":
+        # Every sign-in of each person, whatever session the provider named (ASVS 5.0 V7.4.1).
+        for subject in answer.subjects:
+            account = await session.scalar(select(OAuthAccount).where(
+                OAuthAccount.oauth_name == key, OAuthAccount.account_id == subject,
+            ))
+            user = await session.get(User, account.user_id) if account is not None else None
+            if user is None:
+                continue
+            end_sign_ins(user)
+            await audit.log(
+                action="auth.sign_out.provider", target_type="user", target_id=str(user.id),
+                result=AuditResult.ALLOW, source="system",
+                metadata_json=json.dumps({"provider": key, "email": user.email}),
+            )
+        await session.commit()
+        # Only now the provider hears it worked (its signed answer, in redirect_url).
+        return RedirectResponse(answer.redirect_url or "/login", status_code=status.HTTP_302_FOUND)
+    if answer.outcome == "signed_out":
+        return RedirectResponse("/login?signed_out=provider", status_code=status.HTTP_302_FOUND)
+    if answer.outcome == "not_signed_out":
+        log.info("%s did not confirm the sign-out: %s", key, answer.detail)
+        return RedirectResponse("/login?signed_out=here_only", status_code=status.HTTP_302_FOUND)
+    log.warning("Logout message from %s refused: %s", key, answer.detail)
+    await audit.log(
+        action="auth.sign_out.refused", target_type="sign_in_provider", target_id=key,
+        result=AuditResult.DENY, source="system", severity="high",
+        metadata_json=json.dumps({"provider": key, "detail": answer.detail}),
+    )
+    await session.commit()
+    return _to_login(Refusal.PROVIDER_ERROR)

@@ -185,7 +185,9 @@
     "reset_link": {
       "for_account": "Choose a new password for {{email}}. Afterwards, sign in with it.",
       "expired": "This link has been used, has expired, or was replaced by a newer one. Ask your administrator for a new one."
-    }
+    },
+    "signed_out_provider": "You are signed out, at your identity provider too.",
+    "signed_out_here_only": "You are signed out of Fadenstack. Your identity provider could not confirm signing you out there: close the browser to end that sign-in."
   },
   "root_mode": {
     "active": "ROOT MODE ACTIVE",
@@ -2194,7 +2196,9 @@
       "base_dn": "where people are searched",
       "bind_password": "the service account's password",
       "server_address": "the server address (https:// and the host, nothing after it)",
-      "entity_id": "an entity ID (an absolute URI, at most 256 characters)"
+      "entity_id": "an entity ID (an absolute URI, at most 256 characters)",
+      "idp_entity_id": "the identity provider's entity ID (an absolute URI)",
+      "signing_certificate": "the certificate the metadata is signed with (PEM)"
     },
     "oidc": {
       "register": "Register this address at the provider as the redirect URI:",
@@ -2223,7 +2227,16 @@
       "idp_metadata_url": "Metadata address of the identity provider",
       "idp_metadata_xml": "Metadata (XML)",
       "sign_requests": "Sign the requests sent to the identity provider",
-      "entity_id_help": "Empty: the metadata address. Change it only if the identity provider knows this server by another entity ID."
+      "entity_id_help": "Empty: the metadata address. Change it only if the identity provider knows this server by another entity ID.",
+      "metadata_mdq": "From a federation's metadata service (MDQ)",
+      "mdq_url": "Metadata service (MDQ) address",
+      "mdq_url_help": "The federation's metadata query service; it is asked for the identity provider below.",
+      "idp_entity_id": "Identity provider's entity ID",
+      "signing_certificate": "Certificate the metadata is signed with",
+      "signing_certificate_help": "Pinned: only metadata signed with this certificate's key is accepted. Required with a metadata service; optional otherwise.",
+      "logout_at_idp": "Sign out at the identity provider too",
+      "logout_from_idp": "End sign-ins when the identity provider signs someone out",
+      "sls_url": "Single logout service (SLO)"
     },
     "ldap": {
       "url": "Directory address",

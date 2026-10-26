@@ -68,13 +68,23 @@ export const auth = {
     clearMeCache();
   },
 
+  /**
+   * Signs out here; for a sign-in that came through a provider asking for it (SAML Single Logout), the
+   * browser then goes to the provider to be signed out there too, and comes back to the sign-in page.
+   */
   async logout(): Promise<void> {
-    const res = await fetch("/api/auth/cookie/logout", {
+    const res = await fetch("/api/auth/sso/sign-out", {
       method: "POST",
       credentials: "include",
     });
     await assertOk(res);
     clearMeCache();
+    const { redirect_url: redirectUrl } = (await res.json()) as { redirect_url: string | null };
+    if (redirectUrl) {
+      window.location.assign(redirectUrl);
+      // The page goes away: nothing that would follow a sign-out here runs first.
+      await new Promise<never>(() => {});
+    }
   },
 
   async me(): Promise<AuthUser> {

@@ -237,12 +237,8 @@ async def check_caller(app: Any, claims: dict[str, Any]) -> str | None:
             tenant_id = record.tenant_id
         user = await directory.user(user_id)
         if user is not None and _is_console_sign_in(claims):
-            ended = user.sessions_valid_after
-            # Whole seconds, as in the backend (``sign_in_ended_for_all``): a sign-in made in the second
-            # the others were ended stands.
-            if (ended is not None and int(claims.get("iat", 0)) < int(ended)) or await directory.sign_in_revoked(
-                str(claims.get("jti", "")),
-            ):
+            # As in the backend (``sign_in_ended_for_all``): to the millisecond when the sign-in says.
+            if sign_in_ended_before(claims, user) or await directory.sign_in_revoked(str(claims.get("jti", ""))):
                 raise GatewayError(
                     status_code=401,
                     message="This sign-in has ended. Sign in again.",
@@ -268,12 +264,16 @@ async def check_caller(app: Any, claims: dict[str, Any]) -> str | None:
 def sign_in_ended_before(claims: dict[str, Any], user: Any) -> bool:
     """Whether the token in *claims* was made before *user*'s sign-ins were ended.
 
-    For an app's agent token, which carries ``iat`` like a console sign-in: a password change, a suspension
-    or a change of rights ends it too. Whole seconds, as in the backend (``sign_in_ended_for_all``): one made
-    in that second stands.
+    A console sign-in, or an app's agent token: a password change, a suspension or a change of rights ends
+    it. As in the backend (``sign_in_ended_for_all``): to the millisecond when the token says (``iat_ms``);
+    else whole seconds, and one made in that second stands.
     """
     ended = getattr(user, "sessions_valid_after", None)
-    return ended is not None and int(claims.get("iat", 0)) < int(ended)
+    if ended is None:
+        return False
+    if "iat_ms" in claims:
+        return int(claims["iat_ms"]) < int(ended * 1000)
+    return int(claims.get("iat", 0)) < int(ended)
 
 
 def request_route(scope: dict[str, Any], method: str) -> str:
