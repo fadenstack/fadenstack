@@ -2138,7 +2138,7 @@
     "delete_warning_members": "{{count}} user(s) are currently in this group.",
     "failed_delete": "Failed to delete group.",
     "kept_by": "Kept by {{provider}}",
-    "kept_by_help": "This sign-in provider names the team and keeps who is in it; members an administrator added stay. Give it roles and agents here."
+    "kept_by_help": "This sign-in provider names the group and keeps who is in it; members an administrator added stay. Give it roles and agents here."
   },
   "auth_providers": {
     "title": "Sign-in providers",
@@ -2262,7 +2262,33 @@
     },
     "server_address": "Server address",
     "server_address_help": "Where people open this server, for example https://ai.example.internal. The provider sends them back there; the addresses below are made from it.",
-    "server_address_plain": "Without HTTPS the sign-in module sends nobody back: use an https:// address."
+    "server_address_plain": "Without HTTPS the sign-in module sends nobody back: use an https:// address.",
+    "provisioning": {
+      "column": "Provisioning",
+      "title": "Provisioning: {{name}}",
+      "intro": "With provisioning, the identity provider adds people here, updates them and suspends those who leave, as it happens there, and keeps a group here for each of its groups (SCIM 2.0). Only each person's address and IDs are kept here; everything else stays with the provider.",
+      "help": "How to set up Entra ID and Okta",
+      "needs_https": "Identity providers send only to HTTPS addresses, and this server takes provisioning only over HTTPS. Open the console at its HTTPS address.",
+      "is_off": "Provisioning is off: people get their account and their groups when they sign in.",
+      "switch_on": "Switch provisioning on",
+      "base_url": "SCIM address",
+      "base_url_help": "Entra ID: Tenant URL. Okta: SCIM connector base URL.",
+      "token": "Token",
+      "token_made": "Copy the token now: it is shown only this once. Paste it into the provider's Secret Token field (Entra ID) or API Token field (Okta).",
+      "token_replaced": "The old token no longer works. Copy the new one now (it is shown only this once) and paste it into the provider.",
+      "token_hint": "Ends in {{hint}}, made {{when}}",
+      "last_push": "Last request from the provider",
+      "never": "None yet",
+      "last_error": "Last refused request",
+      "no_error": "None",
+      "error_at": "{{error}} ({{when}})",
+      "replace": "Replace token",
+      "replace_confirm": "Make a new token for \"{{name}}\"? The current one stops working at once: until the provider has the new one, its changes are refused.",
+      "switch_off": "Switch provisioning off",
+      "switch_off_confirm": "Switch provisioning off for \"{{name}}\"? Its token stops working. The people and groups it made stay as they are, and people still sign in with the provider.",
+      "delete_confirm": "Delete the provider \"{{name}}\"? Its provisioning ends too. People who signed in with it keep their accounts, but can no longer sign in with it.",
+      "failed_list": "The provisioning connections could not be loaded."
+    }
   },
   "security_map": {
     "title": "Data Residency Map",

@@ -1,12 +1,19 @@
-/** The sign-in providers page: the module's providers, adding and changing one, and no module at all. */
+/**
+ * The sign-in providers page: the module's providers, adding and changing one, and no module at all; with
+ * Enterprise, provisioning (SCIM) for the identity providers.
+ */
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 
+import { hasFeature } from "~/api/about";
 import * as admin from "~/api/admin";
+import { SCIM_PROVISIONING, scimConnectionsApi, type ScimConnection } from "~/api/scimConnections";
 import { ProviderApiError, signInProviders, type SignInProvider } from "~/api/signInProviders";
 import { renderPage } from "~/test/renderPage";
 
 import AuthProvidersPage from "./AuthProvidersPage";
+
+vi.mock("~/api/about", () => ({ hasFeature: vi.fn() }));
 
 let list: MockInstance<typeof signInProviders.list>;
 let create: MockInstance<typeof signInProviders.create>;
@@ -27,7 +34,26 @@ const STORED: SignInProvider = {
   secrets_set: ["bind_password"], created_at: "", updated_at: "",
 };
 
+const ENTRA: SignInProvider = {
+  ...STORED, id: "p2", key: "entra", name: "Entra ID", protocol: "oidc",
+  settings: {
+    protocol: "oidc", issuer: "https://login.example.com/v2.0", client_id: "app-1",
+    redirect_uri: "https://ai.example.internal/api/auth/sso/entra/callback", scopes: ["openid", "email"],
+    token_auth_method: "client_secret_basic", userinfo: "when_missing", email_claim: "email",
+    email_verified_claim: "email_verified", name_claim: "name", groups_claim: "groups", max_id_token_age_s: 300,
+    ca_bundle: null,
+  },
+  secrets_set: ["client_secret"],
+};
+
+const CONNECTION: ScimConnection = {
+  provider_key: "entra", base_url: "https://ai.example.internal/api/ee/scim/v2/entra", token_hint: "x9Qa",
+  created_at: "2026-10-26T08:00:00Z", token_made_at: "2026-10-26T08:00:00Z", last_push_at: null,
+  last_error: null, last_error_at: null,
+};
+
 beforeEach(() => {
+  vi.mocked(hasFeature).mockResolvedValue(false);
   list = vi.spyOn(signInProviders, "list").mockResolvedValue([STORED]);
   create = vi.spyOn(signInProviders, "create");
   update = vi.spyOn(signInProviders, "update");
@@ -122,5 +148,97 @@ describe("the sign-in providers page", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Change Corp AD" }));
     fireEvent.change(field(/^Directory address/), { target: { value: "ldap://dc1.example.com" } });
     expect(screen.getByText(/Without TLS, passwords cross the network readable/)).toBeInTheDocument();
+  });
+});
+
+describe("provisioning (Enterprise)", () => {
+  let connections: MockInstance<typeof scimConnectionsApi.list>;
+  let makeToken: MockInstance<typeof scimConnectionsApi.makeToken>;
+  let removeConnection: MockInstance<typeof scimConnectionsApi.remove>;
+
+  beforeEach(() => {
+    vi.mocked(hasFeature).mockImplementation(async (feature) => feature === SCIM_PROVISIONING);
+    list.mockResolvedValue([STORED, ENTRA]);
+    connections = vi.spyOn(scimConnectionsApi, "list").mockResolvedValue([]);
+    makeToken = vi.spyOn(scimConnectionsApi, "makeToken");
+    removeConnection = vi.spyOn(scimConnectionsApi, "remove").mockResolvedValue(undefined);
+  });
+
+  const dialogs = () => screen.getAllByRole("dialog");
+  const confirm = (name: string) =>
+    fireEvent.click(within(dialogs()[dialogs().length - 1]).getByRole("button", { name }));
+
+  it("is not offered without the feature", async () => {
+    vi.mocked(hasFeature).mockResolvedValue(false);
+    renderPage(<AuthProvidersPage />);
+    expect(await screen.findByText("Entra ID")).toBeInTheDocument();
+    expect(screen.queryByText("Provisioning")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Provisioning: Entra ID" })).not.toBeInTheDocument();
+    expect(connections).not.toHaveBeenCalled();
+  });
+
+  it("is offered for identity providers, not for directories", async () => {
+    renderPage(<AuthProvidersPage />);
+    expect(await screen.findByRole("button", { name: "Provisioning: Entra ID" })).toBeInTheDocument();
+    expect(screen.getByText("Provisioning")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Provisioning: Corp AD" })).not.toBeInTheDocument();
+  });
+
+  it("switches on and shows the token once, with the address to give the provider", async () => {
+    makeToken.mockResolvedValue({ provider_key: "entra", base_url: CONNECTION.base_url, token: "fscim_secret-x9Qa" });
+    renderPage(<AuthProvidersPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Provisioning: Entra ID" }));
+    expect(screen.getByText(/Provisioning is off/)).toBeInTheDocument();
+
+    connections.mockResolvedValue([CONNECTION]);
+    fireEvent.click(screen.getByRole("button", { name: "Switch provisioning on" }));
+    await waitFor(() => expect(makeToken).toHaveBeenCalledWith("entra"));
+    expect(await screen.findByTestId("provisioning-token")).toHaveTextContent("it is shown only this once");
+    expect(screen.getByDisplayValue("fscim_secret-x9Qa")).toBeInTheDocument();
+    expect(screen.getByDisplayValue(CONNECTION.base_url)).toBeInTheDocument();
+    expect(await screen.findByTestId("provisioning-state")).toHaveTextContent("Ends in x9Qa");
+
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Provisioning: Entra ID" }));
+    expect(screen.queryByDisplayValue("fscim_secret-x9Qa")).not.toBeInTheDocument();
+    expect(screen.getByTestId("provisioning-state")).toHaveTextContent("Ends in x9Qa");
+  });
+
+  it("replaces the token only after asking, and says the old one stopped", async () => {
+    connections.mockResolvedValue([
+      { ...CONNECTION, last_push_at: "2026-10-26T09:00:00Z", last_error: "409 UniquenessException", last_error_at: "2026-10-26T09:00:00Z" },
+    ]);
+    makeToken.mockResolvedValue({ provider_key: "entra", base_url: CONNECTION.base_url, token: "fscim_new" });
+    renderPage(<AuthProvidersPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Provisioning: Entra ID" }));
+    expect(screen.getByTestId("provisioning-state")).toHaveTextContent("409 UniquenessException");
+
+    fireEvent.click(screen.getByRole("button", { name: "Replace token" }));
+    expect(makeToken).not.toHaveBeenCalled();
+    confirm("Replace token");
+    expect(await screen.findByTestId("provisioning-token")).toHaveTextContent("The old token no longer works");
+  });
+
+  it("switches off after asking", async () => {
+    connections.mockResolvedValue([CONNECTION]);
+    renderPage(<AuthProvidersPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Provisioning: Entra ID" }));
+    connections.mockResolvedValue([]);
+    fireEvent.click(screen.getByRole("button", { name: "Switch provisioning off" }));
+    confirm("Switch provisioning off");
+    await waitFor(() => expect(removeConnection).toHaveBeenCalledWith("entra"));
+    expect(await screen.findByRole("button", { name: "Switch provisioning on" })).toBeInTheDocument();
+  });
+
+  it("ends a provider's provisioning when the provider is deleted", async () => {
+    connections.mockResolvedValue([CONNECTION]);
+    vi.spyOn(signInProviders, "remove").mockResolvedValue(undefined);
+    renderPage(<AuthProvidersPage />);
+    await screen.findByRole("button", { name: "Provisioning: Entra ID" });
+    await waitFor(() => expect(connections).toHaveBeenCalled());
+    fireEvent.click(screen.getAllByRole("button", { name: "Delete provider" })[1]);
+    expect(await screen.findByText(/Its provisioning ends too/)).toBeInTheDocument();
+    confirm("Delete");
+    await waitFor(() => expect(removeConnection).toHaveBeenCalledWith("entra"));
   });
 });

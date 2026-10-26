@@ -759,7 +759,7 @@
     "update_failed": "Update failed.",
     "delete_failed": "Delete failed.",
     "action_failed": "Action failed.",
-    "close": "Close",
+    "close": "Cerrar",
     "yes": "Yes",
     "no": "No",
     "none": "<none>",
@@ -1997,7 +1997,7 @@
     "delete_warning_members": "{{count}} usuario(s) están actualmente en este grupo.",
     "failed_delete": "Error al eliminar grupo.",
     "kept_by": "Gestionado por {{provider}}",
-    "kept_by_help": "Este proveedor de inicio de sesión da nombre al equipo y gestiona quién forma parte; los miembros que añadió un administrador se mantienen. Asígnele roles y agentes aquí."
+    "kept_by_help": "Este proveedor de inicio de sesión da nombre al grupo y gestiona quién forma parte; los miembros que añadió un administrador se mantienen. Asígnele roles y agentes aquí."
   },
   "auth_providers": {
     "title": "Proveedores de inicio de sesión",
@@ -2121,7 +2121,33 @@
     },
     "server_address": "Dirección del servidor",
     "server_address_help": "Dónde abren las personas este servidor, por ejemplo https://ai.example.internal. El proveedor las devuelve allí; las direcciones de abajo se forman a partir de ella.",
-    "server_address_plain": "Sin HTTPS, el módulo de inicio de sesión no devuelve a nadie: usar una dirección https://."
+    "server_address_plain": "Sin HTTPS, el módulo de inicio de sesión no devuelve a nadie: usar una dirección https://.",
+    "provisioning": {
+      "column": "Aprovisionamiento",
+      "title": "Aprovisionamiento: {{name}}",
+      "intro": "Con el aprovisionamiento, el proveedor de identidad da de alta aquí a las personas, las actualiza y suspende a quienes se van, en cuanto ocurre allí, y mantiene aquí un grupo por cada uno de sus grupos (SCIM 2.0). Aquí solo se guardan la dirección y los ID de cada persona; todo lo demás se queda en el proveedor.",
+      "help": "Cómo configurar Entra ID y Okta",
+      "needs_https": "Los proveedores de identidad solo envían a direcciones HTTPS, y este servidor solo acepta el aprovisionamiento por HTTPS. Abra la consola en su dirección HTTPS.",
+      "is_off": "El aprovisionamiento está desactivado: las personas reciben su cuenta y sus grupos al iniciar sesión.",
+      "switch_on": "Activar el aprovisionamiento",
+      "base_url": "Dirección SCIM",
+      "base_url_help": "Entra ID: URL del inquilino. Okta: SCIM connector base URL.",
+      "token": "Token",
+      "token_made": "Copie el token ahora: solo se muestra esta vez. Péguelo en el campo Token secreto (Entra ID) o API Token (Okta) del proveedor.",
+      "token_replaced": "El token anterior ya no funciona. Copie el nuevo ahora (solo se muestra esta vez) y péguelo en el proveedor.",
+      "token_hint": "Termina en {{hint}}, creado {{when}}",
+      "last_push": "Última solicitud del proveedor",
+      "never": "Ninguna todavía",
+      "last_error": "Última solicitud rechazada",
+      "no_error": "Ninguna",
+      "error_at": "{{error}} ({{when}})",
+      "replace": "Reemplazar token",
+      "replace_confirm": "¿Crear un token nuevo para «{{name}}»? El actual deja de funcionar al instante: hasta que el proveedor tenga el nuevo, sus cambios se rechazan.",
+      "switch_off": "Desactivar el aprovisionamiento",
+      "switch_off_confirm": "¿Desactivar el aprovisionamiento de «{{name}}»? Su token deja de funcionar. Las personas y los grupos que creó se quedan como están, y se sigue iniciando sesión con el proveedor.",
+      "delete_confirm": "¿Eliminar el proveedor «{{name}}»? Su aprovisionamiento también termina. Quienes iniciaron sesión con él conservan su cuenta, pero ya no pueden iniciar sesión con él.",
+      "failed_list": "No se pudieron cargar los aprovisionamientos."
+    }
   },
   "security_map": {
     "title": "Mapa de Residencia de Datos",

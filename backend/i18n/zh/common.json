@@ -1997,7 +1997,7 @@
     "delete_warning_members": "当前有 {{count}} 个用户在此组中。",
     "failed_delete": "删除组失败。",
     "kept_by": "由 {{provider}} 维护",
-    "kept_by_help": "此登录提供方为团队命名并维护其成员；管理员添加的成员会保留。可在此为其分配角色和智能体。"
+    "kept_by_help": "此登录提供方为组命名并维护其成员；管理员添加的成员会保留。可在此为其分配角色和智能体。"
   },
   "auth_providers": {
     "title": "登录提供商",
@@ -2121,7 +2121,33 @@
     },
     "server_address": "服务器地址",
     "server_address_help": "用户打开本服务器的地址，例如 https://ai.example.internal。提供商会把用户送回这里；下面的地址都由它生成。",
-    "server_address_plain": "没有 HTTPS，登录模块不会把任何人送回：请使用 https:// 地址。"
+    "server_address_plain": "没有 HTTPS，登录模块不会把任何人送回：请使用 https:// 地址。",
+    "provisioning": {
+      "column": "预配",
+      "title": "预配：{{name}}",
+      "intro": "启用预配后，身份提供方会在这里创建人员、更新其信息，并在人员离开时立即停用其账户，同时在这里为其每个组维护一个对应的组（SCIM 2.0）。这里只保存每个人的地址和 ID，其余信息都保留在提供方处。",
+      "help": "如何设置 Entra ID 和 Okta",
+      "needs_https": "身份提供方只向 HTTPS 地址发送数据，本服务器也只通过 HTTPS 接受预配。请通过 HTTPS 地址打开控制台。",
+      "is_off": "预配已关闭：人员在登录时获得账户和组。",
+      "switch_on": "开启预配",
+      "base_url": "SCIM 地址",
+      "base_url_help": "Entra ID：租户 URL。Okta：SCIM connector base URL。",
+      "token": "令牌",
+      "token_made": "请立即复制令牌：它只显示这一次。将其粘贴到提供方的“机密令牌”（Entra ID）或“API Token”（Okta）字段中。",
+      "token_replaced": "旧令牌已失效。请立即复制新令牌（只显示这一次），并粘贴到提供方处。",
+      "token_hint": "以 {{hint}} 结尾，创建于 {{when}}",
+      "last_push": "提供方的最近一次请求",
+      "never": "暂无",
+      "last_error": "最近一次被拒绝的请求",
+      "no_error": "无",
+      "error_at": "{{error}}（{{when}}）",
+      "replace": "更换令牌",
+      "replace_confirm": "为“{{name}}”创建新令牌？当前令牌将立即失效：在提供方获得新令牌之前，其更改都会被拒绝。",
+      "switch_off": "关闭预配",
+      "switch_off_confirm": "关闭“{{name}}”的预配？其令牌将失效。它创建的人员和组保持不变，人员仍可通过该提供方登录。",
+      "delete_confirm": "删除提供方“{{name}}”？其预配也将结束。通过它登录过的人员保留账户，但无法再通过它登录。",
+      "failed_list": "无法加载预配连接。"
+    }
   },
   "security_map": {
     "title": "数据驻留地图",

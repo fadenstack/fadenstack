@@ -1997,7 +1997,7 @@
     "delete_warning_members": "{{count}} Benutzer sind derzeit in dieser Gruppe.",
     "failed_delete": "Gruppe konnte nicht gelöscht werden.",
     "kept_by": "Gepflegt von {{provider}}",
-    "kept_by_help": "Dieser Anmeldeanbieter benennt das Team und pflegt, wer dazugehört; Mitglieder, die ein Administrator hinzugefügt hat, bleiben. Rollen und Agenten geben Sie ihm hier."
+    "kept_by_help": "Dieser Anmeldeanbieter benennt die Gruppe und pflegt, wer dazugehört; Mitglieder, die ein Administrator hinzugefügt hat, bleiben. Rollen und Agenten geben Sie ihr hier."
   },
   "auth_providers": {
     "title": "Anmeldeanbieter",
@@ -2121,7 +2121,33 @@
     },
     "server_address": "Serveradresse",
     "server_address_help": "Wo die Benutzer diesen Server öffnen, z. B. https://ai.example.internal. Der Anbieter schickt sie dorthin zurück; die Adressen darunter werden daraus gebildet.",
-    "server_address_plain": "Ohne HTTPS schickt das Anmeldemodul niemanden zurück: Verwenden Sie eine https://-Adresse."
+    "server_address_plain": "Ohne HTTPS schickt das Anmeldemodul niemanden zurück: Verwenden Sie eine https://-Adresse.",
+    "provisioning": {
+      "column": "Provisionierung",
+      "title": "Provisionierung: {{name}}",
+      "intro": "Mit der Provisionierung legt der Identitätsanbieter Personen hier an, ändert sie und sperrt, wer geht, sobald es dort geschieht, und pflegt hier eine Gruppe für jede seiner Gruppen (SCIM 2.0). Hier bleiben nur die Adresse und die IDs jeder Person; alles andere behält der Anbieter.",
+      "help": "So richten Sie Entra ID und Okta ein",
+      "needs_https": "Identitätsanbieter senden nur an HTTPS-Adressen, und dieser Server nimmt die Provisionierung nur über HTTPS an. Öffnen Sie die Konsole unter ihrer HTTPS-Adresse.",
+      "is_off": "Die Provisionierung ist aus: Personen erhalten ihr Konto und ihre Gruppen bei der Anmeldung.",
+      "switch_on": "Provisionierung einschalten",
+      "base_url": "SCIM-Adresse",
+      "base_url_help": "Entra ID: Mandanten-URL. Okta: SCIM connector base URL.",
+      "token": "Token",
+      "token_made": "Kopieren Sie das Token jetzt: Es wird nur dieses eine Mal gezeigt. Fügen Sie es beim Anbieter in das Feld „Geheimes Token“ (Entra ID) bzw. „API Token“ (Okta) ein.",
+      "token_replaced": "Das alte Token gilt nicht mehr. Kopieren Sie das neue jetzt (es wird nur dieses eine Mal gezeigt) und fügen Sie es beim Anbieter ein.",
+      "token_hint": "Endet auf {{hint}}, erstellt {{when}}",
+      "last_push": "Letzte Anfrage des Anbieters",
+      "never": "Noch keine",
+      "last_error": "Letzte abgelehnte Anfrage",
+      "no_error": "Keine",
+      "error_at": "{{error}} ({{when}})",
+      "replace": "Token ersetzen",
+      "replace_confirm": "Ein neues Token für „{{name}}“ erstellen? Das aktuelle gilt sofort nicht mehr: Bis der Anbieter das neue hat, werden seine Änderungen abgelehnt.",
+      "switch_off": "Provisionierung ausschalten",
+      "switch_off_confirm": "Die Provisionierung für „{{name}}“ ausschalten? Ihr Token gilt dann nicht mehr. Die Personen und Gruppen, die sie angelegt hat, bleiben, wie sie sind, und die Anmeldung über den Anbieter geht weiter.",
+      "delete_confirm": "Den Anbieter „{{name}}“ löschen? Seine Provisionierung endet ebenfalls. Wer sich damit angemeldet hat, behält das Konto, kann sich aber nicht mehr damit anmelden.",
+      "failed_list": "Die Provisionierungen konnten nicht geladen werden."
+    }
   },
   "security_map": {
     "title": "Datenresidenz-Karte",

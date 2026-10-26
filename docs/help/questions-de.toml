@@ -107,6 +107,13 @@
 "Wie melden sich Benutzer mit Active Directory oder LDAP an?" = ""
 "Werden im Verzeichnis deaktivierte Benutzer hier gesperrt?" = "add-the-directory"
 
+["administer/sign-in-provisioning.md"]
+"Wie richte ich die SCIM-Provisionierung aus Entra ID oder Okta ein?" = ""
+"Werden Benutzer, die gehen, ohne Anmeldung gesperrt?" = "what-changes-here"
+"Was speichert Fadenstack über provisionierte Personen?" = "switch-provisioning-on"
+"Wo finde ich die SCIM-Adresse und das Token?" = "switch-provisioning-on"
+"Warum scheitert der Provisionierungstest des Anbieters?" = "when-it-does-not-work"
+
 ["administer/models.md"]
 "Wie finde und lade ich ein Modell herunter?" = "find-a-model"
 "Welche Modelle passen auf meine GPUs?" = "which-models-fit"

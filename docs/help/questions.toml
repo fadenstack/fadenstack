@@ -109,6 +109,13 @@
 "How do I let people sign in with Active Directory or LDAP?" = ""
 "Are people disabled in the directory locked out here?" = "add-the-directory"
 
+["administer/sign-in-provisioning.md"]
+"How do I set up SCIM provisioning from Entra ID or Okta?" = ""
+"Are people who leave locked out without signing in?" = "what-changes-here"
+"What does Fadenstack store about provisioned people?" = "switch-provisioning-on"
+"Where do I find the SCIM address and token?" = "switch-provisioning-on"
+"Why does the provider's provisioning test fail?" = "when-it-does-not-work"
+
 ["administer/models.md"]
 "How do I find and download a model?" = "find-a-model"
 "Which models fit my GPUs?" = "which-models-fit"

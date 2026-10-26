@@ -2140,7 +2140,7 @@
     "delete_warning_members": "{{count}} utilisateur(s) sont actuellement dans ce groupe.",
     "failed_delete": "Échec de la suppression du groupe.",
     "kept_by": "Géré par {{provider}}",
-    "kept_by_help": "Ce fournisseur de connexion nomme l'équipe et gère qui en fait partie ; les membres ajoutés par un administrateur restent. Attribuez-lui des rôles et des agents ici."
+    "kept_by_help": "Ce fournisseur de connexion nomme le groupe et gère qui en fait partie ; les membres ajoutés par un administrateur restent. Attribuez-lui des rôles et des agents ici."
   },
   "auth_providers": {
     "title": "Fournisseurs de connexion",
@@ -2264,7 +2264,33 @@
     },
     "server_address": "Adresse du serveur",
     "server_address_help": "Où les gens ouvrent ce serveur, par exemple https://ai.example.internal. Le fournisseur les y renvoie ; les adresses ci-dessous en sont formées.",
-    "server_address_plain": "Sans HTTPS, le module de connexion ne renvoie personne : utilisez une adresse https://."
+    "server_address_plain": "Sans HTTPS, le module de connexion ne renvoie personne : utilisez une adresse https://.",
+    "provisioning": {
+      "column": "Provisionnement",
+      "title": "Provisionnement : {{name}}",
+      "intro": "Avec le provisionnement, le fournisseur d'identité crée ici les personnes, les met à jour et suspend celles qui partent, dès que cela se produit chez lui, et tient ici un groupe pour chacun de ses groupes (SCIM 2.0). Seuls l'adresse et les identifiants de chaque personne sont conservés ici ; tout le reste demeure chez le fournisseur.",
+      "help": "Configurer Entra ID et Okta",
+      "needs_https": "Les fournisseurs d'identité n'envoient qu'à des adresses HTTPS, et ce serveur n'accepte le provisionnement qu'en HTTPS. Ouvrez la console à son adresse HTTPS.",
+      "is_off": "Le provisionnement est désactivé : les personnes reçoivent leur compte et leurs groupes à la connexion.",
+      "switch_on": "Activer le provisionnement",
+      "base_url": "Adresse SCIM",
+      "base_url_help": "Entra ID : URL du locataire. Okta : SCIM connector base URL.",
+      "token": "Jeton",
+      "token_made": "Copiez le jeton maintenant : il n'est affiché que cette fois. Collez-le dans le champ Jeton secret (Entra ID) ou API Token (Okta) du fournisseur.",
+      "token_replaced": "L'ancien jeton ne fonctionne plus. Copiez le nouveau maintenant (il n'est affiché que cette fois) et collez-le chez le fournisseur.",
+      "token_hint": "Se termine par {{hint}}, créé le {{when}}",
+      "last_push": "Dernière requête du fournisseur",
+      "never": "Aucune pour l'instant",
+      "last_error": "Dernière requête refusée",
+      "no_error": "Aucune",
+      "error_at": "{{error}} ({{when}})",
+      "replace": "Remplacer le jeton",
+      "replace_confirm": "Créer un nouveau jeton pour « {{name}} » ? L'actuel cesse de fonctionner immédiatement : tant que le fournisseur n'a pas le nouveau, ses changements sont refusés.",
+      "switch_off": "Désactiver le provisionnement",
+      "switch_off_confirm": "Désactiver le provisionnement de « {{name}} » ? Son jeton cesse de fonctionner. Les personnes et les groupes qu'il a créés restent telles quelles, et la connexion avec le fournisseur continue.",
+      "delete_confirm": "Supprimer le fournisseur « {{name}} » ? Son provisionnement prend fin aussi. Les personnes qui se sont connectées avec lui gardent leur compte, mais ne peuvent plus se connecter avec lui.",
+      "failed_list": "Les provisionnements n'ont pas pu être chargés."
+    }
   },
   "security_map": {
     "title": "Carte de résidence des données",

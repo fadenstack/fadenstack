@@ -10,19 +10,17 @@ import Alert from "@mui/material/Alert";
 import Checkbox from "@mui/material/Checkbox";
 import Divider from "@mui/material/Divider";
 import FormControlLabel from "@mui/material/FormControlLabel";
-import IconButton from "@mui/material/IconButton";
 import MenuItem from "@mui/material/MenuItem";
 import Stack from "@mui/material/Stack";
 import Switch from "@mui/material/Switch";
 import TextField from "@mui/material/TextField";
-import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 
 import type { Group, RbacRole } from "~/api/admin";
 import { ProviderApiError, signInProviders, type Protocol, type SignInProvider } from "~/api/signInProviders";
 import { FormDialog } from "~/components/FormDialog";
 
+import { Address } from "./Address";
 import {
   addresses,
   blankForm,
@@ -37,37 +35,6 @@ import {
 import { PolicyFields } from "./PolicyFields";
 
 const PROTOCOLS: Protocol[] = ["oidc", "saml", "ldap"];
-
-function Address({ label, value }: { label: string; value: string }) {
-  const { t } = useTranslation();
-  const [copied, setCopied] = useState(false);
-  return (
-    <Stack direction="row" spacing={1} alignItems="center">
-      <TextField
-        size="small"
-        fullWidth
-        label={label}
-        value={value}
-        slotProps={{ input: { readOnly: true, sx: { fontFamily: "monospace", fontSize: 13 } } }}
-      />
-      <Tooltip title={copied ? t("auth_providers.copied") : t("auth_providers.copy")}>
-        <IconButton
-          aria-label={`${t("auth_providers.copy")}: ${label}`}
-          onClick={async () => {
-            try {
-              await navigator.clipboard.writeText(value);
-              setCopied(true);
-            } catch {
-              // The browser refused; the address can still be selected and copied by hand.
-            }
-          }}
-        >
-          <ContentCopyIcon fontSize="small" />
-        </IconButton>
-      </Tooltip>
-    </Stack>
-  );
-}
 
 /**
  * What the provider is told about this server: where people open it (editable), and the addresses made from
