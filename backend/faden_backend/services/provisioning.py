@@ -244,6 +244,13 @@ async def list_people(
     return total, [Provisioned(user=user, record=record) for record, user in rows]
 
 
+async def _loaded(session: AsyncSession, found: Provisioned) -> Provisioned:
+    """*found* with what the database set (timestamps) loaded: an async session loads nothing implicitly."""
+    await session.refresh(found.record)
+    await session.refresh(found.user)
+    return found
+
+
 async def _taken(session: AsyncSession, source: str, person: Person, user_id: uuid.UUID | None) -> None:
     """Refuse an ID or login name another of *source*'s people has."""
     for column, value, what in (
@@ -290,14 +297,14 @@ async def put_person(
             await _audit(session, "user.provision", "user", str(back.user.id), by=source, how="back",
                          email=back.user.email)
             await _update(session, source, back, person)
-            return back, True
+            return await _loaded(session, back), True
     await _taken(session, source, person, user_id)
     if user_id is not None:
         found = await find_person(session, source, user_id=user_id)
         if found is None:
             raise Refused("not_found", "This source keeps no such person.")
         await _update(session, source, found, person)
-        return found, False
+        return await _loaded(session, found), False
 
     existing = await session.scalar(select(User).where(func.lower(User.email) == person.email.lower()))
     if existing is not None:
@@ -325,7 +332,7 @@ async def put_person(
     if not person.active:
         await suspend(session, user, reason="deactivated_by_source", source=source)
     # A taken-over account an administrator suspended stays suspended: a source lifts only its own.
-    return Provisioned(user=user, record=record), True
+    return await _loaded(session, Provisioned(user=user, record=record)), True
 
 
 async def _update(session: AsyncSession, source: str, found: Provisioned, person: Person) -> None:
@@ -446,21 +453,23 @@ async def put_team(
         group = await find_team(session, source, group_id=group_id)
         if group is None:
             raise Refused("not_found", "This source keeps no such team.")
+        # The source's state, whole: an ID it no longer gives is cleared.
         changed = [what for what, old, new in (("name", group.name, name),
                                                ("external_id", group.external_id, team.external_id))
-                   if new is not None and old != new]
+                   if old != new]
         group.name = name
-        if team.external_id is not None:
-            group.external_id = team.external_id
+        group.external_id = team.external_id
         await session.flush()
         if changed:
             await _audit(session, "team.provision.update", "group", str(group.id), by=source, changed=changed,
                          name=name)
+        await session.refresh(group)
         return group, False
     group = Group(id=uuid.uuid4(), name=name, source=source, external_id=team.external_id)
     session.add(group)
     await session.flush()
     await _audit(session, "team.provision", "group", str(group.id), by=source, name=name)
+    await session.refresh(group)
     return group, True
 
 

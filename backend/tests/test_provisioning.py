@@ -180,9 +180,12 @@ async def test_a_team_is_made_kept_and_renamed_by_its_source(dbsession: AsyncSes
     assert roles == 0, "a source's team carries no roles"
     again, new = await provisioning.put_team(dbsession, ENTRA, Team(name=name))
     assert not new and again.id == team.id, "its own team under that name is taken up again"
-    renamed, _ = await provisioning.put_team(dbsession, ENTRA, Team(name=f"{name} EU"), group_id=team.id)
-    assert renamed.name == f"{name} EU"
-    assert await provisioning.find_team(dbsession, ENTRA, external_id="gid-1") is not None
+    assert await provisioning.find_team(dbsession, ENTRA, external_id="gid-1") is None, "an ID it no longer gives"
+    renamed, _ = await provisioning.put_team(
+        dbsession, ENTRA, Team(name=f"{name} EU", external_id="gid-2"), group_id=team.id,
+    )
+    assert (renamed.name, renamed.external_id) == (f"{name} EU", "gid-2")
+    assert await provisioning.find_team(dbsession, ENTRA, external_id="gid-2") is not None
 
     held = Group(id=uuid.uuid4(), name=f"Admins {uuid.uuid4().hex[:6]}")
     dbsession.add(held)
