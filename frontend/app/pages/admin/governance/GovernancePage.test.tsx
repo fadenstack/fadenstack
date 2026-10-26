@@ -124,7 +124,9 @@ describe("GovernancePage", () => {
     expect(screen.getByText(/changed by ada@example.com/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Set limit" }));
     await waitFor(() => expect(ceilings.set).toHaveBeenCalledWith("tenant", "default", "ask"));
-    expect(await screen.findByText("Everyone", { selector: ".MuiListItemText-primary" })).toBeInTheDocument();
+    expect(
+      await screen.findByText("Every chat, in the console and through agents.", { selector: ".MuiListItemText-primary" }),
+    ).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("combobox", { name: "Limit for Finance" }));
     await userEvent.click(await screen.findByRole("option", { name: "Off" }));

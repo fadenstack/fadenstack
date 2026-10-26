@@ -172,7 +172,7 @@ export function ToolCeilingsTable() {
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ flex: 1, minWidth: 0, pr: 6 }}>
                   <Chip size="small" variant="outlined" label={t(`governance.limits.scope_${c.scope}`)} />
                   <ListItemText
-                    primary={who}
+                    primary={c.label ?? t("governance.limits.everyone_hint")}
                     secondary={t("governance.limits.changed", {
                       who: c.updated_by ?? "—",
                       when: formatDateTime(c.updated_at),
