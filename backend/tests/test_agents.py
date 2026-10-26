@@ -27,7 +27,7 @@ from faden_backend.db.dao.rbac_dao import RbacDAO
 from faden_backend.db.models.agents import Agent, AgentGrant, AgentMember, AgentRefreshToken, AgentVersion
 from faden_backend.db.models.containers import AuditEvent
 from faden_backend.db.models.groups import Group, UserGroup
-from faden_backend.db.models.users import User, current_active_user
+from faden_backend.db.models.users import User, current_active_user, end_sign_ins
 from faden_backend.services.agents import access
 from faden_backend.services.extensions import registry
 from faden_backend.settings import settings
@@ -467,8 +467,15 @@ async def test_a_member_in_an_added_role_sees_the_agent_and_changes_nothing(
         assert (await client.put("/api/agents/audited/members", json=members)).status_code == 403
         assert (await client.post("/api/agents/audited/retire")).status_code == 403
         assert (await _access(client, "audited", auditor))["allowed"] is False, "no grant, no use"
+        checks = (await dbsession.execute(select(AuditEvent).where(
+            AuditEvent.action == "agent.access.check", AuditEvent.actor_id == auditor.id,
+        ))).scalars().all()
+        assert checks and json.loads(checks[-1].metadata_json or "{}")["checked"] == str(auditor.id), "recorded"
+        # For the access check, a person by the whole address only: no list of everyone (GDPR Art. 5(1)(c)).
         found = await client.get("/api/agents/principals", params={"q": auditor.email[:6]})
-        assert found.status_code == 200, "for the access check"
+        assert found.status_code == 200 and found.json() == [], "a part of an address finds nobody"
+        whole = (await client.get("/api/agents/principals", params={"q": admin.email.upper()})).json()
+        assert [p["label"] for p in whole] == [admin.email]
     finally:
         registry.member_roles.discard("auditor")
 
@@ -518,6 +525,8 @@ async def test_grants_and_members_are_labelled_and_principals_found_by_agent_man
     # A maintainer without RBAC rights may look principals up; someone who manages no agent may not.
     signed_in.user = member
     assert (await client.get("/api/agents/principals", params={"q": "exam"})).status_code == status.HTTP_200_OK
+    partly = (await client.get("/api/agents/principals", params={"q": member.email[:6]})).json()
+    assert {"type": "user", "id": str(member.id), "label": member.email} in partly, "a maintainer grants: searches"
     signed_in.user = await _user(dbsession)
     r = await client.get("/api/agents/principals", params={"q": "exam"})
     assert r.status_code == status.HTTP_403_FORBIDDEN
@@ -810,6 +819,26 @@ async def test_refresh_rotates_and_a_reused_token_ends_the_sign_in(
     assert r.json()["detail"]["code"] == "refresh_token_reused"
     r = await client.post("/api/agent-tokens/refresh", json={"refresh_token": second["refresh_token"]})
     assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+async def test_an_apps_sign_in_ends_with_the_persons_other_sign_ins(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession, secret: str,
+) -> None:
+    """A password change, a suspension or a change of rights ends the apps' sign-ins too (ASVS 5.0 V7.4.1)."""
+    signed_in.user = await _user(dbsession, admin=True)
+    user = await _user(dbsession)
+    await _agent(client, slug="ends-with-others")
+    await _grant(client, "ends-with-others", ("user", user.id))
+    signed_in.user = user
+    tokens = (await _sign_in(client, "ends-with-others")).json()
+    end_sign_ins(user)
+    await dbsession.flush()
+    r = await client.post("/api/agent-tokens/refresh", json={"refresh_token": tokens["refresh_token"]})
+    assert r.status_code == status.HTTP_401_UNAUTHORIZED
+    assert r.json()["detail"]["code"] == "sign_in_ended"
+    again = (await _sign_in(client, "ends-with-others")).json()
+    r = await client.post("/api/agent-tokens/refresh", json={"refresh_token": again["refresh_token"]})
+    assert r.status_code == status.HTTP_200_OK, "a sign-in made after it works"
 
 
 async def test_refresh_is_refused_once_the_grant_is_gone(

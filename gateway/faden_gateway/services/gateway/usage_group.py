@@ -22,6 +22,8 @@ from typing import Any, Generic, TypeVar
 
 import asyncpg
 
+from faden_gateway.services.gateway import access_epoch
+
 logger = logging.getLogger(__name__)
 
 V = TypeVar("V")
@@ -55,22 +57,27 @@ class UsageGroupResolver(Generic[V]):
         self._max = max_entries
         self._clock = clock
         self._close = close
-        self._cache: dict[str, tuple[V | None, float]] = {}
-        self._inflight: dict[str, asyncio.Future[V | None]] = {}
+        self._cache: dict[str, tuple[V | None, float, int | None]] = {}
+        self._inflight: dict[tuple[str, int | None], asyncio.Future[V | None]] = {}
 
     async def resolve(self, user_id: str) -> V | None:
-        """The user's value, or ``None`` when unattributed, unknown or failed."""
+        """The user's value, or ``None`` when unattributed, unknown or failed.
+
+        A team joined or left is seen at the next request: an answer read before the count of changes to
+        access last moved is read again (``access_epoch``).
+        """
         now = self._clock()
         hit = self._cache.get(user_id)
-        if hit is not None and hit[1] > now:
+        if hit is not None and hit[1] > now and access_epoch.usable(hit[2]):
             return hit[0]
 
-        pending = self._inflight.get(user_id)
+        epoch = access_epoch.current()
+        pending = self._inflight.get((user_id, epoch))
         if pending is not None:
             return await pending
 
         fut: asyncio.Future[V | None] = asyncio.get_running_loop().create_future()
-        self._inflight[user_id] = fut
+        self._inflight[(user_id, epoch)] = fut
         try:
             try:
                 value = await self._fetch(user_id)
@@ -78,11 +85,11 @@ class UsageGroupResolver(Generic[V]):
             except Exception as exc:  # attribution never fails the request
                 logger.warning("Usage group lookup failed for user %s: %s", user_id, exc)
                 value, ttl = None, self._error_ttl
-            self._remember(user_id, value, now + ttl)
+            self._remember(user_id, value, now + ttl, epoch)
             fut.set_result(value)
             return value
         finally:
-            self._inflight.pop(user_id, None)
+            self._inflight.pop((user_id, epoch), None)
 
     def invalidate(self, user_id: str | None = None) -> None:
         """Forget one user, or everyone."""
@@ -95,15 +102,18 @@ class UsageGroupResolver(Generic[V]):
         if self._close is not None:
             await self._close()
 
-    def _remember(self, user_id: str, value: V | None, expires_at: float) -> None:
+    def _remember(self, user_id: str, value: V | None, expires_at: float, epoch: int | None) -> None:
+        kept = self._cache.get(user_id)
+        if kept is not None and epoch is not None and kept[2] is not None and kept[2] > epoch:
+            return  # a newer read is kept already
         if len(self._cache) >= self._max and user_id not in self._cache:
             now = self._clock()
-            for key in [k for k, (_, exp) in self._cache.items() if exp <= now]:
+            for key in [k for k, (_, exp, _) in self._cache.items() if exp <= now]:
                 del self._cache[key]
             if len(self._cache) >= self._max:
                 # Still full: drop the entry that expires soonest.
                 del self._cache[min(self._cache, key=lambda k: self._cache[k][1])]
-        self._cache[user_id] = (value, expires_at)
+        self._cache[user_id] = (value, expires_at, epoch)
 
 
 class BackendUserGroups:

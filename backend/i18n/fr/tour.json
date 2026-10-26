@@ -478,6 +478,12 @@
       "action_create": "Créer un groupe avec ses rôles",
       "action_members": "Ajouter ou retirer des membres"
     },
+    "api_tokens": {
+      "title": "Jetons d'API",
+      "description": "Les jetons d'API de chacun : à qui appartient chacun, et quand, d'où et avec quoi il a été utilisé.",
+      "action_uses": "Voir les utilisations d'un jeton",
+      "action_revoke": "Révoquer un jeton"
+    },
     "auth_providers": {
       "title": "Fournisseurs de connexion",
       "description": "Permettez aux gens de se connecter avec le compte de leur organisation : via OpenID Connect, SAML ou un annuaire (LDAP, Active Directory).",

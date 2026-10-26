@@ -53,6 +53,8 @@ class RecordingMailSender:
     def __init__(self) -> None:
         self.on = True
         self.sent: list[tuple[str, dict[str, Any]]] = []
+        self.base = "https://console.example.com"
+        self.recipients: list[str] = ["ops@example.com"]
 
     def available(self) -> bool:
         """Whether mail goes out: as the test sets ``on``."""
@@ -61,6 +63,14 @@ class RecordingMailSender:
     async def send(self, kind: str, payload: dict[str, Any]) -> None:
         """Keeps the message."""
         self.sent.append((kind, payload))
+
+    def link_base(self) -> str:
+        """The address links start with, as the test sets ``base``."""
+        return self.base
+
+    def admin_recipients(self) -> list[str]:
+        """Who gets alerts, as the test sets ``recipients``."""
+        return self.recipients
 
 
 @pytest.fixture
@@ -122,6 +132,13 @@ async def _engine(anyio_backend: Any) -> AsyncGenerator[AsyncEngine]:
     engine = create_async_engine(str(settings.db_url))
     async with engine.begin() as conn:
         await conn.run_sync(meta.create_all)
+        # What the migration adds beside the models: the count of changes to access, and its triggers.
+        from sqlalchemy import text
+
+        from faden_backend.db import access_epoch
+
+        for statement in access_epoch.create_all():
+            await conn.execute(text(statement))
 
     try:
         yield engine

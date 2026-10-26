@@ -182,7 +182,7 @@ Die Erkennungsrate ist der Anteil der Prüfungen mit einem Fund, nicht der Antei
 4. Schreiben Sie die **Nachricht an den Nutzer**: Das wird Benutzern mitgeteilt, wenn die Regel greift.
 5. Legen Sie die **Priorität** fest. Niedrigere Werte werden zuerst geprüft, und die erste passende Regel
    entscheidet. So kann eine Regel mit einer niedrigeren Zahl eine Ausnahme von einer allgemeineren Regel bilden.
-6. Speichern Sie die Regel. Regeln greifen innerhalb von 30 Sekunden.
+6. Speichern Sie die Regel. Regeln greifen sofort.
 
 Ohne Regeln laufen Tools so, wie es der Tool-Modus vorgibt.
 
@@ -217,7 +217,7 @@ wen, wählen Sie das Team, den Agenten oder die Person, dann **Höchstens**, und
 Ändern Sie eine Grenze in ihrer Zeile, oder entfernen Sie sie. Für einen Chat können mehrere Grenzen gelten (die
 für alle, die der Teams der Person, die des Agenten, die eigene der Person): Die engste gilt. Benutzer sehen, dass
 ihr Chat begrenzt ist, und die Anwendungen eines Agenten erhalten seine Grenze ebenfalls. Änderungen wirken
-innerhalb von 30 Sekunden und werden im Audit-Protokoll festgehalten.
+sofort und werden im Audit-Protokoll festgehalten.
 
 Ohne gültige Enterprise-Lizenz können die Grenzen nicht angewendet werden, daher sind Tools in jedem Chat nur
 lesend, bis die Lizenz zurück ist; ein Hinweis für Administratoren sagt das. **Aufheben** in diesem Hinweis gibt

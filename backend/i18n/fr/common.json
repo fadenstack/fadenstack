@@ -103,7 +103,8 @@
     "agents": "Agents",
     "governance": "Gouvernance",
     "updates": "Mises à jour",
-    "check_content": "Vérifier un contenu"
+    "check_content": "Vérifier un contenu",
+    "api_tokens": "Jetons d'API"
   },
   "auth": {
     "logout": "Déconnexion",
@@ -4288,6 +4289,7 @@
       "check_title": "Vérifier l'accès de quelqu'un",
       "check_help": "Si un utilisateur peut utiliser l'agent, et pourquoi.",
       "check_placeholder": "Rechercher un utilisateur…",
+      "check_placeholder_exact": "L'adresse e-mail complète de la personne…",
       "allowed": "{{who}} peut utiliser cet agent.",
       "refused": "{{who}} ne peut pas utiliser cet agent.",
       "unenforced_hint": "Seuls ses responsables peuvent utiliser cet agent : il utilise des réglages qui nécessitent Fadenstack Enterprise ({{names}}).",
@@ -4659,5 +4661,30 @@
     },
     "action": "Connexions liées",
     "of_title": "Connexions liées de {{email}}"
+  },
+  "api_tokens": {
+    "title": "Jetons d'API",
+    "description": "Les jetons d'API de chacun, avec leur propriétaire et leur usage. Chaque requête faite avec un jeton est enregistrée : quand, depuis quelle adresse, avec quelle application, sur quelle route.",
+    "owner": "Propriétaire",
+    "name": "Jeton",
+    "last_used": "Dernière utilisation",
+    "state": "État",
+    "state_active": "Actif",
+    "show_uses": "Utilisations",
+    "show_ended": "Afficher les révoqués et expirés",
+    "search": "Filtrer par propriétaire, jeton ou adresse",
+    "none": "Aucun jeton d'API.",
+    "never_used": "Pas utilisé récemment",
+    "last_use": "{{when}} depuis {{address}}",
+    "unknown_address": "une adresse inconnue",
+    "recent_uses": "utilisations sur 30 jours : {{count}}",
+    "uses_title": "Utilisations de {{name}}",
+    "uses_none": "Aucune utilisation enregistrée.",
+    "uses_kept": "Les 100 dernières utilisations, la plus récente d'abord. Elles sont conservées 90 jours.",
+    "col_when": "Quand",
+    "col_address": "Adresse",
+    "col_client": "Application",
+    "col_route": "Route",
+    "revoke_confirm": "Révoquer {{name}} de {{email}} ? Les applications qui l'utilisent cessent aussitôt de fonctionner."
   }
 }

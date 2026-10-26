@@ -103,7 +103,8 @@
     "agents": "Agents",
     "governance": "Governance",
     "updates": "Updates",
-    "check_content": "Check content"
+    "check_content": "Check content",
+    "api_tokens": "API tokens"
   },
   "auth": {
     "logout": "Logout",
@@ -4286,6 +4287,7 @@
       "check_title": "Check someone's access",
       "check_help": "Whether a user may use the agent, and why.",
       "check_placeholder": "Find a user…",
+      "check_placeholder_exact": "The person's whole e-mail address…",
       "allowed": "{{who}} may use this agent.",
       "refused": "{{who}} may not use this agent.",
       "unenforced_hint": "Only its maintainers can use this agent: it uses settings that need Fadenstack Enterprise ({{names}}).",
@@ -4657,5 +4659,30 @@
     },
     "action": "Linked sign-ins",
     "of_title": "Linked sign-ins of {{email}}"
+  },
+  "api_tokens": {
+    "title": "API tokens",
+    "description": "Everyone's API tokens, with who owns each and how it is used. Every request made with a token is recorded: when, from which address, with which application, on which route.",
+    "owner": "Owner",
+    "name": "Token",
+    "last_used": "Last used",
+    "state": "State",
+    "state_active": "Active",
+    "show_uses": "Uses",
+    "show_ended": "Show revoked and expired",
+    "search": "Filter by owner, token or address",
+    "none": "No API tokens.",
+    "never_used": "Not used lately",
+    "last_use": "{{when}} from {{address}}",
+    "unknown_address": "an unknown address",
+    "recent_uses": "uses in 30 days: {{count}}",
+    "uses_title": "Uses of {{name}}",
+    "uses_none": "No uses recorded.",
+    "uses_kept": "The latest 100 uses, newest first. Uses are kept for 90 days.",
+    "col_when": "When",
+    "col_address": "Address",
+    "col_client": "Application",
+    "col_route": "Route",
+    "revoke_confirm": "Revoke {{name}} of {{email}}? Applications using it stop working at once."
   }
 }

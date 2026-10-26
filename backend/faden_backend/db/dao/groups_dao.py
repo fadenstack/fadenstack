@@ -101,9 +101,9 @@ class GroupDAO:
                     .on_conflict_do_nothing(),
                 )
         await self.session.flush()
-        # Re-fetch to refresh relationships
+        # Read again, past the session's copy, whose roles are those from before
         result = await self.session.execute(
-            select(Group).where(Group.id == group_id),
+            select(Group).where(Group.id == group_id).execution_options(populate_existing=True),
         )
         return result.scalar_one()
 

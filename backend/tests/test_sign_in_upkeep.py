@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_backend.db.models.agents import Agent, AgentRefreshToken
+from faden_backend.db.models.api_tokens import ApiToken, ApiTokenUse
 from faden_backend.db.models.groups import Group, UserGroup
 from faden_backend.db.models.oauth import OAuthAccount
 from faden_backend.db.models.users import User
@@ -120,6 +121,19 @@ async def test_an_agent_in_use_keeps_the_account(db: AsyncSession, fake: FakeMod
         created_at=NOW - timedelta(days=60), last_used_at=NOW - timedelta(days=1),
         expires_at=NOW + timedelta(days=30), idle_expires_at=NOW + timedelta(days=7),
     ))
+    await db.flush()
+    await upkeep.upkeep_once(db)
+    assert await _active(db, user)
+
+
+async def test_an_api_token_in_use_keeps_the_account(db: AsyncSession, fake: FakeModule) -> None:
+    """Someone who works through a script signs in rarely; each request with their token counts as use."""
+    fake.providers = [ProviderUpkeep(key="corp", inactive_days=45)]
+    user = await _linked(db, days_ago=90)
+    token = ApiToken(id=uuid.uuid4(), user_id=user.id, name="nightly export")
+    db.add(token)
+    await db.flush()
+    db.add(ApiTokenUse(token_id=token.id, user_id=user.id, at=NOW - timedelta(days=2), route="POST /v1/x"))
     await db.flush()
     await upkeep.upkeep_once(db)
     assert await _active(db, user)

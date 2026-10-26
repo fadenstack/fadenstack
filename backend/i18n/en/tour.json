@@ -478,6 +478,12 @@
       "action_create": "Create a group with its roles",
       "action_members": "Add or remove members"
     },
+    "api_tokens": {
+      "title": "API tokens",
+      "description": "Everyone's API tokens: who owns each, and when, from where and with what it was used.",
+      "action_uses": "See a token's uses",
+      "action_revoke": "Revoke a token"
+    },
     "auth_providers": {
       "title": "Sign-in providers",
       "description": "Let people sign in with their organisation's account: through OpenID Connect, SAML, or a directory (LDAP, Active Directory).",

@@ -82,7 +82,7 @@ Die Seite des Agenten öffnet sich. Sein Status in der Liste ist **Entwurf**, **
 
 Das Speichern der Definition erzeugt eine neue Version (**Als neue Version speichern** oder **Speichern und
 veröffentlichen**); Versionen ändern sich nie. Eine veröffentlichte Version erreicht alle, die den Agenten
-nutzen, innerhalb einer Minute.
+nutzen, bei ihrer nächsten Anfrage.
 
 ![Der Reiter „Zugriff“: „Wer ihn nutzen darf“ mit „Person oder Team hinzufügen“ und den Personen, denen der Agent gewährt ist](../images/administer/agent-access.png)
 
@@ -96,9 +96,18 @@ Prüfer sehen die Versionen, Mitglieder, Einstellungen und Aktivität des Agente
 können sie ihn nur, wenn er ihnen wie allen anderen freigegeben ist. Ohne gültige Enterprise-Lizenz sehen sie
 ihn nicht mehr.
 
+Um den Zugriff einer Person zu prüfen, geben Prüfer ihre ganze E-Mail-Adresse ein: Ein Teil davon findet
+niemanden, so listet die Prüfung nicht alle auf (DSGVO Art. 5 Abs. 1 lit. c, Art. 25 Abs. 2). Jede Prüfung wird
+im Audit-Protokoll festgehalten, mit wer wen geprüft hat (`agent.access.check`).
+
+!!! note "Betriebsrat"
+    Prüfer lesen, was Personen mit einem Agenten getan haben. Eine technische Einrichtung, die Verhalten oder
+    Leistung der Beschäftigten überwachen kann, braucht die Zustimmung des Betriebsrats (BetrVG § 87 Abs. 1
+    Nr. 6): Vereinbaren Sie die Prüferrolle mit ihm, bevor Sie sie vergeben.
+
 Mit Enterprise dürfen **Ausgeschlossene Personen** den Agenten nicht nutzen, auch nicht über ein Team, das ihn
 nutzen darf: Wählen Sie die Person, geben Sie eine **Begründung** an und wählen Sie **Ausschließen**. Das wirkt
-in den Anwendungen innerhalb einer Minute und wird im Audit-Protokoll festgehalten. Die Person erfährt nur,
+in den Anwendungen sofort und wird im Audit-Protokoll festgehalten. Die Person erfährt nur,
 dass sie ausgeschlossen ist; die Begründung ist für die Betreuer und Administratoren des Agenten. Betreuer und
 Administratoren behalten den Agenten immer und können nicht ausgeschlossen werden.
 
@@ -231,7 +240,7 @@ der Konsole oder auf ihrer Seite **Agenten**.
 
 | Um | So geht's |
 |---|---|
-| den Agenten innerhalb einer Minute für alle zu sperren | **Stilllegen**: Anmeldungen funktionieren nicht mehr; seine Versionen, Zugriffe und sein Verlauf bleiben erhalten. **Wiederherstellen** holt ihn so zurück, wie er war. |
+| den Agenten sofort für alle zu sperren | **Stilllegen**: Anmeldungen funktionieren nicht mehr; seine Versionen, Zugriffe und sein Verlauf bleiben erhalten. **Wiederherstellen** holt ihn so zurück, wie er war. |
 | einen stillgelegten Agenten endgültig zu löschen | **Löschen**, dann zur Bestätigung seine Adresse eingeben. Seine Versionen, Zugriffe und Anmeldungen werden entfernt; was er getan hat, bleibt in den Nutzungs- und Audit-Logs, und seine Adresse ist für einen neuen Agenten frei. Zum Löschen ist die Berechtigung `agents:delete` nötig, die die integrierte Rolle `admin` hat, Betreuer aber nicht. |
 | die Anmeldung eines Geräts zu beenden | **Abmelden** auf dem Reiter **Aktivität**: Die Person muss sich erneut anmelden. |
 

@@ -287,8 +287,8 @@ async def gateway_errors(facts: Facts) -> list[Item]:
     """A 5xx rate over the gateway alert monitor's window and threshold."""
     if not facts.has_gateway:
         return []
-    minutes = settings.mailer_alert_5xx_window_minutes
-    threshold = float(settings.mailer_alert_5xx_threshold_percent)
+    minutes = settings.alert_5xx_window_minutes
+    threshold = float(settings.alert_5xx_threshold_percent)
 
     async def query(session: Any) -> list[Item]:
         total, errors = (

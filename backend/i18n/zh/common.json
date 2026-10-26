@@ -103,7 +103,8 @@
     "agents": "智能体",
     "governance": "治理",
     "updates": "更新",
-    "check_content": "检查内容"
+    "check_content": "检查内容",
+    "api_tokens": "API 令牌"
   },
   "auth": {
     "logout": "退出登录",
@@ -4288,6 +4289,7 @@
       "check_title": "检查某人的访问权限",
       "check_help": "某个用户能否使用该智能体，以及原因。",
       "check_placeholder": "查找用户…",
+      "check_placeholder_exact": "此人的完整电子邮件地址…",
       "allowed": "{{who}} 可以使用此智能体。",
       "refused": "{{who}} 不能使用此智能体。",
       "unenforced_hint": "只有其维护者可以使用此智能体：它使用了需要 Fadenstack Enterprise 的设置（{{names}}）。",
@@ -4659,5 +4661,30 @@
     },
     "action": "已关联的登录方式",
     "of_title": "{{email}} 已关联的登录方式"
+  },
+  "api_tokens": {
+    "title": "API 令牌",
+    "description": "所有人的 API 令牌，包括每个令牌的所有者及其使用情况。使用令牌发出的每个请求都会被记录：时间、来源地址、所用应用程序和访问路径。",
+    "owner": "所有者",
+    "name": "令牌",
+    "last_used": "上次使用",
+    "state": "状态",
+    "state_active": "有效",
+    "show_uses": "使用记录",
+    "show_ended": "显示已撤销和已过期的令牌",
+    "search": "按所有者、令牌或地址筛选",
+    "none": "没有 API 令牌。",
+    "never_used": "近期未使用",
+    "last_use": "{{when}}，来自 {{address}}",
+    "unknown_address": "未知地址",
+    "recent_uses": "30 天内使用次数：{{count}}",
+    "uses_title": "{{name}} 的使用记录",
+    "uses_none": "没有使用记录。",
+    "uses_kept": "最近 100 次使用，最新的在前。使用记录保留 90 天。",
+    "col_when": "时间",
+    "col_address": "地址",
+    "col_client": "应用程序",
+    "col_route": "路径",
+    "revoke_confirm": "撤销 {{email}} 的 {{name}}？使用它的应用程序将立即停止工作。"
   }
 }

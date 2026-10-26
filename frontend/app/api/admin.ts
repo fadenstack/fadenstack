@@ -788,9 +788,13 @@ export const adminUsers = {
   listMyApiTokens() {
     return request<ApiTokenInfo[]>("/users/me/api-tokens");
   },
-  /** Revokes one of the current user's API tokens; the gateway refuses it within a minute. */
+  /** Revokes one of the current user's API tokens; the gateway refuses it at the next request. */
   revokeMyApiToken(tokenId: string) {
     return request<void>(`/users/me/api-tokens/${tokenId}`, { method: "DELETE" });
+  },
+  /** One of the current user's tokens' latest uses, newest first. */
+  listMyApiTokenUses(tokenId: string) {
+    return request<ApiTokenUse[]>(`/users/me/api-tokens/${tokenId}/uses`);
   },
   /** Someone's API tokens (administrators). */
   listUserApiTokens(userId: string) {
@@ -800,9 +804,17 @@ export const adminUsers = {
   revokeUserApiToken(userId: string, tokenId: string) {
     return request<void>(`/users/${userId}/api-tokens/${tokenId}`, { method: "DELETE" });
   },
+  /** Everyone's API tokens with their owner and last use (administrators). */
+  listAllApiTokens() {
+    return request<AdminApiTokenInfo[]>("/users/api-tokens");
+  },
+  /** A token's latest uses, newest first (administrators). */
+  listApiTokenUses(tokenId: string) {
+    return request<ApiTokenUse[]>(`/users/api-tokens/${tokenId}/uses`);
+  },
 };
 
-/** An API token as its owner sees it. */
+/** An API token as its owner sees it, with its latest use (within the kept period). */
 export interface ApiTokenInfo {
   id: string;
   name: string | null;
@@ -810,6 +822,26 @@ export interface ApiTokenInfo {
   created_at: string;
   expires_at: string | null;
   revoked_at: string | null;
+  last_used_at?: string | null;
+  last_used_address?: string | null;
+  last_used_client?: string | null;
+  last_used_route?: string | null;
+  /** Its uses in the last 30 days. */
+  recent_uses?: number;
+}
+
+/** An API token in the overview of everyone's. */
+export interface AdminApiTokenInfo extends ApiTokenInfo {
+  user_id: string;
+  email: string;
+}
+
+/** One use of an API token: each request the gateway let in with it. */
+export interface ApiTokenUse {
+  at: string;
+  address: string | null;
+  client: string | null;
+  route: string | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -21,6 +21,7 @@ from faden_backend.services.system_settings.runtime_mapping import (
     register_runtime_secret_key,
     register_runtime_value_key,
     resolve_runtime_attr,
+    runtime_target,
 )
 from faden_backend.services.system_settings.registry import (
     SETTINGS_REGISTRY,
@@ -444,7 +445,7 @@ class SystemSettingsService:
         attr_name = resolve_runtime_attr(key)
         if not attr_name:
             return
-        object.__setattr__(settings, attr_name, value)
+        object.__setattr__(runtime_target(key), attr_name, value)
 
     async def _emit_apply_failure_alert(
         self,

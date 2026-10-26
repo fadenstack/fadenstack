@@ -159,6 +159,13 @@ async def refresh(dao: AgentsDAO, *, secret: str, refresh_token: str) -> IssuedT
     if user is None or agent is None:
         await dao.revoke_family(row.family_id, now)
         raise AgentTokenError(401, "invalid_refresh_token", "The refresh token is not valid.")
+    first = await dao.session.get(AgentRefreshToken, row.family_id)
+    started = first.created_at if first is not None else row.created_at
+    if user.sessions_valid_after is not None and started < user.sessions_valid_after:
+        # The person's sign-ins were ended since (a password change, a suspension, a change of rights): this
+        # one too (ASVS 5.0 V7.4.1).
+        await dao.revoke_family(row.family_id, now)
+        raise AgentTokenError(401, "sign_in_ended", "This sign-in has ended; sign in again.")
     decision = await decide(dao, agent, user)
     if not decision.allowed:
         await dao.revoke_family(row.family_id, now)
@@ -167,8 +174,6 @@ async def refresh(dao: AgentsDAO, *, secret: str, refresh_token: str) -> IssuedT
     life = await _lifetimes(dao, agent)
     # The sign-in ends where it always would; only idleness is renewed. A
     # lifetime lowered since takes effect now: the end moves closer.
-    first = await dao.session.get(AgentRefreshToken, row.family_id)
-    started = first.created_at if first is not None else row.created_at
     expires_at = min(row.expires_at, started + timedelta(seconds=life.refresh_s))
     new_refresh = secrets.token_urlsafe(32)
     replacement = await dao.add_refresh_token(

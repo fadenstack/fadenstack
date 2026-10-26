@@ -78,7 +78,7 @@ The agent's page opens. Its list status is **Draft**, **Published** or **Retired
 ![The Versions tab of the Word assistant: v2 live with View and Changes, v1 with View and Roll back, below the agent's tabs and the Edit and Retire buttons](../images/administer/agent-versions.png)
 
 Saving the definition makes a new version (**Save as new version**, or **Save and publish**); versions never
-change. Publishing a version reaches everyone who uses the agent within a minute.
+change. Publishing a version reaches everyone who uses the agent at their next request.
 
 ![The Access tab: Who may use it, with Add a person or team and the people the agent is granted to](../images/administer/agent-access.png)
 
@@ -90,8 +90,17 @@ person, or change a member's role in the list, and select **Save**. Auditors see
 members, settings and activity and change nothing; to use it, they need it granted like anyone else. Without
 a valid Enterprise licence they no longer see it.
 
+To check someone's access, an auditor types the person's whole e-mail address: a part of one finds nobody, so
+the check does not list everyone (GDPR Art. 5(1)(c), 25(2)). Every check is recorded in the audit log, with who
+checked whom (`agent.access.check`).
+
+!!! note "Works councils"
+    Auditors read what people did with an agent. In Germany, a tool that can monitor employees' conduct or
+    performance needs the works council's agreement (BetrVG § 87(1) No. 6): agree the auditor role with it
+    before you give it.
+
 With Enterprise, **Excluded people** may not use the agent, even through a team that may: pick the person,
-give a **Reason** and select **Exclude**. It takes effect in the applications within a minute and is recorded
+give a **Reason** and select **Exclude**. It takes effect in the applications at once and is recorded
 in the audit log. The person is told only that they are excluded; the reason is for the agent's maintainers
 and administrators. Maintainers and administrators always keep the agent and cannot be excluded.
 
@@ -219,7 +228,7 @@ on their **Agents** page.
 
 | To | Do this |
 |---|---|
-| Close the agent to everyone within a minute | **Retire**: sign-ins stop working, and its versions, access and history are kept. **Restore** brings it back as it was. |
+| Close the agent to everyone at once | **Retire**: sign-ins stop working, and its versions, access and history are kept. **Restore** brings it back as it was. |
 | Delete a retired agent for good | **Delete**, then type its address to confirm. Its versions, access and sign-ins go; what it did stays in the usage and audit logs, and its address is free for a new agent. Deleting needs the permission `agents:delete`, which the built-in `admin` role has and maintainers do not. |
 | End one device's sign-in | **Sign out** on the **Activity** tab: that person must sign in again. |
 

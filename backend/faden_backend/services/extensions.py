@@ -105,6 +105,18 @@ class MailSender(Protocol):
         """Deliver one message of *kind* (``password_reset``, ``link_code``, ``admin_alert``), or raise."""
         ...
 
+    def link_base(self) -> str:
+        """The console's address that links in mail start with, as configured for mail.
+
+        Never taken from a request's ``Host``: a forged one would send a reset link to someone else's site
+        (OWASP Forgot Password Cheat Sheet, password reset poisoning).
+        """
+        ...
+
+    def admin_recipients(self) -> list[str]:
+        """Who gets administrators' alerts (``admin_alert``); none, and they are not queued."""
+        ...
+
 
 @dataclass(frozen=True)
 class AdminNotice:

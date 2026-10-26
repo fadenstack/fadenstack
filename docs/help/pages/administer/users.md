@@ -103,8 +103,9 @@ A group gathers people, for three things:
 To make one: open **Access Control → Groups**, select **Create Group**, name it and tick its roles under
 **Assign Roles**, save it, then select **Manage Members** and **Add Members**.
 
-Removing someone from a group takes away the group's roles. Skills shared with the group stop reaching their
-chats within a minute.
+Removing someone from a group takes away the group's roles, and the skills shared with the group stop
+reaching their chats at once. Joining or leaving a group signs the person out, as any change of their
+rights does (see [Sign-ins and API tokens](#sign-ins-and-api-tokens)).
 
 ## Developer mode
 
@@ -122,7 +123,7 @@ person's own computer. It is for people who build or test tools, and it can end 
 
 | | |
 |---|---|
-| **A sign-in** | lasts 7 days; then people sign in again. **Logout** ends it at once. A password change or reset, a suspension, and a role taken away end all of a person's sign-ins; the gateway notices within half a minute. |
+| **A sign-in** | lasts 7 days; then people sign in again. **Logout** ends it at once. A password change or reset, a suspension, and any change of a person's rights end all of their sign-ins, the agents' on their devices too, at once: a role given or taken, joining or leaving a group, a change to the roles of their groups or to the permissions of their roles, the administrator right given or taken. They sign in again. Each is recorded in the audit log (`user.sign_ins.ended`, with the cause). |
 | **API tokens** | let scripts and applications use the models through the API. Each person makes their own under **Manage Profile** (or **My Profile** in the console), and can revoke it there. |
 | **Every API token expires** | after 90 days unless its maker picks another lifetime, and after a year at most. |
 | **Agents** (the browser agent, the Office add-ins) | have their own sign-ins on each device, shown on an agent's **Activity** tab (see [Agents and add-ins](agents.md)). |
@@ -130,7 +131,14 @@ person's own computer. It is for people who build or test tools, and it can end 
 ![API tokens of one person: each token with its name, when it was made and when it expires](../images/administer/user-api-tokens.png)
 
 To revoke someone else's token: in **Access Control → Users**, select **API tokens** (the key icon) in their
-row, then **Revoke**. Applications using a revoked token stop working within a minute.
+row, then **Revoke**. Applications using a revoked token stop working at once.
+
+Every request made with an API token is recorded: when, from which address, with which application, and on
+which route; never what was sent. **Access Control → API tokens** lists everyone's tokens with their owner and
+last use; **Uses** shows a token's latest 100 uses. A person sees the same for their own tokens under **Manage
+Profile**. A token's use also counts as activity, so a provider's "suspend after days without use" does not
+suspend people who work only through tokens. The uses are kept for 90 days, then deleted
+(`FADEN_BACKEND_API_TOKEN_USE_RETENTION_DAYS` on the server; 0 keeps them).
 
 ![Settings → General: Sign-in lifetime (s), API token lifetime (s) and Longest API token lifetime (s)](../images/administer/settings-sign-in.png)
 
@@ -182,7 +190,7 @@ example when no administrator can sign in).
    row.
 2. Confirm.
 
-Their sign-ins, API tokens and agents stop working within a minute. Nothing of theirs is deleted: **Let back
+Their sign-ins, API tokens and agents stop working at once. Nothing of theirs is deleted: **Let back
 in** in the same place gives them their access back, but the sign-ins they had stay over: they sign in again.
 You cannot suspend yourself, nor the last superuser.
 

@@ -63,8 +63,8 @@ class GatewayAlertMonitor:
             await asyncio.sleep(_POLL_INTERVAL_SECONDS)
 
     async def _check(self) -> None:
-        window = timedelta(minutes=settings.mailer_alert_5xx_window_minutes)
-        threshold = settings.mailer_alert_5xx_threshold_percent
+        window = timedelta(minutes=settings.alert_5xx_window_minutes)
+        threshold = settings.alert_5xx_threshold_percent
         cutoff = datetime.now(tz=UTC) - window
 
         async with self._gateway_sf() as gw_session:
@@ -93,15 +93,15 @@ class GatewayAlertMonitor:
             queued = await service.maybe_enqueue_admin_alert(
                 subject="Gateway 5xx error rate spike",
                 severity="critical",
-                fingerprint=f"gateway_5xx_rate:{settings.mailer_alert_5xx_window_minutes}m",
+                fingerprint=f"gateway_5xx_rate:{settings.alert_5xx_window_minutes}m",
                 summary=(
                     f"Gateway 5xx error rate is {error_pct:.1f}% "
                     f"({errors}/{total} requests in the last "
-                    f"{settings.mailer_alert_5xx_window_minutes} minutes)."
+                    f"{settings.alert_5xx_window_minutes} minutes)."
                 ),
                 details=(
                     f"Threshold: {threshold}%. Window: "
-                    f"{settings.mailer_alert_5xx_window_minutes} minutes."
+                    f"{settings.alert_5xx_window_minutes} minutes."
                 ),
                 source="faden_backend.gateway_alert_monitor",
                 occurred_at=datetime.now(tz=UTC),

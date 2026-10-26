@@ -25,6 +25,9 @@ from faden_gateway.services.gateway.auth import (
     _refresh_jwt_secret_if_needed,
     caller_context,
     get_auth_context_from_claims,
+    record_token_use,
+    request_route,
+    sign_in_ended_before,
     verify_token,
 )
 from faden_gateway.services.gateway.client_ws import DeviceIdentity, handle_client_websocket
@@ -63,12 +66,15 @@ async def authenticate_device(app: Any, token: str) -> DeviceIdentity:
     if agent_id is None or directory is None:
         raise PermissionError("agents_unavailable", "Agents are not available here.")
     try:
+        await directory.note_epoch()
         profile = await directory.agent(auth.tenant_id, agent_id)
         user = await directory.user(auth.user_id) if profile is not None else None
     except AgentLookupError as exc:
         raise PermissionError("agent_lookup_failed", "The agent could not be looked up; try again.") from exc
     if profile is None or profile.id != agent_id:
         raise PermissionError("agent_not_found", "No such agent.")
+    if sign_in_ended_before(claims, user):
+        raise PermissionError("sign_in_ended", "This sign-in has ended. Sign in again.")
     resolver = getattr(app.state, "group_membership_resolver", None)
     groups = (await resolver.resolve(auth.user_id) or ()) if resolver is not None else ()
     decision = await decide(profile, user_id=auth.user_id, user=user, groups=groups, registry=registry)
@@ -116,9 +122,23 @@ class _Briefly:
 async def client_websocket(ws: WebSocket) -> None:
     """A device's connection: authenticated first, then its tools, then calls."""
     dao = _Briefly(ws.app.state.db_session_factory)
+    recorded: str | None = None
 
     async def authenticate(token: str) -> DeviceIdentity:
-        return await authenticate_device(ws.app, token)
+        nonlocal recorded
+        identity = await authenticate_device(ws.app, token)
+        if token != recorded:
+            # A use of an API token is kept when the connection presents it, not at each check after.
+            try:
+                await record_token_use(
+                    ws.app, verify_token(token, check_audience=False),
+                    address=ws.client.host if ws.client else None, client=ws.headers.get("user-agent"),
+                    route=request_route(ws.scope, "WS"),
+                )
+            except GatewayError as exc:
+                raise PermissionError(exc.code or "access_check_failed", exc.message) from exc
+            recorded = token
+        return identity
 
     await handle_client_websocket(
         ws, dao,  # type: ignore[arg-type]

@@ -219,6 +219,7 @@ async def check_caller(app: Any, claims: dict[str, Any]) -> str | None:
     user_id = str(claims.get("sub", "")).strip()
     tenant_id: str | None = None
     try:
+        await directory.note_epoch()
         if claims.get("typ") == API_TOKEN_TYPE and directory.checks_api_tokens:
             record = await directory.api_token(str(claims.get("jti", "")))
             if record is None or record.revoked or record.user_id != user_id:
@@ -264,6 +265,50 @@ async def check_caller(app: Any, claims: dict[str, Any]) -> str | None:
     return tenant_id
 
 
+def sign_in_ended_before(claims: dict[str, Any], user: Any) -> bool:
+    """Whether the token in *claims* was made before *user*'s sign-ins were ended.
+
+    For an app's agent token, which carries ``iat`` like a console sign-in: a password change, a suspension
+    or a change of rights ends it too. Whole seconds, as in the backend (``sign_in_ended_for_all``): one made
+    in that second stands.
+    """
+    ended = getattr(user, "sessions_valid_after", None)
+    return ended is not None and int(claims.get("iat", 0)) < int(ended)
+
+
+def request_route(scope: dict[str, Any], method: str) -> str:
+    """``POST /v1/chat/completions``: the method and the route matched, never its values."""
+    route = scope.get("route")
+    return f"{method} {getattr(route, 'path', None) or scope.get('path', '')}"
+
+
+async def record_token_use(
+    app: Any, claims: dict[str, Any], *, address: str | None, client: str | None, route: str,
+) -> None:
+    """Keep this use of an API token: who, when, from where, with what (``api_token_uses``).
+
+    Every use is kept, so an organisation knows who uses its tokens and how. A use that cannot be kept is
+    refused, as an access that cannot be checked is.
+    """
+    if claims.get("typ") != API_TOKEN_TYPE:
+        return
+    directory = getattr(app.state, "agent_directory", None)
+    if directory is None:
+        return
+    try:
+        await directory.token_used(
+            str(claims.get("jti", "")), str(claims.get("sub", "")),
+            address=address, client=client, route=route,
+        )
+    except AgentLookupError as exc:
+        raise GatewayError(
+            status_code=503,
+            message="Your access could not be checked; try again.",
+            error_type="server_error",
+            code="access_check_failed",
+        ) from exc
+
+
 async def caller_context(app: Any, claims: dict[str, Any], token: str | None = None) -> AuthContext:
     """Who the caller is, once :func:`check_caller` lets them in.
 
@@ -301,7 +346,12 @@ async def get_auth_context(
             error_type="permission_error",
             code="agent_token_not_allowed",
         )
-    return await caller_context(request.app, claims, token)
+    auth = await caller_context(request.app, claims, token)
+    await record_token_use(
+        request.app, claims, address=request.client.host if request.client else None,
+        client=request.headers.get("user-agent"), route=request_route(request.scope, request.method),
+    )
+    return auth
 
 
 async def check_chat_permission(app: Any, auth: AuthContext, permission: str) -> None:

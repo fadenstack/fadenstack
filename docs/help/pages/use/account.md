@@ -101,7 +101,9 @@ The application also needs the API's address, which your administrator can give 
 1. Select **Revoke** beside the token.
 2. Confirm with **Revoke**.
 
-Applications that use it stop working within a minute. Revoke a token as soon as it is no longer needed, or if it may have been seen by someone else.
+Applications that use it stop working at once. Revoke a token as soon as it is no longer needed, or if it may have been seen by someone else.
+
+Each token shows when it was last used, from which address and with which application; **Uses** lists its latest uses. Every use is recorded, and your administrators see it too: a use you do not recognise is a reason to revoke the token.
 
 ??? info "Other ways a token stops working"
     Your administrator can also revoke your tokens. If your account is deactivated, your tokens stop working too.

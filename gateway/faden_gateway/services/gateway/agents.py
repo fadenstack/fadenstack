@@ -26,6 +26,7 @@ import asyncpg
 
 from faden_gateway.services.extensions import ExtensionRegistry
 from faden_gateway.services.extensions import registry as default_registry
+from faden_gateway.services.gateway import access_epoch
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +101,15 @@ _API_TOKEN_SQL = (
 
 #: A console sign-in a logout ended (the backend's ``revoked_sign_ins``).
 _SIGN_IN_REVOKED_SQL = "SELECT 1 FROM revoked_sign_ins WHERE jti = $1"
+
+#: Keeps one use of an API token: ``(token_id, user_id, address, client, route)``.
+RecordTokenUse = Callable[[str, str, str | None, str | None, str | None], Awaitable[None]]
+
+#: One use of an API token (the backend's ``api_token_uses``).
+_TOKEN_USE_SQL = (
+    "INSERT INTO api_token_uses (token_id, user_id, at, address, client, route) "  # noqa: S105
+    "VALUES ($1::uuid, $2::uuid, now(), $3, $4, $5)"
+)
 
 
 def _json(value: Any, default: Any) -> Any:
@@ -216,7 +226,9 @@ class TtlCache(Generic[K, V]):
     """``key -> value`` with a TTL in front of ``fetch``; misses coalesce.
 
     A failed fetch is not cached and propagates, so the request fails rather
-    than being answered from a guess.
+    than being answered from a guess. An answer is kept with the count of
+    changes to access it was read under, and answers only requests that read
+    the same count (``access_epoch``): a change is in force at the next request.
     """
 
     def __init__(
@@ -231,18 +243,19 @@ class TtlCache(Generic[K, V]):
         self._ttl = ttl_sec
         self._max = max_entries
         self._clock = clock
-        self._cache: dict[K, tuple[V, float]] = {}
-        self._inflight: dict[K, asyncio.Future[V]] = {}
+        self._cache: dict[K, tuple[V, float, int | None]] = {}
+        self._inflight: dict[tuple[K, int | None], asyncio.Future[V]] = {}
 
     async def get(self, key: K) -> V:
         hit = self._cache.get(key)
-        if hit is not None and hit[1] > self._clock():
+        if hit is not None and hit[1] > self._clock() and access_epoch.usable(hit[2]):
             return hit[0]
-        pending = self._inflight.get(key)
+        epoch = access_epoch.current()
+        pending = self._inflight.get((key, epoch))
         if pending is not None:
             return await asyncio.shield(pending)
         fut: asyncio.Future[V] = asyncio.get_running_loop().create_future()
-        self._inflight[key] = fut
+        self._inflight[(key, epoch)] = fut
         try:
             value = await self._fetch(key)
         except BaseException as exc:
@@ -250,11 +263,11 @@ class TtlCache(Generic[K, V]):
             fut.exception()  # retrieved: no "never retrieved" warning when nobody waited
             raise
         else:
-            self._remember(key, value)
+            self._remember(key, value, epoch)
             fut.set_result(value)
             return value
         finally:
-            self._inflight.pop(key, None)
+            self._inflight.pop((key, epoch), None)
 
     def invalidate(self) -> None:
         self._cache.clear()
@@ -263,14 +276,17 @@ class TtlCache(Generic[K, V]):
         """Drops one key: the next ``get`` reads it again."""
         self._cache.pop(key, None)
 
-    def _remember(self, key: K, value: V) -> None:
+    def _remember(self, key: K, value: V, epoch: int | None) -> None:
+        kept = self._cache.get(key)
+        if kept is not None and epoch is not None and kept[2] is not None and kept[2] > epoch:
+            return  # a newer read is kept already
         if len(self._cache) >= self._max and key not in self._cache:
             now = self._clock()
-            for stale in [k for k, (_, exp) in self._cache.items() if exp <= now]:
+            for stale in [k for k, (_, exp, _) in self._cache.items() if exp <= now]:
                 del self._cache[stale]
             if len(self._cache) >= self._max:
                 del self._cache[min(self._cache, key=lambda k: self._cache[k][1])]
-        self._cache[key] = (value, self._clock() + self._ttl)
+        self._cache[key] = (value, self._clock() + self._ttl, epoch)
 
 
 class BackendAgents:
@@ -291,6 +307,30 @@ class BackendAgents:
         except Exception as exc:
             raise AgentLookupError(str(exc)) from exc
         return AgentProfile.from_row(row) if row is not None else None
+
+    async def record_token_use(
+        self, token_id: str, user_id: str, address: str | None, client: str | None, route: str | None,
+    ) -> None:
+        """Keep one use of an API token; when it cannot be kept, the request fails."""
+        try:
+            pool = await self._get_pool()
+            await pool.execute(
+                _TOKEN_USE_SQL, token_id, user_id, (address or "")[:64] or None, (client or "")[:200] or None,
+                (route or "")[:200] or None, timeout=self._timeout,
+            )
+        except Exception as exc:
+            raise AgentLookupError(str(exc)) from exc
+
+    async def epoch(self) -> int:
+        """The count of changes to access (``access_epoch``); unreadable, the request fails."""
+        try:
+            pool = await self._get_pool()
+            value = await pool.fetchval(access_epoch.SQL, timeout=self._timeout)
+        except Exception as exc:
+            raise AgentLookupError(str(exc)) from exc
+        if value is None:
+            raise AgentLookupError("access_epoch has no row")
+        return int(value)
 
     async def user(self, user_id: str) -> UserFlags | None:
         try:
@@ -371,8 +411,9 @@ class BackendAgents:
 class AgentDirectory:
     """Cached agents, users and API tokens, from the backend database.
 
-    A revoked API token or a deactivated user is refused once its cache entry
-    expires, so within ``ttl_sec`` (``api_token_ttl_sec`` for tokens).
+    With the count of changes to access (``fetch_epoch``), read once per request by :meth:`note_epoch`,
+    a revoked API token, a logout, a suspension or a change of rights is in force at the next request;
+    without it (development, tests), once its cache entry expires.
     """
 
     def __init__(
@@ -384,6 +425,8 @@ class AgentDirectory:
         fetch_sign_in_revoked: Callable[[str], Awaitable[bool]] | None = None,
         save_language: Callable[[str, str | None], Awaitable[None]] | None = None,
         fetch_language: Callable[[str], Awaitable[str | None]] | None = None,
+        fetch_epoch: Callable[[], Awaitable[int]] | None = None,
+        record_token_use: RecordTokenUse | None = None,
         ttl_sec: float = 60.0,
         api_token_ttl_sec: float = 30.0,
         close: Callable[[], Awaitable[None]] | None = None,
@@ -393,11 +436,13 @@ class AgentDirectory:
         self._api_tokens: TtlCache[str, ApiTokenRecord | None] | None = (
             TtlCache(fetch_api_token, ttl_sec=api_token_ttl_sec) if fetch_api_token is not None else None
         )
-        # Cached like API tokens: a logout reaches the gateway within ``api_token_ttl_sec``. The cache
-        # is what keeps this to one read per sign-in per half minute rather than one per request.
+        # Cached like API tokens, so most requests make no read for it; a logout moves the count of changes,
+        # which makes the next request read it again.
         self._sign_ins: TtlCache[str, bool] | None = (
             TtlCache(fetch_sign_in_revoked, ttl_sec=api_token_ttl_sec) if fetch_sign_in_revoked is not None else None
         )
+        self._fetch_epoch = fetch_epoch
+        self._record_token_use = record_token_use
         self._close = close
         self._save_language = save_language
         self._fetch_language = fetch_language
@@ -417,6 +462,18 @@ class AgentDirectory:
         await self._save_language(user_id, language)
         self._users.forget(user_id)
         return True
+
+    async def note_epoch(self) -> None:
+        """Read the count of changes to access for this request (``access_epoch``), before any answer."""
+        if self._fetch_epoch is not None:
+            access_epoch.note(await self._fetch_epoch())
+
+    async def token_used(
+        self, token_id: str, user_id: str, *, address: str | None, client: str | None, route: str | None,
+    ) -> None:
+        """Keep one use of an API token (nothing without the backend database)."""
+        if self._record_token_use is not None:
+            await self._record_token_use(token_id, user_id, address, client, route)
 
     async def sign_in_revoked(self, jti: str) -> bool:
         """Whether a logout ended the console sign-in with this ``jti`` (``False`` when it cannot be asked)."""
@@ -474,6 +531,8 @@ def build_agent_directory(settings: object) -> AgentDirectory | None:
         fetch_sign_in_revoked=backend.sign_in_revoked,
         save_language=backend.save_language,
         fetch_language=backend.user_language,
+        fetch_epoch=backend.epoch,
+        record_token_use=backend.record_token_use,
         close=backend.close,
     )
 

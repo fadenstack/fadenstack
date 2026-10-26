@@ -305,8 +305,10 @@ class RbacDAO:
                     .on_conflict_do_nothing(),
                 )
         await self.session.flush()
-        # Re-fetch to refresh permissions relationship
-        result = await self.session.execute(select(Role).where(Role.id == role_id))
+        # Read again, past the session's copy, whose permissions are those from before
+        result = await self.session.execute(
+            select(Role).where(Role.id == role_id).execution_options(populate_existing=True),
+        )
         return result.scalar_one()
 
     async def delete_role(self, role_id: uuid.UUID) -> bool:

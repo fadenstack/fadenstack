@@ -51,6 +51,7 @@ export default [
     route("/admin/users", "pages/admin/UsersPage.tsx"),
     route("/admin/roles", "pages/admin/RolesPage.tsx"),
     route("/admin/groups", "pages/admin/GroupsPage.tsx"),
+    route("/admin/api-tokens", "pages/admin/ApiTokensPage.tsx"),
     route("/admin/auth-providers", "pages/admin/AuthProvidersPage.tsx"),
     route("/admin/llm/providers", "pages/admin/llm/ProvidersPage.tsx"),
     // The models pages moved into the marketplace; old links land there.

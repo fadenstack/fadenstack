@@ -9,7 +9,7 @@ from __future__ import annotations
 import uuid
 
 from pydantic import BaseModel
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_backend.db.models.groups import Group
@@ -60,11 +60,13 @@ def parse_ids(ids: str) -> tuple[list[uuid.UUID], list[uuid.UUID]]:
 
 
 async def find_principals(
-    session: AsyncSession, *, q: str | None = None, ids: str | None = None,
+    session: AsyncSession, *, q: str | None = None, ids: str | None = None, exact: bool = False,
 ) -> list[PrincipalOption]:
     """Groups, then users: those named by *ids*, else those matching *q* (active users only).
 
-    *q* is taken literally, and shorter than ``MIN_QUERY`` it finds nobody.
+    *q* is taken literally, and shorter than ``MIN_QUERY`` it finds nobody. With *exact*, *q* finds only the
+    person with that whole address or the team with that whole name (case aside): for those who check access
+    but grant nothing, who need no list of everyone (GDPR Art. 5(1)(c), 25(2)).
     """
     users: list[User] = []
     groups: list[Group] = []
@@ -74,6 +76,14 @@ async def find_principals(
             users = list((await session.execute(select(User).where(User.id.in_(wanted_users)))).scalars())
         if wanted_groups:
             groups = list((await session.execute(select(Group).where(Group.id.in_(wanted_groups)))).scalars())
+    elif q and exact:
+        wanted = q.strip().lower()
+        users = list((await session.execute(
+            select(User).where(User.is_active.is_(True), func.lower(User.email) == wanted),
+        )).scalars())
+        groups = list(
+            (await session.execute(select(Group).where(func.lower(Group.name) == wanted))).scalars(),
+        )
     elif q and len(q.strip()) >= MIN_QUERY:
         pattern = contains_pattern(q.strip())
         users = list(

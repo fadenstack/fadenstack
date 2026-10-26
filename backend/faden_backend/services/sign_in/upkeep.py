@@ -1,8 +1,8 @@
 """The hourly upkeep of accounts that sign in with an outside provider.
 
 - **Inactive** (CIS v8 5.3): an account linked to a provider whose policy has ``inactive_days``, and not
-  used for that long, is suspended. Used means a sign-in with any of its providers, or one of its agents
-  renewing its sign-in. Personal API tokens do not record their use, so they do not count.
+  used for that long, is suspended. Used means a sign-in with any of its providers, one of its agents
+  renewing its sign-in, or a request with one of its API tokens (``api_token_uses``).
 - **Gone** (CIS v8 6.2, BSI ORP.4.A2): for a directory provider the module says whom it still has. The
   disabled and the missing are suspended; for the others the memberships the provider keeps follow the
   directory, as they would at a sign-in.
@@ -27,7 +27,7 @@ from sqlalchemy import func, select, text
 from faden_backend.db.models.agents import AgentRefreshToken
 from faden_backend.db.models.oauth import OAuthAccount
 from faden_backend.db.models.users import User
-from faden_backend.services import provisioning
+from faden_backend.services import api_token_uses, provisioning
 from faden_backend.services.sign_in import accounts, module
 
 if TYPE_CHECKING:
@@ -81,6 +81,7 @@ async def _inactive(session: AsyncSession, provider: ProviderUpkeep, report: Rep
         .where(AgentRefreshToken.user_id == User.id)
         .scalar_subquery()
     )
+    last_token = api_token_uses.last_token_use_of_user()
     # greatest() leaves out NULLs; an account with no recorded use at all is left alone.
     found = await session.scalars(
         select(User)
@@ -88,7 +89,7 @@ async def _inactive(session: AsyncSession, provider: ProviderUpkeep, report: Rep
             User.is_active.is_(True),
             User.is_superuser.is_(False),
             User.id.in_(select(OAuthAccount.user_id).where(OAuthAccount.oauth_name == provider.key)),
-            func.greatest(last_sign_in, last_agent) < cutoff,
+            func.greatest(last_sign_in, last_agent, last_token) < cutoff,
         ),
     )
     for user in found.all():

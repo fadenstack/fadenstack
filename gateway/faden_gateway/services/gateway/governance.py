@@ -207,9 +207,14 @@ class ToolRuleCheck:
 
 
 class ToolRules:
-    """Each tenant's tool rules, read once per 30 s per worker."""
+    """Each tenant's tool rules, read at each check by default.
 
-    def __init__(self, ttl_sec: float = 30.0) -> None:
+    They decide whether a tool may run, so a rule changed holds at the next call in every worker (ASVS 5.0
+    V8.3.2); they live in the gateway's own database, which the count of changes to access does not cover.
+    A *ttl_sec* above 0 keeps them that long (tests).
+    """
+
+    def __init__(self, ttl_sec: float = 0.0) -> None:
         self.ttl_sec = ttl_sec
         self._cache: dict[str, tuple[float, tuple[Rule, ...]]] = {}
 

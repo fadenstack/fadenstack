@@ -110,8 +110,9 @@ So erstellen Sie eine: Öffnen Sie **Zugriffskontrolle → Gruppen**, wählen Si
 einen Namen, kreuzen Sie unter **Rollen zuweisen** ihre Rollen an, speichern Sie sie, und wählen Sie dann
 **Mitglieder verwalten** und **Mitglieder hinzufügen**.
 
-Wenn Sie jemanden aus einer Gruppe entfernen, verliert die Person die Rollen der Gruppe. Mit der Gruppe geteilte
-Skills erreichen ihre Chats innerhalb einer Minute nicht mehr.
+Wenn Sie jemanden aus einer Gruppe entfernen, verliert die Person die Rollen der Gruppe, und mit der Gruppe
+geteilte Skills erreichen ihre Chats sofort nicht mehr. Der Eintritt in eine Gruppe oder der Austritt meldet die
+Person ab, wie jede Änderung ihrer Rechte (siehe [Anmeldungen und API-Tokens](#sign-ins-and-api-tokens)).
 
 ## Entwicklermodus {#developer-mode}
 
@@ -129,7 +130,7 @@ kann zu einem Zeitpunkt enden, den Sie unter **Endet** festlegen. Lassen Sie ihn
 
 | | |
 |---|---|
-| **Eine Anmeldung** | gilt 7 Tage; danach melden sich die Benutzer erneut an. **Abmelden** beendet sie sofort. Eine Passwortänderung oder ein Zurücksetzen, eine Sperre und eine entzogene Rolle beenden alle Anmeldungen einer Person; das Gateway bemerkt es innerhalb einer halben Minute. |
+| **Eine Anmeldung** | gilt 7 Tage; danach melden sich die Benutzer erneut an. **Abmelden** beendet sie sofort. Eine Passwortänderung oder ein Zurücksetzen, eine Sperre und jede Änderung der Rechte einer Person beenden sofort alle ihre Anmeldungen, auch die der Agenten auf ihren Geräten: eine Rolle gegeben oder entzogen, der Eintritt in eine Gruppe oder der Austritt, eine Änderung an den Rollen ihrer Gruppen oder an den Berechtigungen ihrer Rollen, das Administratorrecht gegeben oder entzogen. Sie meldet sich erneut an. Jede wird im Audit-Protokoll festgehalten (`user.sign_ins.ended`, mit dem Grund). |
 | **API-Tokens** | erlauben Skripten und Anwendungen, die Modelle über die API zu nutzen. Jede Person erstellt ihre eigenen unter **Profil verwalten** (oder **Mein Profil** in der Konsole) und kann sie dort widerrufen. |
 | **Jedes API-Token läuft ab** | nach 90 Tagen, sofern die Person, die es erstellt, keine andere Gültigkeitsdauer wählt, und spätestens nach einem Jahr. |
 | **Agenten** (der Browser-Agent, die Office-Add-ins) | haben auf jedem Gerät eigene Anmeldungen, zu sehen auf dem Tab **Aktivität** eines Agenten (siehe [Agenten und Add-ins](agents.md)). |
@@ -138,7 +139,15 @@ kann zu einem Zeitpunkt enden, den Sie unter **Endet** festlegen. Lassen Sie ihn
 
 Das Token einer anderen Person widerrufen: Wählen Sie unter **Zugriffskontrolle → Benutzer** in deren Zeile
 **API-Tokens** (das Schlüssel-Symbol) und dann **Widerrufen**. Anwendungen, die ein widerrufenes Token verwenden,
-funktionieren innerhalb einer Minute nicht mehr.
+funktionieren sofort nicht mehr.
+
+Jede Anfrage mit einem API-Token wird festgehalten: wann, von welcher Adresse, mit welcher Anwendung und auf
+welchem Weg; nie, was gesendet wurde. **Zugriffskontrolle → API-Tokens** listet die Tokens aller Personen mit
+Inhaber und letzter Nutzung; **Nutzungen** zeigt die letzten 100 Nutzungen eines Tokens. Jede Person sieht
+dasselbe für ihre eigenen Tokens unter **Profil verwalten**. Die Nutzung eines Tokens zählt auch als Aktivität:
+Die Regel eines Anbieters, nach Tagen ohne Nutzung zu sperren, sperrt so niemanden, der nur über Tokens arbeitet.
+Die Nutzungen werden 90 Tage aufbewahrt und dann gelöscht (`FADEN_BACKEND_API_TOKEN_USE_RETENTION_DAYS` auf dem
+Server; 0 behält sie).
 
 ![Einstellungen → Allgemein: „Sign-in lifetime (s)“, „API token lifetime (s)“ und „Longest API token lifetime (s)“](../images/administer/settings-sign-in.png)
 
@@ -194,7 +203,7 @@ wenn sich kein Administrator anmelden kann).
    Personen-Symbol mit einem Strich hindurch).
 2. Bestätigen Sie.
 
-Ihre Anmeldungen, API-Tokens und Agenten funktionieren innerhalb einer Minute nicht mehr. Nichts von ihr wird
+Ihre Anmeldungen, API-Tokens und Agenten funktionieren sofort nicht mehr. Nichts von ihr wird
 gelöscht: **Wieder freigeben** an derselben Stelle gibt ihr den Zugang zurück, die bisherigen Anmeldungen bleiben
 aber beendet: Sie meldet sich neu an. Sie können weder sich selbst sperren noch den letzten Superuser.
 

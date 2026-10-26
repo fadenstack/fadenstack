@@ -170,6 +170,29 @@ class ApiTokenDTO(BaseModel):
     created_at: datetime
     expires_at: datetime | None = None
     revoked_at: datetime | None = None
+    #: Its latest use within the kept period: when, from which address, with which client, on which route.
+    last_used_at: datetime | None = None
+    last_used_address: str | None = None
+    last_used_client: str | None = None
+    last_used_route: str | None = None
+    #: Its uses in the last 30 days.
+    recent_uses: int = 0
+
+
+class AdminApiTokenDTO(ApiTokenDTO):
+    """An API token in the overview of everyone's: with its owner."""
+
+    user_id: uuid.UUID
+    email: str
+
+
+class ApiTokenUseDTO(BaseModel):
+    """One use of an API token."""
+
+    at: datetime
+    address: str | None = None
+    client: str | None = None
+    route: str | None = None
 
 
 class UpdateUserUsageGroupRequest(BaseModel):

@@ -478,6 +478,12 @@
       "action_create": "创建组并指定其角色",
       "action_members": "添加或移除成员"
     },
+    "api_tokens": {
+      "title": "API 令牌",
+      "description": "所有人的 API 令牌：每个令牌属于谁，以及何时、从何处、用什么使用过。",
+      "action_uses": "查看令牌的使用记录",
+      "action_revoke": "撤销令牌"
+    },
     "auth_providers": {
       "title": "登录提供商",
       "description": "让用户使用其组织的账户登录：通过 OpenID Connect、SAML 或目录（LDAP、Active Directory）。",

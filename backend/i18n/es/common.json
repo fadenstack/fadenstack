@@ -103,7 +103,8 @@
     "agents": "Agentes",
     "governance": "Gobernanza",
     "updates": "Actualizaciones",
-    "check_content": "Comprobar contenido"
+    "check_content": "Comprobar contenido",
+    "api_tokens": "Tokens de API"
   },
   "auth": {
     "logout": "Cerrar sesion",
@@ -4288,6 +4289,7 @@
       "check_title": "Comprobar el acceso de alguien",
       "check_help": "Si un usuario puede usar el agente, y por qué.",
       "check_placeholder": "Buscar un usuario…",
+      "check_placeholder_exact": "La dirección de correo completa de la persona…",
       "allowed": "{{who}} puede usar este agente.",
       "refused": "{{who}} no puede usar este agente.",
       "unenforced_hint": "Solo sus responsables pueden usar este agente: usa ajustes que necesitan Fadenstack Enterprise ({{names}}).",
@@ -4659,5 +4661,30 @@
     },
     "action": "Inicios de sesión vinculados",
     "of_title": "Inicios de sesión vinculados de {{email}}"
+  },
+  "api_tokens": {
+    "title": "Tokens de API",
+    "description": "Los tokens de API de todas las personas, con quién es su propietario y cómo se usa. Cada solicitud hecha con un token queda registrada: cuándo, desde qué dirección, con qué aplicación y en qué ruta.",
+    "owner": "Propietario",
+    "name": "Token",
+    "last_used": "Último uso",
+    "state": "Estado",
+    "state_active": "Activo",
+    "show_uses": "Usos",
+    "show_ended": "Mostrar revocados y caducados",
+    "search": "Filtrar por propietario, token o dirección",
+    "none": "No hay tokens de API.",
+    "never_used": "Sin uso reciente",
+    "last_use": "{{when}} desde {{address}}",
+    "unknown_address": "una dirección desconocida",
+    "recent_uses": "usos en 30 días: {{count}}",
+    "uses_title": "Usos de {{name}}",
+    "uses_none": "No hay usos registrados.",
+    "uses_kept": "Los últimos 100 usos, el más reciente primero. Los usos se conservan 90 días.",
+    "col_when": "Cuándo",
+    "col_address": "Dirección",
+    "col_client": "Aplicación",
+    "col_route": "Ruta",
+    "revoke_confirm": "¿Revocar {{name}} de {{email}}? Las aplicaciones que lo usan dejan de funcionar al instante."
   }
 }

@@ -169,7 +169,7 @@ found something, not a measurement of how much personal data was successfully re
 4. Write the **Message to the user**: what people are told when the rule applies.
 5. Set the **Priority**. Lower is tried first, and the first rule that matches decides, so a rule with a
    lower number can make an exception to a broader one.
-6. Save it. Rules apply within 30 seconds.
+6. Save it. Rules apply at once.
 
 Without rules, tools run as the tool mode says.
 
@@ -201,7 +201,7 @@ With Enterprise, **Agents → Governance → Tool mode limits** sets the most a 
 **Everyone**, **A team**, **An agent** or **A person**: choose who it is **For**, pick the team, agent or person,
 choose **At most** and select **Set limit**. Change a limit in its row, or remove it. Several limits can apply
 to one chat (everyone's, the person's teams', the agent's, the person's own): the narrowest wins. People see
-that their chat is capped, and an agent's applications get its limit too. Changes apply within 30 seconds and
+that their chat is capped, and an agent's applications get its limit too. Changes apply at once and
 are recorded in the audit log.
 
 Without a valid Enterprise licence the limits cannot be applied, so tools in every chat are read-only until the

@@ -14,7 +14,7 @@ from faden_backend.db.models.notifications import (
     NotificationAlertState,
     NotificationOutbox,
 )
-from faden_backend.services.extensions import mail_available
+from faden_backend.services.extensions import mail_available, registry
 from faden_backend.settings import settings
 
 log = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ class NotificationService:
         if not mail_available():
             return False
         now = datetime.now(tz=UTC)
-        cooldown = timedelta(minutes=settings.mailer_alert_cooldown_minutes)
+        cooldown = timedelta(minutes=settings.alert_cooldown_minutes)
 
         result = await self._session.execute(
             select(NotificationAlertState).where(
@@ -65,10 +65,9 @@ class NotificationService:
             log.debug("Alert %s suppressed by cooldown.", fingerprint)
             return False
 
-        # Resolve recipients.
-        recipients = settings.mailer_admin_recipients
-        if isinstance(recipients, str):
-            recipients = [r.strip() for r in recipients.split(",") if r.strip()]
+        # Who gets alerts is the mail extension's to say: core keeps no addresses for it.
+        sender = registry.mail_sender
+        recipients = sender.admin_recipients() if sender is not None else []
         if not recipients:
             log.warning("No admin recipients configured — alert '%s' dropped.", subject)
             return False

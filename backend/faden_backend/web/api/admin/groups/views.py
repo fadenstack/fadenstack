@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from typing import Annotated
 
@@ -10,10 +11,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
+from faden_backend.db.dao.audit_dao import AuditDAO
 from faden_backend.db.dao.groups_dao import GroupDAO
 from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.containers import AuditResult
 from faden_backend.db.models.groups import Group
 from faden_backend.db.models.users import User
+from faden_backend.services.rights import members_of, rights_changed
 from faden_backend.services.skills.client import forget_principal
 from faden_backend.web.api.admin.dependencies import require_superuser
 from faden_backend.web.api.admin.groups.schema import (
@@ -26,6 +30,28 @@ from faden_backend.web.api.admin.groups.schema import (
 from faden_backend.web.api.admin.users.schema import PermissionDTO, RoleDTO
 
 router = APIRouter()
+
+
+async def _log(
+    session: AsyncSession, action: str, group_id: uuid.UUID, admin: User, **details: object,
+) -> None:
+    """Record a change to a team: its roles and members decide what people may do (ASVS 5.0 V16.3.3)."""
+    await AuditDAO(session).log(
+        action=action, target_type="group", target_id=str(group_id), result=AuditResult.ALLOW,
+        actor_id=admin.id, severity="high", metadata_json=json.dumps(details, default=str),
+    )
+
+
+async def _members_changed(session: AsyncSession, group: Group, before: set[uuid.UUID], admin: User) -> None:
+    """Record who joined and left *group*, and end their sign-ins: their rights changed (services/rights)."""
+    after = await members_of(session, group.id)
+    added, removed = sorted(after - before), sorted(before - after)
+    if not added and not removed:
+        return
+    await _log(session, "team.members.set", group.id, admin, name=group.name, added=added, removed=removed)
+    await rights_changed(
+        session, [*added, *removed], cause="team.members", actor_id=admin.id, team=group.name,
+    )
 
 
 def _role_to_dto(role) -> RoleDTO:
@@ -101,6 +127,10 @@ async def create_group(
             detail=f"Group '{payload.name}' already exists",
         )
     group = await group_dao.create_group(payload.name, payload.description, payload.role_ids)
+    await _log(
+        group_dao.session, "team.create", group.id, _user, name=group.name,
+        roles=sorted(role.name for role in group.roles),
+    )
     return _group_to_dto(group)
 
 
@@ -115,12 +145,21 @@ async def update_group(
     existing = await group_dao.get_group_by_id(group_id)
     if existing is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
+    had = {role.id for role in existing.roles}
     group = await group_dao.update_group(
         group_id,
         name=payload.name,
         description=payload.description,
         role_ids=payload.role_ids,
     )
+    roles = sorted(role.name for role in group.roles)  # type: ignore[union-attr]
+    await _log(group_dao.session, "team.update", group_id, _user, name=existing.name, roles=roles)
+    if payload.role_ids is not None and set(payload.role_ids) != had:
+        # Its members have other rights now (services/rights.py).
+        members = await members_of(group_dao.session, group_id)
+        await rights_changed(
+            group_dao.session, members, cause="team.roles", actor_id=_user.id, team=existing.name,
+        )
     count = await group_dao.count_group_members(group_id)
     return _group_to_dto(group, member_count=count)  # type: ignore[arg-type]
 
@@ -135,7 +174,12 @@ async def delete_group(
     existing = await group_dao.get_group_by_id(group_id)
     if existing is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
+    members = await members_of(group_dao.session, group_id)
+    await _log(group_dao.session, "team.delete", group_id, _user, name=existing.name, members=len(members))
     await group_dao.delete_group(group_id)
+    await rights_changed(
+        group_dao.session, members, cause="team.deleted", actor_id=_user.id, team=existing.name,
+    )
     await forget_principal("group", str(group_id))
 
 
@@ -175,7 +219,9 @@ async def set_group_members(
     group = await group_dao.get_group_by_id(group_id)
     if group is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
+    before = await members_of(session, group_id)
     await group_dao.set_group_members(group_id, payload.user_ids)
+    await _members_changed(session, group, before, _user)
 
     member_ids = await group_dao.get_group_members(group_id)
     if not member_ids:
@@ -198,7 +244,9 @@ async def add_group_members(
     group = await group_dao.get_group_by_id(group_id)
     if group is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
+    before = await members_of(group_dao.session, group_id)
     await group_dao.add_members(group_id, payload.user_ids)
+    await _members_changed(group_dao.session, group, before, _user)
 
 
 @router.delete(
@@ -216,4 +264,6 @@ async def remove_group_member(
     group = await group_dao.get_group_by_id(group_id)
     if group is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
+    before = await members_of(group_dao.session, group_id)
     await group_dao.remove_member(group_id, user_id)
+    await _members_changed(group_dao.session, group, before, _user)

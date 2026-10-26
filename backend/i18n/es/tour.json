@@ -478,6 +478,12 @@
       "action_create": "Crear un grupo con sus roles",
       "action_members": "Añadir o quitar miembros"
     },
+    "api_tokens": {
+      "title": "Tokens de API",
+      "description": "Los tokens de API de todos: de quién es cada uno, y cuándo, desde dónde y con qué se usó.",
+      "action_uses": "Ver los usos de un token",
+      "action_revoke": "Revocar un token"
+    },
     "auth_providers": {
       "title": "Proveedores de inicio de sesión",
       "description": "Permite que las personas inicien sesión con la cuenta de su organización: mediante OpenID Connect, SAML o un directorio (LDAP, Active Directory).",

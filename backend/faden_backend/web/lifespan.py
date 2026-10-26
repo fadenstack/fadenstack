@@ -44,6 +44,7 @@ from faden_backend.services.rabbit.lifespan import init_rabbit, shutdown_rabbit
 from faden_backend.services.system_settings.runtime_mapping import (
     get_runtime_secret_key_map,
     get_runtime_value_key_map,
+    runtime_target,
     register_runtime_secret_key,
     register_runtime_value_key,
 )
@@ -64,14 +65,14 @@ except ImportError:  # pragma: no cover
     _EE_AVAILABLE = False
 # ──────────────────────────────────────────────────────────────────
 
-def register_hydration_key(key: str, attr: str) -> None:
-    """Register an additional runtime value key for DB hydration (used by EE plugins)."""
-    register_runtime_value_key(key, attr)
+def register_hydration_key(key: str, attr: str, *, target: Any = None) -> None:
+    """Register an additional runtime value key for DB hydration (used by EE plugins); onto *target*."""
+    register_runtime_value_key(key, attr, target=target)
 
 
-def register_hydration_secret(key: str, attr: str) -> None:
-    """Register an additional runtime secret key for DB hydration (used by EE plugins)."""
-    register_runtime_secret_key(key, attr)
+def register_hydration_secret(key: str, attr: str, *, target: Any = None) -> None:
+    """Register an additional runtime secret key for DB hydration (used by EE plugins); onto *target*."""
+    register_runtime_secret_key(key, attr, target=target)
 
 
 def _setup_db(app: FastAPI) -> None:  # pragma: no cover
@@ -280,7 +281,7 @@ async def _load_runtime_settings_from_db(app: FastAPI) -> None:  # pragma: no co
                 if isinstance(value, str) and not value.strip():
                     continue
                 log.debug("DB hydration: %s -> %s = %r", db_key, attr_name, value)
-                object.__setattr__(settings, attr_name, value)
+                object.__setattr__(runtime_target(db_key), attr_name, value)
         except Exception:
             log.exception("Failed to load runtime value settings from DB.")
 
@@ -304,7 +305,7 @@ async def _load_runtime_settings_from_db(app: FastAPI) -> None:  # pragma: no co
                 except Exception:
                     log.exception("Failed to decrypt secret '%s'.", db_key)
                     continue
-                object.__setattr__(settings, attr_name, plaintext)
+                object.__setattr__(runtime_target(db_key), attr_name, plaintext)
         except Exception:
             log.exception("Failed to load runtime secret settings from DB.")
 
@@ -413,6 +414,13 @@ async def _node_command_reaper_loop(app: FastAPI) -> None:
 
                     if dropped := await prune_sent_notifications(session):
                         log.info("Deleted %d sent notification(s) older than a week", dropped)
+                    # Each use of an API token: kept for the retention period (GDPR Art. 5(1)(e)).
+                    from faden_backend.services import api_token_uses  # noqa: PLC0415
+
+                    days = settings.api_token_use_retention_days
+                    if dropped := await api_token_uses.delete_older_than(session, days):
+                        await session.commit()
+                        log.info("Deleted %d API token use(s) older than %d days", dropped, days)
         except asyncio.CancelledError:
             raise
         except Exception:

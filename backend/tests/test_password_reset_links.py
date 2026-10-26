@@ -199,3 +199,18 @@ async def test_the_mailed_reset_link_carries_its_token_in_the_fragment(
     ))).scalar_one()
     url = mail.payload_json["reset_url"]
     assert "/reset-password#token=" in url and "?" not in url, url
+
+
+async def test_the_mailed_reset_link_starts_where_mail_says_not_where_the_request_says(
+    client: AsyncClient, dbsession: AsyncSession, mail_on: RecordingMailSender,
+) -> None:
+    """A forged Host must not send the link to someone else's site (OWASP: password reset poisoning)."""
+    user = await _person(dbsession)
+    r = await client.post(
+        "/api/auth/forgot-password", json={"email": user.email}, headers={"Host": "evil.example"},
+    )
+    assert r.status_code == 202
+    mail = (await dbsession.execute(select(NotificationOutbox).where(
+        NotificationOutbox.kind == "password_reset", NotificationOutbox.payload_json["to_email"].astext == user.email,
+    ))).scalar_one()
+    assert mail.payload_json["reset_url"].startswith(f"{mail_on.base}/reset-password#token=")

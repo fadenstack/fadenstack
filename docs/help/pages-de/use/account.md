@@ -104,7 +104,9 @@ Die Anwendung braucht außerdem die Adresse der API, die Ihnen Ihr Administrator
 1. Wählen Sie neben dem Token **Widerrufen**.
 2. Bestätigen Sie mit **Widerrufen**.
 
-Anwendungen, die das Token nutzen, funktionieren innerhalb einer Minute nicht mehr. Widerrufen Sie ein Token, sobald es nicht mehr gebraucht wird oder wenn es jemand anderes gesehen haben könnte.
+Anwendungen, die das Token nutzen, funktionieren sofort nicht mehr. Widerrufen Sie ein Token, sobald es nicht mehr gebraucht wird oder wenn es jemand anderes gesehen haben könnte.
+
+Jedes Token zeigt, wann es zuletzt genutzt wurde, von welcher Adresse und mit welcher Anwendung; **Nutzungen** listet seine letzten Nutzungen. Jede Nutzung wird festgehalten, und Ihre Administratoren sehen sie auch: Eine Nutzung, die Sie nicht kennen, ist ein Grund, das Token zu widerrufen.
 
 ??? info "Wann ein Token sonst nicht mehr funktioniert"
     Ihr Administrator kann Ihre Tokens ebenfalls widerrufen. Wenn Ihr Konto deaktiviert wird, funktionieren auch Ihre Tokens nicht mehr.

@@ -3,7 +3,8 @@
 The backend keeps them (its ``tenant_restrictions`` table; ``faden_backend/services/tenant_restrictions.py``
 says what each name means), and an installed extension that enforces one lists it in
 ``registry.tenant_restrictions``. The gateway reads a tenant's names over a small pool of its own, kept for
-:data:`TTL_S` seconds, and fails closed for each name nothing enforces:
+:data:`TTL_S` seconds at most and read again once the count of changes to access moved (``access_epoch``), and
+fails closed for each name nothing enforces:
 
 - ``tool_mode_ceilings``: every chat's tool mode is at most ``read_only`` (a ceiling, ``tool_classes``).
 
@@ -19,6 +20,7 @@ import time
 from typing import Any
 
 from faden_gateway.services.extensions import ExtensionRegistry
+from faden_gateway.services.gateway import access_epoch
 from faden_gateway.services.gateway.tool_classes import CeilingContext, ToolMode
 
 logger = logging.getLogger(__name__)
@@ -39,18 +41,19 @@ class TenantRestrictions:
         self._timeout = timeout_s
         self._pool: Any = None
         self._lock = asyncio.Lock()
-        self._kept: dict[str, tuple[frozenset[str], float]] = {}
+        self._kept: dict[str, tuple[frozenset[str], float, int | None]] = {}
 
     async def names(self, tenant_id: str) -> frozenset[str]:
         """The names *tenant_id* is marked with (raises when they cannot be read)."""
         now = time.monotonic()
         kept = self._kept.get(tenant_id)
-        if kept is not None and kept[1] > now:
+        if kept is not None and kept[1] > now and access_epoch.usable(kept[2]):
             return kept[0]
+        epoch = access_epoch.current()
         pool = await self._get_pool()
         rows = await pool.fetch(_SQL, tenant_id, timeout=self._timeout)
         names = frozenset(str(row["name"]) for row in rows)
-        self._kept[tenant_id] = (names, now + TTL_S)
+        self._kept[tenant_id] = (names, now + TTL_S, epoch)
         return names
 
     async def tool_mode_ceiling(self, ctx: CeilingContext) -> ToolMode | None:

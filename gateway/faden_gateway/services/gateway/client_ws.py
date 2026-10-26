@@ -31,8 +31,9 @@ What changed from the first version, and why:
   fail with a clear error.
 - **Checked while connected.** The token was checked once, at connect: a
   revoked or expired token, a suspended person, an agent whose access was
-  taken away went on getting calls for hours. The caller is checked again
-  every ``RECHECK_SEC``; when it may no longer be served, the device gets an
+  taken away went on getting calls for hours. The caller is checked again at
+  each message it sends and every ``RECHECK_SEC`` between them (a change of
+  access is seen at once: ``access_epoch``); when it may no longer be served, the device gets an
   ``error`` saying why and the channel closes (4401: the token is no good,
   4403: the caller may not). A device renews its token in place with
   ``token_refresh`` -- an agent's lasts minutes -- as the same caller only.
@@ -686,6 +687,10 @@ async def handle_client_websocket(
                 if not await _refresh_token(ws, msg, caller, conn, authenticate):
                     return
                 continue
+            # Each message is a request: the caller is checked as of now (ASVS 5.0 V7.4.1, V8.3.2), at the
+            # cost of one read of the count of changes to access when nothing changed.
+            if not await _still_allowed(ws, caller, conn, authenticate):
+                return
             await _dispatch(conn, msg, dao, hub)
     except TimeoutError:
         with contextlib.suppress(Exception):

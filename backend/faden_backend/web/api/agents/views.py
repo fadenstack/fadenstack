@@ -256,12 +256,15 @@ async def list_principals(
     """Users and teams to grant an agent to, make its members or check the access of.
 
     For those who manage agents or are members of one (maintainers; e.g. auditors, for the access check).
-    ``q`` searches e-mail addresses and group names; ``ids`` (``user:<id>,group:<id>``) names them.
+    ``q`` searches e-mail addresses and group names; ``ids`` (``user:<id>,group:<id>``) names them. Those who
+    grant nothing (auditors) name a person by their whole address and a team by its whole name: they check
+    access one person at a time and need no list of everyone (GDPR Art. 5(1)(c), 25(2)).
     """
     rights = [await _has(rbac, user, action) for action in ("read", "create", "manage")]
-    if not any(rights) and not await dao.member_of_any(user.id, registry.member_roles):
+    grants = any(rights) or await dao.maintains_any(user.id)
+    if not grants and not await dao.member_of_any(user.id, registry.member_roles):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not manage agents.")
-    return await find_principals(dao.session, q=q, ids=ids)
+    return await find_principals(dao.session, q=q, ids=ids, exact=not grants)
 
 
 @router.get("/templates", response_model=list[AgentTemplateDTO], name="agent_templates")
@@ -577,13 +580,24 @@ async def explain_access(
     user: Annotated[User, Depends(current_active_user)],
     dao: AgentsDAO = Depends(),
     rbac: RbacDAO = Depends(),
+    audit: AuditDAO = Depends(),
 ) -> AccessDTO:
-    """Whether a user may use the agent, and why."""
+    """Whether a user may use the agent, and why.
+
+    Each check is recorded, who checked whom (GDPR Art. 5(2): a look at someone's access is accountable).
+    """
     agent = await _inspected_agent(dao, rbac, agent_ref, user)
     target = await dao.session.get(User, user_id)
     if target is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     decision = await access.decide(dao, agent, target)
+    await _audit(
+        audit, user, "agent.access.check", str(agent.id),
+        {
+            "checked": str(target.id), "email": target.email, "allowed": decision.allowed,
+            "code": decision.code,
+        },
+    )
     return AccessDTO(allowed=decision.allowed, code=decision.code, detail=decision.detail)
 
 

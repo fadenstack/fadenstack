@@ -46,6 +46,9 @@ from faden_gateway.services.gateway.auth import (
     caller_context,
     get_agent_route_claims,
     get_auth_context_from_claims,
+    record_token_use,
+    request_route,
+    sign_in_ended_before,
 )
 from faden_gateway.services.gateway.errors import GatewayError, error_from, error_response, validation_message
 from faden_gateway.services.gateway.pii_policy import VALID_EGRESS_MODES, mode_switch_allowed
@@ -135,7 +138,13 @@ async def agent_request(
         get_auth_context_from_claims(claims, token) if agent_token
         else await caller_context(request.app, claims, token)
     )
+    await record_token_use(
+        request.app, claims, address=request.client.host if request.client else None,
+        client=request.headers.get("user-agent"), route=request_route(request.scope, request.method),
+    )
     try:
+        if agent_token:
+            await directory.note_epoch()  # the other tokens' check read it (caller_context)
         profile = await directory.agent(auth.tenant_id, agent)
         if agent_token and (profile is None or f"agent:{profile.id}" not in _audiences(claims)):
             # The cache may hold an agent deleted since and made again under the same address, or miss one
@@ -151,6 +160,10 @@ async def agent_request(
         ) from exc
     if profile is None:
         raise GatewayError(status_code=404, message=f"No agent '{agent}'.", code="agent_not_found")
+    if agent_token and sign_in_ended_before(claims, user):
+        raise GatewayError(
+            status_code=401, message="This sign-in has ended. Sign in again.", code="sign_in_ended",
+        )
 
     if agent_token and f"agent:{profile.id}" not in _audiences(claims):
         raise GatewayError(

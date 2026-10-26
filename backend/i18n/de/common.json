@@ -103,7 +103,8 @@
     "agents": "Agenten",
     "governance": "Governance",
     "updates": "Updates",
-    "check_content": "Inhalte prüfen"
+    "check_content": "Inhalte prüfen",
+    "api_tokens": "API-Tokens"
   },
   "auth": {
     "logout": "Abmelden",
@@ -4288,6 +4289,7 @@
       "check_title": "Zugriff prüfen",
       "check_help": "Ob ein Nutzer den Agenten nutzen darf, und warum.",
       "check_placeholder": "Nutzer suchen…",
+      "check_placeholder_exact": "Die ganze E-Mail-Adresse der Person…",
       "allowed": "{{who}} darf diesen Agenten nutzen.",
       "refused": "{{who}} darf diesen Agenten nicht nutzen.",
       "unenforced_hint": "Nur seine Betreuer können diesen Agenten nutzen: Er verwendet Einstellungen, die Fadenstack Enterprise benötigen ({{names}}).",
@@ -4659,5 +4661,30 @@
     },
     "action": "Verknüpfte Anmeldungen",
     "of_title": "Verknüpfte Anmeldungen von {{email}}"
+  },
+  "api_tokens": {
+    "title": "API-Tokens",
+    "description": "Die API-Tokens aller Personen, mit wem jedes gehört und wie es genutzt wird. Jede Anfrage mit einem Token wird festgehalten: wann, von welcher Adresse, mit welcher Anwendung, auf welchem Weg.",
+    "owner": "Inhaber",
+    "name": "Token",
+    "last_used": "Zuletzt genutzt",
+    "state": "Status",
+    "state_active": "Aktiv",
+    "show_uses": "Nutzungen",
+    "show_ended": "Widerrufene und abgelaufene zeigen",
+    "search": "Nach Inhaber, Token oder Adresse filtern",
+    "none": "Keine API-Tokens.",
+    "never_used": "In letzter Zeit nicht genutzt",
+    "last_use": "{{when}} von {{address}}",
+    "unknown_address": "einer unbekannten Adresse",
+    "recent_uses": "Nutzungen in 30 Tagen: {{count}}",
+    "uses_title": "Nutzungen von {{name}}",
+    "uses_none": "Keine Nutzungen festgehalten.",
+    "uses_kept": "Die letzten 100 Nutzungen, die neueste zuerst. Nutzungen werden 90 Tage aufbewahrt.",
+    "col_when": "Wann",
+    "col_address": "Adresse",
+    "col_client": "Anwendung",
+    "col_route": "Weg",
+    "revoke_confirm": "{{name}} von {{email}} widerrufen? Anwendungen, die es nutzen, funktionieren sofort nicht mehr."
   }
 }

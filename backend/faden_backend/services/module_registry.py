@@ -46,6 +46,8 @@ class ModuleDef:
 
     # ── Container-type fields ─────────────────────────────────
     settings_flag: str | None = None
+    #: The object that holds ``settings_flag``: an extension's own settings; ``None``, core's ``settings``.
+    settings_target: Any = None
     health_url_fn: Callable[[], str] | None = None
     compose_profile: str | None = None
     compose_services: list[str] = field(default_factory=list)

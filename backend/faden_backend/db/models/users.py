@@ -281,7 +281,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         if (
             update_dict.get("password") is not None
             or update_dict.get("is_active") is False
-            or update_dict.get("is_superuser") is False
+            or ("is_superuser" in update_dict and update_dict["is_superuser"] != user.is_superuser)
         ):
             update_dict = {**update_dict, "sessions_valid_after": datetime.now(UTC)}
         if update_dict.get("password") is not None:
@@ -341,7 +341,14 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         try:
             # The token in the fragment, which browsers never send: not to the server, not as the Referer of
             # the page's own requests, so it stays out of every access log (as an administrator's reset links).
-            base = settings.mailer_frontend_base_url.rstrip("/")
+            from faden_backend.services.extensions import registry  # noqa: PLC0415
+
+            # Mail goes out only with a sender (mail_available() is asked before anything is queued), and the
+            # address the link starts with is the one configured for mail, never this request's Host.
+            sender = registry.mail_sender
+            if sender is None:
+                return
+            base = sender.link_base().rstrip("/")
             reset_url = f"{base}/reset-password#{urlencode({'token': token})}"
             request_id = str(uuid.uuid4())
             if request is not None:
@@ -424,8 +431,10 @@ def sign_in_ended_for_all(claims: dict[str, Any], sessions_valid_after: datetime
 def end_sign_ins(user: User) -> None:
     """End all of *user*'s console sign-ins (browser cookies, apps signed in with a bearer token) from now on.
 
-    Called for a password change, a suspension and a role taken away; ``UserManager._update`` does it for the
-    stock routes. API tokens are separate keys with their own revoke, and agent tokens their own refresh.
+    Called for a password change, a suspension and any change of rights (``services/rights.py``);
+    ``UserManager._update`` does it for the stock routes. Apps signed in for an agent end too: their
+    refresh is refused, and the gateway refuses their access tokens made before. API tokens are separate
+    keys with their own revoke; what they may do is checked at each request.
     """
     user.sessions_valid_after = datetime.now(UTC)
 

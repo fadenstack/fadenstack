@@ -42,6 +42,7 @@ from faden_backend.db.models.groups import Group, UserGroup
 from faden_backend.db.models.provisioning import ProvisionedAccount
 from faden_backend.db.models.rbac import Role
 from faden_backend.db.models.users import User, end_sign_ins
+from faden_backend.services.rights import rights_changed
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -527,6 +528,7 @@ async def change_members(
     if added or removed:
         await _audit(session, "team.members.provision", "group", str(group_id), by=source,
                      added=[str(u) for u in added], removed=[str(u) for u in removed])
+        await rights_changed(session, [*added, *removed], cause="team.members", by=source, team=group.name)
     return added, removed
 
 
@@ -576,4 +578,9 @@ async def sync_memberships(
             UserGroup.user_id == user.id, UserGroup.source == source, UserGroup.group_id.in_(removed),
         ))
     await session.flush()
+    if added or removed:
+        # At a sign-in, the one being made stands: it is issued after this (services/rights.py).
+        await rights_changed(
+            session, [user.id], cause="team.members", by=source, added=added, removed=removed,
+        )
     return added, removed

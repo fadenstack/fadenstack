@@ -390,7 +390,8 @@ function AccessCheck({ agent }: { agent: Agent }) {
       <PrincipalPicker
         search={(q) => agentsApi.findPrincipals(q)}
         types={["user"]}
-        placeholder={t("agents.access.check_placeholder")}
+        // Those who only inspect the agent find a person by the whole address (the backend's rule).
+        placeholder={t(agent.can_manage ? "agents.access.check_placeholder" : "agents.access.check_placeholder_exact")}
         disabled={check.busy}
         onPick={(who) => {
           setChecked(null);
