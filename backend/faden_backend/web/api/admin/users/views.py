@@ -57,10 +57,12 @@ from faden_backend.web.api.admin.users.schema import (
     UpdateUserRolesRequest,
     UpdateUserUsageGroupRequest,
 )
+from faden_backend.web.api.admin.users.sign_ins import router as sign_ins_router
 from faden_backend.web.api.agents.schema import DeveloperModeDTO, DeveloperModeRequest
 
 router = APIRouter()
 router.include_router(preferences_router)
+router.include_router(sign_ins_router)
 
 
 def _role_to_dto(role: Role, user_count: int = 0) -> RoleDTO:
@@ -691,6 +693,7 @@ async def change_password(
     if problem:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=problem)
     user.hashed_password = password_helper.hash(payload.new_password)
+    user.password_set = True
     # The point of changing it can be that someone else got in: their sign-ins end with the old password.
     end_sign_ins(user)
     session.add(user)

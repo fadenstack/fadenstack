@@ -145,6 +145,18 @@ funktionieren innerhalb einer Minute nicht mehr.
 Die Gültigkeitsdauern ändern Sie unter **Einstellungen → Allgemein**: **Sign-in lifetime (s)**, **API token
 lifetime (s)** und **Longest API token lifetime (s)**.
 
+### Verknüpfte Anmeldungen {#linked-sign-ins}
+
+Unter **Zugriffskontrolle → Benutzer** zeigt **Verknüpfte Anmeldungen** (das Ketten-Symbol) in der Zeile einer
+Person die Anmeldeanbieter, mit denen ihr Konto verknüpft ist, und ob auch ihr Passwort sie anmeldet.
+**Trennen** beendet eine Verknüpfung: Die Person kann sich damit nicht mehr anmelden, bis sie sie unter **Mein
+Profil** wieder verknüpft. Das wird mit Ihrem Namen im Audit-Protokoll festgehalten.
+
+Die letzte Art, wie sich eine Person anmeldet, lässt sich nicht trennen, damit niemand versehentlich ausgesperrt
+wird. Soll jemand vom Anbieter zum Passwort wechseln, geben Sie ihm zuerst einen
+[Link zum Zurücksetzen des Passworts](#a-forgotten-password). Um den Zugang zu beenden, sperren Sie stattdessen
+das Konto (siehe [Jemandem den Zugang entziehen](#end-someones-access)).
+
 ## Ein vergessenes Passwort {#a-forgotten-password}
 
 Wenn Ihr Server keine E-Mails versendet oder die Person sie nicht erhält, geben Sie ihr einen **Link zum

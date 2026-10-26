@@ -108,7 +108,7 @@ async def _audit(
 async def create_account(
     session: AsyncSession, email: str, *, role_ids: Iterable[uuid.UUID] = (), **audit: object,
 ) -> User:
-    """A new account for *email*: verified, no usable password, the given roles; none given, none at all.
+    """A new account for *email*: verified, no password anyone knows, the given roles; none given, none at all.
 
     Denied by default: the roles are the ones a provider's policy names (an administrator picks
     ``default_user`` there for people who should chat). Never a superuser. *audit* is recorded with
@@ -116,7 +116,7 @@ async def create_account(
     """
     user = User(
         id=uuid.uuid4(), email=email, hashed_password=PasswordHelper().hash(secrets.token_urlsafe(32)),
-        is_active=True, is_superuser=False, is_verified=True,
+        password_set=False, is_active=True, is_superuser=False, is_verified=True,
     )
     session.add(user)
     await session.flush()

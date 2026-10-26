@@ -137,6 +137,17 @@ row, then **Revoke**. Applications using a revoked token stop working within a m
 To change the lifetimes: **Settings → General**, **Sign-in lifetime (s)**, **API token lifetime (s)** and
 **Longest API token lifetime (s)**.
 
+### Linked sign-ins
+
+In **Access Control → Users**, **Linked sign-ins** (the link icon) in someone's row shows the sign-in providers
+their account is linked to, and whether their password also signs them in. **Unlink** ends one: they can no
+longer sign in with it until they link it again from **My Profile**. It is recorded in the audit log with your
+name.
+
+A person's last way to sign in cannot be unlinked, so nobody is locked out by mistake. To move someone from a
+provider to a password, give them a [password reset link](#a-forgotten-password) first. To end their access,
+suspend the account instead (see [End someone's access](#end-someones-access)).
+
 ## A forgotten password
 
 When your server sends no e-mail, or the person cannot get it, give them a **password reset link**:

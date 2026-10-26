@@ -4,6 +4,7 @@ import { adminGroups, adminUsers, hasDeveloperMode, type AdminUser, type Group, 
 import { DataTable, type ColumnDef } from "~/components/DataTable";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { UserApiTokensDialog } from "./UserApiTokensDialog";
+import { UserSignInsDialog } from "./UserSignInsDialog";
 import { FormDialog } from "~/components/FormDialog";
 import { DeveloperModeDialog } from "~/components/users/DeveloperModeDialog";
 import { ResetLinkDialog } from "~/components/users/ResetLinkDialog";
@@ -33,6 +34,7 @@ import CodeIcon from "@mui/icons-material/Code";
 import DeleteIcon from "@mui/icons-material/Delete";
 import HowToRegIcon from "@mui/icons-material/HowToReg";
 import KeyIcon from "@mui/icons-material/Key";
+import LinkIcon from "@mui/icons-material/Link";
 import LockResetIcon from "@mui/icons-material/LockReset";
 import PersonOffIcon from "@mui/icons-material/PersonOff";
 
@@ -63,6 +65,7 @@ export default function UsersPage() {
   const [developerModeOf, setDeveloperModeOf] = useState<AdminUser | null>(null);
   const [suspendTarget, setSuspendTarget] = useState<AdminUser | null>(null);
   const [tokensOf, setTokensOf] = useState<AdminUser | null>(null);
+  const [signInsOf, setSignInsOf] = useState<AdminUser | null>(null);
   const [rightsOf, setRightsOf] = useState<AdminUser | null>(null);
   const [resetLinkOf, setResetLinkOf] = useState<AdminUser | null>(null);
   const [suspending, setSuspending] = useState(false);
@@ -300,6 +303,11 @@ export default function UsersPage() {
               <KeyIcon fontSize="small" />
             </IconButton>
           </Tooltip>
+          <Tooltip title={t("sign_ins.action")}>
+            <IconButton size="small" data-user-sign-ins={u.id} onClick={() => setSignInsOf(u)}>
+              <LinkIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
           {u.is_active && (
             <Tooltip title={t("users.reset_link.action")}>
               <IconButton size="small" data-user-reset-link={u.id} onClick={() => setResetLinkOf(u)}>
@@ -496,6 +504,7 @@ export default function UsersPage() {
       </FormDialog>
 
       <UserApiTokensDialog user={tokensOf} onClose={() => setTokensOf(null)} />
+      {signInsOf && <UserSignInsDialog key={signInsOf.id} user={signInsOf} onClose={() => setSignInsOf(null)} />}
       <RightsDialog user={rightsOf} users={users} onClose={() => setRightsOf(null)} onChanged={() => void load()} />
       <ResetLinkDialog user={resetLinkOf} onClose={() => setResetLinkOf(null)} />
 

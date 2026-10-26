@@ -115,6 +115,7 @@ async def use(session: AsyncSession, token: str, password: str) -> User:
         raise PasswordRejectedError(problem)
     link.used_at = datetime.now(UTC)
     user.hashed_password = PasswordHelper().hash(password)
+    user.password_set = True
     end_sign_ins(user)
     await session.execute(delete(PasswordResetLink).where(
         PasswordResetLink.user_id == user.id, PasswordResetLink.used_at.is_(None),

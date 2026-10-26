@@ -19,7 +19,7 @@ from fastapi_users.authentication import (
 from fastapi_users.db import SQLAlchemyBaseUserTableUUID, SQLAlchemyUserDatabase
 from fastapi_users.jwt import generate_jwt
 from pydantic import ConfigDict
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, delete, false, select
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, delete, false, select, true
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -63,6 +63,15 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     sessions_valid_after: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
+    )
+    # Whether the account has a password someone knows. An account a sign-in provider or a provisioning source
+    # made has a random one nobody knows, until its owner sets one (a reset link): then the password is no way
+    # in, and the last linked sign-in may not be unlinked (``services/sign_in/linked.py``).
+    password_set: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=true(),
     )
 
 
@@ -117,6 +126,24 @@ class UserUpdate(schemas.BaseUserUpdate):
         changes = super().create_update_dict_superuser()
         changes.pop("current_password", None)
         return changes
+
+
+async def password_check_refusal(email: str) -> str | None:
+    """The first reason a password check gives to refuse *email*; a check that fails counts as one.
+
+    The checks are the extension registry's ``password_sign_in_checks``; they hold for anyone but a superuser.
+    """
+    from faden_backend.services.extensions import registry  # noqa: PLC0415
+
+    for check in registry.password_sign_in_checks:
+        try:
+            reason = await check(email)
+        except Exception:
+            log.exception("A password sign-in check failed; refusing the sign-in")
+            return "the sign-in check failed"
+        if reason:
+            return reason
+    return None
 
 
 class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
@@ -187,18 +214,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
 
     @staticmethod
     async def _password_check_refusal(email: str) -> str | None:
-        """The first reason a password check gives to refuse *email*; a check that fails counts as one."""
-        from faden_backend.services.extensions import registry  # noqa: PLC0415
-
-        for check in registry.password_sign_in_checks:
-            try:
-                reason = await check(email)
-            except Exception:
-                log.exception("A password sign-in check failed; refusing the sign-in")
-                return "the sign-in check failed"
-            if reason:
-                return reason
-        return None
+        return await password_check_refusal(email)
 
     async def on_after_login(
         self, user: User, request: Request | None = None, response: Any = None,
@@ -268,6 +284,8 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
             or update_dict.get("is_superuser") is False
         ):
             update_dict = {**update_dict, "sessions_valid_after": datetime.now(UTC)}
+        if update_dict.get("password") is not None:
+            update_dict = {**update_dict, "password_set": True}
         return await super()._update(user, update_dict)
 
     async def on_after_register(self, user: User, request: Request | None = None) -> None:

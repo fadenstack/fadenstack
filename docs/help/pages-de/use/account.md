@@ -56,6 +56,22 @@ den Namen Ihrer Organisation, oder eine Auswahl zwischen **Fadenstack-Konto** un
 Organisation, wo Sie Ihren **Kontonamen** und Ihr gewohntes Passwort eingeben. Eine so begonnene Anmeldung kann
 kürzer als sieben Tage gelten, wie Ihre Organisation es festgelegt hat.
 
+## Verknüpfte Anmeldungen {#linked-sign-ins}
+
+**Mein Profil** zeigt unter **Verknüpfte Anmeldungen** die Anmeldeanbieter, mit denen Sie sich anmelden, und ob
+auch Ihr Passwort Sie anmeldet. Der Abschnitt erscheint, wenn Ihre Organisation ihre eigene Anmeldung angebunden
+hat.
+
+- **Anbieter verknüpfen**: Wählen Sie ihn aus und melden Sie sich dort wie gewohnt an. Sie kommen zu **Mein
+  Profil** zurück und können sich von da an damit anmelden. Bei einem Verzeichnis geben Sie stattdessen Ihren
+  **Kontonamen** und dessen Passwort ein.
+- **Trennen**: Sie können sich mit diesem Anbieter nicht mehr anmelden, bis Sie ihn wieder verknüpfen. Die
+  Schaltfläche ist aus, wenn es Ihre einzige Art ist, sich anzumelden: Sie würden sich aussperren. Bitten Sie
+  Ihren Administrator zuerst um einen Link zum Zurücksetzen des Passworts, wenn Sie sich stattdessen mit einem
+  Passwort anmelden möchten.
+
+Eine Anmeldung, die hier schon zu einem anderen Konto gehört, wird nicht mit Ihrem verknüpft.
+
 ## API-Tokens {#api-tokens}
 
 Mit einem API-Token kann ein Skript oder eine Anwendung die Modelle Ihrer Organisation in Ihrem Namen nutzen, über die API, die für Chat, Embeddings und Rerank wie die von OpenAI funktioniert. Das Token steht für Sie: Was darüber gesendet wird, zählt als Ihre Nutzung und unterliegt denselben Regeln wie Ihre Chats. Für den Chat, den Browser-Agenten oder die Office-Add-ins brauchen Sie kein Token.

@@ -4628,5 +4628,34 @@
     "lift_title": "Lift this restriction?",
     "lift_body": "The restriction no longer applies. It is recorded in the audit log.",
     "lift_tool_mode_ceilings": "Tools in every chat go back to the mode each person picks. The limits are kept and apply again when Enterprise is back. Recorded in the audit log."
+  },
+  "sign_ins": {
+    "title": "Linked sign-ins",
+    "intro": "The sign-in providers you sign in with, besides your password.",
+    "none": "No sign-in provider is linked.",
+    "last_sign_in": "last sign-in {{when}}",
+    "never_signed_in": "not signed in with it yet",
+    "unlink": "Unlink",
+    "unlink_title": "Unlink {{name}}",
+    "unlink_confirm_own": "Unlink {{name}}? You can no longer sign in with it until you link it again.",
+    "unlink_confirm_other": "Unlink {{name}} from {{email}}? They can no longer sign in with it until they link it again.",
+    "last_way_own": "This is your only way to sign in, so it cannot be unlinked.",
+    "last_way_other": "This is their only way to sign in, so it cannot be unlinked. Give them a password reset link first.",
+    "password_own": "Your password also signs you in.",
+    "password_other": "Their password also signs them in.",
+    "no_password_own": "Your password does not sign you in: you have none, or your organisation lets you sign in with a provider only.",
+    "no_password_other": "Their password does not sign them in: they have none, or their address may sign in with a provider only.",
+    "link": "Link a provider",
+    "link_title": "Link {{name}}",
+    "link_submit": "Link",
+    "account_name": "Account name",
+    "password": "Password",
+    "linked": "{{name}} is linked: you can sign in with it now.",
+    "refused": {
+      "already_linked": "This sign-in belongs to another account here, so it was not linked to yours.",
+      "last_way": "This is your only way to sign in, so it cannot be unlinked."
+    },
+    "action": "Linked sign-ins",
+    "of_title": "Linked sign-ins of {{email}}"
   }
 }

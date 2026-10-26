@@ -56,6 +56,19 @@ organisation's name, or a choice between **Fadenstack account** and your organis
 type your **Account name** and your usual password. A sign-in that way may last less than seven days, as your
 organisation set it.
 
+## Linked sign-ins
+
+**My Profile** shows, under **Linked sign-ins**, the sign-in providers you sign in with, and whether your
+password also signs you in. It appears when your organisation connected its own sign-in.
+
+- **Link a provider**: pick it, and sign in there as usual. You come back to **My Profile**, and from then on
+  you can sign in with it. For a directory, type your **Account name** and its password instead.
+- **Unlink**: you can no longer sign in with that provider, until you link it again. The button is off when it
+  is your only way to sign in: you would lock yourself out. Ask your administrator for a password reset link
+  first, if you want to sign in with a password instead.
+
+A sign-in that already belongs to another account here is not linked to yours.
+
 ## API tokens
 
 An API token lets a script or an application use your organisation's models in your name, through the API that works like OpenAI's for chat, embeddings and rerank. It acts as you: what it sends counts as your usage, under the same rules as your chats. You do not need a token for the chat, the browser agent or the Office add-ins.

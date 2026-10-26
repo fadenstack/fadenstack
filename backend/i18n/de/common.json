@@ -4630,5 +4630,34 @@
     "lift_title": "Diese Einschränkung aufheben?",
     "lift_body": "Die Einschränkung gilt nicht mehr. Das wird im Audit-Protokoll festgehalten.",
     "lift_tool_mode_ceilings": "Tools in jedem Chat folgen wieder dem Modus, den jede Person wählt. Die Grenzen bleiben gespeichert und gelten wieder, sobald Enterprise zurück ist. Wird im Audit-Protokoll festgehalten."
+  },
+  "sign_ins": {
+    "title": "Verknüpfte Anmeldungen",
+    "intro": "Die Anmeldeanbieter, mit denen Sie sich neben Ihrem Passwort anmelden.",
+    "none": "Kein Anmeldeanbieter ist verknüpft.",
+    "last_sign_in": "zuletzt angemeldet {{when}}",
+    "never_signed_in": "noch nicht damit angemeldet",
+    "unlink": "Trennen",
+    "unlink_title": "{{name}} trennen",
+    "unlink_confirm_own": "{{name}} trennen? Sie können sich damit nicht mehr anmelden, bis Sie es wieder verknüpfen.",
+    "unlink_confirm_other": "{{name}} von {{email}} trennen? Die Person kann sich damit nicht mehr anmelden, bis sie es wieder verknüpft.",
+    "last_way_own": "Dies ist Ihre einzige Art, sich anzumelden, daher lässt es sich nicht trennen.",
+    "last_way_other": "Dies ist die einzige Art, wie sich die Person anmeldet, daher lässt es sich nicht trennen. Geben Sie ihr zuerst einen Link zum Zurücksetzen des Passworts.",
+    "password_own": "Auch Ihr Passwort meldet Sie an.",
+    "password_other": "Auch ihr Passwort meldet die Person an.",
+    "no_password_own": "Ihr Passwort meldet Sie nicht an: Sie haben keines, oder Ihre Organisation lässt Sie nur über einen Anbieter anmelden.",
+    "no_password_other": "Ihr Passwort meldet die Person nicht an: Sie hat keines, oder ihre Adresse darf sich nur über einen Anbieter anmelden.",
+    "link": "Anbieter verknüpfen",
+    "link_title": "{{name}} verknüpfen",
+    "link_submit": "Verknüpfen",
+    "account_name": "Kontoname",
+    "password": "Passwort",
+    "linked": "{{name}} ist verknüpft: Sie können sich jetzt damit anmelden.",
+    "refused": {
+      "already_linked": "Diese Anmeldung gehört hier zu einem anderen Konto und wurde daher nicht mit Ihrem verknüpft.",
+      "last_way": "Dies ist Ihre einzige Art, sich anzumelden, daher lässt es sich nicht trennen."
+    },
+    "action": "Verknüpfte Anmeldungen",
+    "of_title": "Verknüpfte Anmeldungen von {{email}}"
   }
 }

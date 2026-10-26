@@ -4630,5 +4630,34 @@
     "lift_title": "Lever cette restriction ?",
     "lift_body": "La restriction ne s'applique plus. C'est consigné dans le journal d'audit.",
     "lift_tool_mode_ceilings": "Les outils de chaque chat reviennent au mode que chacun choisit. Les limites sont conservées et s'appliquent de nouveau au retour d'Enterprise. Consigné dans le journal d'audit."
+  },
+  "sign_ins": {
+    "title": "Connexions liées",
+    "intro": "Les fournisseurs de connexion avec lesquels vous vous connectez, en plus de votre mot de passe.",
+    "none": "Aucun fournisseur de connexion n'est lié.",
+    "last_sign_in": "dernière connexion {{when}}",
+    "never_signed_in": "pas encore connecté avec lui",
+    "unlink": "Délier",
+    "unlink_title": "Délier {{name}}",
+    "unlink_confirm_own": "Délier {{name}} ? Vous ne pourrez plus vous connecter avec lui tant que vous ne l'aurez pas lié de nouveau.",
+    "unlink_confirm_other": "Délier {{name}} de {{email}} ? Cette personne ne pourra plus se connecter avec lui tant qu'elle ne l'aura pas lié de nouveau.",
+    "last_way_own": "C'est votre seule façon de vous connecter : il ne peut pas être délié.",
+    "last_way_other": "C'est sa seule façon de se connecter : il ne peut pas être délié. Donnez-lui d'abord un lien de réinitialisation du mot de passe.",
+    "password_own": "Votre mot de passe vous connecte aussi.",
+    "password_other": "Son mot de passe la connecte aussi.",
+    "no_password_own": "Votre mot de passe ne vous connecte pas : vous n'en avez pas, ou votre organisation ne vous laisse vous connecter qu'avec un fournisseur.",
+    "no_password_other": "Son mot de passe ne la connecte pas : elle n'en a pas, ou son adresse ne peut se connecter qu'avec un fournisseur.",
+    "link": "Lier un fournisseur",
+    "link_title": "Lier {{name}}",
+    "link_submit": "Lier",
+    "account_name": "Nom du compte",
+    "password": "Mot de passe",
+    "linked": "{{name}} est lié : vous pouvez maintenant vous connecter avec lui.",
+    "refused": {
+      "already_linked": "Cette connexion appartient ici à un autre compte : elle n'a pas été liée au vôtre.",
+      "last_way": "C'est votre seule façon de vous connecter : il ne peut pas être délié."
+    },
+    "action": "Connexions liées",
+    "of_title": "Connexions liées de {{email}}"
   }
 }

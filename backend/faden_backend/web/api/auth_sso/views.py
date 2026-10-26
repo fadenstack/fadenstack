@@ -10,6 +10,12 @@
   that met an existing account waits, in this browser only (the ``faden_link`` cookie), until the person
   proves the account is theirs, with its password or a code sent to its address
   (``services/sign_in/link_requests.py``). Not ``/link/password``: ``/{key}/password`` would take it.
+- ``POST /api/auth/sso/{key}/link-start``, ``POST /{key}/link-password``: a signed-in person links a provider
+  to their own account from My Profile (``services/sign_in/linked.py``). The start is a POST, so no other
+  site's page can begin it (the Origin check), and the binding cookie names the account: the answer links
+  to that account and signs nobody in. A SAML answer is posted across sites and brings no sign-in cookie,
+  so the binding, signed and tied to this one transaction, is what names the account; it is void once the
+  account's sign-ins were ended.
 
 The binding cookie ties an answer to the browser that began the sign-in, so an answer someone else started
 cannot sign this browser in. It holds a hash of the sign-in's transaction, signed, for ten minutes. An answer
@@ -22,6 +28,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import time
+import uuid
 from datetime import datetime
 from typing import Annotated
 
@@ -33,8 +40,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
 from faden_backend.db.dependencies import get_db_session
-from faden_backend.db.models.users import SignInStrategy, cookie_transport, login_lifetime_seconds
-from faden_backend.services.sign_in import accounts, link_requests, module
+from faden_backend.db.models.users import (
+    SignInStrategy,
+    User,
+    cookie_transport,
+    current_active_user,
+    login_lifetime_seconds,
+    sign_in_ended_for_all,
+)
+from faden_backend.services.sign_in import accounts, link_requests, linked, module
 from faden_backend.services.sign_in.contract import (
     KEY_PATTERN,
     ExternalIdentity,
@@ -81,6 +95,18 @@ def _to_login(refusal: Refusal) -> RedirectResponse:
     return response
 
 
+#: Where a link begun on My Profile comes back to.
+PROFILE = "/admin/profile"
+
+
+def _to_profile(*, linked_key: str | None = None, refused: str | None = None) -> RedirectResponse:
+    """Back to My Profile, which says whether the provider was linked, or why not."""
+    query = f"linked={linked_key}" if linked_key else f"link_refused={refused}"
+    response = RedirectResponse(f"{PROFILE}?{query}", status_code=status.HTTP_302_FOUND)
+    response.delete_cookie(BINDING_COOKIE, path=BINDING_PATH)
+    return response
+
+
 async def _offered(key: str) -> ProviderPublic | Refusal:
     """The provider with *key*, or why nobody can sign in with it now.
 
@@ -115,15 +141,16 @@ def _return_url(request: Request, provider: ProviderPublic) -> str:
     return f"{public_origin(request)}{BINDING_PATH}/{provider.key}/{step}"
 
 
-def _bound(request: Request, key: str, transaction: str) -> bool:
+def _binding(request: Request, key: str, transaction: str) -> dict | None:
+    """This browser's binding for *transaction* at *key*, if it has one."""
     cookie = request.cookies.get(BINDING_COOKIE)
     if not cookie:
-        return False
+        return None
     try:
         claims = jwt.decode(cookie, settings.users_secret, algorithms=["HS256"], audience=_BINDING_AUDIENCE)
     except jwt.PyJWTError:
-        return False
-    return claims.get("key") == key and claims.get("tx") == _hash(transaction)
+        return None
+    return claims if claims.get("key") == key and claims.get("tx") == _hash(transaction) else None
 
 
 async def _issue(
@@ -153,51 +180,100 @@ async def providers() -> list[ProviderPublic]:
     return await module.public_providers()
 
 
-@router.get("/{key}/start", name="sso_start")
-async def start(key: Key, request: Request) -> RedirectResponse:
-    """Off to the provider; the answer comes back to ``callback`` or ``acs``."""
+async def _begin(
+    request: Request, key: str, *, link: User | None = None,
+) -> tuple[ProviderPublic, str, str] | Refusal:
+    """The provider, where to send the browser and the binding cookie for a sign-in; or why it cannot start.
+
+    With *link*, the answer is to be linked to that account rather than sign anyone in.
+    """
     provider = await _offered(key)
     if isinstance(provider, Refusal):
-        return _to_login(provider)
+        return provider
     if provider.kind is not ProviderKind.REDIRECT:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="This provider signs in on the page",
         )
-    https = _https(request)
-    if provider.posts_back and not https and settings.environment not in _DEV_ENVIRONMENTS:
-        return _to_login(Refusal.NEEDS_HTTPS)
+    if provider.posts_back and not _https(request) and settings.environment not in _DEV_ENVIRONMENTS:
+        return Refusal.NEEDS_HTTPS
     try:
         begun = await module.start(key, _return_url(request, provider))
     except module.ModuleRefusedError as exc:
         log.warning("Sign-in with %s could not start: %s", key, exc)
-        return _to_login(_refusal_named(exc.detail, Refusal.PROVIDER_ERROR))
+        return _refusal_named(exc.detail, Refusal.PROVIDER_ERROR)
     except module.ModuleUnavailableError as exc:
         log.warning("Sign-in with %s could not start: %s", key, exc)
-        return _to_login(Refusal.PROVIDER_UNAVAILABLE)
-    response = RedirectResponse(begun.redirect_url, status_code=status.HTTP_302_FOUND)
-    expires = int(time.time()) + BINDING_TTL_S
-    binding = jwt.encode(
-        {"aud": _BINDING_AUDIENCE, "key": key, "tx": _hash(begun.transaction), "exp": expires},
-        settings.users_secret,
-        algorithm="HS256",
-    )
-    cross_site = provider.posts_back and https
+        return Refusal.PROVIDER_UNAVAILABLE
+    now = int(time.time())
+    claims: dict[str, object] = {
+        "aud": _BINDING_AUDIENCE, "key": key, "tx": _hash(begun.transaction), "iat": now,
+        "exp": now + BINDING_TTL_S,
+    }
+    if link is not None:
+        claims["link"] = str(link.id)
+    binding = jwt.encode(claims, settings.users_secret, algorithm="HS256")
+    return provider, begun.redirect_url, binding
+
+
+def _set_binding(request: Request, response: Response, provider: ProviderPublic, binding: str) -> None:
+    https = _https(request)
     response.set_cookie(
         BINDING_COOKIE, binding, max_age=BINDING_TTL_S, path=BINDING_PATH, httponly=True,
-        samesite="none" if cross_site else "lax", secure=https,
+        samesite="none" if provider.posts_back and https else "lax", secure=https,
     )
+
+
+@router.get("/{key}/start", name="sso_start")
+async def start(key: Key, request: Request) -> RedirectResponse:
+    """Off to the provider; the answer comes back to ``callback`` or ``acs``."""
+    begun = await _begin(request, key)
+    if isinstance(begun, Refusal):
+        return _to_login(begun)
+    provider, redirect_url, binding = begun
+    response = RedirectResponse(redirect_url, status_code=status.HTTP_302_FOUND)
+    _set_binding(request, response, provider, binding)
     return response
 
 
-def _answer_is_ours(request: Request, provider: ProviderPublic, transaction: str | None) -> bool:
-    """Whether this browser began the sign-in the answer belongs to."""
+class LinkStart(BaseModel):
+    """Where to send the browser to sign in with the provider that is to be linked."""
+
+    redirect_url: str
+
+
+@router.post("/{key}/link-start", response_model=LinkStart, name="sso_link_start")
+async def link_start(
+    key: Key, request: Request, response: Response, user: Annotated[User, Depends(current_active_user)],
+) -> LinkStart:
+    """Begin linking *key* to the signed-in account; the answer comes back to My Profile.
+
+    Refused with 404 ``not_offered`` / 503 and the reason as ``detail``, as the sign-in page's are named.
+    """
+    begun = await _begin(request, key, link=user)
+    if isinstance(begun, Refusal):
+        gone = begun is Refusal.NOT_OFFERED
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND if gone else status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=begun.value,
+        )
+    provider, redirect_url, binding = begun
+    _set_binding(request, response, provider, binding)
+    return LinkStart(redirect_url=redirect_url)
+
+
+def _answer_is_ours(request: Request, provider: ProviderPublic, transaction: str | None) -> dict | None:
+    """This browser's binding for the sign-in the answer belongs to; ``None`` when it did not begin it."""
     if not transaction:
-        return False
-    if _bound(request, provider.key, transaction):
-        return True
+        return None
+    claims = _binding(request, provider.key, transaction)
+    if claims is not None:
+        return claims
     # Over plain HTTP a posted answer never brings the cookie back. That is allowed in development only
-    # (``start`` refuses it elsewhere), where the module's own check of the request ID is what remains.
-    return provider.posts_back and not _https(request) and settings.environment in _DEV_ENVIRONMENTS
+    # (``start`` refuses it elsewhere), where the module's own check of the request ID is what remains; a
+    # link needs the binding, so none is made this way.
+    if provider.posts_back and not _https(request) and settings.environment in _DEV_ENVIRONMENTS:
+        return {}
+    return None
 
 
 async def _identity(
@@ -224,9 +300,12 @@ async def _finish(
     transaction: str | None,
     params: dict[str, str],
 ) -> RedirectResponse:
-    if transaction is None or not _answer_is_ours(request, provider, transaction):
+    claims = _answer_is_ours(request, provider, transaction)
+    if transaction is None or claims is None:
         return _to_login(Refusal.SIGN_IN_EXPIRED)
     identity = await _identity(request, provider, transaction, params)
+    if claims.get("link"):
+        return await _finish_link(session, claims, identity, provider.key)
     if isinstance(identity, Refusal):
         return _to_login(identity)
     signed = await accounts.sign_in(session, identity)
@@ -241,6 +320,31 @@ async def _finish(
     await _issue(request, response, signed, identity)
     response.delete_cookie(BINDING_COOKIE, path=BINDING_PATH)
     return response
+
+
+async def _linking(session: AsyncSession, claims: dict) -> User | None:
+    """The account a link's binding names, while it is active and its sign-ins were not ended since."""
+    try:
+        user = await session.get(User, uuid.UUID(str(claims["link"])))
+    except (KeyError, ValueError):
+        return None
+    if user is None or not user.is_active or sign_in_ended_for_all(claims, user.sessions_valid_after):
+        return None
+    return user
+
+
+async def _finish_link(
+    session: AsyncSession, claims: dict, identity: ExternalIdentity | Refusal, key: str,
+) -> RedirectResponse:
+    """A link begun on My Profile: the identity joins the binding's account, or My Profile says why not."""
+    user = await _linking(session, claims)
+    if user is None:
+        return _to_profile(refused=Refusal.SIGN_IN_EXPIRED.value)
+    if isinstance(identity, Refusal):
+        return _to_profile(refused=identity.value)
+    refused = await linked.link_signed_in(session, user, identity)
+    await session.commit()
+    return _to_profile(refused=refused) if refused else _to_profile(linked_key=key)
 
 
 @router.get("/{key}/callback", name="sso_callback")
@@ -323,6 +427,42 @@ async def password(
         return refused
     await _issue(request, response, signed, answer.identity)
     return None
+
+
+@router.post("/{key}/link-password", status_code=status.HTTP_204_NO_CONTENT, name="sso_link_password_of")
+async def link_password(
+    key: Key, payload: PasswordSignIn, user: Annotated[User, Depends(current_active_user)],
+    session: AsyncSession = Depends(get_db_session),
+) -> None:
+    """Link a directory account to the signed-in account: its name and password prove it.
+
+    A refusal is a 400 (404, 503) with the reason as ``detail``, as ``/{key}/password``'s.
+    """
+    provider = await _offered(key)
+    if isinstance(provider, Refusal):
+        gone = provider is Refusal.NOT_OFFERED
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND if gone else status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=provider.value,
+        )
+    if provider.kind is not ProviderKind.PASSWORD:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="This provider signs in elsewhere")
+    try:
+        answer = await module.password(key, payload.username, payload.password)
+    except module.ModuleRefusedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=Refusal.PROVIDER_ERROR.value,
+        ) from exc
+    except module.ModuleUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=Refusal.PROVIDER_UNAVAILABLE.value,
+        ) from exc
+    if answer.outcome == "refused" or answer.identity is None:
+        refusal = answer.refusal or Refusal.WRONG_CREDENTIALS
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=refusal.value)
+    refused = await linked.link_signed_in(session, user, answer.identity)
+    if refused:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=refused)
 
 
 @router.get("/{key}/metadata", name="sso_metadata")

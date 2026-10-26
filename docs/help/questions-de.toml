@@ -68,6 +68,7 @@
 "Ich habe mein Passwort vergessen" = "forgot-your-password"
 "Wie ändere ich die Sprache oder schalte den dunklen Modus ein?" = "language-and-theme"
 "Wie erstelle ich ein API-Token oder einen Schlüssel?" = "api-tokens"
+"Wie verknüpfe oder trenne ich die Anmeldung meiner Organisation?" = "linked-sign-ins"
 "Warum wurde ich abgemeldet?" = "how-long-a-sign-in-lasts"
 
 ["administer/index.md"]
@@ -86,6 +87,7 @@
 "Wie nutze ich Gruppen?" = "groups"
 "Wie entferne oder sperre ich einen Benutzer?" = "end-someones-access"
 "Wie lange gelten Anmeldungen und API-Token?" = "sign-ins-and-api-tokens"
+"Wie trenne ich den Anmeldeanbieter einer Person?" = "linked-sign-ins"
 "Was ist der Entwicklermodus?" = "developer-mode"
 
 ["administer/sign-in.md"]

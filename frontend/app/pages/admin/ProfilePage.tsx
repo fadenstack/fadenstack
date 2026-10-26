@@ -32,6 +32,7 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 
 import AppearanceSettings from "~/components/AppearanceSettings";
+import { LinkedSignInsCard } from "~/components/users/LinkedSignInsCard";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { adminUsers, type ApiTokenInfo } from "~/api/admin";
 import { auth, type AuthUser } from "~/api/auth";
@@ -220,6 +221,8 @@ export default function ProfilePage() {
           </Stack>
         </CardContent>
       </Card>
+
+      <LinkedSignInsCard />
 
       {/* ── Password Change Card ──────────────────────────────────── */}
       <Card variant="outlined" sx={{ mb: 3 }}>

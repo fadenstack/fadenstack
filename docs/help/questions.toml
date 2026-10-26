@@ -70,6 +70,7 @@
 "I forgot my password" = "forgot-your-password"
 "How do I change the language or switch to dark mode?" = "language-and-theme"
 "How do I create an API token or key?" = "api-tokens"
+"How do I link or unlink my organisation's sign-in?" = "linked-sign-ins"
 "Why was I signed out?" = "how-long-a-sign-in-lasts"
 
 ["administer/index.md"]
@@ -88,6 +89,7 @@
 "How do I use groups?" = "groups"
 "How do I remove or block a user?" = "end-someones-access"
 "How long do sign-ins and API tokens last?" = "sign-ins-and-api-tokens"
+"How do I unlink someone's sign-in provider?" = "linked-sign-ins"
 "What is developer mode?" = "developer-mode"
 
 ["administer/sign-in.md"]

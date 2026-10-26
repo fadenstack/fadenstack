@@ -4630,5 +4630,34 @@
     "lift_title": "¿Levantar esta restricción?",
     "lift_body": "La restricción deja de aplicarse. Queda registrado en el registro de auditoría.",
     "lift_tool_mode_ceilings": "Las herramientas de todos los chats vuelven al modo que elige cada persona. Los límites se conservan y vuelven a aplicarse cuando vuelva Enterprise. Queda registrado en el registro de auditoría."
+  },
+  "sign_ins": {
+    "title": "Inicios de sesión vinculados",
+    "intro": "Los proveedores con los que inicias sesión, además de tu contraseña.",
+    "none": "No hay ningún proveedor de inicio de sesión vinculado.",
+    "last_sign_in": "último inicio de sesión {{when}}",
+    "never_signed_in": "aún no se ha iniciado sesión con él",
+    "unlink": "Desvincular",
+    "unlink_title": "Desvincular {{name}}",
+    "unlink_confirm_own": "¿Desvincular {{name}}? Ya no podrás iniciar sesión con él hasta que lo vuelvas a vincular.",
+    "unlink_confirm_other": "¿Desvincular {{name}} de {{email}}? Ya no podrá iniciar sesión con él hasta que lo vuelva a vincular.",
+    "last_way_own": "Es tu única forma de iniciar sesión, así que no se puede desvincular.",
+    "last_way_other": "Es su única forma de iniciar sesión, así que no se puede desvincular. Dale primero un enlace para restablecer la contraseña.",
+    "password_own": "Tu contraseña también te permite iniciar sesión.",
+    "password_other": "Su contraseña también le permite iniciar sesión.",
+    "no_password_own": "Tu contraseña no te permite iniciar sesión: no tienes ninguna, o tu organización solo te deja iniciar sesión con un proveedor.",
+    "no_password_other": "Su contraseña no le permite iniciar sesión: no tiene ninguna, o su dirección solo puede iniciar sesión con un proveedor.",
+    "link": "Vincular un proveedor",
+    "link_title": "Vincular {{name}}",
+    "link_submit": "Vincular",
+    "account_name": "Nombre de cuenta",
+    "password": "Contraseña",
+    "linked": "{{name}} está vinculado: ya puedes iniciar sesión con él.",
+    "refused": {
+      "already_linked": "Este inicio de sesión pertenece a otra cuenta de aquí, así que no se vinculó a la tuya.",
+      "last_way": "Es tu única forma de iniciar sesión, así que no se puede desvincular."
+    },
+    "action": "Inicios de sesión vinculados",
+    "of_title": "Inicios de sesión vinculados de {{email}}"
   }
 }

@@ -108,6 +108,7 @@ async def reset_password(args: argparse.Namespace) -> dict[str, Any]:
         if user is None:
             return {"ok": False, "error": f"No account with the address {args.email}."}
         user.hashed_password = PasswordHelper().hash(password)
+        user.password_set = True
         end_sign_ins(user)
         await session.commit()
         user_id = str(user.id)
