@@ -64,9 +64,8 @@ The account is active at once. Pass the first password on in person or by phone;
 `https://ai.example.internal`, land in the chat, and can change it under **Manage Profile**.
 
 ??? info "Invitations and single sign-on"
-    There are no invitations: you create each account. Signing in with your organisation's company account
-    (single sign-on) is <span class="fs-planned">Planned</span>: people will sign in with the account they
-    already have, and get a Fadenstack account the first time they do. See also [Your account](../use/account.md).
+    There are no invitations: you create each account, or people get one the first time they sign in with
+    your organisation's account (see [Sign-in providers](sign-in.md)). See also [Your account](../use/account.md).
 
 ## Change what someone may do
 
@@ -104,8 +103,9 @@ A group gathers people, for three things:
 To make one: open **Access Control → Groups**, select **Create Group**, name it and tick its roles under
 **Assign Roles**, save it, then select **Manage Members** and **Add Members**.
 
-Removing someone from a group takes away the group's roles. Skills shared with the group stop reaching their
-chats within a minute.
+Removing someone from a group takes away the group's roles, and the skills shared with the group stop
+reaching their chats at once. Joining or leaving a group signs the person out, as any change of their
+rights does (see [Sign-ins and API tokens](#sign-ins-and-api-tokens)).
 
 ## Developer mode
 
@@ -123,20 +123,68 @@ person's own computer. It is for people who build or test tools, and it can end 
 
 | | |
 |---|---|
-| **A sign-in** | lasts 7 days; then people sign in again. **Logout** ends it at once. A password change or reset, a suspension, and a role taken away end all of a person's sign-ins; the gateway notices within half a minute. |
+| **A sign-in** | lasts 7 days; then people sign in again. **Logout** ends it at once. A password change or reset, a suspension, and any change of a person's rights end all of their sign-ins, the agents' on their devices too, at once: a role given or taken, joining or leaving a group, a change to the roles of their groups or to the permissions of their roles, the administrator right given or taken. They sign in again. Each is recorded in the audit log (`user.sign_ins.ended`, with the cause). |
 | **API tokens** | let scripts and applications use the models through the API. Each person makes their own under **Manage Profile** (or **My Profile** in the console), and can revoke it there. |
 | **Every API token expires** | after 90 days unless its maker picks another lifetime, and after a year at most. |
 | **Agents** (the browser agent, the Office add-ins) | have their own sign-ins on each device, shown on an agent's **Activity** tab (see [Agents and add-ins](agents.md)). |
 
-![API tokens of one person: each token with its name, when it was made and when it expires](../images/administer/user-api-tokens.png)
+![API tokens of one person: each token with its name, when it was made and when it expires, and its last use](../images/administer/user-api-tokens.png)
 
 To revoke someone else's token: in **Access Control → Users**, select **API tokens** (the key icon) in their
-row, then **Revoke**. Applications using a revoked token stop working within a minute.
+row, then **Revoke**. Applications using a revoked token stop working at once.
+
+Every request made with an API token is recorded: when, from which address, with which application, and on
+which route; never what was sent. **Access Control → API tokens** lists everyone's tokens with their owner and
+last use; **Uses** shows a token's latest 100 uses. A person sees the same for their own tokens under **Manage
+Profile**. A token's use also counts as activity, so a provider's "suspend after days without use" does not
+suspend people who work only through tokens. The uses are kept for 90 days, then deleted
+(`FADEN_BACKEND_API_TOKEN_USE_RETENTION_DAYS` on the server; 0 keeps them).
+
+![Access Control → API tokens: each active token with its owner, when it was made and expires, its last use (time, address, application, uses in 30 days), Uses and Revoke](../images/administer/api-tokens.png)
+
+![The uses of one token: when, from which address, with which application, on which route](../images/administer/api-token-uses.png)
 
 ![Settings → General: Sign-in lifetime (s), API token lifetime (s) and Longest API token lifetime (s)](../images/administer/settings-sign-in.png)
 
 To change the lifetimes: **Settings → General**, **Sign-in lifetime (s)**, **API token lifetime (s)** and
 **Longest API token lifetime (s)**.
+
+### Linked sign-ins
+
+![Linked sign-ins of one person: Example Corp, when they last signed in with it, and that their password does not sign them in](../images/administer/user-sign-ins.png)
+
+In **Access Control → Users**, **Linked sign-ins** (the link icon) in someone's row shows the sign-in providers
+their account is linked to, and whether their password also signs them in. **Unlink** ends one: they can no
+longer sign in with it until they link it again from **My Profile**. It is recorded in the audit log with your
+name.
+
+A person's last way to sign in cannot be unlinked, so nobody is locked out by mistake. To move someone from a
+provider to a password, give them a [password reset link](#a-forgotten-password) first. To end their access,
+suspend the account instead (see [End someone's access](#end-someones-access)).
+
+## A forgotten password
+
+When your server sends no e-mail, or the person cannot get it, give them a **password reset link**:
+
+1. Start **Root Mode**.
+2. In **Access Control → Users**, select **Password reset link** (the lock icon) in their row.
+3. Choose how long it **Works for** (**1 hour**, or **24 hours** for someone you reach later) and give a
+   **Reason** (at least 10 characters).
+4. Select **Create link**, then **Copy link**, and give it to the person yourself, through a channel only they
+   read: in person, by phone, a chat you trust.
+
+The person opens it, sees their address, and chooses a new password; then they sign in with it. All their other
+sign-ins end.
+
+- Whoever has the link can take over the account, which is why it needs Root Mode and its reason is recorded in
+  the audit log with your name, as is its use.
+- It works once. A newer link replaces it, and so does a password change or a suspension.
+- It is shown only when you create it; if it gets lost, create a new one.
+- Not for your own account (change it under **Manage Profile**), nor for a suspended one.
+- It also gives a password to an account made by a sign-in provider, which has none anyone knows.
+
+From the server, `faden admin reset-password --email alex@example.com` sets a new password directly (for
+example when no administrator can sign in).
 
 ## End someone's access
 
@@ -146,7 +194,7 @@ To change the lifetimes: **Settings → General**, **Sign-in lifetime (s)**, **A
    row.
 2. Confirm.
 
-Their sign-ins, API tokens and agents stop working within a minute. Nothing of theirs is deleted: **Let back
+Their sign-ins, API tokens and agents stop working at once. Nothing of theirs is deleted: **Let back
 in** in the same place gives them their access back, but the sign-ins they had stay over: they sign in again.
 You cannot suspend yourself, nor the last superuser.
 
@@ -216,4 +264,5 @@ restores.
 | **"User with email '…' already exists"** | There is already an account for that address. Find it in the list instead. |
 | Someone lands in the chat when they open the console | They are not a superuser. Roles do not open the console. |
 | Someone cannot chat after you gave them a role | The roles you ticked replaced `default_user`. Edit their roles and tick `default_user` as well. |
-| Someone forgot their password | The console cannot set another person's password. If the server does not send reset e-mails, whoever runs it sets a new one, for example `faden admin reset-password --email alex@example.com` (it makes one up when none is given). Have the person change it under **Manage Profile**. |
+| Someone forgot their password | Without reset e-mails, give them a password reset link: see [A forgotten password](#a-forgotten-password). |
+| **"Start Root Mode first: a password reset link is recorded with its reason."** | Start **Root Mode**, then create the link again. |

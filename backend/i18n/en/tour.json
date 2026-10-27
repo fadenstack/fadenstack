@@ -478,11 +478,17 @@
       "action_create": "Create a group with its roles",
       "action_members": "Add or remove members"
     },
+    "api_tokens": {
+      "title": "API tokens",
+      "description": "Everyone's API tokens: who owns each, and when, from where and with what it was used.",
+      "action_uses": "See a token's uses",
+      "action_revoke": "Revoke a token"
+    },
     "auth_providers": {
       "title": "Sign-in providers",
-      "description": "Let people sign in with their company account, through OpenID Connect or OAuth2.",
-      "action_add": "Add a provider with its client ID, secret and discovery URL",
-      "action_auto": "Choose whether people get an account the first time they sign in"
+      "description": "Let people sign in with their organisation's account: through OpenID Connect, SAML, or a directory (LDAP, Active Directory).",
+      "action_add": "Add a provider, and register this server with it using the addresses shown",
+      "action_auto": "Choose who may sign in, whether they get an account, and their roles and groups"
     },
     "pii_dashboard": {
       "title": "PII Dashboard",

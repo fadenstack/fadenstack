@@ -326,10 +326,14 @@ function SummaryBody({
   );
 }
 
-/** A release's notes; on fadenstack.com tagged with ref=console-updates and this server's release line. */
+/**
+ * A release's notes; on fadenstack.com tagged with ref=console-updates and this server's release line. Not
+ * where the server switched the vendor's links off.
+ */
 function NotesLink({ url }: { url: string }) {
   const { t } = useTranslation();
   const about = useAboutInfo();
+  if (about?.vendor_links === false) return null;
   return (
     <Link
       href={tagVendorUrl(url, "console-updates", about?.version)}

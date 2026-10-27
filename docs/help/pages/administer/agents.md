@@ -55,7 +55,7 @@ The agent's page opens. Its list status is **Draft**, **Published** or **Retired
 |---|---|
 | **Definition** | The version people get: **Instructions**, **Model**, **Knowledge** (collections it may search), **Server tools** (**What a chat gets**, **Only these**, or **None**), **Local MCP servers**, **Host tools** (the application's tools and their classes), **Appearance** (greeting and suggested prompts) and **Privacy**. |
 | **Versions** | Every version. **Publish** one, **Roll back** to an earlier one, see the **Changes**. |
-| **Access** | **Who may use it** and its **Maintainers**. **Check someone's access** says whether a person may use the agent, and why. |
+| **Access** | **Who may use it**, the **Excluded people** (Enterprise) and its **Maintainers** (with Enterprise: **Maintainers and auditors**). **Check someone's access** says whether a person may use the agent, and why. |
 | **Activity** | Usage over a time range (requests, errors, tokens, users, conversations: counts only, never content), what the applications reported (tools that ran, approvals), and the **Signed-in devices**. |
 | **Apps** | What the applications bring, compared with the agent's version (see [When an application brings new tools](#when-an-application-brings-new-tools)). |
 
@@ -78,12 +78,36 @@ The agent's page opens. Its list status is **Draft**, **Published** or **Retired
 ![The Versions tab of the Word assistant: v2 live with View and Changes, v1 with View and Roll back, below the agent's tabs and the Edit and Retire buttons](../images/administer/agent-versions.png)
 
 Saving the definition makes a new version (**Save as new version**, or **Save and publish**); versions never
-change. Publishing a version reaches everyone who uses the agent within a minute.
+change. Publishing a version reaches everyone who uses the agent at their next request.
 
 ![The Access tab: Who may use it, with Add a person or team and the people the agent is granted to](../images/administer/agent-access.png)
 
 **Maintainers** change the agent, publish versions and decide who may use it, and can use it before it is
 published. They do this from **Agents** in the chat's user menu; they need no access to the console.
+
+With Enterprise, an agent can also have **Auditors**: choose **Add as** → **Auditor** before picking the
+person, or change a member's role in the list, and select **Save**. Auditors see the agent's versions,
+members, settings and activity and change nothing; to use it, they need it granted like anyone else. Without
+a valid Enterprise licence they no longer see it.
+
+To check someone's access, an auditor types the person's whole e-mail address: a part of one finds nobody, so
+the check does not list everyone (GDPR Art. 5(1)(c), 25(2)). Every check is recorded in the audit log, with who
+checked whom (`agent.access.check`).
+
+!!! note "Works councils"
+    Auditors read what people did with an agent. In Germany, a tool that can monitor employees' conduct or
+    performance needs the works council's agreement (BetrVG § 87(1) No. 6): agree the auditor role with it
+    before you give it.
+
+With Enterprise, **Excluded people** may not use the agent, even through a team that may: pick the person,
+give a **Reason** and select **Exclude**. It takes effect in the applications at once and is recorded
+in the audit log. The person is told only that they are excluded; the reason is for the agent's maintainers
+and administrators. Maintainers and administrators always keep the agent and cannot be excluded.
+
+Without a valid Enterprise licence, an agent with excluded people can be used by its maintainers only, so
+that nobody excluded gets it back; the **Access** tab says so. **Open to everyone granted** lifts that:
+everyone the agent is granted to can use it again. Once the licence is valid again, the excluded people still
+listed are kept out again.
 
 ![The Activity tab: requests, errors, tokens, users and conversations of the last 30 days with a chart, and below it what the applications reported, such as tools that ran and approvals](../images/administer/agent-activity.png)
 
@@ -204,7 +228,7 @@ on their **Agents** page.
 
 | To | Do this |
 |---|---|
-| Close the agent to everyone within a minute | **Retire**: sign-ins stop working, and its versions, access and history are kept. **Restore** brings it back as it was. |
+| Close the agent to everyone at once | **Retire**: sign-ins stop working, and its versions, access and history are kept. **Restore** brings it back as it was. |
 | Delete a retired agent for good | **Delete**, then type its address to confirm. Its versions, access and sign-ins go; what it did stays in the usage and audit logs, and its address is free for a new agent. Deleting needs the permission `agents:delete`, which the built-in `admin` role has and maintainers do not. |
 | End one device's sign-in | **Sign out** on the **Activity** tab: that person must sign in again. |
 
@@ -213,6 +237,11 @@ on their **Agents** page.
     takes effect within ten minutes. These are **Agent sign-in lifetime (s)**, **Agent sign-in idle timeout (s)**
     and **Agent access token lifetime (s)** under **Settings → General**.
 
+    With Enterprise, an agent can have shorter ones: **Sign-in lifetimes** on its **Definition** tab, in
+    seconds, at least 60; an empty field keeps the tenant's. They come with the version you save and publish.
+    Longer ones than the tenant's are refused, and lowering the tenant's setting later shortens the agent's too.
+    Devices already signed in get the shorter lifetime when their sign-in is next renewed.
+
 ## When it does not work
 
 The panel says why a sign-in failed:
@@ -220,6 +249,6 @@ The panel says why a sign-in failed:
 | You see | What to do |
 |---|---|
 | **There is no agent under that address.** | The address in the application differs from the agent's. Compare it with the **Agents** list; an agent made without **Start from an app** has an address derived from its name. |
-| **The person has no access.** | Add them, or their group, on the **Access** tab, and check that the agent is published. **Check someone's access** says what stops them. |
+| **The person has no access.** | Add them, or their group, on the **Access** tab, and check that the agent is published. **Check someone's access** says what stops them, such as an exclusion. |
 | **The server does not answer.** | Check the server address in the application and that the computer trusts the server's certificate. |
 | A tool the application offers is not used | It is held back: accept it on the **Apps** tab. |

@@ -67,9 +67,8 @@ Das Konto ist sofort aktiv. Geben Sie das erste Passwort persönlich oder telefo
 sich unter `https://ai.example.internal` an, landet im Chat und kann es unter **Profil verwalten** ändern.
 
 ??? info "Einladungen und Single Sign-on"
-    Es gibt keine Einladungen: Sie legen jedes Konto selbst an. Die Anmeldung mit dem Firmenkonto Ihrer
-    Organisation (Single Sign-on) ist <span class="fs-planned">Geplant</span>: Die Benutzer melden sich dann mit dem
-    Konto an, das sie bereits haben, und erhalten bei der ersten Anmeldung ein Fadenstack-Konto. Siehe auch
+    Es gibt keine Einladungen: Sie legen jedes Konto selbst an, oder die Benutzer erhalten eines, wenn sie sich
+    zum ersten Mal mit dem Konto Ihrer Organisation anmelden (siehe [Anmeldeanbieter](sign-in.md)). Siehe auch
     [Ihr Konto](../use/account.md).
 
 ## Ändern, was jemand darf {#change-what-someone-may-do}
@@ -111,8 +110,9 @@ So erstellen Sie eine: Öffnen Sie **Zugriffskontrolle → Gruppen**, wählen Si
 einen Namen, kreuzen Sie unter **Rollen zuweisen** ihre Rollen an, speichern Sie sie, und wählen Sie dann
 **Mitglieder verwalten** und **Mitglieder hinzufügen**.
 
-Wenn Sie jemanden aus einer Gruppe entfernen, verliert die Person die Rollen der Gruppe. Mit der Gruppe geteilte
-Skills erreichen ihre Chats innerhalb einer Minute nicht mehr.
+Wenn Sie jemanden aus einer Gruppe entfernen, verliert die Person die Rollen der Gruppe, und mit der Gruppe
+geteilte Skills erreichen ihre Chats sofort nicht mehr. Der Eintritt in eine Gruppe oder der Austritt meldet die
+Person ab, wie jede Änderung ihrer Rechte (siehe [Anmeldungen und API-Tokens](#sign-ins-and-api-tokens)).
 
 ## Entwicklermodus {#developer-mode}
 
@@ -130,21 +130,74 @@ kann zu einem Zeitpunkt enden, den Sie unter **Endet** festlegen. Lassen Sie ihn
 
 | | |
 |---|---|
-| **Eine Anmeldung** | gilt 7 Tage; danach melden sich die Benutzer erneut an. **Abmelden** beendet sie sofort. Eine Passwortänderung oder ein Zurücksetzen, eine Sperre und eine entzogene Rolle beenden alle Anmeldungen einer Person; das Gateway bemerkt es innerhalb einer halben Minute. |
+| **Eine Anmeldung** | gilt 7 Tage; danach melden sich die Benutzer erneut an. **Abmelden** beendet sie sofort. Eine Passwortänderung oder ein Zurücksetzen, eine Sperre und jede Änderung der Rechte einer Person beenden sofort alle ihre Anmeldungen, auch die der Agenten auf ihren Geräten: eine Rolle gegeben oder entzogen, der Eintritt in eine Gruppe oder der Austritt, eine Änderung an den Rollen ihrer Gruppen oder an den Berechtigungen ihrer Rollen, das Administratorrecht gegeben oder entzogen. Sie meldet sich erneut an. Jede wird im Audit-Protokoll festgehalten (`user.sign_ins.ended`, mit dem Grund). |
 | **API-Tokens** | erlauben Skripten und Anwendungen, die Modelle über die API zu nutzen. Jede Person erstellt ihre eigenen unter **Profil verwalten** (oder **Mein Profil** in der Konsole) und kann sie dort widerrufen. |
 | **Jedes API-Token läuft ab** | nach 90 Tagen, sofern die Person, die es erstellt, keine andere Gültigkeitsdauer wählt, und spätestens nach einem Jahr. |
 | **Agenten** (der Browser-Agent, die Office-Add-ins) | haben auf jedem Gerät eigene Anmeldungen, zu sehen auf dem Tab **Aktivität** eines Agenten (siehe [Agenten und Add-ins](agents.md)). |
 
-![Die API-Tokens einer Person: jedes Token mit Namen, Erstellungsdatum und Ablaufdatum](../images/administer/user-api-tokens.png)
+![Die API-Tokens einer Person: jedes Token mit Namen, Erstellungsdatum, Ablaufdatum und letzter Nutzung](../images/administer/user-api-tokens.png)
 
 Das Token einer anderen Person widerrufen: Wählen Sie unter **Zugriffskontrolle → Benutzer** in deren Zeile
 **API-Tokens** (das Schlüssel-Symbol) und dann **Widerrufen**. Anwendungen, die ein widerrufenes Token verwenden,
-funktionieren innerhalb einer Minute nicht mehr.
+funktionieren sofort nicht mehr.
+
+Jede Anfrage mit einem API-Token wird festgehalten: wann, von welcher Adresse, mit welcher Anwendung und auf
+welchem Weg; nie, was gesendet wurde. **Zugriffskontrolle → API-Tokens** listet die Tokens aller Personen mit
+Inhaber und letzter Nutzung; **Nutzungen** zeigt die letzten 100 Nutzungen eines Tokens. Jede Person sieht
+dasselbe für ihre eigenen Tokens unter **Profil verwalten**. Die Nutzung eines Tokens zählt auch als Aktivität:
+Die Regel eines Anbieters, nach Tagen ohne Nutzung zu sperren, sperrt so niemanden, der nur über Tokens arbeitet.
+Die Nutzungen werden 90 Tage aufbewahrt und dann gelöscht (`FADEN_BACKEND_API_TOKEN_USE_RETENTION_DAYS` auf dem
+Server; 0 behält sie).
+
+![Zugriffskontrolle → API-Tokens: jedes aktive Token mit Inhaber, Erstellungs- und Ablaufdatum, letzter Nutzung (Zeit, Adresse, Anwendung, Nutzungen in 30 Tagen), Nutzungen und Widerrufen](../images/administer/api-tokens.png)
+
+![Die Nutzungen eines Tokens: wann, von welcher Adresse, mit welcher Anwendung, auf welchem Weg](../images/administer/api-token-uses.png)
 
 ![Einstellungen → Allgemein: „Sign-in lifetime (s)“, „API token lifetime (s)“ und „Longest API token lifetime (s)“](../images/administer/settings-sign-in.png)
 
 Die Gültigkeitsdauern ändern Sie unter **Einstellungen → Allgemein**: **Sign-in lifetime (s)**, **API token
 lifetime (s)** und **Longest API token lifetime (s)**.
+
+### Verknüpfte Anmeldungen {#linked-sign-ins}
+
+![Verknüpfte Anmeldungen einer Person: Example Corp, wann sie sich zuletzt damit angemeldet hat, und dass ihr Passwort sie nicht anmeldet](../images/administer/user-sign-ins.png)
+
+Unter **Zugriffskontrolle → Benutzer** zeigt **Verknüpfte Anmeldungen** (das Ketten-Symbol) in der Zeile einer
+Person die Anmeldeanbieter, mit denen ihr Konto verknüpft ist, und ob auch ihr Passwort sie anmeldet.
+**Trennen** beendet eine Verknüpfung: Die Person kann sich damit nicht mehr anmelden, bis sie sie unter **Mein
+Profil** wieder verknüpft. Das wird mit Ihrem Namen im Audit-Protokoll festgehalten.
+
+Die letzte Art, wie sich eine Person anmeldet, lässt sich nicht trennen, damit niemand versehentlich ausgesperrt
+wird. Soll jemand vom Anbieter zum Passwort wechseln, geben Sie ihm zuerst einen
+[Link zum Zurücksetzen des Passworts](#a-forgotten-password). Um den Zugang zu beenden, sperren Sie stattdessen
+das Konto (siehe [Jemandem den Zugang entziehen](#end-someones-access)).
+
+## Ein vergessenes Passwort {#a-forgotten-password}
+
+Wenn Ihr Server keine E-Mails versendet oder die Person sie nicht erhält, geben Sie ihr einen **Link zum
+Zurücksetzen des Passworts**:
+
+1. Starten Sie den **Root-Modus**.
+2. Wählen Sie unter **Zugriffskontrolle → Benutzer** in ihrer Zeile **Link zum Zurücksetzen des Passworts**
+   (das Schloss-Symbol).
+3. Wählen Sie, wie lange er **Gültig für** ist (**1 Stunde**, oder **24 Stunden** für jemanden, den Sie später
+   erreichen), und geben Sie eine **Begründung** an (mindestens 10 Zeichen).
+4. Wählen Sie **Link erstellen**, dann **Link kopieren**, und geben Sie ihn der Person selbst, über einen Weg,
+   den nur sie liest: persönlich, am Telefon, in einem Chat, dem Sie vertrauen.
+
+Die Person öffnet ihn, sieht ihre Adresse und wählt ein neues Passwort; danach meldet sie sich damit an. Alle
+ihre anderen Anmeldungen enden.
+
+- Wer den Link hat, kann das Konto übernehmen. Deshalb braucht er den Root-Modus, und seine Begründung wird mit
+  Ihrem Namen im Audit-Protokoll festgehalten, ebenso seine Verwendung.
+- Er gilt einmal. Ein neuerer Link ersetzt ihn, ebenso eine Passwortänderung oder eine Sperre.
+- Er wird nur beim Erstellen angezeigt; geht er verloren, erstellen Sie einen neuen.
+- Nicht für Ihr eigenes Konto (ändern Sie es unter **Profil verwalten**) und nicht für ein gesperrtes.
+- Er gibt auch einem Konto, das bei der Anmeldung über einen Anbieter entstanden ist, ein Passwort; ein solches
+  Konto hat keines, das jemand kennt.
+
+Auf dem Server setzt `faden admin reset-password --email alex@example.com` direkt ein neues Passwort (etwa
+wenn sich kein Administrator anmelden kann).
 
 ## Jemandem den Zugang entziehen {#end-someones-access}
 
@@ -154,7 +207,7 @@ lifetime (s)** und **Longest API token lifetime (s)**.
    Personen-Symbol mit einem Strich hindurch).
 2. Bestätigen Sie.
 
-Ihre Anmeldungen, API-Tokens und Agenten funktionieren innerhalb einer Minute nicht mehr. Nichts von ihr wird
+Ihre Anmeldungen, API-Tokens und Agenten funktionieren sofort nicht mehr. Nichts von ihr wird
 gelöscht: **Wieder freigeben** an derselben Stelle gibt ihr den Zugang zurück, die bisherigen Anmeldungen bleiben
 aber beendet: Sie meldet sich neu an. Sie können weder sich selbst sperren noch den letzten Superuser.
 
@@ -227,4 +280,5 @@ nie; es übersteht Upgrades, Sicherungen und Wiederherstellungen.
 | **„User with email '…' already exists“** | Es gibt bereits ein Konto für diese Adresse. Suchen Sie es stattdessen in der Liste. |
 | Jemand landet im Chat, wenn er die Konsole öffnet | Die Person ist kein Superuser. Rollen öffnen die Konsole nicht. |
 | Jemand kann nicht chatten, nachdem Sie ihm eine Rolle gegeben haben | Die angekreuzten Rollen haben `default_user` ersetzt. Bearbeiten Sie die Rollen der Person und kreuzen Sie zusätzlich `default_user` an. |
-| Jemand hat sein Passwort vergessen | Die Konsole kann das Passwort einer anderen Person nicht setzen. Wenn der Server keine E-Mails zum Zurücksetzen versendet, setzt die Person, die ihn betreibt, ein neues, z. B. mit `faden admin reset-password --email alex@example.com` (ohne Angabe wird eines erzeugt). Lassen Sie die Person es unter **Profil verwalten** ändern. |
+| Jemand hat sein Passwort vergessen | Ohne E-Mails zum Zurücksetzen geben Sie der Person einen Link zum Zurücksetzen des Passworts: siehe [Ein vergessenes Passwort](#a-forgotten-password). |
+| **„Start Root Mode first: a password reset link is recorded with its reason.“** | Starten Sie den **Root-Modus** und erstellen Sie den Link erneut. |

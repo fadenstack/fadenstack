@@ -68,6 +68,7 @@
 "Ich habe mein Passwort vergessen" = "forgot-your-password"
 "Wie ändere ich die Sprache oder schalte den dunklen Modus ein?" = "language-and-theme"
 "Wie erstelle ich ein API-Token oder einen Schlüssel?" = "api-tokens"
+"Wie verknüpfe oder trenne ich die Anmeldung meiner Organisation?" = "linked-sign-ins"
 "Warum wurde ich abgemeldet?" = "how-long-a-sign-in-lasts"
 
 ["administer/index.md"]
@@ -86,7 +87,36 @@
 "Wie nutze ich Gruppen?" = "groups"
 "Wie entferne oder sperre ich einen Benutzer?" = "end-someones-access"
 "Wie lange gelten Anmeldungen und API-Token?" = "sign-ins-and-api-tokens"
+"Wie trenne ich den Anmeldeanbieter einer Person?" = "linked-sign-ins"
 "Was ist der Entwicklermodus?" = "developer-mode"
+
+["administer/sign-in.md"]
+"Wie melden sich Benutzer mit ihrem Firmenkonto an (Single Sign-on)?" = ""
+"Wie füge ich Entra ID, Okta, Google oder einen anderen Anmeldeanbieter hinzu?" = "add-a-provider"
+"Wer erhält ein Konto, wenn er sich über einen Anbieter anmeldet?" = "who-may-sign-in-and-what-they-get"
+"Wie verhindere ich die Anmeldung mit Passwort?" = "who-may-sign-in-and-what-they-get"
+"Jemand mit Konto kann sich nicht über den Anbieter anmelden" = "someone-who-already-has-an-account-here"
+
+["administer/sign-in-oidc.md"]
+"Wie binde ich Entra ID oder einen anderen OpenID-Connect-Anbieter an?" = ""
+"Welche Weiterleitungs-URI trage ich ein?" = "register-fadenstack-at-the-provider"
+
+["administer/sign-in-saml.md"]
+"Wie binde ich AD FS oder einen anderen SAML-Identitätsanbieter an?" = ""
+"Wo finde ich die Metadaten des Dienstanbieters?" = "register-fadenstack-at-the-identity-provider"
+
+["administer/sign-in-ldap.md"]
+"Wie melden sich Benutzer mit Active Directory oder LDAP an?" = ""
+"Werden im Verzeichnis deaktivierte Benutzer hier gesperrt?" = "add-the-directory"
+
+["administer/sign-in-provisioning.md"]
+"Wie richte ich die SCIM-Provisionierung aus Entra ID oder Okta ein?" = ""
+"Werden Benutzer, die gehen, ohne Anmeldung gesperrt?" = "what-changes-here"
+"Was speichert Fadenstack über provisionierte Personen?" = "switch-provisioning-on"
+"Wo finde ich die SCIM-Adresse und das Token?" = "switch-provisioning-on"
+"Warum scheitert der Provisionierungstest des Anbieters?" = "when-it-does-not-work"
+"Wie melden sich provisionierte Personen zum ersten Mal an?" = "the-first-sign-in"
+"Wie lasse ich nur provisionierte Personen sich anmelden?" = "the-first-sign-in"
 
 ["administer/models.md"]
 "Wie finde und lade ich ein Modell herunter?" = "find-a-model"

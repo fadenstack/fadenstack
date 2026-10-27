@@ -1,6 +1,7 @@
 /**
- * Who may use an agent (users and teams), who looks after it (maintainers),
- * and why a particular person may or may not use it.
+ * Who may use an agent (users and teams), who may not although a team may
+ * (excluded people, when the server offers it), who looks after it
+ * (maintainers), and why a particular person may or may not use it.
  */
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -9,14 +10,27 @@ import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
+import MenuItem from "@mui/material/MenuItem";
 import Stack from "@mui/material/Stack";
+import TextField from "@mui/material/TextField";
 
-import { agentsApi, type AccessExplanation, type Agent, type AgentGrant, type AgentMember } from "~/api/agents";
+import { hasFeature } from "~/api/about";
+import { AGENT_EXCLUSIONS, agentExclusionsApi, type AgentExclusion } from "~/api/agentExclusions";
+import {
+  AGENT_AUDITORS,
+  agentsApi,
+  type AccessExplanation,
+  type Agent,
+  type AgentGrant,
+  type AgentMember,
+} from "~/api/agents";
 import { principalKey, type PrincipalOption } from "~/api/principals";
 import { AsyncSection } from "~/components/AsyncSection";
+import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { PrincipalList, samePrincipals } from "~/components/PrincipalList";
 import { PrincipalPicker } from "~/components/PrincipalPicker";
 import { SectionCard } from "~/components/SectionCard";
+import { formatDateTime } from "~/lib/dates";
 import { useAction } from "~/lib/useAction";
 import { useAsyncData } from "~/lib/useAsyncData";
 
@@ -40,28 +54,39 @@ const memberRow = (m: AgentMember): MemberRow => ({
 
 const keysOf = (rows: PrincipalOption[]) => new Set(rows.map((r) => principalKey(r.type, r.id)));
 
+const keyOf = (r: PrincipalOption) => principalKey(r.type, r.id);
+
 /**
  * A list edited in place and saved as a whole: the rows on screen, whether
- * they differ from what was loaded, and the save.
+ * they differ from what was loaded (`sameRow` compares what a row holds
+ * beside who it names, such as a role), and the save.
  */
-function useListDraft<T extends PrincipalOption>(loaded: T[]) {
+function useListDraft<T extends PrincipalOption>(loaded: T[], sameRow: (a: T, b: T) => boolean = () => true) {
   const [rows, setRows] = useState<T[]>(loaded);
   useEffect(() => setRows(loaded), [loaded]);
+  const was = useMemo(() => new Map(loaded.map((r) => [keyOf(r), r])), [loaded]);
   return {
     rows,
     taken: useMemo(() => keysOf(rows), [rows]),
-    dirty: !samePrincipals(rows, loaded),
+    dirty: !samePrincipals(rows, loaded) || rows.some((r) => !sameRow(r, was.get(keyOf(r)) ?? r)),
     add: (row: T) => setRows((prev) => [...prev, row]),
-    remove: (row: T) => setRows((prev) => prev.filter((r) => principalKey(r.type, r.id) !== principalKey(row.type, row.id))),
+    replace: (row: T) => setRows((prev) => prev.map((r) => (keyOf(r) === keyOf(row) ? row : r))),
+    remove: (row: T) => setRows((prev) => prev.filter((r) => keyOf(r) !== keyOf(row))),
     reset: () => setRows(loaded),
   };
 }
 
+/** The roles the console names; any other is shown as the server has it. */
+const AUDITOR_ROLE = "auditor";
+const NAMED_ROLES = [NEW_MEMBER_ROLE, AUDITOR_ROLE];
+
 export interface AgentAccessPanelProps {
   agent: Agent;
+  /** The agent itself changed (a restriction lifted): load it again. */
+  onChanged?: () => void;
 }
 
-export function AgentAccessPanel({ agent }: AgentAccessPanelProps) {
+export function AgentAccessPanel({ agent, onChanged }: AgentAccessPanelProps) {
   const { t } = useTranslation();
   const editable = agent.can_manage;
 
@@ -73,11 +98,21 @@ export function AgentAccessPanel({ agent }: AgentAccessPanelProps) {
   });
 
   const grantDraft = useListDraft(grants.data);
-  const memberDraft = useListDraft(members.data);
+  const memberDraft = useListDraft(members.data, (a, b) => a.role === b.role);
+  const auditing = useAsyncData(() => hasFeature(AGENT_AUDITORS), [], { initialValue: false });
+  const roles = auditing.data ? NAMED_ROLES : [NEW_MEMBER_ROLE];
+  const [newRole, setNewRole] = useState(NEW_MEMBER_ROLE);
+  const roleLabel = (role: string) => (NAMED_ROLES.includes(role) ? t(`agents.access.role_${role}`) : role);
   const saveGrants = useAction();
   const saveMembers = useAction();
+  const excluding = useAsyncData(() => hasFeature(AGENT_EXCLUSIONS), [], { initialValue: false });
+  const maintainers = useMemo(() => keysOf(members.data), [members.data]);
 
   const search = (q: string) => agentsApi.findPrincipals(q);
+  const unenforced = agent.unenforced ?? [];
+  const liftable = editable ? (agent.unenforced_restrictions ?? []) : [];
+  const [lifting, setLifting] = useState(false);
+  const lift = useAction();
 
   return (
     <Stack spacing={2}>
@@ -86,6 +121,38 @@ export function AgentAccessPanel({ agent }: AgentAccessPanelProps) {
           {t(agent.status === "retired" ? "agents.access.retired_hint" : "agents.access.draft_hint")}
         </Alert>
       )}
+      {unenforced.length > 0 && (
+        <Alert
+          severity="warning"
+          action={
+            liftable.length > 0 && (
+              <Button color="inherit" size="small" onClick={() => setLifting(true)}>
+                {t("agents.access.lift")}
+              </Button>
+            )
+          }
+        >
+          {t("agents.access.unenforced_hint", { names: unenforced.join(", ") })}
+        </Alert>
+      )}
+      {lift.error && <Alert severity="error">{lift.error}</Alert>}
+      <ConfirmDialog
+        open={lifting}
+        title={t("agents.access.lift_title")}
+        message={t("agents.access.lift_body", { names: liftable.join(", ") })}
+        confirmLabel={t("agents.access.lift_confirm")}
+        cancelLabel={t("common.cancel")}
+        confirmColor="warning"
+        loading={lift.busy}
+        onClose={() => setLifting(false)}
+        onConfirm={() =>
+          void lift
+            .run(async () => {
+              for (const name of liftable) await agentsApi.liftRestriction(agent.slug, name);
+            }, onChanged)
+            .then(() => setLifting(false))
+        }
+      />
 
       <SectionCard title={t("agents.access.users_title")} description={t("agents.access.users_help")}>
         {saveGrants.error && <Alert severity="error">{saveGrants.error}</Alert>}
@@ -121,25 +188,70 @@ export function AgentAccessPanel({ agent }: AgentAccessPanelProps) {
         )}
       </SectionCard>
 
-      <SectionCard title={t("agents.access.maintainers_title")} description={t("agents.access.maintainers_help")}>
+      {editable && excluding.data && <ExcludedPeople agent={agent} maintainers={maintainers} />}
+
+      <SectionCard
+        title={t(auditing.data ? "agents.access.members_title" : "agents.access.maintainers_title")}
+        description={
+          auditing.data
+            ? `${t("agents.access.maintainers_help")} ${t("agents.access.auditors_help")}`
+            : t("agents.access.maintainers_help")
+        }
+      >
         {saveMembers.error && <Alert severity="error">{saveMembers.error}</Alert>}
         <AsyncSection loading={members.loading} error={members.error} empty={members.data.length === 0}>
           <Stack spacing={1}>
             {editable && (
-              <PrincipalPicker
-                search={search}
-                types={["user"]}
-                exclude={memberDraft.taken}
-                placeholder={t("agents.access.add_maintainers")}
-                onPick={(p) => memberDraft.add({ ...p, role: NEW_MEMBER_ROLE })}
-              />
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
+                {roles.length > 1 && (
+                  <TextField
+                    select
+                    size="small"
+                    label={t("agents.access.add_as")}
+                    value={newRole}
+                    onChange={(e) => setNewRole(e.target.value)}
+                    sx={{ minWidth: 160 }}
+                  >
+                    {roles.map((r) => (
+                      <MenuItem key={r} value={r}>
+                        {roleLabel(r)}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                )}
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <PrincipalPicker
+                    search={search}
+                    types={["user"]}
+                    exclude={memberDraft.taken}
+                    placeholder={t(roles.length > 1 ? "agents.access.add_member" : "agents.access.add_maintainers")}
+                    onPick={(p) => memberDraft.add({ ...p, role: roles.includes(newRole) ? newRole : NEW_MEMBER_ROLE })}
+                  />
+                </Box>
+              </Stack>
             )}
             <PrincipalList
               items={memberDraft.rows}
               emptyText={t("agents.access.no_maintainers")}
               onRemove={editable ? memberDraft.remove : undefined}
               renderControl={(m) =>
-                m.role !== NEW_MEMBER_ROLE && <Chip size="small" variant="outlined" label={m.role} />
+                editable && roles.length > 1 ? (
+                  <TextField
+                    select
+                    size="small"
+                    value={m.role}
+                    onChange={(e) => memberDraft.replace({ ...m, role: e.target.value })}
+                    slotProps={{ select: { SelectDisplayProps: { "aria-label": t("agents.access.role_of", { who: m.label }) } } }}
+                  >
+                    {[...new Set([...roles, m.role])].map((r) => (
+                      <MenuItem key={r} value={r}>
+                        {roleLabel(r)}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                ) : (
+                  m.role !== NEW_MEMBER_ROLE && <Chip size="small" variant="outlined" label={roleLabel(m.role)} />
+                )
               }
             />
           </Stack>
@@ -178,6 +290,95 @@ function SaveRow({ dirty, busy, onReset, onSave }: { dirty: boolean; busy: boole
   );
 }
 
+type ExclusionRow = PrincipalOption & { exclusion: AgentExclusion };
+
+const MIN_REASON = 3;
+const MAX_REASON = 500;
+
+/**
+ * People who may not use the agent although a team of theirs may, each with
+ * why. Every change applies at once (and is audited); maintainers are not
+ * offered, as they always keep the agent.
+ */
+function ExcludedPeople({ agent, maintainers }: { agent: Agent; maintainers: Set<string> }) {
+  const { t } = useTranslation();
+  const list = useAsyncData(async () => agentExclusionsApi.list(agent.slug), [agent.slug], {
+    initialValue: [] as AgentExclusion[],
+  });
+  const [who, setWho] = useState<PrincipalOption | null>(null);
+  const [reason, setReason] = useState("");
+  const change = useAction();
+
+  const rows = useMemo<ExclusionRow[]>(
+    () => list.data.map((e) => ({ type: "user", id: e.user_id, label: e.email, exclusion: e })),
+    [list.data],
+  );
+  const taken = useMemo(() => new Set([...maintainers, ...keysOf(rows)]), [maintainers, rows]);
+  const tooShort = reason.trim().length < MIN_REASON;
+
+  const done = () => {
+    setWho(null);
+    setReason("");
+    return list.refresh(true);
+  };
+
+  return (
+    <SectionCard title={t("agents.access.excluded_title")} description={t("agents.access.excluded_help")}>
+      {change.error && <Alert severity="error">{change.error}</Alert>}
+      <AsyncSection loading={list.loading} error={list.error} empty={list.data.length === 0}>
+        <Stack spacing={1}>
+          {who ? (
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "flex-start" }}>
+              <Chip label={who.label} onDelete={change.busy ? undefined : () => setWho(null)} sx={{ mt: { sm: 0.5 } }} />
+              <TextField
+                size="small"
+                fullWidth
+                autoFocus
+                label={t("agents.access.excluded_reason")}
+                helperText={t("agents.access.excluded_reason_help")}
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                slotProps={{ htmlInput: { maxLength: MAX_REASON } }}
+              />
+              <Button
+                variant="contained"
+                size="small"
+                disabled={tooShort || change.busy}
+                sx={{ mt: { sm: 0.5 }, flexShrink: 0 }}
+                onClick={() => void change.run(() => agentExclusionsApi.add(agent.slug, who.id, reason.trim()), done)}
+              >
+                {t("agents.access.exclude")}
+              </Button>
+            </Stack>
+          ) : (
+            <PrincipalPicker
+              search={(q) => agentsApi.findPrincipals(q)}
+              types={["user"]}
+              exclude={taken}
+              placeholder={t("agents.access.add_excluded")}
+              disabled={change.busy}
+              onPick={setWho}
+            />
+          )}
+          <PrincipalList
+            items={rows}
+            emptyText={t("agents.access.nobody_excluded")}
+            onRemove={
+              change.busy ? undefined : (row) => void change.run(() => agentExclusionsApi.remove(agent.slug, row.id), done)
+            }
+            renderSecondary={({ exclusion: e }) =>
+              `${e.reason} · ${t(e.created_by ? "agents.access.excluded_by" : "agents.access.excluded_on", {
+                who: e.created_by,
+                when: formatDateTime(e.created_at),
+              })}`
+            }
+          />
+        </Stack>
+      </AsyncSection>
+    </SectionCard>
+  );
+}
+
 /** Pick a user, see whether they may use the agent and why. */
 function AccessCheck({ agent }: { agent: Agent }) {
   const { t } = useTranslation();
@@ -189,7 +390,8 @@ function AccessCheck({ agent }: { agent: Agent }) {
       <PrincipalPicker
         search={(q) => agentsApi.findPrincipals(q)}
         types={["user"]}
-        placeholder={t("agents.access.check_placeholder")}
+        // Those who only inspect the agent find a person by the whole address (the backend's rule).
+        placeholder={t(agent.can_manage ? "agents.access.check_placeholder" : "agents.access.check_placeholder_exact")}
         disabled={check.busy}
         onPick={(who) => {
           setChecked(null);

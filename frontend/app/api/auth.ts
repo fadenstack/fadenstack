@@ -6,6 +6,14 @@ export interface AuthUser {
   is_verified: boolean;
 }
 
+/** What the sign-in page may offer (``GET /api/auth/options``). */
+export interface SignInOptions {
+  /** A forgotten password is reset by mail; otherwise an administrator sets a new one. */
+  password_reset: boolean;
+  /** The page links back to fadenstack.com (absent: it does). */
+  vendor_links?: boolean;
+}
+
 const ME_CACHE_TTL_MS = 30_000;
 
 let meCache: { value: AuthUser; expiresAt: number } | null = null;
@@ -23,6 +31,29 @@ async function assertOk(res: Response): Promise<void> {
   }
 }
 
+/**
+ * A refused password sign-in: ``code`` is the backend's (``LOGIN_BAD_CREDENTIALS``,
+ * ``LOGIN_USE_SIGN_IN_PROVIDER``, ...), or ``TOO_MANY`` when the server is rate-limiting, or ``OTHER``.
+ */
+export class LoginRefused extends Error {
+  constructor(readonly code: string) {
+    super(code);
+  }
+}
+
+/** A refused reset by an administrator's link: ``expired``, or the password rule's words. */
+export class ResetRefused extends Error {
+  constructor(readonly reason: string) {
+    super(reason);
+  }
+}
+
+async function refusal(res: Response): Promise<LoginRefused> {
+  if (res.status === 429) return new LoginRefused("TOO_MANY");
+  const body = (await res.json().catch(() => ({}))) as { detail?: unknown };
+  return new LoginRefused(typeof body.detail === "string" ? body.detail : "OTHER");
+}
+
 export const auth = {
   async login(username: string, password: string): Promise<void> {
     const body = new URLSearchParams({ username, password });
@@ -32,17 +63,28 @@ export const auth = {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: body.toString(),
     });
+    if (res.status === 400 || res.status === 429) throw await refusal(res);
     await assertOk(res);
     clearMeCache();
   },
 
+  /**
+   * Signs out here; for a sign-in that came through a provider asking for it (SAML Single Logout), the
+   * browser then goes to the provider to be signed out there too, and comes back to the sign-in page.
+   */
   async logout(): Promise<void> {
-    const res = await fetch("/api/auth/cookie/logout", {
+    const res = await fetch("/api/auth/sso/sign-out", {
       method: "POST",
       credentials: "include",
     });
     await assertOk(res);
     clearMeCache();
+    const { redirect_url: redirectUrl } = (await res.json()) as { redirect_url: string | null };
+    if (redirectUrl) {
+      window.location.assign(redirectUrl);
+      // The page goes away: nothing that would follow a sign-out here runs first.
+      await new Promise<never>(() => {});
+    }
   },
 
   async me(): Promise<AuthUser> {
@@ -91,6 +133,16 @@ export const auth = {
     clearMeCache();
   },
 
+  /**
+   * What the sign-in page may offer: a reset of a forgotten password by mail only while this server can send
+   * mail. Unknown (an older server, no answer) reads as offered, as before.
+   */
+  async options(): Promise<SignInOptions> {
+    const res = await fetch("/api/auth/options", { credentials: "include" });
+    if (!res.ok) return { password_reset: true };
+    return (await res.json()) as SignInOptions;
+  },
+
   async forgotPassword(email: string): Promise<void> {
     const res = await fetch("/api/auth/forgot-password", {
       method: "POST",
@@ -101,6 +153,35 @@ export const auth = {
     if (res.status !== 202) {
       await assertOk(res);
     }
+  },
+
+  /** Whose password a link from an administrator sets; ``null`` once it no longer works. Changes nothing. */
+  async resetLinkPreview(token: string): Promise<{ email: string; expires_at: string } | null> {
+    const res = await fetch("/api/auth/reset-link/preview", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+    if (res.status === 404) return null;
+    await assertOk(res);
+    return (await res.json()) as { email: string; expires_at: string };
+  },
+
+  /**
+   * Set a new password with a link from an administrator, once; nobody is signed in. Throws
+   * ``ResetRefused("expired")``, or ``ResetRefused`` with the password rule's words.
+   */
+  async resetWithLink(token: string, password: string): Promise<void> {
+    const res = await fetch("/api/auth/reset-link/use", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, password }),
+    });
+    if (res.ok) return;
+    const body = (await res.json().catch(() => ({}))) as { detail?: unknown };
+    throw new ResetRefused(typeof body.detail === "string" ? body.detail : `status_${res.status}`);
   },
 
   async resetPassword(token: string, password: string): Promise<void> {

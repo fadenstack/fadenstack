@@ -6,7 +6,12 @@ tests drive that code, and three of them mocked only some of the helpers
 and killed the development stack the developer was running at the time.
 A test run should never be able to do that. The same went for a deploy step
 that ran `docker exec faden-postgres` for real and switched off logins of the
-developer's database, so a real `docker exec` fails the test too.
+developer's database, so a real `docker exec` fails the test too. And for the
+runtime images `deploy` and `upgrade` fetch at the end: the upgrade tests read
+the pins out of the real backend image and pulled every runtime image it names
+(about 10 GB each), which filled CI's disk; a machine that already had them
+passed. So that step's Docker is answered "not here", and a real `docker pull`
+fails the test.
 
 The guard patches the primitives rather than the functions, so the tests that
 exist to exercise the matching logic still call the real thing; they just
@@ -17,10 +22,12 @@ this fixture and therefore wins.
 
 from __future__ import annotations
 
+import subprocess
+
 import pytest
 
 from faden_cli.commands.dev import dev_up
-from faden_cli.core import backend_tool, backup, sealing
+from faden_cli.core import backend_tool, backup, runtime_images, sealing
 
 
 @pytest.fixture(autouse=True)
@@ -33,6 +40,12 @@ def never_touch_real_processes(monkeypatch: pytest.MonkeyPatch) -> None:
     # The upgrade, deploy and rebuild steps that carry chat files out of the gateway container: none here.
     monkeypatch.setattr(backup, "keep_chat_files", lambda *_a, **_k: None)
     monkeypatch.setattr(backup, "keep_company_files", lambda *_a, **_k: None)
+    # The runtime images step's Docker (reading the pins out of the backend image, inspecting, pulling): it
+    # finds nothing, says so and goes on, as it does on a server without Docker. Its own tests fake `_run`.
+    monkeypatch.setattr(
+        runtime_images, "_run",
+        lambda cmd, **_k: subprocess.CompletedProcess(cmd, 1, "", "no Docker in the tests"),
+    )
 
     # Nothing to find...
     monkeypatch.setattr(dev_up.psutil, "process_iter", lambda *_a, **_k: [])
@@ -60,6 +73,11 @@ def never_touch_real_processes(monkeypatch: pytest.MonkeyPatch) -> None:
             "cp" in args[1:2] or list(args[1:3]) == ["volume", "create"]
         ):
             pytest.fail(f"a test reached a real `docker cp` or `docker volume create`: {args!r}")
+        # Nor a pull: the images are gigabytes, and a test passes only where they happen to be present.
+        if isinstance(args, (list, tuple)) and isinstance(first, str) and "docker" in first.lower() and (
+            "pull" in args[1:2]
+        ):
+            pytest.fail(f"a test reached a real `docker pull`: {args!r}")
         return real_run(args, *rest, **kwargs)
 
     monkeypatch.setattr(dev_up.subprocess, "run", guarded_run)

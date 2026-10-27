@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  adminAuthProviders,
   adminGroups,
   adminUsers,
+  teamKeeper,
   type Group,
   type GroupMember,
   type RbacRole,
@@ -29,6 +31,7 @@ import ListItem from "@mui/material/ListItem";
 import ListItemText from "@mui/material/ListItemText";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 
 import AddIcon from "@mui/icons-material/Add";
@@ -42,22 +45,29 @@ export default function GroupsPage() {
 
   // ── Data loading via useAsyncData ──
   const {
-    data: { groups, roles, allUsers },
+    data: { groups, roles, allUsers, providerNames },
     loading,
     error,
     refresh: load,
     setError,
   } = useAsyncData(
     async () => {
-      const [g, r, u] = await Promise.all([
+      const [g, r, u, p] = await Promise.all([
         adminGroups.list(),
         adminUsers.listRoles(),
         adminUsers.list(),
+        // Only to name the provider that keeps a group; its key stands in when it cannot be had.
+        adminAuthProviders.listPublic().catch(() => []),
       ]);
-      return { groups: g, roles: r, allUsers: u };
+      return { groups: g, roles: r, allUsers: u, providerNames: new Map(p.map((x) => [x.key, x.name])) };
     },
     [],
-    { initialValue: { groups: [] as Group[], roles: [] as RbacRole[], allUsers: [] as AdminUser[] } },
+    {
+      initialValue: {
+        groups: [] as Group[], roles: [] as RbacRole[], allUsers: [] as AdminUser[],
+        providerNames: new Map<string, string>(),
+      },
+    },
   );
 
   // Group editor dialog
@@ -201,9 +211,23 @@ export default function GroupsPage() {
       key: "name",
       label: t("groups.name"),
       sortable: true,
-      render: (row) => (
-        <Typography fontWeight={600}>{row.name}</Typography>
-      ),
+      render: (row) => {
+        const keeper = teamKeeper(row);
+        return (
+          <Stack spacing={0.5} alignItems="flex-start">
+            <Typography fontWeight={600}>{row.name}</Typography>
+            {keeper && (
+              <Tooltip title={t("groups.kept_by_help")}>
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  label={t("groups.kept_by", { provider: providerNames.get(keeper) ?? keeper })}
+                />
+              </Tooltip>
+            )}
+          </Stack>
+        );
+      },
     },
     {
       key: "description",

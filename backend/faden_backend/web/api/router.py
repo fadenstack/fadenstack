@@ -4,6 +4,7 @@ from faden_backend.web.api import about, docs, i18n, logs, monitoring, users
 from faden_backend.web.api.admin import admin_router
 from faden_backend.web.api.agents.views import router as agents_router
 from faden_backend.web.api.agents.views import tokens_router as agent_tokens_router
+from faden_backend.web.api.auth_sso import router as auth_sso_router
 from faden_backend.web.api.bootstrap.views import router as bootstrap_router
 from faden_backend.web.api.chat.views import router as chat_router
 from faden_backend.web.api.inference import inference_router
@@ -18,6 +19,7 @@ api_router = APIRouter()
 api_router.include_router(monitoring.router)
 api_router.include_router(about.router)
 api_router.include_router(users.router)
+api_router.include_router(auth_sso_router, prefix="/auth/sso", tags=["auth"])
 api_router.include_router(docs.router)
 api_router.include_router(bootstrap_router)
 api_router.include_router(admin_router, prefix="/admin", tags=["admin"])

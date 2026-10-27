@@ -8,7 +8,7 @@
  * the user picked -- the same button and choice as the admin console.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams, useOutletContext } from "react-router";
+import { useNavigate, useParams, useOutletContext, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import Box from "@mui/material/Box";
 import Dialog from "@mui/material/Dialog";
@@ -76,7 +76,9 @@ export default function ChatPage() {
   const [selectedModel, setSelectedModel] = useState<string>("");
   const [languages, setLanguages] = useState<UiLanguage[]>([]);
   const [language, setLanguage] = useState<string>(i18n.resolvedLanguage || i18n.language || "en");
-  const [profileOpen, setProfileOpen] = useState(false);
+  const [search] = useSearchParams();
+  // A provider linked from My Profile comes back here with how it went: My Profile says it.
+  const [profileOpen, setProfileOpen] = useState(() => search.has("linked") || search.has("link_refused"));
   const [toolDrawerOpen, setToolDrawerOpen] = useState(false);
   const [drawerTab, setDrawerTab] = useState(0);
   const { executionMode, setExecutionMode } = useToolPolicy(sessionId ?? null);

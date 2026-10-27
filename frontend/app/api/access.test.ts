@@ -14,6 +14,11 @@ describe("access keys and agent rights", () => {
     expect(agentRights(can)).toEqual({ open: true, create: false, seeAll: false, delete: false });
   });
 
+  it("an auditor opens the agents pages too, sees their own, creates none", () => {
+    const can = canFrom(new Set(accessKeys({ permissions: [perm("chat", "use")], inspects_agents: true })));
+    expect(agentRights(can)).toEqual({ open: true, create: false, seeAll: false, delete: false });
+  });
+
   it("deleting agents is a role's agents:delete, which maintaining does not give", () => {
     const can = canFrom(new Set(accessKeys({ permissions: [perm("agents", "delete")], maintains_agents: false })));
     expect(agentRights(can)).toMatchObject({ delete: true, create: false });

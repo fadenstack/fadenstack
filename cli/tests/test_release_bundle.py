@@ -94,6 +94,10 @@ def _no_docker(monkeypatch: pytest.MonkeyPatch, calls: list[str]) -> None:
     monkeypatch.setattr(bootstrap, "wait_for_backend", lambda *a, **k: True)
     monkeypatch.setattr(deploy_module, "_sync_postgres_password", lambda *a, **k: None)
     monkeypatch.setattr(deploy_module, "retire_fixed_logins", lambda *a, **k: [])
+    # The runtime images are pulled for real otherwise: several gigabytes, on any machine with Docker.
+    from faden_cli.commands import runtime_images  # noqa: PLC0415
+
+    monkeypatch.setattr(runtime_images, "run_step", lambda *a, **k: calls.append("runtime images"))
 
 
 def _configure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, install: Path) -> None:
@@ -137,7 +141,7 @@ def test_an_upgrade_moves_a_release_install_to_this_release(
     assert "REDIS_AUTH" in env, "keys a release introduces are added"
     assert env["FADEN_BACKEND_BOOTSTRAP_TOKEN"], "an install from before the bootstrap token gets one"
     # Pulled, not built; then the front door restarts first, and the rest.
-    assert calls == ["pull", "up", "up"], "published images are pulled, not built"
+    assert calls == ["pull", "up", "up", "runtime images"], "published images are pulled, not built"
     assert bundle.installed_release(install) == __version__
 
 

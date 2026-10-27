@@ -24,10 +24,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette import status
 
 from faden_backend.db.dao.rbac_dao import RbacDAO
-from faden_backend.db.models.agents import AgentGrant, AgentMember, AgentRefreshToken, AgentVersion
+from faden_backend.db.models.agents import Agent, AgentGrant, AgentMember, AgentRefreshToken, AgentVersion
 from faden_backend.db.models.containers import AuditEvent
 from faden_backend.db.models.groups import Group, UserGroup
-from faden_backend.db.models.users import User, current_active_user
+from faden_backend.db.models.users import User, current_active_user, end_sign_ins
+from faden_backend.services.agents import access
 from faden_backend.services.extensions import registry
 from faden_backend.settings import settings
 
@@ -327,6 +328,57 @@ async def test_settings_nothing_enforces_close_the_agent_to_all_but_maintainers(
     assert (await _access(client, "was-enterprise", admin))["allowed"] is True
 
 
+async def test_a_restriction_nothing_enforces_closes_the_agent_to_all_but_maintainers(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession, clean_registry: None,
+) -> None:
+    """An extension's restriction on the agent itself (Enterprise's exclusions), with the extension gone."""
+    signed_in.user = admin = await _user(dbsession, admin=True)
+    user = await _user(dbsession)
+    agent = await _agent(client, slug="restricted")
+    await _grant(client, "restricted", ("user", user.id))
+    agent_id = uuid.UUID(agent["id"])
+    await access.set_restricted(dbsession, agent_id, "exclusions", on=True)
+    await access.set_restricted(dbsession, agent_id, "exclusions", on=True)  # once is enough
+    row = await dbsession.get(Agent, agent_id)
+    await dbsession.refresh(row)
+    assert row.restricted_by == ["exclusions"]
+
+    decision = await _access(client, "restricted", user)
+    assert decision["code"] == "needs_enterprise" and "exclusions" in decision["detail"]
+    assert (await _access(client, "restricted", admin))["allowed"] is True
+    told = (await client.get("/api/agents/restricted")).json()
+    assert (told["unenforced"], told["unenforced_restrictions"]) == (["exclusions"], ["exclusions"]), "to managers"
+    lift = "/api/agents/restricted/restrictions/exclusions"
+    registry.agent_restrictions.add("exclusions")  # the extension is back and enforces it
+    try:
+        assert (await _access(client, "restricted", user))["allowed"] is True
+        assert (await client.get("/api/agents/restricted")).json()["unenforced"] == []
+        assert (await client.delete(lift)).status_code == status.HTTP_409_CONFLICT, "changed where it is kept"
+    finally:
+        registry.agent_restrictions.discard("exclusions")
+
+    # With the extension gone for good, a manager opens the agent again.
+    assert (await client.delete("/api/agents/restricted/restrictions/other")).status_code == 404
+    signed_in.user = user
+    assert (await client.delete(lift)).status_code == status.HTTP_403_FORBIDDEN
+    signed_in.user = admin
+    lifted = await client.delete(lift)
+    assert lifted.status_code == 200, lifted.text
+    assert (lifted.json()["unenforced"], lifted.json()["unenforced_restrictions"]) == ([], [])
+    await dbsession.refresh(row)
+    assert row.restricted_by == []
+    assert (await _access(client, "restricted", user))["allowed"] is True
+    event = await dbsession.scalar(select(AuditEvent).where(
+        AuditEvent.action == "agent.restriction.lift", AuditEvent.target_id == str(agent_id),
+    ))
+    assert event is not None and event.severity == "high" and json.loads(event.metadata_json) == {
+        "restriction": "exclusions",
+    }
+    await access.set_restricted(dbsession, agent_id, "exclusions", on=False)  # already off: nothing changes
+    await dbsession.refresh(row)
+    assert row.restricted_by == []
+
+
 async def test_a_user_lists_only_the_agents_they_can_use(
     signed_in: _As, client: AsyncClient, dbsession: AsyncSession,
 ) -> None:
@@ -388,6 +440,57 @@ async def test_me_access_says_whether_the_user_maintains_an_agent(
     assert (await client.get("/api/admin/users/me/access")).json()["maintains_agents"] is True
 
 
+async def test_a_member_in_an_added_role_sees_the_agent_and_changes_nothing(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession,
+) -> None:
+    """A role an extension adds (Enterprise's auditor): read-only; using the agent still takes a grant."""
+    signed_in.user = admin = await _user(dbsession, admin=True)
+    auditor = await _user(dbsession)
+    await _agent(client, slug="audited")
+    members = {"members": [{"user_id": str(admin.id)}, {"user_id": str(auditor.id), "role": "auditor"}]}
+    refused = await client.put("/api/agents/audited/members", json=members)
+    assert refused.status_code == status.HTTP_400_BAD_REQUEST and "auditor" in refused.text, "nothing adds it yet"
+
+    registry.member_roles.add("auditor")
+    try:
+        assert (await client.put("/api/agents/audited/members", json=members)).status_code == 200
+        signed_in.user = auditor
+        assert (await client.get("/api/admin/users/me/access")).json()["inspects_agents"] is True
+        assert [a["slug"] for a in (await client.get("/api/agents")).json()] == ["audited"]
+        detail = await client.get("/api/agents/audited")
+        assert detail.status_code == 200 and detail.json()["can_manage"] is False
+        for path in ("versions", "versions/1", "grants", "members", f"access/{auditor.id}", "usage", "apps"):
+            # Usage has no database of its own in these tests (503): past the check all the same.
+            assert (await client.get(f"/api/agents/audited/{path}")).status_code not in (401, 403, 404), path
+        assert (await client.patch("/api/agents/audited", json={"name": "Mine"})).status_code == 403
+        assert (await client.put("/api/agents/audited/grants", json={"grants": []})).status_code == 403
+        assert (await client.put("/api/agents/audited/members", json=members)).status_code == 403
+        assert (await client.post("/api/agents/audited/retire")).status_code == 403
+        assert (await _access(client, "audited", auditor))["allowed"] is False, "no grant, no use"
+        checks = (await dbsession.execute(select(AuditEvent).where(
+            AuditEvent.action == "agent.access.check", AuditEvent.actor_id == auditor.id,
+        ))).scalars().all()
+        assert checks and json.loads(checks[-1].metadata_json or "{}")["checked"] == str(auditor.id), "recorded"
+        # For the access check, a person by the whole address only: no list of everyone (GDPR Art. 5(1)(c)).
+        found = await client.get("/api/agents/principals", params={"q": auditor.email[:6]})
+        assert found.status_code == 200 and found.json() == [], "a part of an address finds nobody"
+        whole = (await client.get("/api/agents/principals", params={"q": admin.email.upper()})).json()
+        assert [p["label"] for p in whole] == [admin.email]
+    finally:
+        registry.member_roles.discard("auditor")
+
+    # The role no longer added: the membership gives nothing, and the maintainers can still edit the members.
+    assert (await client.get("/api/agents/audited/versions")).status_code == 403
+    assert (await client.get("/api/agents/principals", params={"q": auditor.email[:6]})).status_code == 403
+    assert (await client.get("/api/agents")).json() == []
+    assert (await client.get("/api/admin/users/me/access")).json()["inspects_agents"] is False
+    signed_in.user = admin
+    assert (await client.put("/api/agents/audited/members", json=members)).status_code == 200, "kept as it was"
+    other = await _user(dbsession)
+    given = {"members": [*members["members"], {"user_id": str(other.id), "role": "auditor"}]}
+    assert (await client.put("/api/agents/audited/members", json=given)).status_code == 400, "not given anew"
+
+
 async def test_grants_name_known_principals_only(
     signed_in: _As, client: AsyncClient, dbsession: AsyncSession,
 ) -> None:
@@ -422,6 +525,8 @@ async def test_grants_and_members_are_labelled_and_principals_found_by_agent_man
     # A maintainer without RBAC rights may look principals up; someone who manages no agent may not.
     signed_in.user = member
     assert (await client.get("/api/agents/principals", params={"q": "exam"})).status_code == status.HTTP_200_OK
+    partly = (await client.get("/api/agents/principals", params={"q": member.email[:6]})).json()
+    assert {"type": "user", "id": str(member.id), "label": member.email} in partly, "a maintainer grants: searches"
     signed_in.user = await _user(dbsession)
     r = await client.get("/api/agents/principals", params={"q": "exam"})
     assert r.status_code == status.HTTP_403_FORBIDDEN
@@ -714,6 +819,26 @@ async def test_refresh_rotates_and_a_reused_token_ends_the_sign_in(
     assert r.json()["detail"]["code"] == "refresh_token_reused"
     r = await client.post("/api/agent-tokens/refresh", json={"refresh_token": second["refresh_token"]})
     assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+async def test_an_apps_sign_in_ends_with_the_persons_other_sign_ins(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession, secret: str,
+) -> None:
+    """A password change, a suspension or a change of rights ends the apps' sign-ins too (ASVS 5.0 V7.4.1)."""
+    signed_in.user = await _user(dbsession, admin=True)
+    user = await _user(dbsession)
+    await _agent(client, slug="ends-with-others")
+    await _grant(client, "ends-with-others", ("user", user.id))
+    signed_in.user = user
+    tokens = (await _sign_in(client, "ends-with-others")).json()
+    end_sign_ins(user)
+    await dbsession.flush()
+    r = await client.post("/api/agent-tokens/refresh", json={"refresh_token": tokens["refresh_token"]})
+    assert r.status_code == status.HTTP_401_UNAUTHORIZED
+    assert r.json()["detail"]["code"] == "sign_in_ended"
+    again = (await _sign_in(client, "ends-with-others")).json()
+    r = await client.post("/api/agent-tokens/refresh", json={"refresh_token": again["refresh_token"]})
+    assert r.status_code == status.HTTP_200_OK, "a sign-in made after it works"
 
 
 async def test_refresh_is_refused_once_the_grant_is_gone(

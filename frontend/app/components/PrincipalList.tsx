@@ -24,9 +24,17 @@ export interface PrincipalListProps<T extends PrincipalOption> {
   onRemove?: (item: T) => void;
   /** A control at the end of the row, before remove. */
   renderControl?: (item: T) => ReactNode;
+  /** A second line under the name (a reason, who and when). */
+  renderSecondary?: (item: T) => ReactNode;
 }
 
-export function PrincipalList<T extends PrincipalOption>({ items, emptyText, onRemove, renderControl }: PrincipalListProps<T>) {
+export function PrincipalList<T extends PrincipalOption>({
+  items,
+  emptyText,
+  onRemove,
+  renderControl,
+  renderSecondary,
+}: PrincipalListProps<T>) {
   const { t } = useTranslation();
   return (
     <List dense disablePadding>
@@ -45,7 +53,11 @@ export function PrincipalList<T extends PrincipalOption>({ items, emptyText, onR
           <ListItemIcon sx={{ minWidth: 32 }}>
             <PrincipalIcon type={item.type} />
           </ListItemIcon>
-          <ListItemText primary={item.label} slotProps={{ primary: { noWrap: true } }} />
+          <ListItemText
+            primary={item.label}
+            secondary={renderSecondary?.(item)}
+            slotProps={{ primary: { noWrap: true } }}
+          />
           {renderControl && <span style={{ marginRight: onRemove ? 40 : 0 }}>{renderControl(item)}</span>}
         </ListItem>
       ))}

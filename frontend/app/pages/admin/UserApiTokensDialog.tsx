@@ -18,6 +18,7 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 
 import { adminUsers, type AdminUser, type ApiTokenInfo } from "~/api/admin";
+import { TokenLastUse, TokenUsesDialog } from "~/components/users/ApiTokenUses";
 
 export function UserApiTokensDialog({ user, onClose }: { user: AdminUser | null; onClose: () => void }) {
   const { t, i18n } = useTranslation();
@@ -25,6 +26,7 @@ export function UserApiTokensDialog({ user, onClose }: { user: AdminUser | null;
   const [tokens, setTokens] = useState<ApiTokenInfo[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [showing, setShowing] = useState<ApiTokenInfo | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -85,7 +87,11 @@ export function UserApiTokensDialog({ user, onClose }: { user: AdminUser | null;
                       ? t("profile.token_expires", { date: formatDate(tok.expires_at) })
                       : t("profile.token_never_expires")}
                   </Typography>
+                  <TokenLastUse token={tok} />
                 </Box>
+                <Button size="small" onClick={() => setShowing(tok)}>
+                  {t("api_tokens.show_uses")}
+                </Button>
                 {tok.revoked_at && <Chip size="small" label={t("profile.token_revoked")} />}
                 {expired && <Chip size="small" label={t("profile.token_expired")} />}
                 {live && (
@@ -101,6 +107,7 @@ export function UserApiTokensDialog({ user, onClose }: { user: AdminUser | null;
       <DialogActions>
         <Button onClick={onClose}>{t("common.close")}</Button>
       </DialogActions>
+      <TokenUsesDialog token={showing} load={adminUsers.listApiTokenUses} onClose={() => setShowing(null)} />
     </Dialog>
   );
 }

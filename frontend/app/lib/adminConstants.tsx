@@ -56,6 +56,7 @@ import PeopleIcon from "@mui/icons-material/People";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import GroupWorkIcon from "@mui/icons-material/GroupWork";
 import VpnKeyIcon from "@mui/icons-material/VpnKey";
+import KeyIcon from "@mui/icons-material/Key";
 import ApiIcon from "@mui/icons-material/Api";
 import DataThresholdingIcon from "@mui/icons-material/DataThresholding";
 import InsightsIcon from "@mui/icons-material/Insights";
@@ -380,6 +381,7 @@ export const NAV: NavEntry[] = [
         icon: <AdminPanelSettingsIcon />,
       },
       { to: "/admin/groups", labelKey: "nav.groups", icon: <GroupWorkIcon /> },
+      { to: "/admin/api-tokens", labelKey: "nav.api_tokens", icon: <KeyIcon /> },
       {
         to: "/admin/auth-providers",
         labelKey: "nav.auth_providers",
@@ -589,6 +591,7 @@ export function adminPageTitle(
   if (pathname.startsWith("/admin/users")) return t("users.title");
   if (pathname.startsWith("/admin/roles")) return t("roles.title");
   if (pathname.startsWith("/admin/groups")) return t("groups.title");
+  if (pathname.startsWith("/admin/api-tokens")) return t("api_tokens.title");
   if (pathname.startsWith("/admin/auth-providers"))
     return t("auth_providers.title");
   if (pathname.startsWith("/admin/rag/runtime")) return t("rag_runtime.title");

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link as RouterLink } from "react-router";
 import { useTranslation } from "react-i18next";
@@ -22,6 +22,23 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Without mail (no mail sender on this server) a reset link cannot be sent: an administrator sets a new one.
+  const [byMail, setByMail] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    auth
+      .options()
+      .then((options) => {
+        if (!cancelled) setByMail(options.password_reset === true);
+      })
+      .catch(() => {
+        // unknown: the form stays; the server answers the same for every address
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -61,6 +78,11 @@ export default function ForgotPasswordPage() {
               {t("auth.forgot_password_desc")}
             </Typography>
 
+            {!byMail && (
+              <Alert severity="info" data-testid="no-reset-by-mail">
+                {t("auth.forgot_password_unavailable")}
+              </Alert>
+            )}
             {error && <Alert severity="error">{error}</Alert>}
             {submitted && <Alert severity="success">{t("auth.forgot_password_success")}</Alert>}
 
@@ -69,12 +91,12 @@ export default function ForgotPasswordPage() {
               type="email"
               required
               value={email}
-              disabled={submitted || loading}
+              disabled={submitted || loading || !byMail}
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"
             />
 
-            <Button type="submit" variant="contained" size="large" disabled={submitted || loading}>
+            <Button type="submit" variant="contained" size="large" disabled={submitted || loading || !byMail}>
               {t("auth.forgot_password_submit")}
             </Button>
             <Button component={RouterLink} to="/login" size="small">

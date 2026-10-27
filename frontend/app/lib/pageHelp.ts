@@ -205,10 +205,16 @@ const PAGES: PageHelpDef[] = [
     doc: "administer/users",
   },
   {
+    prefix: "/admin/api-tokens",
+    id: "api_tokens",
+    actions: ["uses", "revoke"],
+    doc: "administer/users",
+  },
+  {
     prefix: "/admin/auth-providers",
     id: "auth_providers",
     actions: ["add", "auto"],
-    doc: "administer/users",
+    doc: "administer/sign-in",
   },
 
   // Privacy

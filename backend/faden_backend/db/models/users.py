@@ -3,7 +3,7 @@ import json
 import logging
 import time
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import urlencode
 
@@ -19,7 +19,7 @@ from fastapi_users.authentication import (
 from fastapi_users.db import SQLAlchemyBaseUserTableUUID, SQLAlchemyUserDatabase
 from fastapi_users.jwt import generate_jwt
 from pydantic import ConfigDict
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, delete, false, select
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, delete, false, select, true
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -63,6 +63,15 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     sessions_valid_after: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
+    )
+    # Whether the account has a password someone knows. An account a sign-in provider or a provisioning source
+    # made has a random one nobody knows, until its owner sets one (a reset link): then the password is no way
+    # in, and the last linked sign-in may not be unlinked (``services/sign_in/linked.py``).
+    password_set: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=true(),
     )
 
 
@@ -119,6 +128,24 @@ class UserUpdate(schemas.BaseUserUpdate):
         return changes
 
 
+async def password_check_refusal(email: str) -> str | None:
+    """The first reason a password check gives to refuse *email*; a check that fails counts as one.
+
+    The checks are the extension registry's ``password_sign_in_checks``; they hold for anyone but a superuser.
+    """
+    from faden_backend.services.extensions import registry  # noqa: PLC0415
+
+    for check in registry.password_sign_in_checks:
+        try:
+            reason = await check(email)
+        except Exception:
+            log.exception("A password sign-in check failed; refusing the sign-in")
+            return "the sign-in check failed"
+        if reason:
+            return reason
+    return None
+
+
 class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     """Manages a user session and its tokens."""
 
@@ -159,16 +186,35 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
             log.exception("Could not record %s in the audit trail", action)
 
     async def authenticate(self, credentials: Any) -> User | None:
-        """Sign-in by password; a refused one is recorded with the address that was tried."""
-        user = await super().authenticate(credentials)
-        if user is None:
-            from faden_backend.db.models.containers import AuditResult  # noqa: PLC0415
+        """Sign-in by password; a refused one is recorded with the address that was tried.
 
-            tried = str(getattr(credentials, "username", "") or "")[:320]
+        The password checks of the extension registry (``password_sign_in_checks``) are asked about the
+        address typed, whatever the password, so their refusal reads the same for a right and a wrong
+        password and for an address without an account (no password or account enumeration). Only a
+        superuser who typed the right password passes them, so an administrator can always get in.
+        """
+        from faden_backend.db.models.containers import AuditResult  # noqa: PLC0415
+
+        user = await super().authenticate(credentials)
+        if user is not None and user.is_superuser:
+            return user
+        tried = str(getattr(credentials, "username", "") or "")[:320]
+        reason = await self._password_check_refusal(tried)
+        if reason:
+            await self._audit(
+                "auth.sign_in.failed", user, result=AuditResult.DENY, target=None if user else tried,
+                metadata={"email": tried, "reason": reason},
+            )
+            raise HTTPException(status_code=400, detail="LOGIN_USE_SIGN_IN_PROVIDER")
+        if user is None:
             await self._audit(
                 "auth.sign_in.failed", None, result=AuditResult.DENY, target=tried, metadata={"email": tried},
             )
         return user
+
+    @staticmethod
+    async def _password_check_refusal(email: str) -> str | None:
+        return await password_check_refusal(email)
 
     async def on_after_login(
         self, user: User, request: Request | None = None, response: Any = None,
@@ -235,9 +281,11 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         if (
             update_dict.get("password") is not None
             or update_dict.get("is_active") is False
-            or update_dict.get("is_superuser") is False
+            or ("is_superuser" in update_dict and update_dict["is_superuser"] != user.is_superuser)
         ):
             update_dict = {**update_dict, "sessions_valid_after": datetime.now(UTC)}
+        if update_dict.get("password") is not None:
+            update_dict = {**update_dict, "password_set": True}
         return await super()._update(user, update_dict)
 
     async def on_after_register(self, user: User, request: Request | None = None) -> None:
@@ -274,7 +322,11 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         token: str,
         request: Request | None = None,
     ) -> None:
-        """Enqueue password-reset email delivery via notification outbox."""
+        """Enqueue password-reset email delivery via notification outbox; without mail nothing is queued.
+
+        The route answers the same either way (no account enumeration, ASVS 5.0 6.3.8); the sign-in page
+        offers the reset only while mail can be sent (``GET /api/auth/options``).
+        """
         try:
             from faden_backend.services.notifications import NotificationService  # noqa: PLC0415
         except Exception:
@@ -287,9 +339,17 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
             return
 
         try:
-            base = settings.mailer_frontend_base_url.rstrip("/")
-            query = urlencode({"token": token})
-            reset_url = f"{base}/reset-password?{query}"
+            # The token in the fragment, which browsers never send: not to the server, not as the Referer of
+            # the page's own requests, so it stays out of every access log (as an administrator's reset links).
+            from faden_backend.services.extensions import registry  # noqa: PLC0415
+
+            # Mail goes out only with a sender (mail_available() is asked before anything is queued), and the
+            # address the link starts with is the one configured for mail, never this request's Host.
+            sender = registry.mail_sender
+            if sender is None:
+                return
+            base = sender.link_base().rstrip("/")
+            reset_url = f"{base}/reset-password#{urlencode({'token': token})}"
             request_id = str(uuid.uuid4())
             if request is not None:
                 request_id = (
@@ -298,12 +358,17 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
                     or request_id
                 )
             to_name = user.email.split("@", 1)[0] if user.email else None
+            from faden_backend.services.notifications.language import recipient_language  # noqa: PLC0415
+
+            accept_language = request.headers.get("accept-language") if request is not None else None
             service = NotificationService(session)
             await service.enqueue_password_reset(
                 to_email=user.email,
                 to_name=to_name,
                 reset_url=reset_url,
                 request_id=request_id,
+                expires_in=timedelta(seconds=self.reset_password_token_lifetime_seconds),
+                language=await recipient_language(session, user.id, accept_language),
             )
         except Exception:
             # Keep forgot-password response enumeration-safe even if enqueue fails.
@@ -353,11 +418,15 @@ def is_current_sign_in(claims: dict[str, Any]) -> bool:
 def sign_in_ended_for_all(claims: dict[str, Any], sessions_valid_after: datetime | None) -> bool:
     """Whether the account's sign-ins were ended (``end_sign_ins``) after this one was made.
 
-    ``iat`` has whole seconds: a sign-in made in the second the others were ended still stands.
+    To the millisecond when the sign-in says (``iat_ms``): one made a moment before, in the same second, ends
+    too, and the one a sign-in makes right after its own change (a provider's group rules) stands. Older ones
+    have whole seconds only (``iat``), and one made in the second the others were ended still stands.
     """
     if sessions_valid_after is None:
         return False
     try:
+        if "iat_ms" in claims:
+            return int(claims["iat_ms"]) < int(sessions_valid_after.timestamp() * 1000)
         return int(claims["iat"]) < int(sessions_valid_after.timestamp())
     except (KeyError, TypeError, ValueError):
         return True
@@ -366,8 +435,10 @@ def sign_in_ended_for_all(claims: dict[str, Any], sessions_valid_after: datetime
 def end_sign_ins(user: User) -> None:
     """End all of *user*'s console sign-ins (browser cookies, apps signed in with a bearer token) from now on.
 
-    Called for a password change, a suspension and a role taken away; ``UserManager._update`` does it for the
-    stock routes. API tokens are separate keys with their own revoke, and agent tokens their own refresh.
+    Called for a password change, a suspension and any change of rights (``services/rights.py``);
+    ``UserManager._update`` does it for the stock routes. Apps signed in for an agent end too: their
+    refresh is refused, and the gateway refuses their access tokens made before. API tokens are separate
+    keys with their own revoke; what they may do is checked at each request.
     """
     user.sessions_valid_after = datetime.now(UTC)
 
@@ -390,14 +461,24 @@ class SignInStrategy(JWTStrategy):
         super().__init__(*args, **kwargs)
         self._session = session
 
-    async def write_token(self, user: Any) -> str:
-        """A sign-in for *user*, with ``iat`` and a ``jti`` to end it by."""
+    async def write_token(self, user: Any, *, provider: str | None = None) -> str:
+        """A sign-in for *user*, with ``iat`` and a ``jti`` to end it by.
+
+        *provider*: the sign-in provider it came through (``sso``), so signing out can go on to the
+        provider's logout (SAML Single Logout).
+        """
+        now = time.time()
         data = {
             "sub": str(user.id),
             "aud": self.token_audience,
-            "iat": int(time.time()),
+            "iat": int(now),
+            # To the millisecond: one made just before the account's sign-ins were ended, in the same second,
+            # ends with them (``sign_in_ended_for_all``).
+            "iat_ms": int(now * 1000),
             "jti": uuid.uuid4().hex,
         }
+        if provider:
+            data["sso"] = provider
         return generate_jwt(data, self.encode_key, self.lifetime_seconds, algorithm=self.algorithm)
 
     async def read_token(self, token: str | None, user_manager: Any) -> Any:

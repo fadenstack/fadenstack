@@ -7,8 +7,9 @@ instead of hard-coding values.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 
 # ── GitHub organisation ───────────────────────────────────────────
@@ -541,6 +542,67 @@ def extend_dev_processes(extra: list[DevProcess]) -> None:
         if proc.name not in existing:
             DEV_PROCESSES.append(proc)
             existing.add(proc.name)
+
+
+# ── What an add-on adds to an install ────────────────────────────
+
+#: Compose files beside the install's ``docker-compose.yaml`` that every compose command of the install
+#: includes, after core's own, when they exist (``compose.ComposeContext.base_cmd``).
+COMPOSE_OVERLAYS: list[str] = []
+#: Files an add-on ships, by their name in the install: ``faden deploy`` and ``faden upgrade`` write them
+#: with the bundled deployment files (``bundle.unpack``), so an upgrade brings the add-on's copy too.
+BUNDLE_FILES: dict[str, Path] = {}
+#: Keys of ``.env`` written to ``secrets/<KEY>`` before every compose command, like core's own keys
+#: (``secret_files.SECRET_FILES``): an add-on's compose file mounts them under ``/run/secrets``.
+SECRET_FILE_KEYS: list[str] = []
+#: Called by ``faden deploy`` and ``faden upgrade`` with the install's directory once its ``.env`` is
+#: written and before any image is pulled or started: an add-on writes its settings and secrets, or logs in
+#: to the registry its images come from. One that raises stops the deploy or the upgrade.
+INSTALL_HOOKS: list[Callable[[Path], None]] = []
+
+
+def extend_compose_files(names: list[str]) -> None:
+    """Add compose files every command of an install includes when they exist (idempotent)."""
+    for name in names:
+        if Path(name).name != name or not name.endswith((".yaml", ".yml")):
+            msg = f"Not a compose file beside the install's own: {name!r}"
+            raise ValueError(msg)
+        if name not in COMPOSE_OVERLAYS:
+            COMPOSE_OVERLAYS.append(name)
+
+
+def extend_bundle_files(files: dict[str, Path]) -> None:
+    """Add files written into an install with the bundled deployment files (a later add wins)."""
+    for name, source in files.items():
+        # Either separator: an install on Windows reads "/etc/x" as relative to its drive.
+        rel = PurePosixPath(name.replace("\\", "/"))
+        if rel.is_absolute() or Path(name).is_absolute() or ".." in rel.parts:
+            msg = f"Not a path inside the install: {name!r}"
+            raise ValueError(msg)
+        BUNDLE_FILES[name] = source
+
+
+def extend_secret_files(keys: list[str]) -> None:
+    """Add ``.env`` keys written as files under ``secrets/`` before every compose command (idempotent)."""
+    for key in keys:
+        if not key.isidentifier() or key.upper() != key:
+            msg = f"Not an .env key: {key!r}"
+            raise ValueError(msg)
+        if key not in SECRET_FILE_KEYS:
+            SECRET_FILE_KEYS.append(key)
+
+
+def extend_install_hooks(hooks: list[Callable[[Path], None]]) -> None:
+    """Add steps ``faden deploy`` and ``faden upgrade`` run before pulling (idempotent)."""
+    for hook in hooks:
+        if hook not in INSTALL_HOOKS:
+            INSTALL_HOOKS.append(hook)
+
+
+def run_install_hooks(install_dir: Path) -> None:
+    """Run the add-ons' install steps, in the order they were added."""
+    for hook in INSTALL_HOOKS:
+        hook(install_dir)
 
 
 def _read_env_values(path: Path) -> dict[str, str]:

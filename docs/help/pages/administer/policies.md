@@ -169,7 +169,7 @@ found something, not a measurement of how much personal data was successfully re
 4. Write the **Message to the user**: what people are told when the rule applies.
 5. Set the **Priority**. Lower is tried first, and the first rule that matches decides, so a rule with a
    lower number can make an exception to a broader one.
-6. Save it. Rules apply within 30 seconds.
+6. Save it. Rules apply at once.
 
 Without rules, tools run as the tool mode says.
 
@@ -194,6 +194,19 @@ People pick a tool mode per chat, and the class decides what runs:
 No mode runs a destructive or unclassified tool without asking. To let a tool run in **Auto**, classify it
 as **read** or **write**.
 Fadenstack's own tools (the knowledge base search, the time, the tool search) are read tools.
+
+### Tool mode limits {#tool-mode-limits}
+
+With Enterprise, **Agents → Governance → Tool mode limits** sets the most a chat's tool mode may be, for
+**Everyone**, **A team**, **An agent** or **A person**: choose who it is **For**, pick the team, agent or person,
+choose **At most** and select **Set limit**. Change a limit in its row, or remove it. Several limits can apply
+to one chat (everyone's, the person's teams', the agent's, the person's own): the narrowest wins. People see
+that their chat is capped, and an agent's applications get its limit too. Changes apply at once and
+are recorded in the audit log.
+
+Without a valid Enterprise licence the limits cannot be applied, so tools in every chat are read-only until the
+licence is back; a notice for administrators says so. **Lift** on that notice gives every chat the mode each
+person picks again; the limits are kept, and apply again once the licence is valid.
 
 ### Decisions
 
@@ -227,7 +240,7 @@ Applications using the API get the same outcomes as errors they can handle; the 
 | Personal data | PII policies, per-chat and per-agent settings | |
 | The prompt | | Content policies on the prompt <span class="fs-planned">Planned</span> |
 | The answer | | Content policies on the answer <span class="fs-planned">Planned</span> |
-| Tools | Tool rules, tool classes, tool modes | Content policies on tool arguments, and limits on the tool mode people may pick, per team, agent or person <span class="fs-planned">Planned</span> |
+| Tools | Tool rules, tool classes, tool modes | Tool mode limits for everyone, a team, an agent or a person; content policies on tool arguments <span class="fs-planned">Planned</span> |
 | The record | Decisions, without the text | An auditor's view with policy names, and exports <span class="fs-planned">Planned</span> |
 
 Content policies will refuse a prompt, an answer or a tool call by what it says.

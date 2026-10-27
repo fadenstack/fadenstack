@@ -156,7 +156,8 @@ def _resolve_container_status(
 
     Returns ``(configured, containers)``.
     """
-    configured: bool = getattr(settings, mod.settings_flag, False) if mod.settings_flag else False
+    holder = mod.settings_target if mod.settings_target is not None else settings
+    configured: bool = getattr(holder, mod.settings_flag, False) if mod.settings_flag else False
     containers = (
         _container_states_from_name_map(name_map, mod.container_names)
         if docker_reachable

@@ -478,11 +478,17 @@
       "action_create": "Créer un groupe avec ses rôles",
       "action_members": "Ajouter ou retirer des membres"
     },
+    "api_tokens": {
+      "title": "Jetons d'API",
+      "description": "Les jetons d'API de chacun : à qui appartient chacun, et quand, d'où et avec quoi il a été utilisé.",
+      "action_uses": "Voir les utilisations d'un jeton",
+      "action_revoke": "Révoquer un jeton"
+    },
     "auth_providers": {
-      "title": "Fournisseurs d'authentification",
-      "description": "Permettez aux gens de se connecter avec leur compte d'entreprise, via OpenID Connect ou OAuth2.",
-      "action_add": "Ajouter un fournisseur avec son ID client, son secret et son URL de découverte",
-      "action_auto": "Choisir si les gens reçoivent un compte lors de leur première connexion"
+      "title": "Fournisseurs de connexion",
+      "description": "Permettez aux gens de se connecter avec le compte de leur organisation : via OpenID Connect, SAML ou un annuaire (LDAP, Active Directory).",
+      "action_add": "Ajouter un fournisseur, et y enregistrer ce serveur avec les adresses affichées",
+      "action_auto": "Choisir qui peut se connecter, s'il reçoit un compte, et ses rôles et groupes"
     },
     "pii_dashboard": {
       "title": "Tableau de bord PII",

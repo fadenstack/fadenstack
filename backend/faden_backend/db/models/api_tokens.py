@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, func
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, String, func
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -46,3 +46,36 @@ class ApiToken(Base):
     #: ``None``: the token does not expire.
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ApiTokenUse(Base):
+    """One use of an API token: each request the gateway let in with it.
+
+    Every use is kept, so an organisation knows who uses which token, when, from where and with what (the
+    owner's rule: tokens must not become a way around its overview). Kept ``api_token_use_retention_days``
+    (GDPR Art. 5(1)(e)), then deleted by the sign-in upkeep. Only the address, the client's name and the
+    route are kept, never what was sent.
+    """
+
+    __tablename__ = "api_token_uses"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    token_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("api_tokens.id", ondelete="CASCADE"), nullable=False,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), nullable=False,
+    )
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    #: The caller's address, as the gateway saw it behind the edge.
+    address: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    #: The client's ``User-Agent``, cut to 200 characters.
+    client: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    #: The method and the route (``POST /v1/chat/completions``), never its values.
+    route: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+    __table_args__ = (
+        Index("ix_api_token_uses_token_at", "token_id", "at"),
+        Index("ix_api_token_uses_user_at", "user_id", "at"),
+        Index("ix_api_token_uses_at", "at"),
+    )

@@ -1,6 +1,12 @@
-from fastapi import APIRouter, Request, Response
-from fastapi.responses import JSONResponse
+from datetime import datetime
 
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
+from starlette import status
+
+from faden_backend.db.dependencies import get_db_session
 from faden_backend.db.models.users import (
     UserRead,  # type: ignore
     UserUpdate,  # type: ignore
@@ -10,7 +16,10 @@ from faden_backend.db.models.users import (
     get_jwt_strategy,  # type: ignore
     login_lifetime_seconds,
 )
+from faden_backend.services import password_reset_links
+from faden_backend.services.extensions import mail_available
 from faden_backend.settings import settings
+from faden_backend.web.api import about
 
 router = APIRouter()
 
@@ -42,6 +51,69 @@ users_router.routes[:] = [
 router.include_router(users_router, prefix="/users", tags=["users"])
 router.include_router(api_users.get_auth_router(auth_jwt), prefix="/auth/jwt", tags=["auth"])
 router.include_router(api_users.get_auth_router(auth_cookie), prefix="/auth/cookie", tags=["auth"])
+
+
+class SignInOptions(BaseModel):
+    """What the sign-in page may offer; no account is named."""
+
+    #: A forgotten password can be reset by mail (a mail sender is on); else an administrator sets a new one.
+    password_reset: bool
+    #: The page links back to fadenstack.com (as ``GET /api/about`` says once signed in).
+    vendor_links: bool = True
+
+
+@router.get("/auth/options", response_model=SignInOptions, tags=["auth"])
+async def sign_in_options() -> SignInOptions:
+    """What the sign-in page may offer, before anyone signs in."""
+    return SignInOptions(password_reset=mail_available(), vendor_links=about.vendor_links())
+
+
+class ResetLinkToken(BaseModel):
+    """The token from a password reset link an administrator made (``services/password_reset_links.py``)."""
+
+    token: str = Field(min_length=16, max_length=128)
+
+
+class ResetLinkPreview(BaseModel):
+    """Whose password the link sets, and until when it works."""
+
+    email: str
+    expires_at: datetime
+
+
+class ResetLinkUse(ResetLinkToken):
+    """The token and the new password."""
+
+    password: str = Field(min_length=1, max_length=1024)
+
+
+@router.post("/auth/reset-link/preview", response_model=ResetLinkPreview, tags=["auth"])
+async def reset_link_preview(
+    payload: ResetLinkToken, session: AsyncSession = Depends(get_db_session),
+) -> ResetLinkPreview:
+    """Whose password the link sets; 404 ``expired`` once it no longer works. Changes nothing.
+
+    The token goes in the body: the page reads it from the address's fragment, which never reaches a server.
+    """
+    found = await password_reset_links.pending(session, payload.token)
+    if found is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="expired")
+    return ResetLinkPreview(email=found[0], expires_at=found[1])
+
+
+@router.post("/auth/reset-link/use", status_code=status.HTTP_204_NO_CONTENT, tags=["auth"])
+async def reset_link_use(payload: ResetLinkUse, session: AsyncSession = Depends(get_db_session)) -> None:
+    """Set the new password, once; every sign-in of the account ends and nobody is signed in.
+
+    400 ``expired`` when the link no longer works; 422 with the password rule's words when the password breaks
+    it (the link stays usable).
+    """
+    try:
+        await password_reset_links.use(session, payload.token, payload.password)
+    except password_reset_links.LinkExpiredError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="expired") from exc
+    except password_reset_links.PasswordRejectedError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
 
 
 @router.post("/auth/dev-login", tags=["auth"])

@@ -42,7 +42,7 @@ zwei Stufen:
 ??? info "Mehr dazu, was in einen Chat gelangt"
     Dieselben Regeln entscheiden, was in einen Chat gelangt: Ein privater Skill erreicht nie den Chat einer Person,
     mit der er nicht geteilt ist. Verlässt jemand eine Gruppe, erreichen die mit dieser Gruppe geteilten Skills
-    seine Chats innerhalb einer Minute nicht mehr.
+    seine Chats sofort nicht mehr.
 
 ## Einen Skill für alle erstellen {#create-a-skill-for-everyone}
 

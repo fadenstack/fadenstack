@@ -80,6 +80,8 @@ class MeAccessDTO(BaseModel):
     permissions: list[PermissionDTO] = Field(default_factory=list)
     #: Maintains at least one agent: a right on those agents, not an RBAC permission.
     maintains_agents: bool = False
+    #: Sees the details of at least one agent as a member in another role (e.g. auditor), without managing it.
+    inspects_agents: bool = False
 
 
 class SetAdministratorRequest(BaseModel):
@@ -87,6 +89,21 @@ class SetAdministratorRequest(BaseModel):
 
     administrator: bool
     reason: str = Field(min_length=10, max_length=500)
+
+
+class CreatePasswordResetLinkRequest(BaseModel):
+    """A one-time link that sets a new password for the account; recorded with the reason."""
+
+    reason: str = Field(min_length=10, max_length=500)
+    #: How long the link works: an hour, or a day for a person reached later.
+    valid_hours: Literal[1, 24] = 1
+
+
+class PasswordResetLinkDTO(BaseModel):
+    """The link's token, shown this once (the console makes the address), and when it expires."""
+
+    token: str
+    expires_at: datetime
 
 
 class HandOverRequest(BaseModel):
@@ -153,6 +170,29 @@ class ApiTokenDTO(BaseModel):
     created_at: datetime
     expires_at: datetime | None = None
     revoked_at: datetime | None = None
+    #: Its latest use within the kept period: when, from which address, with which client, on which route.
+    last_used_at: datetime | None = None
+    last_used_address: str | None = None
+    last_used_client: str | None = None
+    last_used_route: str | None = None
+    #: Its uses in the last 30 days.
+    recent_uses: int = 0
+
+
+class AdminApiTokenDTO(ApiTokenDTO):
+    """An API token in the overview of everyone's: with its owner."""
+
+    user_id: uuid.UUID
+    email: str
+
+
+class ApiTokenUseDTO(BaseModel):
+    """One use of an API token."""
+
+    at: datetime
+    address: str | None = None
+    client: str | None = None
+    route: str | None = None
 
 
 class UpdateUserUsageGroupRequest(BaseModel):

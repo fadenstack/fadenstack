@@ -144,10 +144,8 @@ async def test_an_upload_is_kept_like_a_fetched_feed(dbsession: AsyncSession) ->
 
 
 async def test_administrators_are_emailed_once_about_a_security_release(
-    dbsession: AsyncSession, served: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    dbsession: AsyncSession, served: dict[str, Any], monkeypatch: pytest.MonkeyPatch, mail_on: object,
 ) -> None:
-    monkeypatch.setattr(settings, "mailer_enabled", True)
-    monkeypatch.setattr(settings, "mailer_admin_recipients", ["ops@example.com"])
     state = await check.check_now(dbsession, now=NOW)
     assert await check.notify(dbsession, state)
     assert not await check.notify(dbsession, state)  # once per release

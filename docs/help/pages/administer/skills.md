@@ -38,8 +38,8 @@ A private skill can be shared with people and groups on its **Sharing** tab, at 
 
 ??? info "More about what reaches a chat"
     The same rules decide what reaches a chat: a private skill never reaches the chat of anyone it is not
-    shared with. When someone leaves a group, the skills shared with that group stop reaching their chats within
-    a minute.
+    shared with. When someone leaves a group, the skills shared with that group stop reaching their chats at
+    once.
 
 ## Create a skill for everyone
 

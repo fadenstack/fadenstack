@@ -274,28 +274,34 @@ class Settings(BaseSettings):
     # service refuses every call without it.
     pii_service_token: str = ""
 
-    # Mailer module settings
-    mailer_enabled: bool = False
-    mailer_service_url: str = "http://127.0.0.1:8004"
-    mailer_api_token: str = ""
-    mailer_frontend_base_url: str = "http://localhost:5173"
-    mailer_admin_recipients: list[str] | str = []
-    mailer_alert_5xx_threshold_percent: int = 5
-    mailer_alert_5xx_window_minutes: int = 5
-    mailer_alert_cooldown_minutes: int = 30
-    mailer_grafana_webhook_token: str = ""
-    mailer_smtp_host: str = ""
-    mailer_smtp_port: int = 587
-    mailer_smtp_username: str = ""
-    mailer_smtp_password: str = ""
-    mailer_smtp_starttls: bool = True
-    mailer_smtp_ssl: bool = False
-    mailer_from_email: str = "noreply@faden.local"
-    mailer_from_name: str = "Fadenstack"
+    # Alerts to administrators (services/notifications): the share of the gateway's answers that are 5xx
+    # which raises one, over how many minutes, and how soon the same alert may come again. Core sends no
+    # mail: who gets alerts, and how, is the mail extension's (Enterprise; its settings are its own).
+    # The names these had before (``FADEN_BACKEND_MAILER_ALERT_*``) are still read.
+    alert_5xx_threshold_percent: int = Field(
+        5, validation_alias=AliasChoices(
+            "alert_5xx_threshold_percent", "FADEN_BACKEND_ALERT_5XX_THRESHOLD_PERCENT",
+            "FADEN_BACKEND_MAILER_ALERT_5XX_THRESHOLD_PERCENT",
+        ),
+    )
+    alert_5xx_window_minutes: int = Field(
+        5, validation_alias=AliasChoices(
+            "alert_5xx_window_minutes", "FADEN_BACKEND_ALERT_5XX_WINDOW_MINUTES",
+            "FADEN_BACKEND_MAILER_ALERT_5XX_WINDOW_MINUTES",
+        ),
+    )
+    alert_cooldown_minutes: int = Field(
+        30, validation_alias=AliasChoices(
+            "alert_cooldown_minutes", "FADEN_BACKEND_ALERT_COOLDOWN_MINUTES",
+            "FADEN_BACKEND_MAILER_ALERT_COOLDOWN_MINUTES",
+        ),
+    )
 
-    # External Auth module settings (enterprise SSO)
+    # Sign-in module (services/sign_in): outside identity providers. The backend calls it with the token;
+    # without one it is not called at all.
     auth_enabled: bool = False
     auth_service_url: str = "http://127.0.0.1:8005"
+    auth_service_token: str = ""
 
     # Document Processor module settings (Docling)
     docling_enabled: bool = False
@@ -335,6 +341,9 @@ class Settings(BaseSettings):
     # default when its maker names no lifetime, and after the maximum at the latest.
     api_token_default_lifetime_s: int = 90 * 24 * 3600
     api_token_max_lifetime_s: int = 365 * 24 * 3600
+    # How long each recorded use of an API token is kept, in days (GDPR Art. 5(1)(e)); the
+    # sign-in upkeep deletes older ones. 0 keeps them for good.
+    api_token_use_retention_days: int = 90
 
     # Agent tokens, tenant-wide (system settings "agents.*"). Enterprise can
     # set them per agent, under a ceiling.

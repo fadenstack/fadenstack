@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -12,13 +12,14 @@ from faden_backend.db.base import Base
 
 
 class OAuthAccount(Base):
-    """Stores OAuth tokens linked to a user.
+    """A person's account at an outside sign-in provider, linked to their Fadenstack account.
 
-    Compatible with fastapi-users ``SQLAlchemyBaseOAuthAccountTableUUID``
-    layout but defined explicitly so Alembic picks it up.
+    ``oauth_name`` is the provider's key and ``account_id`` the person's stable ID there; together they name
+    one person, so there is one row for them. The provider's own tokens stay with the sign-in module.
     """
 
     __tablename__ = "oauth_account"
+    __table_args__ = (UniqueConstraint("oauth_name", "account_id", name="uq_oauth_account_provider_subject"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
@@ -37,6 +38,47 @@ class OAuthAccount(Base):
     refresh_token: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     account_id: Mapped[str] = mapped_column(String(320), nullable=False, index=True)
     account_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    # The last time the person signed in this way; ``None`` before any since this was kept.
+    last_sign_in_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class IdentityLinkRequest(Base):
+    """An outside identity waiting for the person to prove an existing account is theirs.
+
+    Made when a sign-in with a provider meets an account with the same address that it is not linked to
+    (``services/sign_in/link_requests.py``). It belongs to the browser that signed in: its cookie holds a
+    token, of which only the SHA-256 is kept. It works once, until ``expires_at``, for ``MAX_TRIES``
+    wrong passwords or codes.
+    """
+
+    __tablename__ = "identity_link_requests"
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("user.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    provider: Mapped[str] = mapped_column(String(100), nullable=False)
+    provider_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    subject: Mapped[str] = mapped_column(String(320), nullable=False)
+    identity_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    # The account's address when the sign-in met it: it must still be the account's when the proof comes.
+    sent_to: Mapped[str] = mapped_column(String(320), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    # The identity as the module gave it (groups, the sign-in's lifetime): signed in with it once linked.
+    identity_json: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # The last code sent to the account's address, as an HMAC under the backend's secret.
+    code_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    codes_sent: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    code_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class AuthProvider(Base):

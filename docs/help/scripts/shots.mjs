@@ -162,6 +162,23 @@ const asReleaseInstall = (p) =>
     }
   });
 
+/** Pictures as an install reached over HTTPS shows them: the console warns about plain HTTP, which the install
+ *  the pictures are taken from may use and Help's readers do not. */
+/** An Enterprise licence's notices (seats, expiry) belong to that install, not to the Help: hidden. */
+const withoutLicenceNotice = (p) =>
+  p.evaluate(() => {
+    for (const alert of document.querySelectorAll(".MuiAlert-root")) {
+      if (/licen[cs]e|lizenz/i.test(alert.textContent ?? "")) alert.style.display = "none";
+    }
+  });
+
+const asHttpsInstall = (p) =>
+  p.evaluate((warning) => {
+    for (const alert of document.querySelectorAll(".MuiAlert-root")) {
+      if (alert.textContent?.includes(warning)) alert.style.display = "none";
+    }
+  }, K("auth_providers.provisioning.needs_https"));
+
 // name: the file under pages/images/; path: where to go; act: what to open first (never a confirm button);
 // clip: a locator to picture instead of the whole window; region: a fixed part of the window.
 const SHOTS = [
@@ -249,6 +266,28 @@ const SHOTS = [
   { name: "administer/users-create", path: "/admin/users", act: async (p) => p.getByRole("button", { name: L("Create User") }).click(), clip: (p) => p.getByRole("dialog") },
   { name: "administer/users-edit-roles", path: "/admin/users", act: async (p) => p.getByRole("button", { name: L("Edit Roles") }).first().click(), clip: (p) => p.getByRole("dialog") },
   { name: "administer/users-developer-mode", path: "/admin/users", act: async (p) => p.getByRole("button", { name: L("Developer mode") }).first().click(), clip: (p) => p.getByRole("dialog") },
+  // Sign-in providers, provisioning (SCIM) and linked sign-ins: an install with a provider whose provisioning is
+  // on, IDS.provisioned_user one of the people it provisioned, and the admin's own account linked to it.
+  {
+    name: "administer/sign-in-providers", path: "/admin/auth-providers", act: asHttpsInstall,
+    region: { x: 240, y: 0, width: 1200, height: 300 },
+  },
+  {
+    name: "administer/sign-in-provisioning", path: "/admin/auth-providers", clip: (p) => p.getByRole("dialog"),
+    act: async (p) => {
+      await p.getByRole("button", { name: new RegExp(`^${K("auth_providers.provisioning.column")}: `) }).first().click();
+      await p.getByTestId("provisioning-state").waitFor({ timeout: 20000 });
+      await asHttpsInstall(p);
+    },
+  },
+  {
+    name: "administer/user-sign-ins", path: "/admin/users", clip: (p) => p.getByRole("dialog"),
+    act: async (p) => {
+      await p.locator(`[data-user-sign-ins="${IDS.provisioned_user}"]`).click();
+      await p.getByTestId("linked-sign-ins").waitFor({ timeout: 20000 });
+    },
+  },
+  { name: "use/profile-linked-sign-ins", path: "/admin/profile", clip: (p) => p.getByTestId("linked-sign-ins-card") },
   { name: "administer/skill-sharing", path: () => `/admin/skills/${IDS.skill}`, act: async (p) => p.getByRole("tab", { name: L("Sharing") }).click() },
   { name: "administer/skill-versions", path: () => `/admin/skills/${IDS.skill}`, act: async (p) => p.getByRole("tab", { name: L("Versions") }).click() },
   {
@@ -339,9 +378,52 @@ const SHOTS = [
     name: "administer/groups", path: "/admin/groups", clip: (p) => p.getByRole("dialog"),
     act: async (p) => p.getByRole("button", { name: L("Create Group") }).first().click(),
   },
+  // API tokens: IDS.token_user someone whose token was used, IDS.token_name that token (else the first ones).
   {
     name: "administer/user-api-tokens", path: "/admin/users", clip: (p) => p.getByRole("dialog"),
-    act: async (p) => p.getByRole("button", { name: L("API tokens") }).first().click(),
+    act: async (p) => (IDS.token_user
+      ? p.locator(`[data-user-tokens="${IDS.token_user}"]`)
+      : p.getByRole("button", { name: L("API tokens") }).first()).click(),
+  },
+  {
+    name: "administer/api-tokens", path: "/admin/api-tokens", act: withoutLicenceNotice,
+    region: { x: 240, y: 0, width: 1200, height: 470 },
+  },
+  {
+    name: "administer/api-token-uses", path: "/admin/api-tokens", clip: (p) => p.getByRole("dialog"),
+    act: async (p) => {
+      const rows = IDS.token_name ? p.getByRole("row").filter({ hasText: IDS.token_name }) : p.getByRole("row");
+      await rows.getByRole("button", { name: K("api_tokens.show_uses") }).first().click();
+      await p.getByRole("dialog").getByRole("row").nth(1).waitFor({ timeout: 20000 });
+    },
+  },
+  // A new SAML provider's metadata from a federation's metadata service and its logout switches: filled in,
+  // never created.
+  {
+    name: "administer/sign-in-saml-logout", path: "/admin/auth-providers",
+    act: async (p) => {
+      await p.getByRole("button", { name: K("auth_providers.create") }).click();
+      const dialog = p.getByTestId("provider-dialog");
+      await dialog.getByLabel(K("auth_providers.protocol")).click();
+      await p.getByRole("option", { name: K("auth_providers.protocols.saml") }).click();
+      await dialog.getByLabel(K("auth_providers.name")).first().fill("Example Corp");
+      await dialog.getByLabel(K("auth_providers.key")).first().fill("example-corp");
+      await dialog.getByLabel(K("auth_providers.saml.metadata_source")).click();
+      await p.getByRole("option", { name: K("auth_providers.saml.metadata_mdq") }).click();
+      await dialog.getByLabel(K("auth_providers.saml.mdq_url")).fill("https://mdq.example.org");
+      await dialog.getByLabel(K("auth_providers.saml.idp_entity_id")).fill("https://idp.example.com/saml");
+      await dialog.getByLabel(K("auth_providers.saml.signing_certificate"))
+        .fill("-----BEGIN CERTIFICATE-----\nMIIDdzCCAl+gAwIBAgIUExampleOnly...\n-----END CERTIFICATE-----");
+      await dialog.getByLabel(K("auth_providers.saml.logout_at_idp")).check();
+      await dialog.getByLabel(K("auth_providers.saml.logout_from_idp")).check();
+      // Room above the first field, whose label sits on its border.
+      await dialog.getByLabel(K("auth_providers.saml.metadata_source"))
+        .locator("xpath=ancestor::div[contains(@class,'MuiStack-root')][1]")
+        .evaluate((el) => { el.style.paddingTop = "12px"; });
+    },
+    // From the metadata source to the logout switches: the protocol's own part of the dialog.
+    clip: (p) => p.getByTestId("provider-dialog").getByLabel(K("auth_providers.saml.metadata_source"))
+      .locator("xpath=ancestor::div[contains(@class,'MuiStack-root')][1]"),
   },
   {
     name: "administer/user-suspend", path: "/admin/users", clip: (p) => p.getByRole("dialog"),

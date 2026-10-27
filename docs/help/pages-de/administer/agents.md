@@ -58,7 +58,7 @@ Die Seite des Agenten öffnet sich. Sein Status in der Liste ist **Entwurf**, **
 |---|---|
 | **Definition** | Die Version, die Benutzer erhalten: **Anweisungen**, **Modell**, **Wissen** (Sammlungen, die er durchsuchen darf), **Server-Tools** (**Wie im Chat**, **Nur diese** oder **Keine**), **Lokale MCP-Server**, **Host-Tools** (die Tools der Anwendung und ihre Klassen), **Darstellung** (Begrüßung und vorgeschlagene Prompts) und **Datenschutz**. |
 | **Versionen** | Jede Version. Mit **Veröffentlichen** eine Version veröffentlichen, mit **Zurücksetzen** zu einer früheren zurückkehren, unter **Änderungen** die Unterschiede sehen. |
-| **Zugriff** | **Wer ihn nutzen darf** und seine **Betreuer**. **Zugriff prüfen** zeigt, ob eine Person den Agenten nutzen darf, und warum. |
+| **Zugriff** | **Wer ihn nutzen darf**, die Liste **Ausgeschlossene Personen** (Enterprise) und seine **Betreuer** (mit Enterprise: **Betreuer und Prüfer**). **Zugriff prüfen** zeigt, ob eine Person den Agenten nutzen darf, und warum. |
 | **Aktivität** | Nutzung über einen Zeitraum (Anfragen, Fehler, Tokens, Benutzer, Unterhaltungen: nur Zahlen, nie Inhalte), was die Anwendungen gemeldet haben (ausgeführte Tools, Zustimmungen) und **Angemeldete Geräte**. |
 | **Apps** | Was die Anwendungen mitbringen, verglichen mit der Version des Agenten (siehe [Wenn eine Anwendung neue Tools mitbringt](#when-an-application-brings-new-tools)). |
 
@@ -82,13 +82,39 @@ Die Seite des Agenten öffnet sich. Sein Status in der Liste ist **Entwurf**, **
 
 Das Speichern der Definition erzeugt eine neue Version (**Als neue Version speichern** oder **Speichern und
 veröffentlichen**); Versionen ändern sich nie. Eine veröffentlichte Version erreicht alle, die den Agenten
-nutzen, innerhalb einer Minute.
+nutzen, bei ihrer nächsten Anfrage.
 
 ![Der Reiter „Zugriff“: „Wer ihn nutzen darf“ mit „Person oder Team hinzufügen“ und den Personen, denen der Agent gewährt ist](../images/administer/agent-access.png)
 
 **Betreuer** ändern den Agenten, veröffentlichen Versionen, entscheiden, wer ihn nutzen darf, und können ihn
 schon vor der Veröffentlichung nutzen. Das tun sie über **Agenten** im Benutzermenü des Chats; Zugriff auf die
 Konsole brauchen sie nicht.
+
+Mit Enterprise kann ein Agent auch **Prüfer** haben: Wählen Sie **Hinzufügen als** → **Prüfer**, bevor Sie
+die Person auswählen, oder ändern Sie die Rolle eines Mitglieds in der Liste, und wählen Sie **Speichern**.
+Prüfer sehen die Versionen, Mitglieder, Einstellungen und Aktivität des Agenten und ändern nichts; nutzen
+können sie ihn nur, wenn er ihnen wie allen anderen freigegeben ist. Ohne gültige Enterprise-Lizenz sehen sie
+ihn nicht mehr.
+
+Um den Zugriff einer Person zu prüfen, geben Prüfer ihre ganze E-Mail-Adresse ein: Ein Teil davon findet
+niemanden, so listet die Prüfung nicht alle auf (DSGVO Art. 5 Abs. 1 lit. c, Art. 25 Abs. 2). Jede Prüfung wird
+im Audit-Protokoll festgehalten, mit wer wen geprüft hat (`agent.access.check`).
+
+!!! note "Betriebsrat"
+    Prüfer lesen, was Personen mit einem Agenten getan haben. Eine technische Einrichtung, die Verhalten oder
+    Leistung der Beschäftigten überwachen kann, braucht die Zustimmung des Betriebsrats (BetrVG § 87 Abs. 1
+    Nr. 6): Vereinbaren Sie die Prüferrolle mit ihm, bevor Sie sie vergeben.
+
+Mit Enterprise dürfen **Ausgeschlossene Personen** den Agenten nicht nutzen, auch nicht über ein Team, das ihn
+nutzen darf: Wählen Sie die Person, geben Sie eine **Begründung** an und wählen Sie **Ausschließen**. Das wirkt
+in den Anwendungen sofort und wird im Audit-Protokoll festgehalten. Die Person erfährt nur,
+dass sie ausgeschlossen ist; die Begründung ist für die Betreuer und Administratoren des Agenten. Betreuer und
+Administratoren behalten den Agenten immer und können nicht ausgeschlossen werden.
+
+Ohne gültige Enterprise-Lizenz können einen Agenten mit ausgeschlossenen Personen nur seine Betreuer nutzen,
+damit niemand Ausgeschlossenes ihn zurückbekommt; der Reiter **Zugriff** sagt das.
+**Für alle Berechtigten öffnen** hebt das auf: Alle, denen der Agent freigegeben ist, können ihn wieder nutzen.
+Sobald die Lizenz wieder gültig ist, bleiben die noch aufgeführten ausgeschlossenen Personen wieder außen vor.
 
 ![Der Reiter „Aktivität“: Anfragen, Fehler, Tokens, Nutzer und Gespräche der letzten 30 Tage mit einem Diagramm, darunter, was die Anwendungen gemeldet haben, etwa ausgeführte Tools und Freigaben](../images/administer/agent-activity.png)
 
@@ -214,7 +240,7 @@ der Konsole oder auf ihrer Seite **Agenten**.
 
 | Um | So geht's |
 |---|---|
-| den Agenten innerhalb einer Minute für alle zu sperren | **Stilllegen**: Anmeldungen funktionieren nicht mehr; seine Versionen, Zugriffe und sein Verlauf bleiben erhalten. **Wiederherstellen** holt ihn so zurück, wie er war. |
+| den Agenten sofort für alle zu sperren | **Stilllegen**: Anmeldungen funktionieren nicht mehr; seine Versionen, Zugriffe und sein Verlauf bleiben erhalten. **Wiederherstellen** holt ihn so zurück, wie er war. |
 | einen stillgelegten Agenten endgültig zu löschen | **Löschen**, dann zur Bestätigung seine Adresse eingeben. Seine Versionen, Zugriffe und Anmeldungen werden entfernt; was er getan hat, bleibt in den Nutzungs- und Audit-Logs, und seine Adresse ist für einen neuen Agenten frei. Zum Löschen ist die Berechtigung `agents:delete` nötig, die die integrierte Rolle `admin` hat, Betreuer aber nicht. |
 | die Anmeldung eines Geräts zu beenden | **Abmelden** auf dem Reiter **Aktivität**: Die Person muss sich erneut anmelden. |
 
@@ -223,6 +249,12 @@ der Konsole oder auf ihrer Seite **Agenten**.
     Zugriffs wirkt innerhalb von zehn Minuten. Diese Werte sind **Agent sign-in lifetime (s)**,
     **Agent sign-in idle timeout (s)** und **Agent access token lifetime (s)** unter **Einstellungen → Allgemein**.
 
+    Mit Enterprise kann ein Agent kürzere haben: **Gültigkeit der Anmeldung** auf seinem Reiter **Definition**,
+    in Sekunden, mindestens 60; ein leeres Feld behält den Wert des Mandanten. Sie gelten mit der Version, die
+    Sie speichern und veröffentlichen. Längere als die des Mandanten werden abgelehnt, und wird der Wert des
+    Mandanten später gesenkt, verkürzt das auch die des Agenten. Bereits angemeldete Geräte erhalten die kürzere
+    Gültigkeit, wenn ihre Anmeldung das nächste Mal erneuert wird.
+
 ## Wenn es nicht funktioniert {#when-it-does-not-work}
 
 Der Agent zeigt in der Anwendung an, warum eine Anmeldung fehlgeschlagen ist:
@@ -230,6 +262,6 @@ Der Agent zeigt in der Anwendung an, warum eine Anmeldung fehlgeschlagen ist:
 | Sie sehen | Was Sie tun |
 |---|---|
 | **Unter dieser Adresse gibt es keinen Agenten.** | Die Adresse in der Anwendung weicht von der des Agenten ab. Vergleichen Sie sie mit der Liste **Agenten**; ein Agent, der ohne **Von einer App ausgehen** erstellt wurde, hat eine aus seinem Namen abgeleitete Adresse. |
-| **Die Person hat keinen Zugriff.** | Fügen Sie sie oder ihre Gruppe auf dem Reiter **Zugriff** hinzu, und prüfen Sie, ob der Agent veröffentlicht ist. **Zugriff prüfen** zeigt, was sie daran hindert. |
+| **Die Person hat keinen Zugriff.** | Fügen Sie sie oder ihre Gruppe auf dem Reiter **Zugriff** hinzu, und prüfen Sie, ob der Agent veröffentlicht ist. **Zugriff prüfen** zeigt, was sie daran hindert, etwa ein Ausschluss. |
 | **Der Server antwortet nicht.** | Prüfen Sie die Serveradresse in der Anwendung und ob der Computer dem Zertifikat des Servers vertraut. |
 | Ein Tool, das die Anwendung anbietet, wird nicht genutzt | Es wird zurückgehalten: Übernehmen Sie es auf dem Reiter **Apps**. |

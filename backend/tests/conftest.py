@@ -47,6 +47,42 @@ def _no_gateway_erase(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, str]]:
     return calls
 
 
+class RecordingMailSender:
+    """A mail sender that is on and keeps what it was given (core has none; Enterprise registers its mailer)."""
+
+    def __init__(self) -> None:
+        self.on = True
+        self.sent: list[tuple[str, dict[str, Any]]] = []
+        self.base = "https://console.example.com"
+        self.recipients: list[str] = ["ops@example.com"]
+
+    def available(self) -> bool:
+        """Whether mail goes out: as the test sets ``on``."""
+        return self.on
+
+    async def send(self, kind: str, payload: dict[str, Any]) -> None:
+        """Keeps the message."""
+        self.sent.append((kind, payload))
+
+    def link_base(self) -> str:
+        """The address links start with, as the test sets ``base``."""
+        return self.base
+
+    def admin_recipients(self) -> list[str]:
+        """Who gets alerts, as the test sets ``recipients``."""
+        return self.recipients
+
+
+@pytest.fixture
+def mail_on(monkeypatch: pytest.MonkeyPatch) -> RecordingMailSender:
+    """Mail can be sent, as with Enterprise's mailer switched on."""
+    from faden_backend.services.extensions import registry  # noqa: PLC0415
+
+    sender = RecordingMailSender()
+    monkeypatch.setattr(registry, "mail_sender", sender)
+    return sender
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _run_from_the_repository_root() -> Generator[None]:
     """
@@ -96,6 +132,13 @@ async def _engine(anyio_backend: Any) -> AsyncGenerator[AsyncEngine]:
     engine = create_async_engine(str(settings.db_url))
     async with engine.begin() as conn:
         await conn.run_sync(meta.create_all)
+        # What the migration adds beside the models: the count of changes to access, and its triggers.
+        from sqlalchemy import text
+
+        from faden_backend.db import access_epoch
+
+        for statement in access_epoch.create_all():
+            await conn.execute(text(statement))
 
     try:
         yield engine

@@ -52,14 +52,31 @@ _RUNTIME_SECRET_KEY_MAP: dict[str, str] = {
 }
 
 
-def register_runtime_value_key(key: str, attr: str) -> None:
-    """Register additional runtime value mapping (for EE/plugin extension)."""
+#: Keys whose value goes onto an extension's own settings object rather than core's ``settings``.
+_RUNTIME_TARGETS: dict[str, Any] = {}
+
+
+def register_runtime_value_key(key: str, attr: str, *, target: Any = None) -> None:
+    """Register additional runtime value mapping (for EE/plugin extension); onto *target* when given."""
     _RUNTIME_VALUE_KEY_MAP[key] = attr
+    if target is not None:
+        _RUNTIME_TARGETS[key] = target
 
 
-def register_runtime_secret_key(key: str, attr: str) -> None:
-    """Register additional runtime secret mapping (for EE/plugin extension)."""
+def register_runtime_secret_key(key: str, attr: str, *, target: Any = None) -> None:
+    """Register additional runtime secret mapping (for EE/plugin extension); onto *target* when given."""
     _RUNTIME_SECRET_KEY_MAP[key] = attr
+    if target is not None:
+        _RUNTIME_TARGETS[key] = target
+
+
+def runtime_target(key: str) -> Any:
+    """The object *key*'s value is set on: core's ``settings``, or the one an extension registered for it."""
+    if key in _RUNTIME_TARGETS:
+        return _RUNTIME_TARGETS[key]
+    from faden_backend.settings import settings  # noqa: PLC0415
+
+    return settings
 
 
 def get_runtime_value_key_map() -> dict[str, str]:
@@ -88,8 +105,6 @@ async def refresh_runtime_values(session: Any, *, prefix: str) -> None:
     """
     from sqlalchemy import text  # noqa: PLC0415
 
-    from faden_backend.settings import settings  # noqa: PLC0415
-
     keys = {k: a for k, a in get_runtime_value_key_map().items() if k.startswith(prefix)}
     if not keys:
         return
@@ -103,5 +118,5 @@ async def refresh_runtime_values(session: Any, *, prefix: str) -> None:
             value = value.get("value", value)
         if isinstance(value, str) and not value.strip():
             continue  # blank keeps the code-level default, as at startup
-        object.__setattr__(settings, keys[str(row["key"])], value)
+        object.__setattr__(runtime_target(str(row["key"])), keys[str(row["key"])], value)
 

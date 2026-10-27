@@ -34,7 +34,9 @@ Sie sehen **Passwort erfolgreich geändert. Ihre anderen Anmeldungen wurden been
 2. Geben Sie Ihre E-Mail-Adresse ein.
 3. Wählen Sie **Reset-Link senden**.
 
-Wenn der Server Ihrer Organisation E-Mails versendet, erhalten Sie einen Link, mit dem Sie ein neues Passwort festlegen. Wenn nichts ankommt, bitten Sie Ihren Administrator, ein neues Passwort für Sie festzulegen.
+Per E-Mail erhalten Sie einen Link, mit dem Sie ein neues Passwort festlegen. Wenn nichts ankommt, bitten Sie Ihren Administrator, ein neues Passwort für Sie festzulegen.
+
+Die Anmeldeseite bietet **Passwort vergessen?** nur an, wenn der Server Ihrer Organisation E-Mails versendet. Sonst steht dort **Passwort vergessen? Die Administration kann ein neues setzen.**: Wenden Sie sich an Ihren Administrator. Sie erhalten einen Link, mit dem Sie ein neues Passwort festlegen; er gilt einmal und nur eine Zeit lang. Öffnen Sie ihn, wählen Sie das neue Passwort und melden Sie sich dann damit an.
 
 ## Sprache und Design {#language-and-theme}
 
@@ -49,7 +51,28 @@ Eine Sprache, die Sie in den Einstellungen des Browser-Agenten oder eines Office
 
 Eine Anmeldung gilt sieben Tage, sofern Ihre Organisation keine andere Dauer festgelegt hat. Danach werden Sie gebeten, sich erneut anzumelden. Um sie früher zu beenden, wählen Sie Ihren Avatar und dann **Abmelden**: Diese Anmeldung ist sofort beendet, auch für jeden, der sie kopiert hat. Eine Passwortänderung oder ein Administrator, der Ihr Konto sperrt oder Ihnen eine Rolle entzieht, beendet alle Ihre Anmeldungen. Melden Sie sich an jedem Computer ab, den auch andere nutzen.
 
-Anmeldung mit Ihrem Firmenkonto (Single Sign-on) <span class="fs-planned">Geplant</span>
+Hat Ihre Organisation ihre eigene Anmeldung angebunden, bietet die Anmeldeseite sie an: **Anmelden mit** und
+den Namen Ihrer Organisation, oder eine Auswahl zwischen **Fadenstack-Konto** und dem Verzeichnis Ihrer
+Organisation, wo Sie Ihren **Kontonamen** und Ihr gewohntes Passwort eingeben. Eine so begonnene Anmeldung kann
+kürzer als sieben Tage gelten, wie Ihre Organisation es festgelegt hat.
+
+## Verknüpfte Anmeldungen {#linked-sign-ins}
+
+![Verknüpfte Anmeldungen in Mein Profil: Example Corp mit Trennen, und dass auch Ihr Passwort Sie anmeldet](../images/use/profile-linked-sign-ins.png)
+
+**Mein Profil** zeigt unter **Verknüpfte Anmeldungen** die Anmeldeanbieter, mit denen Sie sich anmelden, und ob
+auch Ihr Passwort Sie anmeldet. Der Abschnitt erscheint, wenn Ihre Organisation ihre eigene Anmeldung angebunden
+hat.
+
+- **Anbieter verknüpfen**: Wählen Sie ihn aus und melden Sie sich dort wie gewohnt an. Sie kommen zu **Mein
+  Profil** zurück und können sich von da an damit anmelden. Bei einem Verzeichnis geben Sie stattdessen Ihren
+  **Kontonamen** und dessen Passwort ein.
+- **Trennen**: Sie können sich mit diesem Anbieter nicht mehr anmelden, bis Sie ihn wieder verknüpfen. Die
+  Schaltfläche ist aus, wenn es Ihre einzige Art ist, sich anzumelden: Sie würden sich aussperren. Bitten Sie
+  Ihren Administrator zuerst um einen Link zum Zurücksetzen des Passworts, wenn Sie sich stattdessen mit einem
+  Passwort anmelden möchten.
+
+Eine Anmeldung, die hier schon zu einem anderen Konto gehört, wird nicht mit Ihrem verknüpft.
 
 ## API-Tokens {#api-tokens}
 
@@ -81,7 +104,9 @@ Die Anwendung braucht außerdem die Adresse der API, die Ihnen Ihr Administrator
 1. Wählen Sie neben dem Token **Widerrufen**.
 2. Bestätigen Sie mit **Widerrufen**.
 
-Anwendungen, die das Token nutzen, funktionieren innerhalb einer Minute nicht mehr. Widerrufen Sie ein Token, sobald es nicht mehr gebraucht wird oder wenn es jemand anderes gesehen haben könnte.
+Anwendungen, die das Token nutzen, funktionieren sofort nicht mehr. Widerrufen Sie ein Token, sobald es nicht mehr gebraucht wird oder wenn es jemand anderes gesehen haben könnte.
+
+Jedes Token zeigt, wann es zuletzt genutzt wurde, von welcher Adresse und mit welcher Anwendung; **Nutzungen** listet seine letzten Nutzungen. Jede Nutzung wird festgehalten, und Ihre Administratoren sehen sie auch: Eine Nutzung, die Sie nicht kennen, ist ein Grund, das Token zu widerrufen.
 
 ??? info "Wann ein Token sonst nicht mehr funktioniert"
     Ihr Administrator kann Ihre Tokens ebenfalls widerrufen. Wenn Ihr Konto deaktiviert wird, funktionieren auch Ihre Tokens nicht mehr.

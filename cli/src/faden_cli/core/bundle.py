@@ -96,6 +96,16 @@ def unpack(install_dir: Path) -> list[str]:
         if not target.is_file() or target.read_bytes() != data:
             target.write_bytes(data)
             written.append(rel)
+    # What an add-on ships (registry.extend_bundle_files), replaced like the bundle's own files.
+    from faden_cli.core.registry import BUNDLE_FILES  # noqa: PLC0415
+
+    for rel, source in BUNDLE_FILES.items():
+        target = install_dir / rel
+        data = Path(source).read_bytes()
+        if not target.is_file() or target.read_bytes() != data:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(data)
+            written.append(rel)
     for rel, content in _STARTING_CONTENT.items():
         target = install_dir / rel
         if not target.exists():

@@ -108,6 +108,7 @@ async def reset_password(args: argparse.Namespace) -> dict[str, Any]:
         if user is None:
             return {"ok": False, "error": f"No account with the address {args.email}."}
         user.hashed_password = PasswordHelper().hash(password)
+        user.password_set = True
         end_sign_ins(user)
         await session.commit()
         user_id = str(user.id)
@@ -122,15 +123,22 @@ async def grant_admin(args: argparse.Namespace) -> dict[str, Any]:
         user = await _user_by_email(session, args.email)
         if user is None:
             return {"ok": False, "error": f"No account with the address {args.email}."}
+        from faden_backend.db.models.users import end_sign_ins  # noqa: PLC0415
+
         already = bool(user.is_superuser)
         user.is_superuser = True
         user.is_active = True
+        if not already:
+            end_sign_ins(user)  # a change of rights (services/rights.py)
         await session.commit()
         user_id = str(user.id)
     if not already:
         await _record(
             factory, "user.administrator.grant", "user", user_id,
-            metadata={"email": args.email, "reason": args.reason, "how": "faden admin grant-admin"},
+            metadata={
+                "email": args.email, "reason": args.reason, "how": "faden admin grant-admin",
+                "sign_ins_ended": True,
+            },
         )
     return {"ok": True, "user_id": user_id, "already": already}
 

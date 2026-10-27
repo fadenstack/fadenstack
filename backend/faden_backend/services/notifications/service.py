@@ -10,9 +10,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_backend.db.models.notifications import (
+    DEFAULT_TTL,
     NotificationAlertState,
     NotificationOutbox,
 )
+from faden_backend.services.extensions import mail_available, registry
 from faden_backend.settings import settings
 
 log = logging.getLogger(__name__)
@@ -20,6 +22,10 @@ log = logging.getLogger(__name__)
 
 class NotificationService:
     """Per-request service that writes to the notification outbox.
+
+    Nothing is queued while no mail can be sent (``extensions.mail_available``): a message that waits for a
+    mailer someone may switch on weeks later would go out stale and keep an address meanwhile. Each message
+    expires with what it carries.
 
     The caller owns the session and is responsible for calling
     ``session.commit()`` or ``session.flush()`` after enqueueing.
@@ -41,10 +47,12 @@ class NotificationService:
     ) -> bool:
         """Enqueue an admin alert if the cooldown window has elapsed.
 
-        Returns ``True`` if the alert was enqueued, ``False`` if suppressed.
+        Returns ``True`` if the alert was enqueued, ``False`` if suppressed or no mail can be sent.
         """
+        if not mail_available():
+            return False
         now = datetime.now(tz=UTC)
-        cooldown = timedelta(minutes=settings.mailer_alert_cooldown_minutes)
+        cooldown = timedelta(minutes=settings.alert_cooldown_minutes)
 
         result = await self._session.execute(
             select(NotificationAlertState).where(
@@ -57,10 +65,9 @@ class NotificationService:
             log.debug("Alert %s suppressed by cooldown.", fingerprint)
             return False
 
-        # Resolve recipients.
-        recipients = settings.mailer_admin_recipients
-        if isinstance(recipients, str):
-            recipients = [r.strip() for r in recipients.split(",") if r.strip()]
+        # Who gets alerts is the mail extension's to say: core keeps no addresses for it.
+        sender = registry.mail_sender
+        recipients = sender.admin_recipients() if sender is not None else []
         if not recipients:
             log.warning("No admin recipients configured — alert '%s' dropped.", subject)
             return False
@@ -82,6 +89,7 @@ class NotificationService:
                 kind="admin_alert",
                 payload_json=payload,
                 status="pending",
+                expires_at=now + DEFAULT_TTL,
             ),
         )
 
@@ -109,8 +117,15 @@ class NotificationService:
         to_name: str | None,
         reset_url: str,
         request_id: str,
-    ) -> None:
-        """Enqueue a password-reset email for async delivery."""
+        expires_in: timedelta,
+        language: str | None = None,
+    ) -> bool:
+        """Enqueue a password-reset email, in *language* (BCP 47) if given; it expires with the link.
+
+        ``False`` when no mail can be sent: nothing is queued.
+        """
+        if not mail_available():
+            return False
         now = datetime.now(tz=UTC)
         payload = {
             "to_email": to_email,
@@ -118,6 +133,7 @@ class NotificationService:
             "reset_url": reset_url,
             "requested_at": now.isoformat(),
             "request_id": request_id,
+            "language": language,
         }
         self._session.add(
             NotificationOutbox(
@@ -125,6 +141,48 @@ class NotificationService:
                 kind="password_reset",
                 payload_json=payload,
                 status="pending",
+                expires_at=now + expires_in,
             ),
         )
         await self._session.flush()
+        return True
+
+    async def enqueue_link_code(
+        self,
+        *,
+        to_email: str,
+        to_name: str | None,
+        provider_name: str,
+        identity_email: str | None,
+        code: str,
+        expires_at: datetime,
+        language: str | None = None,
+    ) -> bool:
+        """Enqueue the code an account's owner types to link an outside sign-in; it expires with the code.
+
+        ``False`` when no mail can be sent: nothing is queued.
+        """
+        if not mail_available():
+            return False
+        now = datetime.now(tz=UTC)
+        payload = {
+            "to_email": to_email,
+            "to_name": to_name,
+            "provider_name": provider_name,
+            "identity_email": identity_email,
+            "code": code,
+            "expires_minutes": max(1, round((expires_at - now).total_seconds() / 60)),
+            "requested_at": now.isoformat(),
+            "language": language,
+        }
+        self._session.add(
+            NotificationOutbox(
+                id=uuid.uuid4(),
+                kind="link_code",
+                payload_json=payload,
+                status="pending",
+                expires_at=expires_at,
+            ),
+        )
+        await self._session.flush()
+        return True

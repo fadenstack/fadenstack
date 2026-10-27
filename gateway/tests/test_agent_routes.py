@@ -382,6 +382,8 @@ async def test_access_follows_grants_and_the_agents_state(
         (_profile(status="retired"), 403, "agent_retired"),
         (_profile(status="draft", published=False), 403, "agent_not_published"),
         (_profile(extensions={"pii": {"mode": "device_only"}}), 403, "agent_needs_enterprise"),
+        # A restriction on the agent itself (Enterprise's exclusions) that nothing enforces now.
+        (_profile(restricted_by=("exclusions",)), 403, "agent_needs_enterprise"),
     ]
     backend.groups[USER] = (TEAM,)
     for profile, code, error in cases:

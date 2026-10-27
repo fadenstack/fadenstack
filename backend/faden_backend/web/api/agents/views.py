@@ -21,6 +21,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi import Path as FastAPIPath
 from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -98,17 +99,26 @@ async def _managed_agent(dao: AgentsDAO, rbac: RbacDAO, ref: str, user: User) ->
     return agent
 
 
+async def _may_inspect(dao: AgentsDAO, rbac: RbacDAO, agent: Agent, user: User) -> bool:
+    """Whether the user may see the agent's details: ``agents:read``, managing it, or a seeing member role."""
+    return (
+        await _has(rbac, user, "read")
+        or await _can_manage(dao, rbac, agent, user)
+        or await access.inspects(dao, agent, user)
+    )
+
+
 async def _inspected_agent(dao: AgentsDAO, rbac: RbacDAO, ref: str, user: User) -> Agent:
-    """An agent whose details the user may see (``agents:read``) or manages."""
+    """An agent whose details the user may see (``agents:read``, managing it, or e.g. auditing it)."""
     agent = await _agent_or_404(dao, ref)
-    if not (await _has(rbac, user, "read") or await _can_manage(dao, rbac, agent, user)):
+    if not await _may_inspect(dao, rbac, agent, user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not maintain this agent.")
     return agent
 
 
 async def _visible_agent(dao: AgentsDAO, rbac: RbacDAO, ref: str, user: User) -> Agent:
     agent = await _agent_or_404(dao, ref)
-    if await _has(rbac, user, "read") or await _can_manage(dao, rbac, agent, user):
+    if await _may_inspect(dao, rbac, agent, user):
         return agent
     if (await access.decide(dao, agent, user)).allowed:
         return agent
@@ -129,6 +139,8 @@ async def _dto(dao: AgentsDAO, agent: Agent, *, can_manage: bool) -> AgentDTO:
         published_version=published.version if published else None,
         latest_version=latest.version if latest else None,
         can_manage=can_manage,
+        unenforced=access.unenforced(agent, published) if can_manage else [],
+        unenforced_restrictions=access.unenforced_restrictions(agent) if can_manage else [],
         created_at=agent.created_at,
         updated_at=agent.updated_at,
     )
@@ -168,6 +180,7 @@ async def _audit(
     action: str,
     target_id: str,
     metadata: dict[str, Any] | None = None,
+    severity: str = "normal",
 ) -> None:
     await audit.log(
         action=action,
@@ -175,6 +188,7 @@ async def _audit(
         target_id=target_id,
         result=AuditResult.ALLOW,
         actor_id=user.id,
+        severity=severity,
         metadata_json=json.dumps(metadata, default=str) if metadata else None,
     )
 
@@ -188,9 +202,12 @@ async def list_agents(
     dao: AgentsDAO = Depends(),
     rbac: RbacDAO = Depends(),
 ) -> list[AgentDTO]:
-    """Every agent for readers and managers; otherwise those the user can use or maintains."""
+    """Every agent for readers and managers; otherwise those the user can use, maintains or e.g. audits."""
     see_all = await _has(rbac, user, "read") or await _has(rbac, user, "manage")
-    agents = await dao.list_all(TENANT) if see_all else await dao.list_for_user(TENANT, user.id)
+    if see_all:
+        agents = await dao.list_all(TENANT)
+    else:
+        agents = await dao.list_for_user(TENANT, user.id, registry.member_roles)
     manage_all = await _has(rbac, user, "manage")
     return [
         await _dto(dao, a, can_manage=manage_all or await access.is_maintainer(dao, a, user)) for a in agents
@@ -236,14 +253,18 @@ async def list_principals(
     q: Annotated[str | None, Query(min_length=2, max_length=100)] = None,
     ids: Annotated[str | None, Query(max_length=4000)] = None,
 ) -> list[PrincipalOption]:
-    """Users and teams to grant an agent to or make its maintainers, for those who manage agents.
+    """Users and teams to grant an agent to, make its members or check the access of.
 
-    ``q`` searches e-mail addresses and group names; ``ids`` (``user:<id>,group:<id>``) names them.
+    For those who manage agents or are members of one (maintainers; e.g. auditors, for the access check).
+    ``q`` searches e-mail addresses and group names; ``ids`` (``user:<id>,group:<id>``) names them. Those who
+    grant nothing (auditors) name a person by their whole address and a team by its whole name: they check
+    access one person at a time and need no list of everyone (GDPR Art. 5(1)(c), 25(2)).
     """
     rights = [await _has(rbac, user, action) for action in ("read", "create", "manage")]
-    if not any(rights) and not await dao.maintains_any(user.id):
+    grants = any(rights) or await dao.maintains_any(user.id)
+    if not grants and not await dao.member_of_any(user.id, registry.member_roles):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not manage agents.")
-    return await find_principals(dao.session, q=q, ids=ids)
+    return await find_principals(dao.session, q=q, ids=ids, exact=not grants)
 
 
 @router.get("/templates", response_model=list[AgentTemplateDTO], name="agent_templates")
@@ -526,7 +547,13 @@ async def replace_members(
 ) -> list[MemberDTO]:
     """The agent's maintainers (and, with Enterprise, auditors); replaces the list."""
     agent = await _managed_agent(dao, rbac, agent_ref, user)
-    bad_roles = {m.role for m in payload.members} - registry.member_roles
+    # A role nothing adds any more may stay where it is (it gives nothing); it is not given anew.
+    kept = {m.user_id: m.role for m in await dao.members(agent.id)}
+    bad_roles = {
+        m.role
+        for m in payload.members
+        if m.role not in registry.member_roles and kept.get(m.user_id) != m.role
+    }
     if bad_roles:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -553,14 +580,52 @@ async def explain_access(
     user: Annotated[User, Depends(current_active_user)],
     dao: AgentsDAO = Depends(),
     rbac: RbacDAO = Depends(),
+    audit: AuditDAO = Depends(),
 ) -> AccessDTO:
-    """Whether a user may use the agent, and why."""
+    """Whether a user may use the agent, and why.
+
+    Each check is recorded, who checked whom (GDPR Art. 5(2): a look at someone's access is accountable).
+    """
     agent = await _inspected_agent(dao, rbac, agent_ref, user)
     target = await dao.session.get(User, user_id)
     if target is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     decision = await access.decide(dao, agent, target)
+    await _audit(
+        audit, user, "agent.access.check", str(agent.id),
+        {
+            "checked": str(target.id), "email": target.email, "allowed": decision.allowed,
+            "code": decision.code,
+        },
+    )
     return AccessDTO(allowed=decision.allowed, code=decision.code, detail=decision.detail)
+
+
+@router.delete("/{agent_ref}/restrictions/{name}", response_model=AgentDTO, name="lift_agent_restriction")
+async def lift_restriction(
+    agent_ref: str,
+    name: Annotated[str, FastAPIPath(max_length=64)],
+    user: Annotated[User, Depends(current_active_user)],
+    dao: AgentsDAO = Depends(),
+    rbac: RbacDAO = Depends(),
+    audit: AuditDAO = Depends(),
+) -> AgentDTO:
+    """Lift a restriction nothing installed enforces: everyone granted can use the agent again.
+
+    Refused while an extension enforces it (it is changed there). The extension may set it again once back.
+    """
+    agent = await _managed_agent(dao, rbac, agent_ref, user)
+    if name not in (agent.restricted_by or []):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="The agent has no such restriction")
+    if name in registry.agent_restrictions:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This restriction is enforced; change it where it is kept.",
+        )
+    await access.set_restricted(dao.session, agent.id, name, on=False)
+    await _audit(audit, user, "agent.restriction.lift", str(agent.id), {"restriction": name}, severity="high")
+    await dao.session.refresh(agent)
+    return await _dto(dao, agent, can_manage=True)
 
 
 # -- usage and sign-ins -------------------------------------------------------------

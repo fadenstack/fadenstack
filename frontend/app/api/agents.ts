@@ -69,6 +69,13 @@ export interface Agent {
   latest_version: number | null;
   /** The caller maintains it, or manages every agent. */
   can_manage: boolean;
+  /**
+   * Settings and restrictions no installed extension enforces: until one does, only the maintainers can use
+   * the agent. Told to those who manage it.
+   */
+  unenforced?: string[];
+  /** Those of them that are restrictions on the agent, which its managers can lift. */
+  unenforced_restrictions?: string[];
   created_at: string;
   updated_at: string;
 }
@@ -249,6 +256,9 @@ export const agentsApi = {
   /** Whether a user may use the agent, and why. */
   explainAccess: (agent: string, userId: string) =>
     request<AccessExplanation>(`${at(agent)}/access/${segment(userId)}`),
+  /** Lift a restriction nothing enforces: everyone granted can use the agent again. */
+  liftRestriction: (agent: string, name: string) =>
+    request<Agent>(`${at(agent)}/restrictions/${segment(name)}`, json("DELETE")),
 
   /** The apps that run the agent and what they bring, against its latest version. */
   apps: (agent: string) => request<AppsReview>(`${at(agent)}/apps`),
@@ -278,8 +288,20 @@ export const agentsApi = {
  */
 export const AGENT_MAINTAINER = "agents:maintain";
 
+/**
+ * Seeing an agent's details as a member in another role (with Enterprise: auditor), changing nothing;
+ * `/users/me/access` says so (`inspects_agents`).
+ */
+export const AGENT_INSPECTOR = "agents:inspect";
+
 /** Any of these opens the agents pages. */
-export const AGENTS_PAGE_KEYS = ["agents:read", "agents:create", "agents:manage", AGENT_MAINTAINER];
+export const AGENTS_PAGE_KEYS = ["agents:read", "agents:create", "agents:manage", AGENT_MAINTAINER, AGENT_INSPECTOR];
+
+/** The feature with which the server offers auditors among an agent's members (`GET /api/about`). */
+export const AGENT_AUDITORS = "agent_auditors";
+
+/** The feature with which the server takes an agent's own token lifetimes (`extensions.token`). */
+export const AGENT_TOKEN_LIFETIMES = "agent_token_lifetimes";
 
 /** What the user may do with agents in general; each agent says itself whether they manage it (`can_manage`). */
 export function agentRights(can: (permission: string) => boolean) {

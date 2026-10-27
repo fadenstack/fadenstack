@@ -38,13 +38,13 @@ from faden_backend.services.llm.gateway_sync import GatewaySyncService
 from faden_backend.services.llm.service import LLMService
 from faden_backend.services.notifications import (
     GatewayAlertMonitor,
-    MailerClient,
     NotificationDispatcher,
 )
 from faden_backend.services.rabbit.lifespan import init_rabbit, shutdown_rabbit
 from faden_backend.services.system_settings.runtime_mapping import (
     get_runtime_secret_key_map,
     get_runtime_value_key_map,
+    runtime_target,
     register_runtime_secret_key,
     register_runtime_value_key,
 )
@@ -65,14 +65,14 @@ except ImportError:  # pragma: no cover
     _EE_AVAILABLE = False
 # ──────────────────────────────────────────────────────────────────
 
-def register_hydration_key(key: str, attr: str) -> None:
-    """Register an additional runtime value key for DB hydration (used by EE plugins)."""
-    register_runtime_value_key(key, attr)
+def register_hydration_key(key: str, attr: str, *, target: Any = None) -> None:
+    """Register an additional runtime value key for DB hydration (used by EE plugins); onto *target*."""
+    register_runtime_value_key(key, attr, target=target)
 
 
-def register_hydration_secret(key: str, attr: str) -> None:
-    """Register an additional runtime secret key for DB hydration (used by EE plugins)."""
-    register_runtime_secret_key(key, attr)
+def register_hydration_secret(key: str, attr: str, *, target: Any = None) -> None:
+    """Register an additional runtime secret key for DB hydration (used by EE plugins); onto *target*."""
+    register_runtime_secret_key(key, attr, target=target)
 
 
 def _setup_db(app: FastAPI) -> None:  # pragma: no cover
@@ -281,7 +281,7 @@ async def _load_runtime_settings_from_db(app: FastAPI) -> None:  # pragma: no co
                 if isinstance(value, str) and not value.strip():
                     continue
                 log.debug("DB hydration: %s -> %s = %r", db_key, attr_name, value)
-                object.__setattr__(settings, attr_name, value)
+                object.__setattr__(runtime_target(db_key), attr_name, value)
         except Exception:
             log.exception("Failed to load runtime value settings from DB.")
 
@@ -305,7 +305,7 @@ async def _load_runtime_settings_from_db(app: FastAPI) -> None:  # pragma: no co
                 except Exception:
                     log.exception("Failed to decrypt secret '%s'.", db_key)
                     continue
-                object.__setattr__(settings, attr_name, plaintext)
+                object.__setattr__(runtime_target(db_key), attr_name, plaintext)
         except Exception:
             log.exception("Failed to load runtime secret settings from DB.")
 
@@ -318,16 +318,13 @@ def _extract_setting_value(value_json: object) -> object:
 
 
 async def _start_notification_runtime(app: FastAPI) -> None:
-    """Start background notification dispatcher and gateway alert monitor."""
-    http_client = httpx.AsyncClient(verify=default_httpx_verify())
+    """Start background notification dispatcher and gateway alert monitor.
+
+    The dispatcher hands mail to ``registry.mail_sender``; without one (core) it only deletes what expired.
+    """
     try:
-        mailer_client = MailerClient(http_client=http_client)
-        dispatcher = NotificationDispatcher(
-            session_factory=app.state.db_session_factory,
-            mailer_client=mailer_client,
-        )
+        dispatcher = NotificationDispatcher(session_factory=app.state.db_session_factory)
         dispatcher.start()
-        app.state.notification_http_client = http_client
         app.state.notification_dispatcher = dispatcher
 
         gateway_session_factory = getattr(app.state, "llm_graph_trace_session_factory", None)
@@ -341,7 +338,6 @@ async def _start_notification_runtime(app: FastAPI) -> None:
         app.state.gateway_alert_monitor = monitor
     except Exception:
         log.exception("Failed to start notification runtime.")
-        await http_client.aclose()
 
 
 async def _node_command_reaper_loop(app: FastAPI) -> None:
@@ -418,6 +414,13 @@ async def _node_command_reaper_loop(app: FastAPI) -> None:
 
                     if dropped := await prune_sent_notifications(session):
                         log.info("Deleted %d sent notification(s) older than a week", dropped)
+                    # Each use of an API token: kept for the retention period (GDPR Art. 5(1)(e)).
+                    from faden_backend.services import api_token_uses  # noqa: PLC0415
+
+                    days = settings.api_token_use_retention_days
+                    if dropped := await api_token_uses.delete_older_than(session, days):
+                        await session.commit()
+                        log.info("Deleted %d API token use(s) past their retention period", dropped)
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -814,6 +817,35 @@ def _start_update_check(app: FastAPI) -> None:
     app.state.update_check = asyncio.create_task(_update_check_loop(app), name="update_check")
 
 
+async def _sign_in_upkeep_loop(app: FastAPI) -> None:
+    """Hourly: suspend inactive accounts and those a directory no longer has (services/sign_in/upkeep.py).
+
+    Only with a sign-in module; ``run_pass`` lets one worker act at a time.
+    """
+    import random  # noqa: PLC0415
+
+    from faden_backend.services.sign_in import upkeep  # noqa: PLC0415
+
+    await asyncio.sleep(300 + random.uniform(0, 300))  # noqa: S311
+    while True:
+        try:
+            report = await upkeep.run_pass(app.state.db_session_factory)
+            if report is not None and (report.suspended or report.groups_changed):
+                log.info("Sign-in upkeep: %d suspended, %d group changes", len(report.suspended),
+                         report.groups_changed)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.exception("Sign-in upkeep failed.")
+        await asyncio.sleep(3600)
+
+
+def _start_sign_in_upkeep(app: FastAPI) -> None:
+    if broker.is_worker_process or not settings.auth_enabled:
+        return
+    app.state.sign_in_upkeep = asyncio.create_task(_sign_in_upkeep_loop(app), name="sign_in_upkeep")
+
+
 async def _stop_notification_runtime(app: FastAPI) -> None:
     """Stop notification background workers and close shared HTTP client."""
     monitor: GatewayAlertMonitor | None = getattr(app.state, "gateway_alert_monitor", None)
@@ -823,10 +855,6 @@ async def _stop_notification_runtime(app: FastAPI) -> None:
     dispatcher: NotificationDispatcher | None = getattr(app.state, "notification_dispatcher", None)
     if dispatcher is not None:
         await dispatcher.stop()
-
-    http_client: httpx.AsyncClient | None = getattr(app.state, "notification_http_client", None)
-    if http_client is not None:
-        await http_client.aclose()
 
 
 def _init_rag_lite(app: FastAPI) -> None:
@@ -1022,6 +1050,9 @@ async def lifespan_setup(
     # ── Update check: the release feed, once a day (background) ──
     _start_update_check(app)
 
+    # ── Accounts from outside sign-ins: inactive, or gone from the directory (background) ──
+    _start_sign_in_upkeep(app)
+
     # ── Export catalogued runtime images for nodes (background) ──
     _start_runtime_image_exports(app)
 
@@ -1113,6 +1144,14 @@ async def lifespan_setup(
         update_check_task.cancel()
         try:
             await update_check_task
+        except (asyncio.CancelledError, Exception):
+            pass
+
+    sign_in_upkeep_task = getattr(app.state, "sign_in_upkeep", None)
+    if sign_in_upkeep_task is not None:
+        sign_in_upkeep_task.cancel()
+        try:
+            await sign_in_upkeep_task
         except (asyncio.CancelledError, Exception):
             pass
 

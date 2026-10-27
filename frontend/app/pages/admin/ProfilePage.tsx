@@ -32,6 +32,8 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 
 import AppearanceSettings from "~/components/AppearanceSettings";
+import { TokenLastUse, TokenUsesDialog } from "~/components/users/ApiTokenUses";
+import { LinkedSignInsCard } from "~/components/users/LinkedSignInsCard";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { adminUsers, type ApiTokenInfo } from "~/api/admin";
 import { auth, type AuthUser } from "~/api/auth";
@@ -77,6 +79,7 @@ export default function ProfilePage() {
   // ── The user's tokens ────────────────────────────────────────────
   const [tokens, setTokens] = useState<ApiTokenInfo[] | null>(null);
   const [revokeTarget, setRevokeTarget] = useState<ApiTokenInfo | null>(null);
+  const [showingUses, setShowingUses] = useState<ApiTokenInfo | null>(null);
   const [revoking, setRevoking] = useState(false);
 
   function loadTokens() {
@@ -220,6 +223,8 @@ export default function ProfilePage() {
           </Stack>
         </CardContent>
       </Card>
+
+      <LinkedSignInsCard />
 
       {/* ── Password Change Card ──────────────────────────────────── */}
       <Card variant="outlined" sx={{ mb: 3 }}>
@@ -433,7 +438,11 @@ export default function ProfilePage() {
                         ? t("profile.token_expires", { date: formatDate(tok.expires_at) })
                         : t("profile.token_never_expires")}
                     </Typography>
+                    <TokenLastUse token={tok} />
                   </Box>
+                  <Button size="small" onClick={() => setShowingUses(tok)}>
+                    {t("api_tokens.show_uses")}
+                  </Button>
                   {tok.revoked_at && <Chip size="small" label={t("profile.token_revoked")} />}
                   {expired && <Chip size="small" label={t("profile.token_expired")} />}
                   {live && (
@@ -458,6 +467,7 @@ export default function ProfilePage() {
         onConfirm={handleRevoke}
         onClose={() => setRevokeTarget(null)}
       />
+      <TokenUsesDialog token={showingUses} load={adminUsers.listMyApiTokenUses} onClose={() => setShowingUses(null)} />
     </Box>
   );
 }

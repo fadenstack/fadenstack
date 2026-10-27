@@ -1,4 +1,4 @@
-"""NotificationDispatcher — polls the outbox and delivers via MailerClient."""
+"""NotificationDispatcher — polls the outbox and hands each message to the registered mail sender."""
 
 from __future__ import annotations
 
@@ -10,8 +10,8 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from faden_backend.db.models.notifications import NotificationOutbox
-from faden_backend.services.notifications.mailer_client import MailerClient
-from faden_backend.settings import settings
+from faden_backend.services.extensions import mail_available, registry
+from faden_backend.services.notifications.retention import prune_expired_notifications
 
 log = logging.getLogger(__name__)
 
@@ -22,18 +22,14 @@ _MAX_ATTEMPTS = 5
 class NotificationDispatcher:
     """Background worker that drains the notification outbox.
 
-    Polls for ``status='pending'`` rows whose ``next_attempt_at`` is past,
-    then delivers them via :class:`MailerClient`.  Failures are retried
-    with exponential back-off up to ``_MAX_ATTEMPTS``.
+    Each poll first deletes what expired before it was sent, whether or not mail can go out; then, while a
+    sender is registered and available (``registry.mail_sender``; core has none), it delivers the
+    ``status='pending'`` rows whose ``next_attempt_at`` is past. Failures are retried with exponential
+    back-off up to ``_MAX_ATTEMPTS``, never past the message's expiry.
     """
 
-    def __init__(
-        self,
-        session_factory: async_sessionmaker[AsyncSession],
-        mailer_client: MailerClient,
-    ) -> None:
+    def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
         self._session_factory = session_factory
-        self._mailer = mailer_client
         self._task: asyncio.Task[None] | None = None
 
     def start(self) -> None:
@@ -64,18 +60,21 @@ class NotificationDispatcher:
             await asyncio.sleep(_POLL_INTERVAL_SECONDS)
 
     async def _poll_once(self) -> None:
-        # Skip delivery when mailer module is disabled — messages stay
-        # queued and will be delivered once the module is turned on.
-        if not settings.mailer_enabled:
+        now = datetime.now(tz=UTC)
+        async with self._session_factory() as session:
+            dropped = await prune_expired_notifications(session, now)
+        if dropped:
+            log.info("Deleted %d notifications that expired before they were sent.", dropped)
+        if not mail_available():
             return
 
-        now = datetime.now(tz=UTC)
         async with self._session_factory() as session:
             result = await session.execute(
                 select(NotificationOutbox)
                 .where(
                     NotificationOutbox.status == "pending",
                     NotificationOutbox.next_attempt_at <= now,
+                    NotificationOutbox.expires_at > now,
                 )
                 .order_by(NotificationOutbox.created_at)
                 .limit(20),
@@ -86,14 +85,11 @@ class NotificationDispatcher:
             await self._deliver(row)
 
     async def _deliver(self, row: NotificationOutbox) -> None:
+        sender = registry.mail_sender
+        if sender is None:
+            return
         try:
-            if row.kind == "password_reset":
-                await self._mailer.send_password_reset(row.payload_json)
-            elif row.kind == "admin_alert":
-                await self._mailer.send_admin_alert(row.payload_json)
-            else:
-                log.warning("Unknown notification kind: %s", row.kind)
-                return
+            await sender.send(row.kind, row.payload_json)
 
             async with self._session_factory() as session:
                 await session.execute(

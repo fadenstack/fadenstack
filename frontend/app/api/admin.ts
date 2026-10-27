@@ -7,7 +7,7 @@
  */
 
 import { clearCachedAccess } from "~/lib/adminConstants";
-import { AGENT_MAINTAINER } from "./agents";
+import { AGENT_INSPECTOR, AGENT_MAINTAINER } from "./agents";
 
 const BASE = "/api/admin";
 
@@ -651,12 +651,16 @@ export interface MeAccess {
   permissions: RbacPermission[];
   /** Maintains at least one agent. */
   maintains_agents?: boolean;
+  /** Sees the details of at least one agent as a member in another role (e.g. auditor). */
+  inspects_agents?: boolean;
 }
 
 /** The keys the UI gates on: `resource:action` per permission, and the rights that are not permissions. */
-export function accessKeys(access: Pick<MeAccess, "permissions" | "maintains_agents">): string[] {
+export function accessKeys(access: Pick<MeAccess, "permissions" | "maintains_agents" | "inspects_agents">): string[] {
   const keys = access.permissions.map((p) => `${p.resource}:${p.action}`);
-  return access.maintains_agents ? [...keys, AGENT_MAINTAINER] : keys;
+  if (access.maintains_agents) keys.push(AGENT_MAINTAINER);
+  if (access.inspects_agents) keys.push(AGENT_INSPECTOR);
+  return keys;
 }
 
 export const adminUsers = {
@@ -741,6 +745,16 @@ export const adminUsers = {
       body: JSON.stringify({ administrator, reason }),
     });
   },
+  /**
+   * A one-time link that sets a new password for the account (Root Mode; recorded with the reason). The token
+   * is in this answer only; the console makes the address from it.
+   */
+  createResetLink(userId: string, reason: string, validHours: 1 | 24) {
+    return request<{ token: string; expires_at: string }>(`/users/${userId}/password-reset-link`, {
+      method: "POST",
+      body: JSON.stringify({ reason, valid_hours: validHours }),
+    });
+  },
   /** Move the administrator right or the auditor role from this account to another, in one step. */
   handOver(userId: string, right: "administrator" | "auditor", toUserId: string, reason: string) {
     return request<AdminUser>(`/users/${userId}/hand-over`, {
@@ -774,9 +788,13 @@ export const adminUsers = {
   listMyApiTokens() {
     return request<ApiTokenInfo[]>("/users/me/api-tokens");
   },
-  /** Revokes one of the current user's API tokens; the gateway refuses it within a minute. */
+  /** Revokes one of the current user's API tokens; the gateway refuses it at the next request. */
   revokeMyApiToken(tokenId: string) {
     return request<void>(`/users/me/api-tokens/${tokenId}`, { method: "DELETE" });
+  },
+  /** One of the current user's tokens' latest uses, newest first. */
+  listMyApiTokenUses(tokenId: string) {
+    return request<ApiTokenUse[]>(`/users/me/api-tokens/${tokenId}/uses`);
   },
   /** Someone's API tokens (administrators). */
   listUserApiTokens(userId: string) {
@@ -786,9 +804,17 @@ export const adminUsers = {
   revokeUserApiToken(userId: string, tokenId: string) {
     return request<void>(`/users/${userId}/api-tokens/${tokenId}`, { method: "DELETE" });
   },
+  /** Everyone's API tokens with their owner and last use (administrators). */
+  listAllApiTokens() {
+    return request<AdminApiTokenInfo[]>("/users/api-tokens");
+  },
+  /** A token's latest uses, newest first (administrators). */
+  listApiTokenUses(tokenId: string) {
+    return request<ApiTokenUse[]>(`/users/api-tokens/${tokenId}/uses`);
+  },
 };
 
-/** An API token as its owner sees it. */
+/** An API token as its owner sees it, with its latest use (within the kept period). */
 export interface ApiTokenInfo {
   id: string;
   name: string | null;
@@ -796,6 +822,26 @@ export interface ApiTokenInfo {
   created_at: string;
   expires_at: string | null;
   revoked_at: string | null;
+  last_used_at?: string | null;
+  last_used_address?: string | null;
+  last_used_client?: string | null;
+  last_used_route?: string | null;
+  /** Its uses in the last 30 days. */
+  recent_uses?: number;
+}
+
+/** An API token in the overview of everyone's. */
+export interface AdminApiTokenInfo extends ApiTokenInfo {
+  user_id: string;
+  email: string;
+}
+
+/** One use of an API token: each request the gateway let in with it. */
+export interface ApiTokenUse {
+  at: string;
+  address: string | null;
+  client: string | null;
+  route: string | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -819,6 +865,13 @@ export interface Group {
   created_at: string;
   roles: GroupRole[];
   member_count: number;
+  /** Who keeps the team: absent or null, an administrator; `provider:<key>`, that sign-in provider. */
+  source?: string | null;
+}
+
+/** The provider that keeps a team (`provider:<key>` → `<key>`), or null for an administrator's. */
+export function teamKeeper(group: Pick<Group, "source">): string | null {
+  return group.source?.startsWith("provider:") ? group.source.slice("provider:".length) : null;
 }
 
 export interface GroupMember {
@@ -874,94 +927,119 @@ export const adminGroups = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Notices for administrators
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Something administrators should know now; worded by the console as ``notices.<code>`` with ``params``. */
+export interface AdminNotice {
+  code: string;
+  severity: "info" | "warning" | "error";
+  params: Record<string, string | number>;
+}
+
+export const adminNotices = {
+  /** What the registered sources have to say now (superusers only), errors first. */
+  list() {
+    return request<AdminNotice[]>("/notices");
+  },
+  /** Lift a restriction on the tenant nothing enforces (the action of its `restriction_<name>` notice). */
+  liftRestriction(name: string) {
+    return request<void>(`/notices/restrictions/${encodeURIComponent(name)}`, { method: "DELETE" });
+  },
+};
+
+/** The restriction a notice is about, for those (`restriction_<name>`) that can be lifted; else null. */
+export function liftableRestriction(notice: AdminNotice): string | null {
+  return notice.code.startsWith("restriction_") && typeof notice.params.name === "string" ? notice.params.name : null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Auth Providers (SSO)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** A provider people may sign in with (``GET /api/auth/sso/providers``). */
 export interface AuthProviderPublic {
-  id: string;
+  key: string;
   name: string;
-  provider_type: string;
-}
-
-export interface AuthProviderDetail {
-  id: string;
-  name: string;
-  provider_type: string;
-  client_id: string;
-  discovery_url: string | null;
-  authorize_url: string | null;
-  token_url: string | null;
-  userinfo_url: string | null;
-  scopes: string;
-  enabled: boolean;
-  auto_register: boolean;
-  default_role_ids: string[];
-  group_mapping: Record<string, unknown>;
-  created_at: string;
-  updated_at: string;
+  /** ``redirect``: off to the provider and back; ``password``: name and password on this page. */
+  kind: "redirect" | "password";
+  posts_back?: boolean;
 }
 
 export const adminAuthProviders = {
-  /** List enabled providers for the login page (no auth required). */
-  listPublic() {
-    return request<AuthProviderPublic[]>("/auth-providers/public");
+  /** The providers people may sign in with, for the sign-in page (no sign-in needed). */
+  async listPublic(): Promise<AuthProviderPublic[]> {
+    const res = await fetch("/api/auth/sso/providers", { credentials: "include" });
+    if (!res.ok) throw new Error(`sign-in providers: ${res.status}`);
+    return (await res.json()) as AuthProviderPublic[];
   },
-  /** List all providers (admin only). */
-  list() {
-    return request<AuthProviderDetail[]>("/auth-providers/");
+  /** Where the browser goes to sign in with a redirect provider. */
+  startUrl(key: string) {
+    return `/api/auth/sso/${encodeURIComponent(key)}/start`;
   },
-  get(providerId: string) {
-    return request<AuthProviderDetail>(`/auth-providers/${providerId}`);
+  /** Sign in with a directory account (a ``password`` provider); the session cookie comes back. */
+  async passwordSignIn(key: string, username: string, password: string): Promise<void> {
+    await postSignIn(`/api/auth/sso/${encodeURIComponent(key)}/password`, { username, password });
   },
-  create(payload: {
-    name: string;
-    provider_type: string;
-    client_id: string;
-    client_secret: string;
-    discovery_url?: string;
-    authorize_url?: string;
-    token_url?: string;
-    userinfo_url?: string;
-    scopes?: string;
-    enabled?: boolean;
-    auto_register?: boolean;
-    default_role_ids?: string[];
-  }) {
-    return request<AuthProviderDetail>("/auth-providers/", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
+  /**
+   * The sign-in that met an existing account and waits, in this browser only (an httpOnly cookie), for the
+   * proof that the account is the person's; ``SignInRefused("sign_in_expired")`` when nothing waits.
+   */
+  async linkWaiting(): Promise<LinkWaiting> {
+    const res = await fetch("/api/auth/sso/link", { credentials: "include" });
+    if (!res.ok) throw await refusedBy(res);
+    return (await res.json()) as LinkWaiting;
   },
-  update(
-    providerId: string,
-    payload: Partial<{
-      name: string;
-      provider_type: string;
-      client_id: string;
-      client_secret: string;
-      discovery_url: string;
-      authorize_url: string;
-      token_url: string;
-      userinfo_url: string;
-      scopes: string;
-      enabled: boolean;
-      auto_register: boolean;
-      default_role_ids: string[];
-    }>,
-  ) {
-    return request<AuthProviderDetail>(`/auth-providers/${providerId}`, {
-      method: "PATCH",
-      body: JSON.stringify(payload),
-    });
+  /** Send a code to the account's address (``no_mail``, ``too_soon``, ``too_many`` when not). */
+  async linkSendCode(): Promise<void> {
+    await postSignIn("/api/auth/sso/link/code", {});
   },
-  delete(providerId: string) {
-    return request<void>(`/auth-providers/${providerId}`, { method: "DELETE" });
+  /** The account's password proves it: the outside sign-in is linked, and the person signed in. */
+  async linkWithPassword(password: string): Promise<void> {
+    await postSignIn("/api/auth/sso/link/with-password", { password });
   },
-  /** Returns the URL the user should be redirected to for SSO login. */
-  authorizeUrl(providerId: string) {
-    return `${BASE}/auth-providers/${providerId}/authorize`;
+  /** The code sent to the account's address proves it: as {@link linkWithPassword}. */
+  async linkWithCode(code: string): Promise<void> {
+    await postSignIn("/api/auth/sso/link/with-code", { code });
   },
 };
+
+/** A sign-in that met an existing account, waiting for the proof (``GET /api/auth/sso/link``). */
+export type LinkWaiting = {
+  provider_name: string;
+  account_email: string;
+  expires_at: string;
+  /** A code can be sent to the account's address. */
+  mail: boolean;
+  code_sent: boolean;
+};
+
+/**
+ * A refused sign-in or link; ``reason`` is the backend's refusal (``wrong_credentials``, ``sign_in_expired``
+ * once a link is used or expired, ...), or ``status_<code>`` when it named none.
+ */
+export class SignInRefused extends Error {
+  constructor(readonly reason: string) {
+    super(reason);
+  }
+}
+
+async function postSignIn(path: string, payload: Record<string, string>): Promise<Response> {
+  // Tokens and passwords go in the body, not the address, so they stay out of access logs.
+  const res = await fetch(path, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (res.ok) return res;
+  throw await refusedBy(res);
+}
+
+async function refusedBy(res: Response): Promise<SignInRefused> {
+  const body = (await res.json().catch(() => ({}))) as { detail?: unknown };
+  return new SignInRefused(typeof body.detail === "string" ? body.detail : `status_${res.status}`);
+}
 
 /** Fadenstack's own containers: edited only in Root Mode. */
 export function isSystemClass(cls: ContainerClass): boolean {

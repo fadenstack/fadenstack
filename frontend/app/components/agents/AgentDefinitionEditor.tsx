@@ -14,7 +14,8 @@ import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 
-import type { AgentDefinition, LocalMcpMode } from "~/api/agents";
+import { hasFeature } from "~/api/about";
+import { AGENT_TOKEN_LIFETIMES, type AgentDefinition, type LocalMcpMode } from "~/api/agents";
 import { chatApi } from "~/api/chatClient";
 import { ragLite } from "~/api/rag";
 import { ChipListField } from "~/components/ChipListField";
@@ -23,11 +24,16 @@ import { useAsyncData } from "~/lib/useAsyncData";
 
 import {
   greetingOf,
+  MIN_TOKEN_LIFETIME_S,
   piiModeSwitch,
   serverToolsMode,
   suggestionsOf,
+  TOKEN_LIFETIMES,
+  TOKEN_SETTING,
+  tokenLifetimeOf,
   withPiiModeSwitch,
   withServerToolsMode,
+  withTokenLifetime,
   withUi,
   type PiiModeSwitch,
   type ServerToolsMode,
@@ -58,6 +64,11 @@ export function AgentDefinitionEditor({ value, onChange, readOnly = false }: Age
     { initialValue: [] as { id: string; name: string }[] },
   );
   const collectionName = new Map(collections.map((c) => [c.id, c.name]));
+  const { data: ownLifetimes } = useAsyncData(() => hasFeature(AGENT_TOKEN_LIFETIMES), [], { initialValue: false });
+  // Shown in their own section where the server takes them; any other setting as it is.
+  const otherExtensions = Object.fromEntries(
+    Object.entries(value.extensions).filter(([key]) => !(ownLifetimes && key === TOKEN_SETTING)),
+  );
   const set = <K extends keyof AgentDefinition>(key: K, next: AgentDefinition[K]) => onChange({ ...value, [key]: next });
   const toolsMode = serverToolsMode(value);
   const piiSwitch = piiModeSwitch(value);
@@ -193,10 +204,37 @@ export function AgentDefinitionEditor({ value, onChange, readOnly = false }: Age
         />
       </Section>
 
-      {Object.keys(value.extensions).length > 0 && (
+      {ownLifetimes && (
+        <Section title={t("agents.definition.token_title")} description={t("agents.definition.token_help")}>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+            {TOKEN_LIFETIMES.map((field) => (
+              <TextField
+                key={field}
+                size="small"
+                type="number"
+                label={t(`agents.definition.token_${field}`)}
+                placeholder={t("agents.definition.token_tenant")}
+                value={tokenLifetimeOf(value, field) ?? ""}
+                onChange={(e) => {
+                  const seconds = e.target.value === "" ? null : Number(e.target.value);
+                  onChange(withTokenLifetime(value, field, Number.isFinite(seconds) ? Math.trunc(seconds!) : null));
+                }}
+                slotProps={{
+                  input: { readOnly },
+                  inputLabel: { shrink: true },
+                  htmlInput: { min: MIN_TOKEN_LIFETIME_S, step: 60 },
+                }}
+                sx={{ flex: 1 }}
+              />
+            ))}
+          </Stack>
+        </Section>
+      )}
+
+      {Object.keys(otherExtensions).length > 0 && (
         <Section title={t("agents.definition.extensions")} description={t("agents.definition.extensions_help")}>
           <Typography component="pre" variant="body2" sx={{ fontFamily: "monospace", m: 0, whiteSpace: "pre-wrap" }}>
-            {JSON.stringify(value.extensions, null, 2)}
+            {JSON.stringify(otherExtensions, null, 2)}
           </Typography>
         </Section>
       )}

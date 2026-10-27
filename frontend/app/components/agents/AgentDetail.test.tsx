@@ -7,7 +7,8 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { agentsApi } from "~/api/agents";
+import { hasFeature } from "~/api/about";
+import { AGENT_TOKEN_LIFETIMES, agentsApi } from "~/api/agents";
 import { agentFixture, appSeenFixture, appsReviewFixture, toolReviewFixture, versionFixture } from "~/test/agentFixtures";
 import { renderPage } from "~/test/renderPage";
 
@@ -30,6 +31,7 @@ vi.mock("~/api/agents", async (importOriginal) => {
   };
 });
 vi.mock("~/api/chatClient", () => ({ chatApi: { listModels: vi.fn().mockResolvedValue([]) } }));
+vi.mock("~/api/about", () => ({ hasFeature: vi.fn() }));
 
 const api = vi.mocked(agentsApi);
 
@@ -45,6 +47,7 @@ beforeEach(() => {
   api.get.mockResolvedValue(agentFixture());
   api.versions.mockResolvedValue([versionFixture(1)]);
   api.apps.mockResolvedValue(appsReviewFixture());
+  vi.mocked(hasFeature).mockResolvedValue(false);
 });
 
 describe("AgentDetail", () => {
@@ -105,6 +108,34 @@ describe("AgentDetail", () => {
         expect.objectContaining({ pii: { allow_mode_override: false } }),
       ),
     );
+  });
+
+  it("sets the agent's own sign-in lifetimes where the server takes them, as part of a new version", async () => {
+    vi.mocked(hasFeature).mockImplementation(async (f) => f === AGENT_TOKEN_LIFETIMES);
+    api.addVersion.mockResolvedValue(versionFixture(2));
+    openAgent();
+
+    const access = await screen.findByRole("spinbutton", { name: "Access token lifetime (s)" });
+    expect(access).toHaveValue(null);
+    await userEvent.type(access, "30");
+    expect(screen.getByText("A sign-in lifetime must be at least 60 seconds.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save as new version" })).toBeDisabled();
+    await userEvent.type(access, "0");
+    expect(screen.getByText("Unsaved changes: Enterprise settings")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Save as new version" }));
+    await waitFor(() =>
+      expect(api.addVersion).toHaveBeenCalledWith(
+        "excel-assistant",
+        expect.objectContaining({ extensions: { token: { access_s: 300 } } }),
+      ),
+    );
+  });
+
+  it("offers no sign-in lifetimes where the server does not take them", async () => {
+    openAgent();
+    expect(await screen.findByRole("textbox", { name: "Instructions" })).toBeInTheDocument();
+    expect(screen.queryByText("Sign-in lifetimes")).not.toBeInTheDocument();
   });
 
   it("is read-only for someone who does not manage the agent", async () => {

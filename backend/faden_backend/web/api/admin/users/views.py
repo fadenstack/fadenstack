@@ -29,22 +29,29 @@ from faden_backend.db.models.users import (
     get_jwt_strategy,
     set_sign_in_cookie,
 )
+from faden_backend.services import api_token_uses, password_reset_links, provisioning
+from faden_backend.services.agents import access
 from faden_backend.services.password_policy import password_problem
+from faden_backend.services.rights import holders_of_role, rights_changed
 from faden_backend.services.skills.client import forget_principal
 from faden_backend.web.api.admin.dependencies import get_root_mode_active, require_superuser
 from faden_backend.web.api.admin.users.preferences import (
     router as preferences_router,
 )
 from faden_backend.web.api.admin.users.schema import (
+    AdminApiTokenDTO,
     AdminUserDTO,
     ApiTokenDTO,
     ApiTokenResponse,
+    ApiTokenUseDTO,
     ChangePasswordRequest,
+    CreatePasswordResetLinkRequest,
     CreateRoleRequest,
     CreateUserRequest,
     GenerateApiTokenRequest,
     HandOverRequest,
     MeAccessDTO,
+    PasswordResetLinkDTO,
     PermissionDTO,
     RoleDTO,
     SetAdministratorRequest,
@@ -53,10 +60,12 @@ from faden_backend.web.api.admin.users.schema import (
     UpdateUserRolesRequest,
     UpdateUserUsageGroupRequest,
 )
+from faden_backend.web.api.admin.users.sign_ins import router as sign_ins_router
 from faden_backend.web.api.agents.schema import DeveloperModeDTO, DeveloperModeRequest
 
 router = APIRouter()
 router.include_router(preferences_router)
+router.include_router(sign_ins_router)
 
 
 def _role_to_dto(role: Role, user_count: int = 0) -> RoleDTO:
@@ -148,10 +157,19 @@ async def me_access(
         roles=[_role_to_dto(role) for role in sorted(roles, key=lambda r: r.name)],
         permissions=_permissions_to_dto(permissions),
         maintains_agents=await agents_dao.maintains_any(user.id),
+        inspects_agents=await agents_dao.member_of_any(user.id, access.inspecting_roles()),
     )
 
 
 # ── Roles CRUD ────────────────────────────────────────────────────────
+
+
+async def _log_role(session: AsyncSession, action: str, role: Role, admin: User, **details: object) -> None:
+    """Record a change to a role: what it gives decides what its holders may do (ASVS 5.0 V16.3.3)."""
+    await AuditDAO(session).log(
+        action=action, target_type="role", target_id=str(role.id), result=AuditResult.ALLOW,
+        actor_id=admin.id, severity="high", metadata_json=json.dumps({"name": role.name, **details}),
+    )
 
 
 @router.get("/roles", response_model=list[RoleDTO], name="list_roles")
@@ -196,6 +214,9 @@ async def create_role(
             detail=f"Role '{payload.name}' already exists",
         )
     role = await rbac_dao.create_role(payload.name, payload.description, payload.permission_ids)
+    await _log_role(
+        rbac_dao.session, "role.create", role, _user, permissions=len(payload.permission_ids or []),
+    )
     return _role_to_dto(role)
 
 
@@ -215,12 +236,20 @@ async def update_role(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Built-in roles cannot be modified",
         )
+    had = {permission.id for permission in existing.permissions}
     role = await rbac_dao.update_role(
         role_id,
         name=payload.name,
         description=payload.description,
         permission_ids=payload.permission_ids,
     )
+    await _log_role(rbac_dao.session, "role.update", role, _user)  # type: ignore[arg-type]
+    if payload.permission_ids is not None and set(payload.permission_ids) != had:
+        # Everyone who holds it, directly or through a team, has other rights now (services/rights.py).
+        holders = await holders_of_role(rbac_dao.session, role_id)
+        await rights_changed(
+            rbac_dao.session, holders, cause="role.permissions", actor_id=_user.id, role=existing.name,
+        )
     count = await rbac_dao.count_role_users(role_id)
     return _role_to_dto(role, user_count=count)  # type: ignore[arg-type]
 
@@ -240,7 +269,12 @@ async def delete_role(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Built-in roles cannot be deleted",
         )
+    holders = await holders_of_role(rbac_dao.session, role_id)
+    await _log_role(rbac_dao.session, "role.delete", existing, _user, holders=len(holders))
     await rbac_dao.delete_role(role_id)
+    await rights_changed(
+        rbac_dao.session, holders, cause="role.deleted", actor_id=_user.id, role=existing.name,
+    )
 
 
 # ── Permissions ───────────────────────────────────────────────────────
@@ -298,9 +332,9 @@ async def set_user_roles(
     before = await rbac_dao.get_user_roles(user_id)
     had = {role.id for role in before}
     await rbac_dao.set_user_roles(user_id, payload.role_ids)
-    if had - set(payload.role_ids):
-        # A role taken away ends their sign-ins, so what they had open is not carried on from before.
-        end_sign_ins(target_user)
+    if had != set(payload.role_ids):
+        # Any change of roles, given or taken, ends their sign-ins (services/rights.py).
+        await rights_changed(session, [user_id], cause="roles", actor_id=_user.id)
     await session.flush()
     await AuditDAO(session).log(
         action="user.roles.set",
@@ -525,9 +559,8 @@ async def set_user_administrator(
         await _refuse_last_superuser(session, target)
     if target.is_superuser != payload.administrator:
         target.is_superuser = payload.administrator
-        if not payload.administrator:
-            end_sign_ins(target)
         await session.flush()
+        await rights_changed(session, [target.id], cause="administrator", actor_id=admin.id)
         await AuditDAO(session).log(
             action="user.administrator.grant" if payload.administrator else "user.administrator.remove",
             target_type="user",
@@ -550,8 +583,8 @@ async def hand_over_right(
 ) -> AdminUserDTO:
     """Move the administrator right or the auditor role from one person to another in one step.
 
-    The one who gets it must be an active account; the one who had it loses it (and their sign-ins, for the
-    administrator right). Root Mode and a reason, recorded with both people named. Returns the new holder.
+    The one who gets it must be an active account; the one who had it loses it. Both people's sign-ins end, as
+    for any change of rights. Root Mode and a reason, recorded with both people named. Returns the new holder.
     """
     await _require_root_mode(root_mode, "handing over a right")
     giver = await session.get(User, user_id)
@@ -572,7 +605,6 @@ async def hand_over_right(
             )
         taker.is_superuser = True
         giver.is_superuser = False
-        end_sign_ins(giver)
     else:
         auditor = await rbac_dao.get_role_by_name("auditor")
         if auditor is None or auditor.id not in {role.id for role in await rbac_dao.get_user_roles(giver.id)}:
@@ -581,8 +613,8 @@ async def hand_over_right(
             )
         await rbac_dao.assign_role(taker.id, auditor.id)
         await rbac_dao.remove_role(giver.id, auditor.id)
-        end_sign_ins(giver)
     await session.flush()
+    await rights_changed(session, [giver.id, taker.id], cause=f"hand_over:{payload.right}", actor_id=admin.id)
     await AuditDAO(session).log(
         action="user.right.hand_over",
         target_type="user",
@@ -595,6 +627,41 @@ async def hand_over_right(
         }),
     )
     return await _build_admin_user_dto(taker, rbac_dao)
+
+
+@router.post(
+    "/{user_id}/password-reset-link", response_model=PasswordResetLinkDTO,
+    status_code=status.HTTP_201_CREATED, name="create_password_reset_link",
+)
+async def create_password_reset_link(
+    user_id: uuid.UUID,
+    payload: CreatePasswordResetLinkRequest,
+    admin: Annotated[User, Depends(require_superuser)],
+    root_mode: Annotated[bool, Depends(get_root_mode_active)],
+    session: AsyncSession = Depends(get_db_session),
+) -> PasswordResetLinkDTO:
+    """A one-time link that sets a new password for an account (Root Mode, a reason).
+
+    Whoever holds the link gets the account, so it is made like a right is granted, and the token is shown
+    only in this answer. Not for one's own account (Manage Profile), nor for a suspended one.
+    """
+    await _require_root_mode(root_mode, "a password reset link")
+    target = await session.get(User, user_id)
+    if target is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if target.id == admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Change your own password under Manage Profile.",
+        )
+    if not target.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A suspended account gets no reset link: let it back in first.",
+        )
+    token, expires_at = await password_reset_links.create(
+        session, target, admin, valid_hours=payload.valid_hours, reason=payload.reason.strip(),
+    )
+    return PasswordResetLinkDTO(token=token, expires_at=expires_at)
 
 
 @router.put("/{user_id}/active", response_model=AdminUserDTO, name="set_user_active")
@@ -617,20 +684,12 @@ async def set_user_active(
         if target.id == admin.id:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="You cannot suspend yourself.")
         await _refuse_last_superuser(session, target)
-    if target.is_active != payload.active:
-        target.is_active = payload.active
-        if not payload.active:
-            # Reactivating must not bring back what they had open before: those sign-ins stay over.
-            end_sign_ins(target)
-        await session.flush()
-        await AuditDAO(session).log(
-            action="user.reactivate" if payload.active else "user.suspend",
-            target_type="user",
-            target_id=str(target.id),
-            result=AuditResult.ALLOW,
-            actor_id=admin.id,
-            metadata_json=json.dumps({"email": target.email}),
-        )
+    # Core's one way to suspend and let back in (services/provisioning.py): an administrator's suspension is
+    # never lifted by a provider, and reactivating does not bring back the sign-ins that were open.
+    if payload.active:
+        await provisioning.reactivate(session, target, actor_id=admin.id)
+    else:
+        await provisioning.suspend(session, target, reason="administrator", actor_id=admin.id)
     return await _build_admin_user_dto(target, RbacDAO(session))
 
 
@@ -659,6 +718,7 @@ async def change_password(
     if problem:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=problem)
     user.hashed_password = password_helper.hash(payload.new_password)
+    user.password_set = True
     # The point of changing it can be that someone else got in: their sign-ins end with the old password.
     end_sign_ins(user)
     session.add(user)
@@ -750,11 +810,75 @@ async def generate_api_token(
     )
 
 
+def _with_last_use(dto: ApiTokenDTO, use: api_token_uses.LastUse | None) -> ApiTokenDTO:
+    if use is None:
+        return dto
+    return dto.model_copy(update={
+        "last_used_at": use.at, "last_used_address": use.address, "last_used_client": use.client,
+        "last_used_route": use.route, "recent_uses": use.recent,
+    })
+
+
 async def _list_api_tokens(session: AsyncSession, user_id: uuid.UUID) -> list[ApiTokenDTO]:
-    result = await session.execute(
+    tokens = list((await session.execute(
         select(ApiToken).where(ApiToken.user_id == user_id).order_by(ApiToken.created_at.desc()),
-    )
-    return [ApiTokenDTO.model_validate(t, from_attributes=True) for t in result.scalars()]
+    )).scalars())
+    used = await api_token_uses.last_uses(session, [t.id for t in tokens])
+    return [
+        _with_last_use(ApiTokenDTO.model_validate(t, from_attributes=True), used.get(t.id)) for t in tokens
+    ]
+
+
+async def _token_uses(
+    session: AsyncSession, token_id: uuid.UUID, owner_id: uuid.UUID | None = None,
+) -> list[ApiTokenUseDTO]:
+    record = await session.get(ApiToken, token_id)
+    if record is None or (owner_id is not None and record.user_id != owner_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="API token not found")
+    return [ApiTokenUseDTO.model_validate(u, from_attributes=True) for u in await api_token_uses.uses_of(
+        session, token_id,
+    )]
+
+
+@router.get("/api-tokens", response_model=list[AdminApiTokenDTO], name="list_all_api_tokens")
+async def list_all_api_tokens(
+    _admin: Annotated[User, Depends(require_superuser)] = None,  # type: ignore[assignment]
+    session: AsyncSession = Depends(get_db_session),
+) -> list[AdminApiTokenDTO]:
+    """Everyone's API tokens with their owner and last use, newest first: who uses which token, and how."""
+    rows = (await session.execute(
+        select(ApiToken, User.email)
+        .join(User, User.id == ApiToken.user_id)
+        .order_by(ApiToken.created_at.desc()),
+    )).all()
+    used = await api_token_uses.last_uses(session, [token.id for token, _ in rows])
+    tokens = []
+    for token, email in rows:
+        dto = _with_last_use(ApiTokenDTO.model_validate(token, from_attributes=True), used.get(token.id))
+        tokens.append(AdminApiTokenDTO(**dto.model_dump(), user_id=token.user_id, email=email))
+    return tokens
+
+
+@router.get("/api-tokens/{token_id}/uses", response_model=list[ApiTokenUseDTO], name="list_api_token_uses")
+async def list_api_token_uses(
+    token_id: uuid.UUID,
+    _admin: Annotated[User, Depends(require_superuser)] = None,  # type: ignore[assignment]
+    session: AsyncSession = Depends(get_db_session),
+) -> list[ApiTokenUseDTO]:
+    """A token's latest uses (100 at most), newest first, for an administrator."""
+    return await _token_uses(session, token_id)
+
+
+@router.get(
+    "/me/api-tokens/{token_id}/uses", response_model=list[ApiTokenUseDTO], name="list_my_api_token_uses",
+)
+async def list_my_api_token_uses(
+    token_id: uuid.UUID,
+    user: Annotated[User, Depends(current_active_user)],
+    session: AsyncSession = Depends(get_db_session),
+) -> list[ApiTokenUseDTO]:
+    """One of the current user's tokens' latest uses (100 at most), newest first."""
+    return await _token_uses(session, token_id, owner_id=user.id)
 
 
 async def _revoke_api_token(
@@ -793,7 +917,7 @@ async def revoke_my_api_token(
     user: Annotated[User, Depends(current_active_user)],
     session: AsyncSession = Depends(get_db_session),
 ) -> None:
-    """Revoke one of the current user's API tokens. The gateway refuses it within a minute."""
+    """Revoke one of the current user's API tokens. The gateway refuses it at the next request."""
     await _revoke_api_token(session, owner_id=user.id, token_id=token_id, actor=user)
 
 

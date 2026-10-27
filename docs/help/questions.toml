@@ -70,6 +70,7 @@
 "I forgot my password" = "forgot-your-password"
 "How do I change the language or switch to dark mode?" = "language-and-theme"
 "How do I create an API token or key?" = "api-tokens"
+"How do I link or unlink my organisation's sign-in?" = "linked-sign-ins"
 "Why was I signed out?" = "how-long-a-sign-in-lasts"
 
 ["administer/index.md"]
@@ -88,7 +89,36 @@
 "How do I use groups?" = "groups"
 "How do I remove or block a user?" = "end-someones-access"
 "How long do sign-ins and API tokens last?" = "sign-ins-and-api-tokens"
+"How do I unlink someone's sign-in provider?" = "linked-sign-ins"
 "What is developer mode?" = "developer-mode"
+
+["administer/sign-in.md"]
+"How do people sign in with their company account (single sign-on)?" = ""
+"How do I add Entra ID, Okta, Google or another sign-in provider?" = "add-a-provider"
+"Who gets an account when they sign in with a provider?" = "who-may-sign-in-and-what-they-get"
+"How do I stop people from using a password?" = "who-may-sign-in-and-what-they-get"
+"Someone with an account cannot sign in with the provider" = "someone-who-already-has-an-account-here"
+
+["administer/sign-in-oidc.md"]
+"How do I connect Entra ID or another OpenID Connect provider?" = ""
+"Which redirect URI do I register?" = "register-fadenstack-at-the-provider"
+
+["administer/sign-in-saml.md"]
+"How do I connect AD FS or another SAML identity provider?" = ""
+"Where is the service provider metadata?" = "register-fadenstack-at-the-identity-provider"
+
+["administer/sign-in-ldap.md"]
+"How do I let people sign in with Active Directory or LDAP?" = ""
+"Are people disabled in the directory locked out here?" = "add-the-directory"
+
+["administer/sign-in-provisioning.md"]
+"How do I set up SCIM provisioning from Entra ID or Okta?" = ""
+"Are people who leave locked out without signing in?" = "what-changes-here"
+"What does Fadenstack store about provisioned people?" = "switch-provisioning-on"
+"Where do I find the SCIM address and token?" = "switch-provisioning-on"
+"Why does the provider's provisioning test fail?" = "when-it-does-not-work"
+"How do provisioned people sign in the first time?" = "the-first-sign-in"
+"How do I let only provisioned people sign in?" = "the-first-sign-in"
 
 ["administer/models.md"]
 "How do I find and download a model?" = "find-a-model"

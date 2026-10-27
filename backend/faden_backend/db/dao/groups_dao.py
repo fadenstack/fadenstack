@@ -101,9 +101,9 @@ class GroupDAO:
                     .on_conflict_do_nothing(),
                 )
         await self.session.flush()
-        # Re-fetch to refresh relationships
+        # Read again, past the session's copy, whose roles are those from before
         result = await self.session.execute(
-            select(Group).where(Group.id == group_id),
+            select(Group).where(Group.id == group_id).execution_options(populate_existing=True),
         )
         return result.scalar_one()
 
@@ -158,15 +158,17 @@ class GroupDAO:
         group_id: uuid.UUID,
         user_ids: list[uuid.UUID],
     ) -> None:
-        """Add users to a group (idempotent)."""
+        """Add users to a group (idempotent); a membership kept by a sign-in provider becomes manual."""
         if not user_ids:
             return
+        statement = pg_insert(UserGroup).values(
+            [{"group_id": group_id, "user_id": uid} for uid in user_ids],
+        )
         await self.session.execute(
-            pg_insert(UserGroup)
-            .values(
-                [{"group_id": group_id, "user_id": uid} for uid in user_ids],
-            )
-            .on_conflict_do_nothing(),
+            statement.on_conflict_do_update(
+                index_elements=[UserGroup.user_id, UserGroup.group_id],
+                set_={"source": None},
+            ),
         )
         await self.session.flush()
 

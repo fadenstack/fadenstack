@@ -23,6 +23,7 @@ vi.mock("~/api/admin", async (importOriginal) => {
       setActive: vi.fn(),
       setAdministrator: vi.fn(),
       handOver: vi.fn(),
+      createResetLink: vi.fn(),
     },
     adminGroups: { ...actual.adminGroups, list: vi.fn().mockResolvedValue([]) },
   };
@@ -112,5 +113,41 @@ describe("rights: administrator and auditor", () => {
     await waitFor(() =>
       expect(users.handOver).toHaveBeenCalledWith("u-1", "administrator", "u-2", "Pat leaves the company"),
     );
+  });
+});
+
+describe("a password reset link", () => {
+  it("is made only with a reason, and shown once with the token in the fragment", async () => {
+    users.list.mockResolvedValue([person()]);
+    users.createResetLink.mockResolvedValue({ token: "the-token-0123456789", expires_at: "2026-10-25T21:00:00Z" });
+    const { container } = renderPage(<UsersPage />);
+    await screen.findByText("pat@example.com");
+    await userEvent.click(container.querySelector("[data-user-reset-link='u-1']") as HTMLElement);
+    expect(screen.getByRole("button", { name: "Create link" })).toBeDisabled();
+    await userEvent.type(screen.getByLabelText(/^Reason/), "Pat lost the password");
+    await userEvent.click(screen.getByRole("button", { name: "Create link" }));
+    expect(users.createResetLink).toHaveBeenCalledWith("u-1", "Pat lost the password", 1);
+    const url = (await screen.findByTestId("reset-link-url")) as HTMLInputElement;
+    expect(url.value).toBe(`${window.location.origin}/reset-password#link=the-token-0123456789`);
+    expect(screen.getByTestId("reset-link-made")).toHaveTextContent("works once");
+  });
+
+  it("says why the server refused it", async () => {
+    users.list.mockResolvedValue([person()]);
+    users.createResetLink.mockRejectedValue(new Error("Start Root Mode first: a password reset link is recorded with its reason."));
+    const { container } = renderPage(<UsersPage />);
+    await screen.findByText("pat@example.com");
+    await userEvent.click(container.querySelector("[data-user-reset-link='u-1']") as HTMLElement);
+    await userEvent.type(screen.getByLabelText(/^Reason/), "Pat lost the password");
+    await userEvent.click(screen.getByRole("button", { name: "Create link" }));
+    expect(await screen.findByText(/Start Root Mode first/)).toBeInTheDocument();
+    expect(screen.queryByTestId("reset-link-url")).not.toBeInTheDocument();
+  });
+
+  it("is not offered for a suspended account", async () => {
+    users.list.mockResolvedValue([person({ is_active: false })]);
+    const { container } = renderPage(<UsersPage />);
+    await screen.findByText("pat@example.com");
+    expect(container.querySelector("[data-user-reset-link='u-1']")).toBeNull();
   });
 });

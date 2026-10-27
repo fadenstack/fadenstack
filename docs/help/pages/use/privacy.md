@@ -104,6 +104,9 @@ website where it was clicked (for example `ref=console-about`) and the release l
 count how its software is used. It carries nothing about you, your organisation or this server, opens in a new tab,
 and does not pass on the address of the page you came from. Nothing is sent unless you click one.
 
+With Enterprise, administrators can take the console's links away (the sign-in page, **About Fadenstack**, the
+release notes on **Updates**): **Settings → Branding → Show links to fadenstack.com**.
+
 ## When it does not work
 
 | You see | What to do |

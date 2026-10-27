@@ -34,7 +34,9 @@ You see **Password changed successfully. Your other sign-ins were ended.** Every
 2. Enter your e-mail address.
 3. Select **Send reset link**.
 
-If your organisation's server sends e-mail, a link to set a new password arrives. If nothing arrives, ask your administrator to set a new password for you.
+A link to set a new password arrives by e-mail. If nothing arrives, ask your administrator to set a new password for you.
+
+The sign-in page offers **Forgot password?** only when your organisation's server sends e-mail. Otherwise it says **Forgot your password? An administrator can set a new one.**: ask your administrator. They give you a link to set a new password, which works once and only for a while; open it, choose the new password, then sign in with it.
 
 ## Language and theme
 
@@ -49,7 +51,25 @@ A language you pick in the settings of the browser agent or an Office add-in is 
 
 A sign-in lasts seven days, unless your organisation set another length. Then you are asked to sign in again. To end it sooner, select your avatar, then **Logout**: that sign-in is over at once, also for anyone who copied it. Changing your password, or an administrator suspending your account or taking a role away, ends all your sign-ins. Sign out on any computer others use.
 
-Signing in with your company account (single sign-on) <span class="fs-planned">Planned</span>
+If your organisation connected its own sign-in, the sign-in page offers it: **Sign in with** and your
+organisation's name, or a choice between **Fadenstack account** and your organisation's directory, where you
+type your **Account name** and your usual password. A sign-in that way may last less than seven days, as your
+organisation set it.
+
+## Linked sign-ins
+
+![Linked sign-ins in My Profile: Example Corp with Unlink, and that your password also signs you in](../images/use/profile-linked-sign-ins.png)
+
+**My Profile** shows, under **Linked sign-ins**, the sign-in providers you sign in with, and whether your
+password also signs you in. It appears when your organisation connected its own sign-in.
+
+- **Link a provider**: pick it, and sign in there as usual. You come back to **My Profile**, and from then on
+  you can sign in with it. For a directory, type your **Account name** and its password instead.
+- **Unlink**: you can no longer sign in with that provider, until you link it again. The button is off when it
+  is your only way to sign in: you would lock yourself out. Ask your administrator for a password reset link
+  first, if you want to sign in with a password instead.
+
+A sign-in that already belongs to another account here is not linked to yours.
 
 ## API tokens
 
@@ -81,7 +101,9 @@ The application also needs the API's address, which your administrator can give 
 1. Select **Revoke** beside the token.
 2. Confirm with **Revoke**.
 
-Applications that use it stop working within a minute. Revoke a token as soon as it is no longer needed, or if it may have been seen by someone else.
+Applications that use it stop working at once. Revoke a token as soon as it is no longer needed, or if it may have been seen by someone else.
+
+Each token shows when it was last used, from which address and with which application; **Uses** lists its latest uses. Every use is recorded, and your administrators see it too: a use you do not recognise is a reason to revoke the token.
 
 ??? info "Other ways a token stops working"
     Your administrator can also revoke your tokens. If your account is deactivated, your tokens stop working too.

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from datetime import datetime
 from typing import Any
 
@@ -59,8 +59,13 @@ class AgentsDAO:
         )
         return list(rows.scalars())
 
-    async def list_for_user(self, tenant_id: str, user_id: uuid.UUID) -> list[Agent]:
-        """Agents the user maintains, or is granted directly or through a group."""
+    async def list_for_user(
+        self,
+        tenant_id: str,
+        user_id: uuid.UUID,
+        roles: Collection[str] = (AgentMemberRole.MAINTAINER.value,),
+    ) -> list[Agent]:
+        """Agents the user is a member of in one of *roles*, or is granted directly or through a group."""
         groups = select(UserGroup.group_id).where(UserGroup.user_id == user_id)
         granted = select(AgentGrant.agent_id).where(
             or_(
@@ -68,7 +73,9 @@ class AgentsDAO:
                 (AgentGrant.principal_type == PrincipalType.GROUP) & AgentGrant.principal_id.in_(groups),
             ),
         )
-        maintained = select(AgentMember.agent_id).where(AgentMember.user_id == user_id)
+        maintained = select(AgentMember.agent_id).where(
+            AgentMember.user_id == user_id, AgentMember.role.in_(roles),
+        )
         rows = await self.session.execute(
             select(Agent)
             .where(
@@ -182,6 +189,18 @@ class AgentsDAO:
             await self.session.scalar(
                 select(AgentMember.agent_id)
                 .where(AgentMember.user_id == user_id, AgentMember.role == AgentMemberRole.MAINTAINER.value)
+                .limit(1),
+            )
+        ) is not None
+
+    async def member_of_any(self, user_id: uuid.UUID, roles: Collection[str]) -> bool:
+        """Whether *user_id* is a member of at least one agent in one of *roles*."""
+        if not roles:
+            return False
+        return (
+            await self.session.scalar(
+                select(AgentMember.agent_id)
+                .where(AgentMember.user_id == user_id, AgentMember.role.in_(roles))
                 .limit(1),
             )
         ) is not None

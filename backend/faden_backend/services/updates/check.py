@@ -198,7 +198,9 @@ async def notify(session: AsyncSession, state: ReleaseFeedState) -> bool:
     if version in notified:
         return False
     state.notified_json = [*notified, version][-20:]
-    if not settings.mailer_enabled:
+    from faden_backend.services.extensions import mail_available  # noqa: PLC0415
+
+    if not mail_available():
         return False
     from faden_backend.services.notifications.service import NotificationService  # noqa: PLC0415
 
