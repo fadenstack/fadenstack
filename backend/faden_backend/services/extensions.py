@@ -28,6 +28,8 @@ Extension points for signing in:
 
 - ``password_sign_in_checks``: extra conditions on signing in with a password, for anyone but a
   superuser (EE: addresses whose organisation signs in through its provider only). Each may only deny.
+- ``sign_in_provider_removed``: told when an administrator has deleted a sign-in provider, so what an
+  extension keeps for it goes too (EE: the provider's provisioning connection and its token).
 
 Extension points for mail:
 
@@ -93,6 +95,10 @@ VersionExtension = Callable[[Any], None]
 #: whatever the password and whether or not an account has it.
 PasswordSignInCheck = Callable[[str], Awaitable[str | None]]
 
+#: ``(provider key, actor id)``, awaited once the sign-in module has deleted that provider: what an extension
+#: keeps for it (credentials above all) goes with it.
+ProviderRemovedHook = Callable[[str, uuid.UUID], Awaitable[None]]
+
 
 class MailSender(Protocol):
     """Delivers the outbox's mail."""
@@ -142,6 +148,7 @@ class ExtensionRegistry:
     agent_restrictions: set[str] = field(default_factory=set)
     tenant_restrictions: set[str] = field(default_factory=set)
     password_sign_in_checks: list[PasswordSignInCheck] = field(default_factory=list)
+    sign_in_provider_removed: list[ProviderRemovedHook] = field(default_factory=list)
     mail_sender: MailSender | None = None
     admin_notices: list[AdminNoticeSource] = field(default_factory=list)
     features: set[str] = field(default_factory=set)

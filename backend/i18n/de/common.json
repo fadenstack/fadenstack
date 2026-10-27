@@ -4638,6 +4638,7 @@
     "licence_invalid": "Die Enterprise-Lizenz ist nicht verwendbar (unlesbar, falsch signiert oder nicht für dieses Produkt): Die Enterprise-Funktionen sind aus.",
     "licence_missing": "Enterprise ist installiert, hat aber keine Lizenz: Die Enterprise-Funktionen sind aus.",
     "licence_seats_over": "{{used}} aktive Konten bei {{seats}} Plätzen in der Lizenz. Gesperrt wird nichts; erweitern Sie die Lizenz oder schalten Sie nicht benötigte Konten ab.",
+    "mail_link_base_missing": "Mail ist eingeschaltet, hat aber keine Konsolenadresse für ihre Links, daher geht keine Mail hinaus: Tragen Sie sie unter Einstellungen → Module → Mailer → Frontend Base URL ein.",
     "unknown": "Ein Hinweis für die Administration: {{code}}",
     "hide": "Ausblenden, bis der Browser geschlossen wird",
     "restriction_tool_mode_ceilings": "Grenzen für den Tool-Modus benötigen Fadenstack Enterprise: Bis es zurück ist, sind Tools in jedem Chat nur lesend.",

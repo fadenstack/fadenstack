@@ -4636,6 +4636,7 @@
     "licence_invalid": "The Enterprise licence cannot be used (unreadable, wrongly signed or not for this product): Enterprise features are off.",
     "licence_missing": "Enterprise is installed but has no licence: Enterprise features are off.",
     "licence_seats_over": "{{used}} active accounts, and the licence has {{seats}} seats. Nothing is blocked; extend the licence or switch off accounts that are not needed.",
+    "mail_link_base_missing": "Mail is switched on but has no console address for its links, so no mail goes out: set it under Settings → Modules → Mailer → Frontend Base URL.",
     "unknown": "A notice for administrators: {{code}}",
     "hide": "Hide until the browser is closed",
     "restriction_tool_mode_ceilings": "Tool mode limits need Fadenstack Enterprise: until it is back, tools in every chat are read-only.",

@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse
 from starlette import status
 
 from faden_backend.db.models.users import User
+from faden_backend.services.extensions import registry
 from faden_backend.services.sign_in import module
 from faden_backend.web.api.admin.dependencies import require_superuser
 
@@ -34,9 +35,13 @@ router = APIRouter()
 async def provider_settings(
     path: str,
     request: Request,
-    _admin: Annotated[User, Depends(require_superuser)],
+    admin: Annotated[User, Depends(require_superuser)],
 ) -> Response:
-    """``/api/admin/auth-providers/<path>`` is the module's ``/api/v1/admin/providers/<path>``."""
+    """``/api/admin/auth-providers/<path>`` is the module's ``/api/v1/admin/providers/<path>``.
+
+    Once the module has deleted a provider, extensions are told (``sign_in_provider_removed``), so what they
+    keep for it goes too.
+    """
     if not module.enabled():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No sign-in module is switched on")
     payload = None
@@ -59,8 +64,20 @@ async def provider_settings(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="The sign-in module is unavailable",
         ) from exc
+    key = path.strip("/")
+    if request.method == "DELETE" and key and "/" not in key and upstream.is_success:
+        await _removed(key, admin)
     return Response(
         content=upstream.content,
         status_code=upstream.status_code,
         media_type=upstream.headers.get("content-type"),
     )
+
+
+async def _removed(key: str, admin: User) -> None:
+    """Tell each extension that provider *key* is gone; one that fails is logged and the others still run."""
+    for hook in registry.sign_in_provider_removed:
+        try:
+            await hook(key, admin.id)
+        except Exception:
+            log.exception("An extension failed to remove what it keeps for sign-in provider %s", key)

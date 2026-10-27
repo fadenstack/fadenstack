@@ -359,6 +359,36 @@ async def test_settings_are_forwarded_for_administrators(
 
 
 @pytest.mark.anyio
+async def test_extensions_hear_of_a_deleted_provider(
+    client: AsyncClient, fake: FakeModule, signed_in: _As, dbsession: AsyncSession,  # noqa: F811
+) -> None:
+    """What an extension keeps for a provider (a provisioning token) goes with it; one hook failing stops none."""
+    admin = await _person(dbsession, admin=True)
+    signed_in.user = admin
+    heard: list[tuple[str, uuid.UUID]] = []
+
+    async def broken(_key: str, _actor: uuid.UUID) -> None:
+        raise RuntimeError("down")
+
+    async def keeps(key: str, actor: uuid.UUID) -> None:
+        heard.append((key, actor))
+
+    before = list(registry.sign_in_provider_removed)
+    registry.sign_in_provider_removed[:] = [broken, keeps]
+    try:
+        assert (await client.delete("/api/admin/auth-providers/corp")).status_code == 200
+        assert heard == [("corp", admin.id)]
+        heard.clear()
+        # Not when the module refused it, nor for a provider's sub-resource, nor for a change.
+        assert (await client.delete("/api/admin/auth-providers/missing")).status_code == 404
+        await client.delete("/api/admin/auth-providers/corp/metadata")
+        await client.patch("/api/admin/auth-providers/corp", json={"enabled": False})
+        assert heard == []
+    finally:
+        registry.sign_in_provider_removed[:] = before
+
+
+@pytest.mark.anyio
 async def test_settings_are_not_for_others(
     client: AsyncClient, fake: FakeModule, signed_in: _As, dbsession: AsyncSession,  # noqa: F811
 ) -> None:

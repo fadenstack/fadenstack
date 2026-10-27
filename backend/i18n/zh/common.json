@@ -4638,6 +4638,7 @@
     "licence_invalid": "Enterprise 许可证无法使用（无法读取、签名错误或不适用于本产品）：Enterprise 功能已关闭。",
     "licence_missing": "已安装 Enterprise，但没有许可证：Enterprise 功能已关闭。",
     "licence_seats_over": "有 {{used}} 个活跃账户，而许可证只有 {{seats}} 个席位。不会阻止任何操作；请扩展许可证或停用不需要的账户。",
+    "mail_link_base_missing": "邮件已开启，但没有用于链接的控制台地址，因此不会发出任何邮件：请在 设置 → 模块 → Mailer → Frontend Base URL 中填写。",
     "unknown": "给管理员的提示：{{code}}",
     "hide": "隐藏，直到关闭浏览器",
     "restriction_tool_mode_ceilings": "工具模式限制需要 Fadenstack Enterprise：在其恢复之前，所有聊天中的工具都是只读的。",
