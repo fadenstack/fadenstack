@@ -42,6 +42,8 @@ what all providers share, see [Sign-in providers](sign-in.md).
 | **Sign out at the identity provider too** | Signing out of Fadenstack signs the person out at the identity provider as well, when its metadata names a single logout service. |
 | **End sign-ins when the identity provider signs someone out** | When the identity provider signs a person out, all their Fadenstack sign-ins end, in every browser and app. Only sign-ins made while this is on are found. |
 
+![A SAML provider's metadata from a federation's metadata service (MDQ): the service's address, the identity provider's entity ID, the certificate the metadata is signed with, and both logout switches on](../images/administer/sign-in-saml-logout.png)
+
 With either logout switch on, register the **Single logout service (SLO)** address the dialog shows at the
 identity provider, as you did the ACS. Logout messages must be signed by the identity provider; unsigned or
 altered ones are refused.

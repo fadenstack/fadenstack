@@ -135,7 +135,7 @@ kann zu einem Zeitpunkt enden, den Sie unter **Endet** festlegen. Lassen Sie ihn
 | **Jedes API-Token läuft ab** | nach 90 Tagen, sofern die Person, die es erstellt, keine andere Gültigkeitsdauer wählt, und spätestens nach einem Jahr. |
 | **Agenten** (der Browser-Agent, die Office-Add-ins) | haben auf jedem Gerät eigene Anmeldungen, zu sehen auf dem Tab **Aktivität** eines Agenten (siehe [Agenten und Add-ins](agents.md)). |
 
-![Die API-Tokens einer Person: jedes Token mit Namen, Erstellungsdatum und Ablaufdatum](../images/administer/user-api-tokens.png)
+![Die API-Tokens einer Person: jedes Token mit Namen, Erstellungsdatum, Ablaufdatum und letzter Nutzung](../images/administer/user-api-tokens.png)
 
 Das Token einer anderen Person widerrufen: Wählen Sie unter **Zugriffskontrolle → Benutzer** in deren Zeile
 **API-Tokens** (das Schlüssel-Symbol) und dann **Widerrufen**. Anwendungen, die ein widerrufenes Token verwenden,
@@ -148,6 +148,10 @@ dasselbe für ihre eigenen Tokens unter **Profil verwalten**. Die Nutzung eines 
 Die Regel eines Anbieters, nach Tagen ohne Nutzung zu sperren, sperrt so niemanden, der nur über Tokens arbeitet.
 Die Nutzungen werden 90 Tage aufbewahrt und dann gelöscht (`FADEN_BACKEND_API_TOKEN_USE_RETENTION_DAYS` auf dem
 Server; 0 behält sie).
+
+![Zugriffskontrolle → API-Tokens: jedes aktive Token mit Inhaber, Erstellungs- und Ablaufdatum, letzter Nutzung (Zeit, Adresse, Anwendung, Nutzungen in 30 Tagen), Nutzungen und Widerrufen](../images/administer/api-tokens.png)
+
+![Die Nutzungen eines Tokens: wann, von welcher Adresse, mit welcher Anwendung, auf welchem Weg](../images/administer/api-token-uses.png)
 
 ![Einstellungen → Allgemein: „Sign-in lifetime (s)“, „API token lifetime (s)“ und „Longest API token lifetime (s)“](../images/administer/settings-sign-in.png)
 

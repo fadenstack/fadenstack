@@ -164,6 +164,14 @@ const asReleaseInstall = (p) =>
 
 /** Pictures as an install reached over HTTPS shows them: the console warns about plain HTTP, which the install
  *  the pictures are taken from may use and Help's readers do not. */
+/** An Enterprise licence's notices (seats, expiry) belong to that install, not to the Help: hidden. */
+const withoutLicenceNotice = (p) =>
+  p.evaluate(() => {
+    for (const alert of document.querySelectorAll(".MuiAlert-root")) {
+      if (/licen[cs]e|lizenz/i.test(alert.textContent ?? "")) alert.style.display = "none";
+    }
+  });
+
 const asHttpsInstall = (p) =>
   p.evaluate((warning) => {
     for (const alert of document.querySelectorAll(".MuiAlert-root")) {
@@ -370,9 +378,52 @@ const SHOTS = [
     name: "administer/groups", path: "/admin/groups", clip: (p) => p.getByRole("dialog"),
     act: async (p) => p.getByRole("button", { name: L("Create Group") }).first().click(),
   },
+  // API tokens: IDS.token_user someone whose token was used, IDS.token_name that token (else the first ones).
   {
     name: "administer/user-api-tokens", path: "/admin/users", clip: (p) => p.getByRole("dialog"),
-    act: async (p) => p.getByRole("button", { name: L("API tokens") }).first().click(),
+    act: async (p) => (IDS.token_user
+      ? p.locator(`[data-user-tokens="${IDS.token_user}"]`)
+      : p.getByRole("button", { name: L("API tokens") }).first()).click(),
+  },
+  {
+    name: "administer/api-tokens", path: "/admin/api-tokens", act: withoutLicenceNotice,
+    region: { x: 240, y: 0, width: 1200, height: 470 },
+  },
+  {
+    name: "administer/api-token-uses", path: "/admin/api-tokens", clip: (p) => p.getByRole("dialog"),
+    act: async (p) => {
+      const rows = IDS.token_name ? p.getByRole("row").filter({ hasText: IDS.token_name }) : p.getByRole("row");
+      await rows.getByRole("button", { name: K("api_tokens.show_uses") }).first().click();
+      await p.getByRole("dialog").getByRole("row").nth(1).waitFor({ timeout: 20000 });
+    },
+  },
+  // A new SAML provider's metadata from a federation's metadata service and its logout switches: filled in,
+  // never created.
+  {
+    name: "administer/sign-in-saml-logout", path: "/admin/auth-providers",
+    act: async (p) => {
+      await p.getByRole("button", { name: K("auth_providers.create") }).click();
+      const dialog = p.getByTestId("provider-dialog");
+      await dialog.getByLabel(K("auth_providers.protocol")).click();
+      await p.getByRole("option", { name: K("auth_providers.protocols.saml") }).click();
+      await dialog.getByLabel(K("auth_providers.name")).first().fill("Example Corp");
+      await dialog.getByLabel(K("auth_providers.key")).first().fill("example-corp");
+      await dialog.getByLabel(K("auth_providers.saml.metadata_source")).click();
+      await p.getByRole("option", { name: K("auth_providers.saml.metadata_mdq") }).click();
+      await dialog.getByLabel(K("auth_providers.saml.mdq_url")).fill("https://mdq.example.org");
+      await dialog.getByLabel(K("auth_providers.saml.idp_entity_id")).fill("https://idp.example.com/saml");
+      await dialog.getByLabel(K("auth_providers.saml.signing_certificate"))
+        .fill("-----BEGIN CERTIFICATE-----\nMIIDdzCCAl+gAwIBAgIUExampleOnly...\n-----END CERTIFICATE-----");
+      await dialog.getByLabel(K("auth_providers.saml.logout_at_idp")).check();
+      await dialog.getByLabel(K("auth_providers.saml.logout_from_idp")).check();
+      // Room above the first field, whose label sits on its border.
+      await dialog.getByLabel(K("auth_providers.saml.metadata_source"))
+        .locator("xpath=ancestor::div[contains(@class,'MuiStack-root')][1]")
+        .evaluate((el) => { el.style.paddingTop = "12px"; });
+    },
+    // From the metadata source to the logout switches: the protocol's own part of the dialog.
+    clip: (p) => p.getByTestId("provider-dialog").getByLabel(K("auth_providers.saml.metadata_source"))
+      .locator("xpath=ancestor::div[contains(@class,'MuiStack-root')][1]"),
   },
   {
     name: "administer/user-suspend", path: "/admin/users", clip: (p) => p.getByRole("dialog"),

@@ -44,6 +44,8 @@ kommen angemeldet zurück. Was für alle Anbieter gilt, steht unter [Anmeldeanbi
 | **Auch beim Identitätsanbieter abmelden** | Die Abmeldung bei Fadenstack meldet die Person auch beim Identitätsanbieter ab, wenn seine Metadaten einen Single-Logout-Dienst nennen. |
 | **Anmeldungen beenden, wenn der Identitätsanbieter jemanden abmeldet** | Meldet der Identitätsanbieter eine Person ab, enden alle ihre Fadenstack-Anmeldungen, in jedem Browser und jeder Anwendung. Gefunden werden nur Anmeldungen, die entstanden, während dies eingeschaltet war. |
 
+![Die Metadaten eines SAML-Anbieters vom Metadatendienst einer Föderation (MDQ): die Adresse des Dienstes, die Entity-ID des Identitätsanbieters, das Zertifikat, mit dem die Metadaten signiert sind, und beide Abmelde-Schalter an](../images/administer/sign-in-saml-logout.png)
+
 Ist einer der beiden Abmelde-Schalter an, tragen Sie die Adresse des **Single-Logout-Dienstes (SLO)**, die der
 Dialog zeigt, beim Identitätsanbieter ein, wie die ACS. Abmeldenachrichten müssen vom Identitätsanbieter signiert
 sein; unsignierte oder veränderte werden abgelehnt.

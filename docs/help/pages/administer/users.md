@@ -128,7 +128,7 @@ person's own computer. It is for people who build or test tools, and it can end 
 | **Every API token expires** | after 90 days unless its maker picks another lifetime, and after a year at most. |
 | **Agents** (the browser agent, the Office add-ins) | have their own sign-ins on each device, shown on an agent's **Activity** tab (see [Agents and add-ins](agents.md)). |
 
-![API tokens of one person: each token with its name, when it was made and when it expires](../images/administer/user-api-tokens.png)
+![API tokens of one person: each token with its name, when it was made and when it expires, and its last use](../images/administer/user-api-tokens.png)
 
 To revoke someone else's token: in **Access Control → Users**, select **API tokens** (the key icon) in their
 row, then **Revoke**. Applications using a revoked token stop working at once.
@@ -139,6 +139,10 @@ last use; **Uses** shows a token's latest 100 uses. A person sees the same for t
 Profile**. A token's use also counts as activity, so a provider's "suspend after days without use" does not
 suspend people who work only through tokens. The uses are kept for 90 days, then deleted
 (`FADEN_BACKEND_API_TOKEN_USE_RETENTION_DAYS` on the server; 0 keeps them).
+
+![Access Control → API tokens: each active token with its owner, when it was made and expires, its last use (time, address, application, uses in 30 days), Uses and Revoke](../images/administer/api-tokens.png)
+
+![The uses of one token: when, from which address, with which application, on which route](../images/administer/api-token-uses.png)
 
 ![Settings → General: Sign-in lifetime (s), API token lifetime (s) and Longest API token lifetime (s)](../images/administer/settings-sign-in.png)
 
