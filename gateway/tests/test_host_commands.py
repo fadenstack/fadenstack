@@ -33,13 +33,13 @@ def command(**changes: Any) -> dict[str, Any]:
     }
 
 
-async def configure(db: AsyncSession, backend: _Backend) -> None:
+async def configure(db: AsyncSession, backend: _Backend, name: str = "nc_actions_undo") -> None:
     await _seed(db, provider=ProviderType.VLLM, pii=None)
     backend.put(
         _profile(
             host_tool_contract=(
                 {
-                    "name": "nc_actions_undo",
+                    "name": name,
                     "risk": "destructive",
                     "schema_sha256": SCHEMA,
                 },
@@ -51,12 +51,13 @@ async def configure(db: AsyncSession, backend: _Backend) -> None:
 
 
 @pytest.mark.anyio
+@pytest.mark.parametrize("name", ["nc_actions_undo", "nc_actions_redo", "nc_actions_reconcile"])
 async def test_direct_command_is_individual_and_the_actor_is_authenticated(
-    client: AsyncClient, db_session: AsyncSession, backend: _Backend,
+    name: str, client: AsyncClient, db_session: AsyncSession, backend: _Backend,
 ) -> None:
-    await configure(db_session, backend)
+    await configure(db_session, backend, name)
     response = await client.post(
-        "/v1/agents/eplan-assistant/tools/check", headers=_headers(), json=command(),
+        "/v1/agents/eplan-assistant/tools/check", headers=_headers(), json=command(name=name),
     )
     assert response.status_code == 200, response.text
     body = response.json()
@@ -74,7 +75,7 @@ async def test_direct_command_is_individual_and_the_actor_is_authenticated(
     checked = await client.post(
         "/v1/agents/eplan-assistant/tools/check",
         headers=_headers(),
-        json=command(phase="dispatch", **prepared),
+        json=command(name=name, phase="dispatch", **prepared),
     )
     assert checked.status_code == 200, checked.text
     assert checked.json()["decision_stamp"] == body["decision_stamp"]
