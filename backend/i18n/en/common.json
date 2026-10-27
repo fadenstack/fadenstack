@@ -941,6 +941,9 @@
     "modules": {
       "title": "Modules"
     },
+    "mail": {
+      "title": "Mail"
+    },
     "categories": {
       "auth": "Authentication",
       "infrastructure": "Infrastructure",
@@ -993,6 +996,173 @@
       "mode_dark": "Dark",
       "mode_light": "Light",
       "saved_here": "Saved in this browser."
+    }
+  },
+  "mail": {
+    "intro": "How this server sends mail (password resets, codes to link a sign-in, alerts for administrators): through your organisation's mail server, on this machine or another. Mail never goes out unencrypted.",
+    "state": {
+      "title": "Mail state",
+      "goes_out": "Mail goes out.",
+      "failing": "Mail is set up, but the last mail failed: see the last failure below.",
+      "does_not_go_out": "No mail goes out",
+      "reasons": {
+        "licence": "The Enterprise licence is not active.",
+        "module_off": "The mail module is switched off: start it under Settings → Modules.",
+        "no_server": "No mail server is set: fill it in below.",
+        "no_link_base": "The console's address for links is missing: fill it in below, under Links."
+      },
+      "waiting": "Waiting to go out",
+      "last_sent": "Last mail sent",
+      "never_sent": "None yet",
+      "last_failure": "Last failure",
+      "kind": "Mail",
+      "when": "Queued",
+      "attempts": "Attempts",
+      "outcome": "Next",
+      "gave_up": "Given up: this mail is not sent.",
+      "next_attempt": "Tries again {{when}}",
+      "sent_since": "Mail has gone out since then."
+    },
+    "kinds": {
+      "admin_alert": "Alert for administrators",
+      "password_reset": "Password reset",
+      "link_code": "Code to link a sign-in"
+    },
+    "server": {
+      "title": "Mail server",
+      "intro": "The server this server hands its mail to (SMTP submission).",
+      "host": "Server",
+      "host_help": "The mail server's name or address, e.g. mail.example.com.",
+      "port": "Port",
+      "security": "Encryption",
+      "security_starttls": "STARTTLS (port 587)",
+      "security_tls": "TLS from the start (port 465)",
+      "security_help": "Mail never goes out unencrypted. The port follows the choice unless you set one of your own."
+    },
+    "sign_in": {
+      "title": "Sign-in",
+      "auth": "Sign in with",
+      "auth_none": "No sign-in",
+      "auth_password": "User name and password",
+      "auth_microsoft365": "Microsoft 365",
+      "auth_none_help": "For a relay in your network that accepts mail from this server without a sign-in.",
+      "auth_password_help": "The account on the mail server, as with a hosting provider's mailbox.",
+      "auth_microsoft365_help": "Signs in with OAuth as an app registered in Microsoft Entra ID; no person's password is stored.",
+      "username": "User name",
+      "username_help": "Often the mailbox's address.",
+      "password": "Password",
+      "password_help": "The account's password.",
+      "mailbox": "Mailbox",
+      "mailbox_help": "The mailbox that sends, e.g. noreply@example.com.",
+      "tenant": "Tenant",
+      "tenant_help": "The directory (tenant) ID or one of its domains, e.g. example.onmicrosoft.com.",
+      "client_id": "Application (client) ID",
+      "client_id_help": "The ID of the app registered in Microsoft Entra ID.",
+      "client_secret": "Client secret",
+      "client_secret_help": "The client secret's value (not its ID).",
+      "stored": "Stored. Leave empty to keep it; what you type replaces it.",
+      "stored_label": "Stored",
+      "stored_other_server": "The stored one was saved for another server: type it again for this one.",
+      "root_mode_hint": "A new password or client secret needs root mode: switch it on in the top bar before you save."
+    },
+    "certificates": {
+      "title": "Trusted certificates",
+      "intro": "Only needed when the mail server's certificate comes from your organisation's own certificate authority (CA). Certificates from public CAs are trusted already.",
+      "pem": "Certificates (PEM)",
+      "pem_help": "Paste one or more certificates, each from -----BEGIN CERTIFICATE----- to -----END CERTIFICATE-----.",
+      "saved": "Saved certificates:",
+      "issuer": "Issued by {{issuer}}",
+      "expires": "Valid until {{date}}",
+      "expired": "Expired on {{date}}",
+      "ca_without_key_usage": "The mail service refuses this CA: it may not sign certificates (no key usage, RFC 5280). Paste the mail server's own certificate instead, or have the CA reissued.",
+      "unreadable": "The saved text holds no certificate that can be read: paste the certificates again.",
+      "unsaved": "Changed: the certificates are read when you save."
+    },
+    "sender": {
+      "title": "Sender",
+      "from_email": "Sender address",
+      "from_email_help": "The address mail comes from. The mail server must allow the account to send as it.",
+      "from_name": "Sender name",
+      "from_name_help": "The name people see next to the address.",
+      "helo_name": "Greeting name",
+      "helo_name_help": "The name this server greets the mail server with (EHLO). Empty: the sender address's domain."
+    },
+    "links": {
+      "title": "Links",
+      "link_base": "Console address",
+      "link_base_help": "Where people open this console, e.g. https://ai.example.com. Links in mail start with it; without it no mail goes out."
+    },
+    "alerts": {
+      "title": "Alerts",
+      "intro": "Alerts for administrators go to every active administrator and to the addresses listed here.",
+      "none": "No further addresses.",
+      "address": "Add an address",
+      "address_help": "Press Enter to add it. Several at once: separate them with commas.",
+      "not_an_address": "Not a mail address.",
+      "remove": "Remove {{address}}",
+      "add": "Add"
+    },
+    "test": {
+      "title": "Test mail",
+      "intro": "Sends a test mail with the settings above, saved or not, so you can try them before you save.",
+      "to": "Send to",
+      "send": "Send a test mail",
+      "sending": "Sending…",
+      "sent": "The test mail went out to {{to}}.",
+      "tls": "Encrypted with {{version}}",
+      "auth": "Signed in: {{auth}}",
+      "elapsed": "{{ms}} ms",
+      "failed": "The test mail did not go out",
+      "too_many": "Too many test mails in ten minutes: wait a few minutes, then try again."
+    },
+    "save": {
+      "saved": "Mail settings saved. The next mail goes out with them.",
+      "problems": "Some fields need attention: see the notes under them.",
+      "root_mode": "A new password or client secret needs root mode: switch it on in the top bar, then save again."
+    },
+    "problems": {
+      "required": "Required.",
+      "invalid": "Not valid: check what you entered.",
+      "not_https": "Must start with https:// (http only for localhost).",
+      "again_for_new_server": "The stored one was saved for another server: type it again to use it with this one.",
+      "root_mode": "Changing it needs root mode: switch it on in the top bar.",
+      "host_invalid": "Not a server name or address.",
+      "port_invalid": "A number from 1 to 65535.",
+      "helo_name_invalid": "Not a server name.",
+      "from_email_invalid": "Not a mail address.",
+      "username_invalid": "Not a mail address.",
+      "to_invalid": "Not a mail address.",
+      "admin_recipients_invalid": "One of the addresses is not a mail address.",
+      "from_name_invalid": "One line only, without control characters.",
+      "link_base_invalid": "An address like https://ai.example.com, without ? or #.",
+      "ca_bundle_invalid": "No certificate can be read from this text.",
+      "m365_tenant_id_invalid": "A tenant ID or a domain, e.g. example.onmicrosoft.com.",
+      "m365_client_id_invalid": "An application ID looks like 00000000-0000-0000-0000-000000000000."
+    },
+    "failure": {
+      "server_said": "The mail server's own words:",
+      "unknown": "The mail service reported {{code}}.",
+      "not_configured": "The mail settings are incomplete: check the server, the sign-in and the sender.",
+      "dns_failed": "The server's name cannot be found: check the spelling, and that this server's DNS knows it.",
+      "connect_failed": "No connection to the mail server: check the server and the port, and that no firewall is in the way.",
+      "timeout": "The mail server did not answer in time: check the port, and that no firewall silently drops the connection.",
+      "tls_unavailable": "The mail server offers no encryption on this port: try TLS from the start (465), or ask for STARTTLS on 587.",
+      "tls_untrusted": "The mail server's certificate is not trusted: add your organisation's CA under Trusted certificates.",
+      "tls_expired": "The mail server's certificate has expired: it must be renewed on the mail server.",
+      "tls_name_mismatch": "The mail server's certificate is for another name: use the name it is issued to.",
+      "tls_failed": "The encrypted connection failed: check that the encryption matches the port (STARTTLS on 587, TLS on 465).",
+      "greeting_refused": "The mail server refused this server's greeting: set a greeting name it accepts, usually a full DNS name.",
+      "login_unsupported": "The mail server offers no sign-in of this kind on this port: check the port, or choose another sign-in.",
+      "login_required": "The mail server requires a sign-in: choose a sign-in and enter the account.",
+      "login_refused": "The mail server refused the sign-in: check the user name and the password, or the app's rights in Microsoft 365.",
+      "secret_for_other_server": "The stored password or secret was saved for another server: type it again for this one and save.",
+      "oauth_failed": "Microsoft 365 issued no token: check the tenant, the application ID and the client secret, and the app's consent.",
+      "sender_refused": "The mail server refused the sender address: the account must be allowed to send as it.",
+      "relay_refused": "The mail server does not pass on mail for this server: allow this server to relay, or sign in.",
+      "recipient_refused": "The mail server refused the recipient: check the address.",
+      "message_refused": "The mail server refused the message itself, e.g. as too large or as spam.",
+      "server_error": "The mail server answered with an error.",
+      "mailer_unreachable": "The mail service cannot be reached: check under Settings → Modules that the mail module is running."
     }
   },
   "users": {
@@ -1874,7 +2044,9 @@
     "module_settings": "Module settings",
     "confirm_disable_recorded": "Switching it off is recorded in the audit log with your name and the time.",
     "confirm_disable_ack": "I understand that generated content will no longer be marked as AI-generated.",
-    "switch_off": "Switch off"
+    "switch_off": "Switch off",
+    "mailer_moved": "The mail server, the sender, the console's address for links and who gets alerts are set under Settings → Mail, with a test mail and whether mail goes out.",
+    "mailer_open": "Open mail settings"
   },
   "provenance_status": {
     "title": "Marking engine",
@@ -4636,7 +4808,8 @@
     "licence_invalid": "The Enterprise licence cannot be used (unreadable, wrongly signed or not for this product): Enterprise features are off.",
     "licence_missing": "Enterprise is installed but has no licence: Enterprise features are off.",
     "licence_seats_over": "{{used}} active accounts, and the licence has {{seats}} seats. Nothing is blocked; extend the licence or switch off accounts that are not needed.",
-    "mail_link_base_missing": "Mail is switched on but has no console address for its links, so no mail goes out: set it under Settings → Modules → Mailer → Frontend Base URL.",
+    "mail_link_base_missing": "Mail is switched on but has no console address for its links, so no mail goes out: set it under Settings → Mail → Links.",
+    "mail_failing": "Mail is failing ({{code}}): Settings → Mail shows what the mail server said and what to do.",
     "unknown": "A notice for administrators: {{code}}",
     "hide": "Hide until the browser is closed",
     "restriction_tool_mode_ceilings": "Tool mode limits need Fadenstack Enterprise: until it is back, tools in every chat are read-only.",

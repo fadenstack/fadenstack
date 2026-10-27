@@ -28,18 +28,22 @@ import SearchIcon from "@mui/icons-material/Search";
 
 import AppearanceSettings from "~/components/AppearanceSettings";
 import ModulesTab from "~/components/ModulesTab";
+import { hasFeature } from "~/api/about";
+import { MAIL_SETTINGS } from "~/api/mailSettings";
+import MailSettingsTab from "~/pages/admin/mail/MailSettingsTab";
 import {
   systemSettingsApi,
   type SystemSettingSchemaItem,
 } from "~/api/systemSettings";
 
-type SettingsTab = "general" | "modules" | "appearance";
+type SettingsTab = "general" | "modules" | "mail" | "appearance";
 
 function getCurrentTab(
   _pathname: string,
   tabQuery: string | null,
 ): SettingsTab {
   if (tabQuery === "modules") return "modules";
+  if (tabQuery === "mail") return "mail";
   if (tabQuery === "appearance") return "appearance";
   return "general";
 }
@@ -101,10 +105,26 @@ export default function SettingsPage() {
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The Mail tab shows while the server offers it (Enterprise); null while that is not known yet.
+  const [mailOffered, setMailOffered] = useState<boolean | null>(null);
 
   useEffect(() => {
     setTab(getCurrentTab(location.pathname, searchParams.get("tab")));
   }, [location.pathname, searchParams]);
+
+  useEffect(() => {
+    let live = true;
+    void hasFeature(MAIL_SETTINGS).then((offered) => {
+      if (live) setMailOffered(offered);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  // A link to the Mail tab on a server without it opens General; until that is known, no tab is marked.
+  const shownTab: SettingsTab | false =
+    tab === "mail" && !mailOffered ? (mailOffered === null ? false : "general") : tab;
 
   async function loadSettings() {
     setLoading(true);
@@ -168,9 +188,13 @@ export default function SettingsPage() {
     return groups;
   }, [schema, search]);
 
-  function handleTabChange(_event: React.SyntheticEvent, nextTab: SettingsTab) {
+  function selectTab(nextTab: SettingsTab) {
     setTab(nextTab);
     navigate(`/admin/settings?tab=${nextTab}`, { replace: true });
+  }
+
+  function handleTabChange(_event: React.SyntheticEvent, nextTab: SettingsTab) {
+    selectTab(nextTab);
   }
 
   function setLocalValue(
@@ -255,12 +279,18 @@ export default function SettingsPage() {
         <Typography variant="h5" sx={{ mb: 1 }}>
           {t("settings.title")}
         </Typography>
-        <Tabs value={tab} onChange={handleTabChange}>
+        <Tabs
+          value={shownTab}
+          onChange={handleTabChange}
+          variant="scrollable"
+          allowScrollButtonsMobile
+        >
           <Tab label={t("settings.general.title")} value="general" />
           <Tab
             label={t("settings.modules.title", { defaultValue: "Modules" })}
             value="modules"
           />
+          {mailOffered && <Tab label={t("settings.mail.title")} value="mail" />}
           <Tab label={t("settings.appearance.title")} value="appearance" />
         </Tabs>
       </Box>
@@ -285,7 +315,7 @@ export default function SettingsPage() {
           overflow: "auto",
         }}
       >
-        {tab === "general" && (
+        {shownTab === "general" && (
           <Stack spacing={2}>
             <TextField
               size="small"
@@ -498,9 +528,20 @@ export default function SettingsPage() {
           </Stack>
         )}
 
-        {tab === "modules" && <ModulesTab />}
+        {shownTab === "modules" && (
+          <ModulesTab
+            onOpenMail={mailOffered ? () => selectTab("mail") : undefined}
+          />
+        )}
 
-        {tab === "appearance" && (
+        {shownTab === "mail" && <MailSettingsTab />}
+        {shownTab === false && (
+          <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+            <CircularProgress size={28} />
+          </Box>
+        )}
+
+        {shownTab === "appearance" && (
           <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, maxWidth: 720 }}>
             <AppearanceSettings />
           </Paper>
