@@ -1247,7 +1247,10 @@
     "col_input_price_1m": "Entrada $/1 M",
     "col_output_price_1m": "Salida $/1 M",
     "user_hidden": "Oculto",
-    "user_hidden_hint": "Estas páginas no muestran quién envió una solicitud."
+    "user_hidden_hint": "Estas páginas no muestran quién envió una solicitud.",
+    "top_users": "Principales usuarios",
+    "filter_user_id": "ID de Usuario",
+    "top_user_value": "{{requests}} sol. · {{cost}}"
   },
   "llm_providers": {
     "title": "LLM Providers",
@@ -1654,7 +1657,9 @@
     "ev_approved": "aprobado",
     "ev_denied": "denegado",
     "ev_error": "fallido",
-    "ev_timeout": "tiempo agotado"
+    "ev_timeout": "tiempo agotado",
+    "chip_user": "Usuario {{id}}",
+    "col_user": "Usuario"
   },
   "agents_api_docs": {
     "title": "Punto de Acceso",
@@ -4878,6 +4883,48 @@
       "statement_intro": "Un documento con los ajustes de privacidad actuales, para adjuntar al acuerdo con el comité de empresa o a la evaluación de impacto relativa a la protección de datos.",
       "statement_language": "Idioma",
       "statement_download": "Descargar"
+    },
+    "statement": {
+      "title": "Medición del uso: declaración de configuración",
+      "generated": "Generada el {{date}} a partir de la configuración vigente.",
+      "intro": "Esta declaración describe cómo este servidor mide el uso de sus modelos de IA y quién puede ver las cifras. Puede adjuntarse a un acuerdo con la representación de los trabajadores y a una evaluación de impacto relativa a la protección de datos.",
+      "purpose_heading": "Finalidad",
+      "purpose": "Las cifras de uso sirven para el control de costes, la planificación de capacidad y el reparto equitativo del servicio.",
+      "excluded": "No se utilizan para vigilar ni evaluar el rendimiento o el comportamiento de los empleados. El servidor no ofrece clasificaciones ni comparaciones de personas.",
+      "settings_heading": "Configuración",
+      "column_setting": "Ajuste",
+      "column_value": "Valor",
+      "person_reporting": "Uso de personas identificadas visible para los auditores de uso",
+      "min_group_size": "Grupo más pequeño mostrado",
+      "person_granularity": "Cifras por persona por",
+      "request_log_retention_days": "Registro de solicitudes conservado durante",
+      "person_retention_days": "Cifras por persona conservadas durante",
+      "hourly_retention_days": "Cifras por hora conservadas durante",
+      "daily_retention_months": "Cifras diarias conservadas durante",
+      "time_zone": "Días y meses contados en",
+      "on": "Activado",
+      "off": "Desactivado",
+      "day": "Día",
+      "month": "Mes",
+      "days": "{{count}} días",
+      "months": "{{count}} meses",
+      "people": "{{count}} personas",
+      "limits_heading": "Límites para toda la instancia",
+      "rpm_limit": "Solicitudes por minuto",
+      "tpm_limit": "Tokens por minuto",
+      "tokens_per_day": "Tokens por día",
+      "no_limit": "Ninguno",
+      "limits_note": "Los límites cuentan la instancia en su conjunto y no guardan cifras sobre personas.",
+      "access_heading": "Quién ve qué",
+      "access_own": "Cada persona ve su propio uso y puede descargarlo.",
+      "access_aggregate": "Los administradores y auditores ven cifras de equipos, agentes, modelos y proveedores, cada una sobre al menos {{k}} personas. Los grupos más pequeños se muestran juntos, nunca por separado.",
+      "access_people_off": "El uso de personas identificadas: nadie lo ve, porque los informes por persona están desactivados.",
+      "access_people_on": "El uso de personas identificadas: los titulares del rol de auditor de uso, cada vez con un motivo indicado. Cada consulta queda registrada y cada persona puede ver cuándo y por qué se consultaron sus cifras.",
+      "access_superuser": "La condición de administrador por sí sola no da acceso al uso de personas identificadas.",
+      "auditors": "Titulares del rol de auditor de uso: {{names}}",
+      "auditors_none": "Titulares del rol de auditor de uso: ninguno",
+      "views": "Consultas y descargas registradas del uso de personas identificadas en los últimos 12 meses: {{count}}",
+      "footer": "Esta declaración describe la configuración; no constituye asesoramiento jurídico."
     }
   }
 }

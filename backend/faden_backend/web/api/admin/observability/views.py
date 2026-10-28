@@ -3,6 +3,9 @@
 Queries the gateway database (``faden_gateway``) via the secondary engine
 set up in ``app.state.llm_graph_trace_session_factory``, using raw SQL
 to avoid coupling with the gateway's ORM models.
+
+No answer here names the person who made a request, and requests cannot be filtered by person
+(``services/observability/service.py``).
 """
 
 from __future__ import annotations
@@ -161,14 +164,13 @@ async def list_requests(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=1, le=500),
     model_alias: str | None = Query(default=None),
-    user_id: str | None = Query(default=None),
     status_code: int | None = Query(default=None),
 ) -> PaginatedRequestsDTO:
     start, end = _parse_range(start, end)
     svc = ObservabilityService(gw)
     data = await svc.get_requests(
         start, end, page=page, limit=limit,
-        model_alias=model_alias, user_id=user_id, status_code=status_code,
+        model_alias=model_alias, status_code=status_code,
     )
     return PaginatedRequestsDTO(**data)
 
@@ -419,40 +421,3 @@ async def pricing_history(
     svc = PricingCRUDService(gw)
     rows = await svc.get_history(provider, model)
     return [PricingEntryDTO(**r) for r in rows]
-
-
-# ── EE stubs (402) ────────────────────────────────────────────────
-
-
-_EE_DETAIL = {
-    "detail": "This feature requires Fadenstack Enterprise Edition",
-    "upgrade_url": "https://fadenstack.com/pricing",
-}
-
-
-@router.post("/budgets", status_code=402, name="observability_budgets_stub")
-async def budgets_stub(
-    _user: Annotated[User, Depends(require_permission("observability", "read"))],
-) -> dict:
-    return _EE_DETAIL
-
-
-@router.get("/forecast", status_code=402, name="observability_forecast_stub")
-async def forecast_stub(
-    _user: Annotated[User, Depends(require_permission("observability", "read"))],
-) -> dict:
-    return _EE_DETAIL
-
-
-@router.post("/alerts", status_code=402, name="observability_alerts_stub")
-async def alerts_stub(
-    _user: Annotated[User, Depends(require_permission("observability", "read"))],
-) -> dict:
-    return _EE_DETAIL
-
-
-@router.get("/chargeback", status_code=402, name="observability_chargeback_stub")
-async def chargeback_stub(
-    _user: Annotated[User, Depends(require_permission("observability", "read"))],
-) -> dict:
-    return _EE_DETAIL

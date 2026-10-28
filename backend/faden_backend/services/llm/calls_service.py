@@ -3,10 +3,16 @@
 Everything here comes from what the gateway records about a call -- ids,
 timings, tokens, outcome, tool and policy metadata. Prompts, completions and
 a failed tool's text are not recorded (or are sealed) and are not read.
+
+Nothing here names the person who made a call, and calls cannot be searched by person: ``user_id`` is
+``None`` in every answer (GDPR Art. 25(2); M02 of the usage compliance report). The usage of named people is
+seen only through ``/api/admin/usage/people``, behind its switch, grant and reason. Internally the person
+still ties a call to its turn and its policy decisions.
 """
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import uuid
 from collections.abc import Callable
@@ -53,7 +59,7 @@ def _turn_of(event: dict[str, Any], turns: list[dict[str, Any]]) -> dict[str, An
     for turn in turns:
         if (
             turn["conversation_id"] == event["conversation_id"]
-            and turn["user_id"] == event["user_id"]
+            and turn["_person"] == event["user_id"]
             and turn["started_at"] - _EVENT_SLACK <= event["at"] <= turn["ended_at"] + _EVENT_SLACK
         ):
             return turn
@@ -101,7 +107,6 @@ class CallFilters:
     q: str | None = None
     model_alias: str | None = None
     outcome: str | None = None  # "ok" or "error"
-    user_id: str | None = None
     agent_id: str | None = None
     session: str | None = None  # a session or conversation id
     min_latency_ms: int | None = None
@@ -117,9 +122,6 @@ class CallFilters:
             clauses.append(_IS_ERROR)
         elif self.outcome == "ok":
             clauses.append(f"NOT {_IS_ERROR}")
-        if self.user_id:
-            clauses.append("l.user_id = :user_id")
-            params["user_id"] = self.user_id
         if self.agent_id:
             clauses.append("l.agent_id = :agent_id")
             params["agent_id"] = self.agent_id
@@ -131,9 +133,9 @@ class CallFilters:
             params["min_latency_ms"] = self.min_latency_ms
         needle = (self.q or "").strip()
         if needle:
-            # Ids match exactly (they are indexed); names and error codes by part.
+            # Ids match exactly (they are indexed); names and error codes by part. Never a person's id.
             clauses.append(
-                "(l.request_id = :q OR l.trace_id = :q OR l.user_id = :q"
+                "(l.request_id = :q OR l.trace_id = :q"
                 " OR l.session_id = :q OR l.conversation_id = :q OR l.agent_id = :q"
                 " OR l.model_alias ILIKE :q_like OR l.error_code ILIKE :q_like"
                 " OR l.endpoint ILIKE :q_like OR l.finish_reason ILIKE :q_like)",
@@ -145,6 +147,11 @@ class CallFilters:
 
 def _escape_like(value: str) -> str:
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _turn_key(user_id: object, turn: object) -> str:
+    """A turn's key in the answers: stable, and without the person's id in it."""
+    return hashlib.sha256(f"{user_id}:{turn}".encode()).hexdigest()[:32]
 
 
 def _num(value: object) -> float | None:
@@ -176,6 +183,7 @@ class LLMCallsService:
 
     def _call(self, row: dict[str, Any]) -> dict[str, Any]:
         call = dict(row)
+        call["user_id"] = None  # nobody is named (module docstring)
         call.pop("source_kind", None)
         call.pop("source_id", None)
         call["estimated_total_cost"] = _num(call.get("estimated_total_cost"))
@@ -294,12 +302,15 @@ class LLMCallsService:
             ).mappings().all()
             turns = [self._turn(dict(r)) for r in rows]
             await self._count_client_events(session, turns)
+        for turn in turns:
+            turn.pop("_person", None)
         return {"items": turns, "total": int(total), "page": page, "limit": limit}
 
     def _turn(self, row: dict[str, Any]) -> dict[str, Any]:
         turn = dict(row)
-        turn["key"] = f"{turn.pop('user_id')}:{turn.pop('tkey')}"
-        turn["user_id"] = row["user_id"]
+        turn["_person"] = turn.pop("user_id")  # matches the app's events to the turn; dropped after
+        turn["key"] = _turn_key(turn["_person"], turn.pop("tkey"))
+        turn["user_id"] = None  # nobody is named (module docstring)
         turn["provider_id"], turn["provider_name"] = self._provider(row)
         turn.pop("source_kind", None)
         turn.pop("source_id", None)
@@ -394,7 +405,7 @@ class LLMCallsService:
         # The model list ignores the model filter itself, so it stays a list to choose from.
         model_where, model_params = CallFilters(
             start=filters.start, end=filters.end, q=filters.q, outcome=filters.outcome,
-            user_id=filters.user_id, agent_id=filters.agent_id, session=filters.session,
+            agent_id=filters.agent_id, session=filters.session,
             min_latency_ms=filters.min_latency_ms,
         ).where()
         async with self._factory() as session:
@@ -462,6 +473,7 @@ class LLMCallsService:
             ).mappings().first()
             if row is None:
                 return None
+            person = row["user_id"]  # ties the call to its policy decisions and turn; never shown
             call = self._call(dict(row))
             tools = (
                 await session.execute(
@@ -489,7 +501,7 @@ class LLMCallsService:
                     {
                         "rid": call["request_id"],
                         "tenant": call["tenant_id"],
-                        "user": call["user_id"],
+                        "user": person,
                         "since": call["created_at"] - timedelta(milliseconds=call["latency_ms"] or 0)
                         - _POLICY_SLACK,
                         "until": call["created_at"] + _POLICY_SLACK,
@@ -497,7 +509,7 @@ class LLMCallsService:
                 )
             ).mappings().all()
             related, group_by, group_value = await self._related(session, call)
-            turn_calls, client_events = await self._turn_detail(session, call)
+            turn_calls, client_events = await self._turn_detail(session, call, person)
         return {
             "call": call,
             "tool_calls": [dict(t) for t in tools],
@@ -510,7 +522,7 @@ class LLMCallsService:
         }
 
     async def _turn_detail(
-        self, session: AsyncSession, call: dict[str, Any],
+        self, session: AsyncSession, call: dict[str, Any], person: str,
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """The calls of the call's turn (oldest first) and what its app reported doing meanwhile."""
         turn_calls = [call]
@@ -526,7 +538,7 @@ class LLMCallsService:
                     """),
                     {
                         "turn": call["turn_id"],
-                        "user": call["user_id"],
+                        "user": person,
                         "since": call["created_at"] - _TURN_REACH,
                         "until": call["created_at"] + _TURN_REACH,
                         "limit": TURN_CALLS_LIMIT,
@@ -539,7 +551,7 @@ class LLMCallsService:
         started = min(c["created_at"] - timedelta(milliseconds=c["latency_ms"] or 0) for c in turn_calls)
         ended = max(c["created_at"] for c in turn_calls)
         events = await self._client_events(session, [call["conversation_id"]], started, ended)
-        events = [e for e in events if e["user_id"] == call["user_id"]]
+        events = [e for e in events if e["user_id"] == person]
         for e in events:
             for key in ("conversation_id", "user_id", "agent_id"):
                 e.pop(key, None)

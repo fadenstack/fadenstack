@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from faden_backend.db.models.system_settings import SystemApplyScope
 from faden_backend.settings import settings
 
 SettingType = Literal["string", "int", "bool", "secret", "json", "enum"]
+
+
+class OutOfRangeError(ValueError):
+    """A value of the right type outside the setting's range (``min_value``-``max_value``)."""
 
 
 @dataclass(frozen=True)
@@ -27,6 +33,101 @@ class SettingDefinition:
     service_targets: tuple[str, ...]
     protected: bool = False
     enum_values: tuple[str, ...] = ()
+    #: The range of an ``int`` setting, both ends included; ``None``: open on that side.
+    min_value: int | None = None
+    max_value: int | None = None
+    #: A further check of a value of the right type; raises ``ValueError`` when it is not one.
+    check: Callable[[object], None] | None = None
+
+
+def check_time_zone(value: object) -> None:
+    """Refuse anything but an IANA zone name the tz database knows (``Europe/Berlin``, ``UTC``).
+
+    ``zoneinfo`` reads names as paths under the tz database, so a name shaped like a path is refused before.
+    """
+    name = str(value)
+    if not name or len(name) > 64 or ".." in name or name.startswith(("/", "\\")):
+        msg = f"Not a time zone name: {name!r}."
+        raise ValueError(msg)
+    try:
+        ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError) as exc:
+        msg = f"Not a time zone name: {name!r}."
+        raise ValueError(msg) from exc
+
+
+def _usage(
+    key: str,
+    type_: SettingType,
+    group: str,
+    label: str,
+    description: str,
+    default: object,
+    **extra: object,
+) -> SettingDefinition:
+    """A ``usage.*`` setting: read live by the backend and by the gateway's rollup job at each run."""
+    return SettingDefinition(
+        key=key,
+        type=type_,
+        category="usage",
+        group=group,
+        label=label,
+        description=description,
+        is_secret=False,
+        default=default,
+        apply_scope=SystemApplyScope.LIVE_RELOAD,
+        service_targets=(),
+        **extra,  # type: ignore[arg-type]
+    )
+
+
+#: Usage metering and its privacy controls (GDPR Art. 5(1)(c), (e), 25(2)): the defaults and ranges of the
+#: compliance report's section 9. The gateway's rollup job reads them from this database at each run.
+USAGE_SETTINGS: list[SettingDefinition] = [
+    _usage(
+        "usage.person_reporting", "bool", "privacy", "Person-level reporting about others",
+        "Lets holders of the usage auditor role see the usage of named people, with a reason that is "
+        "recorded (M02, M06, M07). Off: nobody sees anyone's usage but their own. Needs Root Mode to "
+        "change; where there is a works council, agree it with them first.",
+        False, protected=True,
+    ),
+    _usage(
+        "usage.min_group_size", "int", "privacy", "Smallest group shown (people)",
+        "A figure about fewer people than this is not shown on its own (M04): it joins a 'fewer than k "
+        "people' row. 5 to 50.",
+        5, min_value=5, max_value=50,
+    ),
+    _usage(
+        "usage.person_granularity", "enum", "privacy", "Per-person figures by",
+        "day: per-person figures are kept and shown per day; month: per month (M10). Never by the hour.",
+        "day", enum_values=("day", "month"),
+    ),
+    _usage(
+        "usage.request_log_retention_days", "int", "retention", "Keep the request log (days)",
+        "One row per request: who, when, which model, tokens, cost; never its content. 7 to 365 days (M09).",
+        90, min_value=7, max_value=365,
+    ),
+    _usage(
+        "usage.person_retention_days", "int", "retention", "Keep per-person figures (days)",
+        "Each person's daily figures. 31 to 400 days; more than 90 needs a documented reason (M09, S06).",
+        90, min_value=31, max_value=400,
+    ),
+    _usage(
+        "usage.hourly_retention_days", "int", "retention", "Keep hourly figures (days)",
+        "Hourly figures per team, agent, model and provider, without people. 31 to 180 days.",
+        90, min_value=31, max_value=180,
+    ),
+    _usage(
+        "usage.daily_retention_months", "int", "retention", "Keep daily figures (months)",
+        "Daily figures per team, agent, model and provider, without people. 13 to 60 months.",
+        25, min_value=13, max_value=60,
+    ),
+    _usage(
+        "usage.time_zone", "string", "time", "Time zone of days and months",
+        "Where a day and a month of usage begin and end, e.g. Europe/Berlin (an IANA name).",
+        "UTC", check=check_time_zone,
+    ),
+]
 
 
 SETTINGS_REGISTRY: list[SettingDefinition] = [
@@ -728,6 +829,7 @@ SETTINGS_REGISTRY: list[SettingDefinition] = [
         apply_scope=SystemApplyScope.LIVE_RELOAD,
         service_targets=(),
     ),
+    *USAGE_SETTINGS,
 ]
 
 
@@ -741,8 +843,33 @@ def registry_by_key() -> dict[str, SettingDefinition]:
     return {item.key: item for item in SETTINGS_REGISTRY}
 
 
-def validate_value(defn: SettingDefinition, value: object) -> object:  # noqa: C901
-    """Validate value against setting type and constraints."""
+def validate_value(defn: SettingDefinition, value: object) -> object:
+    """Validate value against setting type and constraints.
+
+    Raises ``OutOfRangeError`` (a ``ValueError``) for a number outside the setting's range, ``ValueError``
+    for anything else wrong. Every route that writes a setting comes through here, so a range (the smallest
+    group shown, M04) cannot be stepped round by writing the key some other way.
+    """
+    checked = _validate_type(defn, value)
+    if defn.check is not None:
+        defn.check(checked)
+    return checked
+
+
+def _check_range(defn: SettingDefinition, value: int) -> None:
+    if defn.min_value is None and defn.max_value is None:
+        return
+    if isinstance(value, bool):  # True is an int to Python; not a number of anything here
+        msg = f"Setting {defn.key} expects integer value."
+        raise ValueError(msg)
+    if (defn.min_value is not None and value < defn.min_value) or (
+        defn.max_value is not None and value > defn.max_value
+    ):
+        msg = f"Setting {defn.key} takes {defn.min_value}-{defn.max_value}."
+        raise OutOfRangeError(msg)
+
+
+def _validate_type(defn: SettingDefinition, value: object) -> object:  # noqa: C901
     if defn.type in {"string", "secret"}:
         if not isinstance(value, str):
             msg = f"Setting {defn.key} expects string value."
@@ -752,6 +879,7 @@ def validate_value(defn: SettingDefinition, value: object) -> object:  # noqa: C
         if not isinstance(value, int):
             msg = f"Setting {defn.key} expects integer value."
             raise ValueError(msg)
+        _check_range(defn, value)
         return value
     if defn.type == "bool":
         if not isinstance(value, bool):
