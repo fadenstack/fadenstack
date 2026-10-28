@@ -37,4 +37,36 @@ describe("the account menu", () => {
 
     expect(onUsage).toHaveBeenCalledOnce();
   });
+
+  it("opens the console's Usage page for someone with usage:read who has no admin button", () => {
+    const onTeamUsage = vi.fn();
+    const shell: ChatShell = {
+      userEmail: "a@example.com",
+      onProfile: () => {},
+      onLogout: () => {},
+      onUsage: () => {},
+      onTeamUsage,
+      phoneNav: null,
+    };
+    render(
+      <MemoryRouter>
+        <ChatShellContext.Provider value={shell}>
+          <ChatTopbar
+            title="Chat"
+            onToggleSidebar={() => {}}
+            sidebarOpen
+            languages={[]}
+            language="en"
+            onLanguageChange={() => {}}
+            isSuperuser={false}
+          />
+        </ChatShellContext.Provider>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Logged in as a@example.com" }));
+    fireEvent.click(within(screen.getByRole("menu")).getByText("Usage of all teams"));
+
+    expect(onTeamUsage).toHaveBeenCalledOnce();
+  });
 });

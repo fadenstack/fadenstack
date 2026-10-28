@@ -141,6 +141,25 @@ describe("usage privacy settings", () => {
     expect(await within(section).findByText("Not a valid value.")).toBeInTheDocument();
   });
 
+  it("takes an https address for the privacy notice, or none", async () => {
+    usage.updateSettings.mockResolvedValue(usageSettings({ privacy_notice_url: "https://intranet.example.com/privacy" }));
+    view();
+    const section = await privacy();
+    const notice = within(section).getByRole("textbox", { name: "Privacy notice" });
+    const save = within(section).getByRole("button", { name: "Save" });
+
+    await userEvent.type(notice, "http://intranet.example.com/privacy");
+    expect(within(section).getByText("An https address, or empty.")).toBeInTheDocument();
+    expect(save).toBeDisabled();
+
+    await userEvent.clear(notice);
+    await userEvent.type(notice, "https://intranet.example.com/privacy");
+    await userEvent.click(save);
+    await waitFor(() =>
+      expect(usage.updateSettings).toHaveBeenCalledWith({ privacy_notice_url: "https://intranet.example.com/privacy" }),
+    );
+  });
+
   it("refuses a time zone it does not know", async () => {
     view();
     const section = await privacy();

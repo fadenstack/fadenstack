@@ -36,6 +36,7 @@ import { WidgetCard, WidgetEmpty } from "~/components/dashboard/kit";
 import { MeasuresTable } from "~/components/usage/UsageParts";
 import { USAGE_HELP, UsageHelpLink } from "~/components/usage/UsageHelpLink";
 import { periodLabel, usageErrorText } from "~/components/usage/usageFormat";
+import { pickableTeams } from "~/lib/teamTree";
 
 type Scope = "person" | "team";
 
@@ -205,7 +206,7 @@ function PeopleDialog({
   /** The answer, the reason it was granted for, and the person chosen (none for a team). */
   onResult: (answer: PeopleUsage, reason: string, chosen: Someone | null) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [scope, setScope] = useState<Scope>("person");
   const [person, setPerson] = useState<AdminUser | null>(null);
   const [team, setTeam] = useState("");
@@ -313,8 +314,8 @@ function PeopleDialog({
               value={team}
               onChange={(e) => setTeam(e.target.value)}
             >
-              {teams.map((g) => (
-                <MenuItem key={g.id} value={g.id}>
+              {pickableTeams(teams, i18n.language).map(({ team: g, depth }) => (
+                <MenuItem key={g.id} value={g.id} sx={{ pl: 2 + (depth - 1) * 2 }}>
                   {g.name}
                 </MenuItem>
               ))}

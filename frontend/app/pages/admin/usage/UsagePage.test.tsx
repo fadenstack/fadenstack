@@ -15,7 +15,7 @@ import { ApiError } from "~/api/http";
 import * as api from "~/api/usage";
 import { getAppTheme } from "~/theme";
 import { renderPage } from "~/test/renderPage";
-import { adminUsage, measures } from "~/test/usageFixtures";
+import { adminUsage, hiddenMeasures, measures } from "~/test/usageFixtures";
 
 import UsagePage from "./UsagePage";
 
@@ -82,7 +82,7 @@ describe("Usage (administrators)", () => {
     expect(within(totals).getByText("21")).toBeInTheDocument();
 
     const table = screen.getByRole("table", { name: "By usage group" });
-    expect(within(table).getByText("Fewer than 5 people")).toBeInTheDocument();
+    expect(within(table).getByText("Smaller teams and others")).toBeInTheDocument();
     expect(within(table).getByText("5 or more")).toBeInTheDocument();
     expect(container.querySelector("[data-usage-small-instance]")).toBeNull();
   });
@@ -91,20 +91,37 @@ describe("Usage (administrators)", () => {
     // The server's order puts the heaviest user first; the page does not follow it.
     usage.admin.mockResolvedValue(
       adminUsage({
+        group_by: "agent",
         groups: [
-          { key: "g-z", label: "Zeta", people: 12, suppressed: false, ...measures({ requests: 9000 }) },
+          { key: "a-z", label: "Zeta", other: false, people: 12, suppressed: false, ...measures({ requests: 9000 }) },
           { key: null, label: null, other: true, people: null, suppressed: true, ...measures({ requests: 40 }) },
-          { key: "g-a", label: "Alpha", people: 6, suppressed: false, ...measures({ requests: 10 }) },
+          { key: null, label: null, other: false, people: 8, suppressed: false, ...measures({ requests: 500 }) },
+          { key: "a-a", label: "Alpha", other: false, people: 6, suppressed: false, ...measures({ requests: 10 }) },
         ],
       }),
     );
     view();
-    await screen.findByRole("table", { name: "By usage group" });
+    const table = await screen.findByRole("table", { name: "By agent" });
 
-    expect(groupOrder()).toEqual(["Alpha", "Zeta", expect.stringContaining("Fewer than 5 people")]);
-    const table = screen.getByRole("table", { name: "By usage group" });
+    const order = within(table)
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) => within(row).getAllByRole("cell")[0].textContent ?? "");
+    expect(order).toEqual(["Alpha", "Zeta", "No agent", expect.stringContaining("Fewer than 5 people")]);
     expect(within(table).queryAllByRole("button")).toHaveLength(0);
-    expect(screen.getByText("Listed by name; nothing here is ranked.")).toBeInTheDocument();
+    expect(screen.getByText(/Listed by name; nothing here is ranked./)).toBeInTheDocument();
+  });
+
+  it("names the rows without a key by what they stand for", async () => {
+    usage.admin.mockResolvedValue(
+      adminUsage({
+        group_by: "model",
+        groups: [{ key: null, label: null, other: false, people: 9, suppressed: false, ...measures() }],
+      }),
+    );
+    view();
+
+    expect(await screen.findByText("Unknown model")).toBeInTheDocument();
   });
 
   it("says when the instance is too small for totals to stay anonymous (S12)", async () => {
@@ -125,7 +142,7 @@ describe("Usage (administrators)", () => {
         bucket: "hour",
         series: [
           { period: "2026-10-28T08:00:00Z", suppressed: false, ...measures({ input_tokens: 100, output_tokens: 10 }) },
-          { period: "2026-10-28T09:00:00Z", suppressed: true, ...measures({ input_tokens: 0, output_tokens: 0 }) },
+          { period: "2026-10-28T09:00:00Z", suppressed: true, ...hiddenMeasures() },
         ],
       }),
     );
@@ -152,6 +169,109 @@ describe("Usage (administrators)", () => {
     view();
 
     expect(await screen.findByText(/Person-level reporting is off: nobody sees the figures of a single person/)).toBeInTheDocument();
+  });
+});
+
+describe("teams as a tree", () => {
+  const tree = () =>
+    adminUsage({
+      groups: [
+        // As the server sends them: a team's figures include its sub-teams.
+        { key: "g-sales", label: "Sales", other: false, people: 14, suppressed: false, parent_key: null, path: ["g-sales"], ...measures({ requests: 900 }) },
+        { key: "g-emea", label: "EMEA", other: false, people: 8, suppressed: false, parent_key: "g-sales", path: ["g-sales", "g-emea"], ...measures({ requests: 600 }) },
+        { key: null, label: null, other: true, people: null, suppressed: true, parent_key: "g-sales", path: ["g-sales"], ...measures({ requests: 300 }) },
+        { key: "g-eng", label: "Engineering", other: false, people: 6, suppressed: false, parent_key: null, path: ["g-eng"], ...measures({ requests: 50 }) },
+        { key: null, label: null, other: false, people: 5, suppressed: false, parent_key: null, path: [], ...measures({ requests: 20 }) },
+      ],
+    });
+
+  it("shows the top teams and Unassigned, and opens a team to its sub-teams and its smaller teams", async () => {
+    usage.admin.mockResolvedValue(tree());
+    view();
+    await screen.findByRole("table", { name: "By usage group" });
+
+    expect(groupOrder()).toEqual(["Engineering", "Sales", expect.stringContaining("Unassigned")]);
+
+    await userEvent.click(screen.getByRole("button", { name: "Show the teams below Sales" }));
+    expect(groupOrder()).toEqual([
+      "Engineering",
+      "Sales",
+      "EMEA",
+      expect.stringContaining("Smaller teams"),
+      expect.stringContaining("Unassigned"),
+    ]);
+    expect(document.querySelector("[data-usage-node='t:g-sales/g-emea']")?.getAttribute("data-usage-depth")).toBe("2");
+
+    await userEvent.click(screen.getByRole("button", { name: "Hide the teams below Sales" }));
+    expect(groupOrder()).toHaveLength(3);
+  });
+
+  it("asks for today's structure when switched, as recorded by default", async () => {
+    usage.admin.mockResolvedValue(tree());
+    view();
+    await screen.findByRole("table", { name: "By usage group" });
+    expect(usage.admin).toHaveBeenLastCalledWith(expect.objectContaining({ group_by: "team", structure: "recorded" }));
+
+    await userEvent.click(screen.getByRole("button", { name: "Today's structure" }));
+    await waitFor(() => expect(usage.admin).toHaveBeenLastCalledWith(expect.objectContaining({ structure: "current" })));
+    expect(screen.getByRole("link", { name: "Help" })).toHaveAttribute("href", "/help/administer/usage/#teams-on-the-usage-page");
+
+    // Not a choice for agents, models or providers.
+    await userEvent.click(screen.getByRole("button", { name: "Agent" }));
+    await waitFor(() => expect(usage.admin).toHaveBeenLastCalledWith(expect.not.objectContaining({ structure: expect.anything() })));
+    expect(screen.queryByRole("button", { name: "Today's structure" })).toBeNull();
+  });
+
+  it("hides the totals of a range with fewer than k people", async () => {
+    usage.admin.mockResolvedValue(
+      adminUsage({ totals: { ...hiddenMeasures(), people: null }, groups: [], small_instance: true }),
+    );
+    view();
+
+    const totals = await screen.findByRole("region", { name: "Totals" });
+    expect(await within(totals).findByText("Fewer than 5")).toBeInTheDocument();
+    expect(within(totals).queryByText(/\d{2,}/)).toBeNull();
+  });
+
+  it("lets a usage auditor show them anyway, after a reason", async () => {
+    usage.admin.mockResolvedValue(
+      adminUsage({
+        totals: { ...hiddenMeasures(), people: null },
+        small_instance: true,
+        person_reporting: true,
+        can_view_people: true,
+      }),
+    );
+    const { container } = view();
+    await userEvent.click(await screen.findByRole("button", { name: "Show anyway" }));
+    const dialog = await screen.findByRole("dialog", { name: "Show figures about fewer than 5 people" });
+    const show = within(dialog).getByRole("button", { name: "Show figures" });
+    expect(show).toBeDisabled();
+
+    usage.admin.mockResolvedValue(adminUsage({ small_instance: true, unhidden: true, can_view_people: true }));
+    await userEvent.type(within(dialog).getByRole("textbox", { name: "Reason" }), "Cost dispute of the pilot team");
+    await userEvent.click(show);
+
+    await waitFor(() =>
+      expect(usage.admin).toHaveBeenLastCalledWith(expect.objectContaining({ reason: "Cost dispute of the pilot team" })),
+    );
+    await waitFor(() => expect(container.querySelector("[data-usage-unhidden]")).not.toBeNull());
+  });
+
+  it("words a refused reason and stops sending it", async () => {
+    usage.admin.mockResolvedValue(
+      adminUsage({ totals: { ...hiddenMeasures(), people: null }, small_instance: true, can_view_people: true }),
+    );
+    view();
+    await userEvent.click(await screen.findByRole("button", { name: "Show anyway" }));
+    const dialog = await screen.findByRole("dialog");
+
+    usage.admin.mockRejectedValueOnce(new ApiError("forbidden", 403, "not_usage_auditor"));
+    await userEvent.type(within(dialog).getByRole("textbox", { name: "Reason" }), "Cost dispute of the pilot team");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Show figures" }));
+
+    expect(await screen.findByText(/need the usage auditor role/)).toBeInTheDocument();
+    await waitFor(() => expect(usage.admin).toHaveBeenLastCalledWith(expect.not.objectContaining({ reason: expect.anything() })));
   });
 });
 

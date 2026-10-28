@@ -21,11 +21,30 @@ export function isoDay(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-/** The last `days` days, today included, as the API's `from`/`to`. */
-export function lastDays(days: number, today = new Date()): { from: string; to: string } {
-  const start = new Date(today);
-  start.setDate(start.getDate() - (days - 1));
-  return { from: isoDay(start), to: isoDay(today) };
+/** Today's date (`YYYY-MM-DD`) in `timeZone` (an IANA name); the browser's when none is given or known. */
+export function todayIn(timeZone?: string, now = new Date()): string {
+  if (timeZone) {
+    try {
+      const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" })
+        .formatToParts(now)
+        .reduce<Record<string, string>>((acc, p) => ({ ...acc, [p.type]: p.value }), {});
+      return `${parts.year}-${parts.month}-${parts.day}`;
+    } catch {
+      // An unknown zone: the browser's day.
+    }
+  }
+  return isoDay(now);
+}
+
+/**
+ * The last `days` days, today included, as the API's `from`/`to`: days of the usage time zone (where
+ * the server's days begin), so "today" is the server's today even when the browser is elsewhere.
+ */
+export function lastDays(days: number, timeZone?: string, now = new Date()): { from: string; to: string } {
+  const to = todayIn(timeZone, now);
+  const start = new Date(`${to}T00:00:00Z`);
+  start.setUTCDate(start.getUTCDate() - (days - 1));
+  return { from: start.toISOString().slice(0, 10), to };
 }
 
 /**

@@ -1977,7 +1977,13 @@
     "delete_title": "删除角色",
     "delete_confirm": "确定要删除角色 \"{{name}}\" 吗？",
     "delete_warning_users": "当前有 {{count}} 个用户拥有此角色。",
-    "failed_delete": "删除角色失败。"
+    "failed_delete": "删除角色失败。",
+    "builtin_names": {
+      "usage_auditor": "用量审计员"
+    },
+    "builtin_hints": {
+      "usage_auditor": "usage_auditor：在按人员统计开启时，每次说明理由后可查看单个人员的用量数据。超级用户身份并不自动拥有此权限。"
+    }
   },
   "groups": {
     "title": "组管理",
@@ -2003,7 +2009,32 @@
     "delete_warning_members": "当前有 {{count}} 个用户在此组中。",
     "failed_delete": "删除组失败。",
     "kept_by": "由 {{provider}} 维护",
-    "kept_by_help": "此登录提供方为组命名并维护其成员；管理员添加的成员会保留。可在此为其分配角色和智能体。"
+    "kept_by_help": "此登录提供方为组命名并维护其成员；管理员添加的成员会保留。可在此为其分配角色和智能体。",
+    "tree": {
+      "cost_center_chip": "成本中心 {{code}}",
+      "archived": "已归档",
+      "archive": "归档",
+      "unarchive": "恢复",
+      "show_archived_one": "显示 {{count}} 个已归档的组",
+      "show_archived_other": "显示 {{count}} 个已归档的组",
+      "parent": "上级组",
+      "parent_help": "此组的上一级组。用量计入此组及其所有上级组；角色不会向下传递。最多 {{max}} 级。",
+      "top": "无（顶级组）",
+      "level": "第 {{level}} 级",
+      "too_deep_option": "层级过深：树将超过 {{max}} 级",
+      "cost_center": "成本中心",
+      "cost_center_help": "用于报表的财务代码，最多 {{max}} 个字符。可选。",
+      "roles_stay": "角色只适用于此组的成员；下级组不会继承。",
+      "archive_title": "归档 {{name}}？",
+      "archive_body": "该组会保留其历史：其用量仍计在原处。它不再接收新成员，不能作为任何人的用量归属组，也不再出现在选择列表中。您可以将其恢复。",
+      "delete_sub_teams": "其下级组将移到它的上级组下。",
+      "archived_name": "{{name}}（已归档）"
+    },
+    "errors": {
+      "team_cycle": "组不能放在自身或其下级组之下。",
+      "team_too_deep": "树将超过六级。请选择更高一级的上级组。",
+      "team_archived": "此组已归档：请先恢复，或选择其他组。"
+    }
   },
   "auth_providers": {
     "title": "登录提供商",
@@ -4710,7 +4741,6 @@
       "menu": "我的用量",
       "title": "我的用量",
       "subtitle": "您使用了多少 AI 模型，以及按本实例的价格大约花费多少。",
-      "back_to_chat": "返回聊天",
       "by_model": "按模型",
       "by_agent": "按智能体",
       "by_project": "按项目",
@@ -4733,7 +4763,13 @@
       "privacy_on_retention": "您的个人数据保留 {{days}} 天，之后删除。",
       "privacy_views_none": "到目前为止，没有人查看过您的数据。",
       "privacy_views_one": "您的数据已被查看 {{count}} 次；下载文件列出了时间和理由。",
-      "privacy_views_other": "您的数据已被查看 {{count}} 次；下载文件列出了时间和理由。"
+      "privacy_views_other": "您的数据已被查看 {{count}} 次；下载文件列出了时间和理由。",
+      "back": "返回",
+      "notice_link": "阅读隐私声明",
+      "unknown_project": "某个聊天项目",
+      "cap_limit": "限额：{{limit}}",
+      "cap_minute_note": "按分钟计数；此处不显示当前已用多少。",
+      "cap_day_hidden": "当今天有足够多的其他人使用本实例后，才会显示今天已用多少。"
     },
     "range_label": "时间段",
     "range": {
@@ -4806,7 +4842,6 @@
         "provider": "按提供商"
       },
       "order_note": "按名称排列；此处不做任何排名。",
-      "no_label": "未设置",
       "reporting_off": "按人员统计已关闭：没有人能看到单个人员的数据。",
       "reporting_on_no_right": "按人员统计已开启。只有拥有用量审计员角色的人员才能看到单个人员的数据。",
       "people": {
@@ -4830,7 +4865,35 @@
         "col_period": "时间段",
         "export_title": "下载某个人的数据",
         "export_note": "每次下载都会连同您为此次查看说明的理由一起记录。"
-      }
+      },
+      "smaller_teams": "较小的组及其他",
+      "smaller_teams_hint": "因人数太少而未单独显示的下级组，以及直接属于 {{name}} 的人员",
+      "unassigned": "未分配",
+      "unassigned_hint": "没有用量归属组的人员",
+      "no_agent": "无智能体",
+      "unknown_model": "未知模型",
+      "unknown_provider": "未知提供商",
+      "expand": "显示 {{name}} 下的组",
+      "collapse": "隐藏 {{name}} 下的组",
+      "expand_all": "全部展开",
+      "collapse_all": "全部收起",
+      "structure_label": "组结构",
+      "structure": {
+        "recorded": "按记录",
+        "current": "当前结构"
+      },
+      "structure_hint": {
+        "recorded": "用量计在使用时该组所处的位置。",
+        "current": "过去的用量按当前的树归类。"
+      },
+      "totals_hidden": "在此时间段内使用本实例的人数少于 {{k}}：不显示合计。",
+      "smaller_teams_top_hint": "人数各少于 {{k}} 的组，合并在一起",
+      "deleted_team": "已删除的组",
+      "unhide": "仍然显示",
+      "unhide_title": "显示涵盖少于 {{k}} 人的数据",
+      "unhide_intro": "作为用量审计员，您可以在说明理由后查看这些数据。此次查看会连同您的理由一起记录，与查看单个人员的数据相同。",
+      "unhidden_note": "这些数据涵盖的人数少于 {{k}}。它们是以用量审计员身份向您显示的，每次查看都会连同您的理由一起记录。",
+      "menu": "所有组的用量"
     },
     "errors": {
       "load_failed": "无法加载用量数据。",
@@ -4882,7 +4945,10 @@
       "statement_title": "配置声明",
       "statement_intro": "一份记录当前隐私设置的文档，可附在企业协议或数据保护影响评估中。",
       "statement_language": "语言",
-      "statement_download": "下载"
+      "statement_download": "下载",
+      "privacy_notice_url": "隐私声明",
+      "privacy_notice_url_help": "面向员工的隐私声明的地址（https）。“我的用量”会链接到它；留空：不显示链接。",
+      "privacy_notice_url_error": "https 地址，或留空。"
     },
     "statement": {
       "title": "使用量计量：配置说明",

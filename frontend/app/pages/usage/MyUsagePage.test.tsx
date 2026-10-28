@@ -12,6 +12,7 @@ import * as api from "~/api/usage";
 import { getAppTheme } from "~/theme";
 import { renderPage } from "~/test/renderPage";
 import { measures, myUsage } from "~/test/usageFixtures";
+import { todayIn } from "~/components/usage/usageFormat";
 
 import MyUsagePage from "./MyUsagePage";
 
@@ -28,6 +29,11 @@ vi.mock("~/api/usage", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/api/usage")>();
   return { ...actual, usageApi: { ...actual.usageApi, me: vi.fn() } };
 });
+
+// The person's own chat projects, which name the project rows.
+vi.mock("~/api/chatClient", () => ({
+  chatApi: { listProjects: vi.fn().mockResolvedValue([{ id: "p-1", name: "Quarterly report" }]) },
+}));
 
 // The chart itself is MUI's; the page decides what goes into it.
 vi.mock("~/components/dashboard/TimeSeriesChart", () => ({
@@ -105,6 +111,70 @@ describe("My usage", () => {
 
     const totals = await screen.findByRole("region", { name: "Totals" });
     expect(within(totals).queryByText(/€|\$/)).toBeNull();
+  });
+
+  it("names chat projects from the person's own projects", async () => {
+    me.mockResolvedValue(
+      myUsage({
+        by_project: [
+          { key: "p-1", label: null, ...measures() },
+          { key: "p-gone", label: null, ...measures() },
+          { key: null, label: null, ...measures() },
+        ],
+      }),
+    );
+    view();
+
+    const projects = await screen.findByRole("region", { name: "By project" });
+    expect(await within(projects).findByText("Quarterly report")).toBeInTheDocument();
+    expect(within(projects).getByText("A chat project")).toBeInTheDocument();
+    expect(within(projects).getByText("Without a project")).toBeInTheDocument();
+  });
+
+  it("links to the organisation's privacy notice when one is set", async () => {
+    me.mockResolvedValue(
+      myUsage({
+        privacy: {
+          person_reporting: false,
+          granularity: "day",
+          retention_days: 90,
+          views_of_my_data: 0,
+          notice_url: "https://intranet.example.com/privacy",
+        },
+      }),
+    );
+    view();
+
+    expect(await screen.findByRole("link", { name: "Read the privacy notice" })).toHaveAttribute(
+      "href",
+      "https://intranet.example.com/privacy",
+    );
+  });
+
+  it("shows only the limit where how much is used is not known", async () => {
+    me.mockResolvedValue(
+      myUsage({
+        caps: [
+          { kind: "rpm", limit: 600, used: null, resets_at: "2026-10-28T10:01:00Z" },
+          { kind: "tokens_per_day", limit: 1000000, used: null, resets_at: "2026-10-28T22:00:00Z" },
+        ],
+      }),
+    );
+    const { container } = view();
+
+    const limits = await screen.findByRole("region", { name: "Limits" });
+    expect(await within(limits).findByText("Limit: 600")).toBeInTheDocument();
+    expect(within(limits).getByText(/Counted per minute/)).toBeInTheDocument();
+    expect(within(limits).getByText(/once enough other people have used the instance today/)).toBeInTheDocument();
+    expect(container.querySelector("[role='progressbar']")).toBeNull();
+  });
+
+  it("counts days in the usage time zone once the server names it", async () => {
+    me.mockResolvedValue(myUsage({ time_zone: "Pacific/Kiritimati" }));
+    view();
+    await screen.findByRole("region", { name: "Totals" });
+
+    await waitFor(() => expect(me).toHaveBeenLastCalledWith(expect.objectContaining({ to: todayIn("Pacific/Kiritimati") })));
   });
 
   it("asks again for another period and per month", async () => {

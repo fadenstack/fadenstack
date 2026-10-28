@@ -352,7 +352,8 @@
       "action_groups": "Grouper par groupe d'usage, agent, modèle ou fournisseur ; les groupes sous la taille minimale comptent dans une ligne, « Moins de ... personnes »",
       "action_small": "Un bandeau avertit quand moins de personnes que la taille minimale de groupe utilisent l'instance : ses totaux comptent alors comme des données personnelles",
       "action_people": "Les auditeurs d'utilisation, avec le suivi par personne activé, voient les chiffres par personne après avoir indiqué un motif ; chaque consultation est enregistrée",
-      "action_settings": "Paramètres → Utilisation et confidentialité fixe la taille minimale de groupe, les durées de conservation, les limites et le suivi par personne"
+      "action_settings": "Paramètres → Utilisation et confidentialité fixe la taille minimale de groupe, les durées de conservation, les limites et le suivi par personne",
+      "action_tree": "Les équipes en arbre : ouvrez une équipe pour voir ses sous-équipes, tel qu'enregistré ou dans la structure actuelle"
     },
     "logs": {
       "title": "Journaux et audit",
@@ -485,7 +486,8 @@
       "title": "Groupes",
       "description": "Un groupe donne des rôles à ses membres et regroupe leur usage dans les rapports.",
       "action_create": "Créer un groupe avec ses rôles",
-      "action_members": "Ajouter ou retirer des membres"
+      "action_members": "Ajouter ou retirer des membres",
+      "action_tree": "Placer un groupe sous un autre, lui donner un centre de coûts ou archiver un groupe terminé"
     },
     "api_tokens": {
       "title": "Jetons d'API",

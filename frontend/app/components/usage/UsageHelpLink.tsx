@@ -30,6 +30,7 @@ export function UsageHelpLink({ doc }: { doc: string }) {
 export const USAGE_HELP = {
   ownUsage: "administer/usage#your-own-usage",
   usagePage: "administer/usage#the-usage-page",
+  teamsTree: "administer/usage#teams-on-the-usage-page",
   limits: "administer/usage#limits-for-the-whole-instance",
   settings: "administer/usage-privacy#the-settings",
   onePerson: "administer/usage-privacy#looking-at-one-persons-figures",

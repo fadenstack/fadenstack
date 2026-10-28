@@ -1977,7 +1977,13 @@
     "delete_title": "Eliminar rol",
     "delete_confirm": "¿Está seguro de que desea eliminar el rol \"{{name}}\"?",
     "delete_warning_users": "{{count}} usuario(s) tienen actualmente este rol.",
-    "failed_delete": "Error al eliminar rol."
+    "failed_delete": "Error al eliminar rol.",
+    "builtin_names": {
+      "usage_auditor": "Auditor de uso"
+    },
+    "builtin_hints": {
+      "usage_auditor": "usage_auditor: puede ver las cifras de uso de una persona mientras el informe por persona está activado, indicando un motivo cada vez. Ser superusuario no lo concede."
+    }
   },
   "groups": {
     "title": "Gestión de grupos",
@@ -2003,7 +2009,32 @@
     "delete_warning_members": "{{count}} usuario(s) están actualmente en este grupo.",
     "failed_delete": "Error al eliminar grupo.",
     "kept_by": "Gestionado por {{provider}}",
-    "kept_by_help": "Este proveedor de inicio de sesión da nombre al grupo y gestiona quién forma parte; los miembros que añadió un administrador se mantienen. Asígnele roles y agentes aquí."
+    "kept_by_help": "Este proveedor de inicio de sesión da nombre al grupo y gestiona quién forma parte; los miembros que añadió un administrador se mantienen. Asígnele roles y agentes aquí.",
+    "tree": {
+      "cost_center_chip": "Centro de coste {{code}}",
+      "archived": "Archivado",
+      "archive": "Archivar",
+      "unarchive": "Recuperar",
+      "show_archived_one": "Mostrar {{count}} grupo archivado",
+      "show_archived_other": "Mostrar {{count}} grupos archivados",
+      "parent": "Grupo superior",
+      "parent_help": "El grupo por encima de este. El uso cuenta aquí y en cada grupo superior; los roles no bajan. Como máximo {{max}} niveles.",
+      "top": "Ninguno (un grupo de primer nivel)",
+      "level": "Nivel {{level}}",
+      "too_deep_option": "Demasiado profundo: el árbol tendría más de {{max}} niveles",
+      "cost_center": "Centro de coste",
+      "cost_center_help": "Un código contable para los informes, hasta {{max}} caracteres. Opcional.",
+      "roles_stay": "Los roles se aplican solo a los miembros de este grupo; los grupos inferiores no los reciben.",
+      "archive_title": "¿Archivar {{name}}?",
+      "archive_body": "El grupo conserva su historial: su uso sigue contado donde estaba. No recibe nuevos miembros, no puede ser el grupo de uso de nadie y ya no se ofrece para elegir. Puede recuperarlo.",
+      "delete_sub_teams": "Sus subgrupos pasan a su grupo superior.",
+      "archived_name": "{{name}} (archivado)"
+    },
+    "errors": {
+      "team_cycle": "Un grupo no puede colocarse por debajo de sí mismo ni de uno de sus subgrupos.",
+      "team_too_deep": "El árbol tendría más de seis niveles. Elija un grupo superior más arriba.",
+      "team_archived": "Este grupo está archivado: recupérelo primero o elija otro grupo."
+    }
   },
   "auth_providers": {
     "title": "Proveedores de inicio de sesión",
@@ -4710,7 +4741,6 @@
       "menu": "Mi uso",
       "title": "Mi uso",
       "subtitle": "Lo que ha usado de los modelos de IA y lo que costaría a los precios de esta instancia.",
-      "back_to_chat": "Volver al chat",
       "by_model": "Por modelo",
       "by_agent": "Por agente",
       "by_project": "Por proyecto",
@@ -4733,7 +4763,13 @@
       "privacy_on_retention": "Sus cifras por persona se conservan {{days}} días y después se eliminan.",
       "privacy_views_none": "Hasta ahora nadie ha consultado sus cifras.",
       "privacy_views_one": "Sus cifras se consultaron {{count}} vez; la descarga indica cuándo y por qué.",
-      "privacy_views_other": "Sus cifras se consultaron {{count}} veces; la descarga indica cuándo y por qué."
+      "privacy_views_other": "Sus cifras se consultaron {{count}} veces; la descarga indica cuándo y por qué.",
+      "back": "Volver",
+      "notice_link": "Leer el aviso de privacidad",
+      "unknown_project": "Un proyecto de chat",
+      "cap_limit": "Límite: {{limit}}",
+      "cap_minute_note": "Se cuenta por minuto; aquí no se muestra cuánto se usa en este momento.",
+      "cap_day_hidden": "Lo usado hoy se muestra cuando suficientes otras personas hayan usado la instancia hoy."
     },
     "range_label": "Periodo",
     "range": {
@@ -4806,7 +4842,6 @@
         "provider": "Por proveedor"
       },
       "order_note": "Ordenado por nombre; aquí no se clasifica nada.",
-      "no_label": "Sin asignar",
       "reporting_off": "El informe por persona está desactivado: nadie ve las cifras de una sola persona.",
       "reporting_on_no_right": "El informe por persona está activado. Solo las personas con el rol de auditor de uso ven las cifras de personas concretas.",
       "people": {
@@ -4830,7 +4865,35 @@
         "col_period": "Periodo",
         "export_title": "Descargar los datos de una persona",
         "export_note": "Cada descarga se registra con el motivo que indicó para esta consulta."
-      }
+      },
+      "smaller_teams": "Equipos más pequeños y otros",
+      "smaller_teams_hint": "Subequipos demasiado pequeños para mostrarse solos, y las personas directamente en {{name}}",
+      "unassigned": "Sin asignar",
+      "unassigned_hint": "Personas sin grupo de uso",
+      "no_agent": "Sin agente",
+      "unknown_model": "Modelo desconocido",
+      "unknown_provider": "Proveedor desconocido",
+      "expand": "Mostrar los equipos bajo {{name}}",
+      "collapse": "Ocultar los equipos bajo {{name}}",
+      "expand_all": "Abrir todo",
+      "collapse_all": "Cerrar todo",
+      "structure_label": "Estructura de equipos",
+      "structure": {
+        "recorded": "Tal como se registró",
+        "current": "Estructura actual"
+      },
+      "structure_hint": {
+        "recorded": "El uso cuenta donde estaba el equipo cuando se usó.",
+        "current": "El uso pasado sigue el árbol actual."
+      },
+      "totals_hidden": "Menos de {{k}} personas usaron la instancia en este periodo: los totales no se muestran.",
+      "smaller_teams_top_hint": "Equipos de menos de {{k}} personas cada uno, juntos",
+      "deleted_team": "Un equipo eliminado desde entonces",
+      "unhide": "Mostrar de todos modos",
+      "unhide_title": "Mostrar cifras sobre menos de {{k}} personas",
+      "unhide_intro": "Como auditor de uso puede ver estas cifras indicando un motivo. La consulta se registra con su motivo, como la consulta de las cifras de una persona.",
+      "unhidden_note": "Estas cifras abarcan menos de {{k}} personas. Se le muestran como auditor de uso, y cada consulta se registra con su motivo.",
+      "menu": "Uso de todos los equipos"
     },
     "errors": {
       "load_failed": "No se pudieron cargar las cifras de uso.",
@@ -4882,7 +4945,10 @@
       "statement_title": "Declaración de configuración",
       "statement_intro": "Un documento con los ajustes de privacidad actuales, para adjuntar al acuerdo con el comité de empresa o a la evaluación de impacto relativa a la protección de datos.",
       "statement_language": "Idioma",
-      "statement_download": "Descargar"
+      "statement_download": "Descargar",
+      "privacy_notice_url": "Aviso de privacidad",
+      "privacy_notice_url_help": "La dirección de su aviso de privacidad para empleados (https). Mi uso enlaza a él; vacío: sin enlace.",
+      "privacy_notice_url_error": "Una dirección https, o vacío."
     },
     "statement": {
       "title": "Medición del uso: declaración de configuración",

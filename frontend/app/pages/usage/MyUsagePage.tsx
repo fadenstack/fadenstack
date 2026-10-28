@@ -1,16 +1,18 @@
 /**
- * My usage (/usage): everyone's own use of the models, beside the chat (M03).
+ * My usage (/usage): everyone's own use of the models (M03), on an account page of its own, so it opens
+ * whether or not the chat module is on.
  *
- * Totals, tokens over time, by model, agent and project, the instance's limits
- * and where they stand, and an export of everything kept about the person's
- * usage (M13). The notice at the top says who can see these figures: when
- * person-level reporting is on it names the role, the purpose and how long the
- * figures are kept (M14); when it is off, that nobody sees them alone.
+ * Totals, tokens over time, by model, agent and project, the instance's limits and where they stand, and a
+ * download of everything kept about the person's usage (M13). The notice at the top says who can see these
+ * figures: when person-level reporting is on it names the role, the purpose and how long the figures are
+ * kept (M14); when it is off, that nobody sees them alone; either way it links to the organisation's
+ * privacy notice when one is set.
  *
- * Blocks an extension adds (`sections`, e.g. budgets) are drawn generically:
- * a heading and their fields.
+ * The periods are days of the usage time zone (where the server's days begin), once the server has named
+ * it. Chat projects come without names (they are sealed with the chat's content): the page names them from
+ * the person's own projects. Blocks an extension adds (`sections`, e.g. budgets) are drawn generically.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 
@@ -20,16 +22,18 @@ import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
 import LinearProgress from "@mui/material/LinearProgress";
+import Link from "@mui/material/Link";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DownloadIcon from "@mui/icons-material/Download";
 
-import { usageApi, type MyBucket, type MyPrivacy, type UsageBreakdown, type UsageCap, type UsageSection } from "~/api/usage";
+import { chatApi } from "~/api/chatClient";
+import { usageApi, type MyBucket, type MyPrivacy, type UsageBreakdown, type UsageCap } from "~/api/usage";
 import { UserPageFrame } from "~/components/UserPageFrame";
 import { FULL_ROW, PanelGrid, RangeToggle, WidgetCard, WidgetEmpty } from "~/components/dashboard/kit";
 import { fmtInt } from "~/components/dashboard/format";
-import { MeasuresTable, UsageSeriesChart, UsageTotals } from "~/components/usage/UsageParts";
+import { MeasuresTable, UsageSectionCard, UsageSeriesChart, UsageTotals } from "~/components/usage/UsageParts";
 import { USAGE_HELP, UsageHelpLink } from "~/components/usage/UsageHelpLink";
 import { fmtWhen, lastDays } from "~/components/usage/usageFormat";
 import { useAsyncData } from "~/lib/useAsyncData";
@@ -38,20 +42,40 @@ type RangeKey = "7d" | "30d" | "90d" | "365d";
 const RANGE_DAYS: Record<RangeKey, number> = { "7d": 7, "30d": 30, "90d": 90, "365d": 365 };
 
 export default function MyUsagePage() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [range, setRange] = useState<RangeKey>("30d");
   const [bucket, setBucket] = useState<MyBucket>("day");
+  // Days of the usage time zone, once the server has said which it is.
+  const [zone, setZone] = useState<string | undefined>(undefined);
+  const dates = lastDays(RANGE_DAYS[range], zone);
 
-  const usage = useAsyncData(() => usageApi.me({ ...lastDays(RANGE_DAYS[range]), bucket }), [range, bucket]);
+  const usage = useAsyncData(() => usageApi.me({ ...dates, bucket }), [dates.from, dates.to, bucket]);
   const data = usage.data;
   const loadingFirst = usage.loading && !data;
+  useEffect(() => {
+    if (data?.time_zone) setZone(data.time_zone);
+  }, [data?.time_zone]);
+
+  // The person's own chat projects, to name the project rows; none when the chat is off or unreachable.
+  const projects = useAsyncData(
+    () => chatApi.listProjects().then((list) => new Map(list.map((p) => [p.id, p.name]))).catch(() => new Map<string, string>()),
+    [],
+    { initialValue: new Map<string, string>() },
+  );
+  const byProject = data?.by_project.map((row) => ({
+    ...row,
+    label: row.label ?? (row.key ? (projects.data.get(row.key) ?? t("usage.my.unknown_project")) : null),
+  }));
+
+  // Back where the person came from (the chat, the console); the chat when this page was opened directly.
+  const back = () => (window.history.length > 1 ? navigate(-1) : navigate("/chat"));
 
   return (
     <UserPageFrame>
       <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" gap={1.5} sx={{ mb: 2 }}>
         <Stack direction="row" alignItems="flex-start" spacing={1.5} sx={{ minWidth: 0 }}>
-          <IconButton onClick={() => navigate("/chat")} aria-label={t("usage.my.back_to_chat")}>
+          <IconButton onClick={back} aria-label={t("usage.my.back")}>
             <ArrowBackIcon />
           </IconButton>
           <Box sx={{ minWidth: 0 }}>
@@ -113,10 +137,10 @@ export default function MyUsagePage() {
 
         <Breakdown title={t("usage.my.by_model")} rows={data?.by_model} none={t("usage.my.no_model")} loading={loadingFirst} />
         <Breakdown title={t("usage.my.by_agent")} rows={data?.by_agent} none={t("usage.my.no_agent")} loading={loadingFirst} />
-        <Breakdown title={t("usage.my.by_project")} rows={data?.by_project} none={t("usage.my.no_project")} loading={loadingFirst} />
+        <Breakdown title={t("usage.my.by_project")} rows={byProject} none={t("usage.my.no_project")} loading={loadingFirst} />
 
         {(data?.sections ?? []).map((section, i) => (
-          <SectionCard key={`${section.kind}-${i}`} section={section} lang={i18n.language} />
+          <UsageSectionCard key={`${section.kind}-${i}`} section={section} />
         ))}
 
         <Box sx={FULL_ROW}>
@@ -149,15 +173,20 @@ export default function MyUsagePage() {
 }
 
 /**
- * Who sees the person's figures (M14). On: the role, the purpose, the
- * granularity, how long they are kept, and how often they were viewed.
+ * Who sees the person's figures (M14). On: the role, the purpose, the granularity, how long they are kept,
+ * and how often they were viewed. Either way the organisation's privacy notice, when it set one.
  */
 function PrivacyNotice({ privacy }: { privacy: MyPrivacy }) {
   const { t } = useTranslation();
+  const notice = privacy.notice_url ? (
+    <Link href={privacy.notice_url} target="_blank" rel="noopener noreferrer" data-usage-notice-link>
+      {t("usage.my.notice_link")}
+    </Link>
+  ) : null;
   if (!privacy.person_reporting) {
     return (
       <Alert severity="info" variant="outlined" sx={{ mb: 2 }} data-usage-privacy="off">
-        {t("usage.my.privacy_off")}
+        {t("usage.my.privacy_off")} {notice}
       </Alert>
     );
   }
@@ -174,11 +203,16 @@ function PrivacyNotice({ privacy }: { privacy: MyPrivacy }) {
           ? t("usage.my.privacy_views", { count: privacy.views_of_my_data })
           : t("usage.my.privacy_views_none")}
       </Typography>
+      {notice && <Typography variant="body2">{notice}</Typography>}
     </Alert>
   );
 }
 
-/** The instance's limits and where each stands; they apply to everyone together (M20). */
+/**
+ * The instance's limits and where each stands; they apply to everyone together (M20). How much of a
+ * per-minute limit is used is not known here, and today's tokens show only once enough other people used
+ * the instance today: then just the limit.
+ */
 function Caps({ caps }: { caps: UsageCap[] }) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
@@ -186,25 +220,33 @@ function Caps({ caps }: { caps: UsageCap[] }) {
   return (
     <Stack gap={1.75}>
       {caps.map((cap) => {
-        const share = cap.limit > 0 ? Math.min(cap.used / cap.limit, 1) : 0;
         const resets = fmtWhen(cap.resets_at, lang);
+        const share = cap.used != null && cap.limit > 0 ? Math.min(cap.used / cap.limit, 1) : null;
         return (
-          <Box key={cap.kind}>
+          <Box key={cap.kind} data-usage-cap={cap.kind}>
             <Stack direction="row" justifyContent="space-between" gap={1}>
               <Typography variant="body2" sx={{ fontWeight: 600 }}>
                 {t(`usage.caps.${cap.kind}`)}
               </Typography>
               <Typography variant="body2" sx={{ fontVariantNumeric: "tabular-nums" }}>
-                {t("usage.my.cap_used", { used: fmtInt(cap.used, lang), limit: fmtInt(cap.limit, lang) })}
+                {cap.used != null
+                  ? t("usage.my.cap_used", { used: fmtInt(cap.used, lang), limit: fmtInt(cap.limit, lang) })
+                  : t("usage.my.cap_limit", { limit: fmtInt(cap.limit, lang) })}
               </Typography>
             </Stack>
-            <LinearProgress
-              variant="determinate"
-              value={share * 100}
-              color={share >= 1 ? "error" : share >= 0.8 ? "warning" : "primary"}
-              aria-label={t(`usage.caps.${cap.kind}`)}
-              sx={{ my: 0.75, height: 8, borderRadius: 999 }}
-            />
+            {share != null ? (
+              <LinearProgress
+                variant="determinate"
+                value={share * 100}
+                color={share >= 1 ? "error" : share >= 0.8 ? "warning" : "primary"}
+                aria-label={t(`usage.caps.${cap.kind}`)}
+                sx={{ my: 0.75, height: 8, borderRadius: 999 }}
+              />
+            ) : (
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                {cap.kind === "tokens_per_day" ? t("usage.my.cap_day_hidden") : t("usage.my.cap_minute_note")}
+              </Typography>
+            )}
             {resets && (
               <Typography variant="caption" color="text.secondary">
                 {t("usage.my.cap_resets", { when: resets })}
@@ -245,40 +287,6 @@ function Breakdown({
           labelHeader={t("usage.col_name")}
           rows={rows.map((r, i) => ({ key: r.key ?? `none-${i}`, label: r.label ?? r.key ?? none, measures: r }))}
         />
-      )}
-    </WidgetCard>
-  );
-}
-
-/** A block from an extension: its heading by kind, then its fields as they come. */
-function SectionCard({ section, lang }: { section: UsageSection; lang: string }) {
-  const { t } = useTranslation();
-  const number = new Intl.NumberFormat(lang);
-  const show = (value: unknown): string => {
-    if (value === null || value === undefined) return "–";
-    if (typeof value === "number") return number.format(value);
-    if (typeof value === "boolean") return value ? t("common.yes") : t("common.no");
-    if (typeof value === "string") return value;
-    return JSON.stringify(value);
-  };
-  const fields = Object.entries(section.data ?? {});
-  return (
-    <WidgetCard title={t(`usage.sections.${section.kind}`, { defaultValue: section.kind })}>
-      {fields.length === 0 ? (
-        <WidgetEmpty message={t("usage.no_data")} />
-      ) : (
-        <Box component="dl" sx={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 0.75, m: 0 }}>
-          {fields.map(([key, value]) => (
-            <Box key={key} sx={{ display: "contents" }}>
-              <Typography component="dt" variant="body2" color="text.secondary">
-                {t(`usage.section_fields.${key}`, { defaultValue: key })}
-              </Typography>
-              <Typography component="dd" variant="body2" sx={{ m: 0, textAlign: "right", overflowWrap: "anywhere" }}>
-                {show(value)}
-              </Typography>
-            </Box>
-          ))}
-        </Box>
       )}
     </WidgetCard>
   );

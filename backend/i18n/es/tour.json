@@ -352,7 +352,8 @@
       "action_groups": "Agrupar por grupo de uso, agente, modelo o proveedor; los grupos por debajo del tamaño mínimo cuentan en una fila, \"Menos de ... personas\"",
       "action_small": "Un aviso advierte cuando menos personas que el tamaño mínimo de grupo usan la instancia: sus totales cuentan entonces como datos personales",
       "action_people": "Los auditores de uso, con el informe por persona activado, ven cifras por persona tras indicar un motivo; cada consulta se registra",
-      "action_settings": "Configuración → Uso y privacidad fija el tamaño mínimo de grupo, los plazos de conservación, los límites y el informe por persona"
+      "action_settings": "Configuración → Uso y privacidad fija el tamaño mínimo de grupo, los plazos de conservación, los límites y el informe por persona",
+      "action_tree": "Equipos en árbol: abra un equipo para ver sus subequipos, tal como se registró o en la estructura actual"
     },
     "logs": {
       "title": "Logs y auditoría",
@@ -485,7 +486,8 @@
       "title": "Grupos",
       "description": "Un grupo da roles a sus miembros y agrupa su uso en los informes.",
       "action_create": "Crear un grupo con sus roles",
-      "action_members": "Añadir o quitar miembros"
+      "action_members": "Añadir o quitar miembros",
+      "action_tree": "Colocar un grupo por debajo de otro, darle un centro de coste o archivar uno que terminó"
     },
     "api_tokens": {
       "title": "Tokens de API",

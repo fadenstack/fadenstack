@@ -5,7 +5,10 @@
  * Privacy rules the page shows rather than hides:
  * - Every figure covers at least k people (M04). Groups below k come merged
  *   into one row, labelled as such, and the rule is written above the table;
- *   hours with fewer than k people are gaps in the chart (M10).
+ *   hours with fewer than k people are gaps in the chart (M10); totals of a
+ *   range with fewer than k people are not shown at all.
+ * - By team the groups are the tree (`UsageGroups`), as recorded at the time
+ *   of use or in today's structure.
  * - With fewer than k active people on the instance, a banner says the totals
  *   are as good as person-level data (S12).
  * - Nothing is ranked: groups are listed by name, the merged row last, and no
@@ -13,19 +16,19 @@
  * - Per-person figures only for a usage auditor with person-level reporting on,
  *   after a stated reason (M02, M06, M07): see `PeopleView`.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import Alert from "@mui/material/Alert";
 import AlertTitle from "@mui/material/AlertTitle";
 import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
-import Stack from "@mui/material/Stack";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import RefreshIcon from "@mui/icons-material/Refresh";
 
-import { usageApi, type AdminBucket, type AdminUsage, type AdminUsageGroup, type GroupBy } from "~/api/usage";
+import { isHidden, usageApi, type AdminBucket, type GroupBy, type TeamStructure } from "~/api/usage";
 import {
   FULL_ROW,
   PageHeader,
@@ -36,14 +39,19 @@ import {
   WidgetEmpty,
 } from "~/components/dashboard/kit";
 import { fmtInt } from "~/components/dashboard/format";
-import { byLabel, MeasuresTable, UsageSeriesChart, UsageTotals, type MeasuresRow } from "~/components/usage/UsageParts";
-import { lastDays } from "~/components/usage/usageFormat";
+import { USAGE_HELP, UsageHelpLink } from "~/components/usage/UsageHelpLink";
+import { UsageSectionCard, UsageSeriesChart, UsageTotals } from "~/components/usage/UsageParts";
+import { lastDays, usageErrorText } from "~/components/usage/usageFormat";
 import { useAsyncData } from "~/lib/useAsyncData";
 
 import PeopleView from "./PeopleView";
+import UnhideDialog from "./UnhideDialog";
+import UsageGroups from "./UsageGroups";
 
 type RangeKey = "7d" | "30d" | "90d" | "365d";
 const RANGE_DAYS: Record<RangeKey, number> = { "7d": 7, "30d": 30, "90d": 90, "365d": 365 };
+/** The longest range the server gives by hour. */
+const MAX_HOUR_DAYS = 31;
 const BUCKETS: AdminBucket[] = ["hour", "day", "month"];
 const GROUP_BYS: GroupBy[] = ["team", "agent", "model", "provider"];
 
@@ -52,15 +60,54 @@ export default function UsagePage() {
   const [range, setRange] = useState<RangeKey>("30d");
   const [bucket, setBucket] = useState<AdminBucket>("day");
   const [groupBy, setGroupBy] = useState<GroupBy>("team");
-  const dates = lastDays(RANGE_DAYS[range]);
+  const [structure, setStructure] = useState<TeamStructure>("recorded");
+  // Days of the usage time zone, once the server has said which it is.
+  const [zone, setZone] = useState<string | undefined>(undefined);
+  const dates = lastDays(RANGE_DAYS[range], zone);
+
+  // A usage auditor's reason to see figures about fewer than k people anyway; sent with every load while
+  // set (each is recorded), dropped when the server refuses it.
+  const [unhideReason, setUnhideReason] = useState<string | null>(null);
+  const [unhideOpen, setUnhideOpen] = useState(false);
+  // A refusal of that reason stays on screen; the page reloads without the reason meanwhile.
+  const [unhideError, setUnhideError] = useState<string | null>(null);
 
   const usage = useAsyncData(
-    () => usageApi.admin({ ...dates, bucket, group_by: groupBy }),
-    [dates.from, dates.to, bucket, groupBy],
+    () =>
+      usageApi
+        .admin({
+          ...dates,
+          bucket,
+          group_by: groupBy,
+          ...(groupBy === "team" ? { structure } : {}),
+          ...(unhideReason ? { reason: unhideReason } : {}),
+        })
+        .catch((err: unknown) => {
+          const words = usageErrorText(err, (key) => t(key));
+          if (unhideReason) {
+            setUnhideError(words);
+            setUnhideReason(null);
+          }
+          throw new Error(words);
+        }),
+    [dates.from, dates.to, bucket, groupBy, structure, unhideReason],
   );
   const data = usage.data;
   const loadingFirst = usage.loading && !data;
   const k = data?.min_group_size ?? 5;
+  useEffect(() => {
+    if (data?.time_zone) setZone(data.time_zone);
+  }, [data?.time_zone]);
+
+  // Hours only over a month at most (the server keeps hours for a range of up to 31 days).
+  const pickRange = (next: RangeKey) => {
+    setRange(next);
+    if (bucket === "hour" && RANGE_DAYS[next] > MAX_HOUR_DAYS) setBucket("day");
+  };
+  const pickBucket = (next: AdminBucket) => {
+    setBucket(next);
+    if (next === "hour" && RANGE_DAYS[range] > MAX_HOUR_DAYS) setRange("7d");
+  };
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2, pb: 2 }}>
@@ -72,13 +119,13 @@ export default function UsagePage() {
             <RangeToggle
               value={range}
               options={(Object.keys(RANGE_DAYS) as RangeKey[]).map((r) => ({ value: r, label: t(`usage.range.${r}`) }))}
-              onChange={setRange}
+              onChange={pickRange}
               ariaLabel={t("usage.range_label")}
             />
             <RangeToggle
               value={bucket}
               options={BUCKETS.map((b) => ({ value: b, label: t(`usage.bucket.${b}`) }))}
-              onChange={setBucket}
+              onChange={pickBucket}
               ariaLabel={t("usage.bucket_label")}
             />
             <Tooltip title={t("common.refresh")}>
@@ -97,11 +144,44 @@ export default function UsagePage() {
       )}
 
       {data?.small_instance && (
-        <Alert severity="warning" data-usage-small-instance>
+        <Alert
+          severity="warning"
+          data-usage-small-instance
+          action={
+            data.can_view_people && isHidden(data.totals) && !data.unhidden ? (
+              <Button color="inherit" size="small" onClick={() => setUnhideOpen(true)}>
+                {t("usage.admin.unhide")}
+              </Button>
+            ) : undefined
+          }
+        >
           <AlertTitle>{t("usage.admin.small_instance_title")}</AlertTitle>
           {t("usage.admin.small_instance", { k })}
         </Alert>
       )}
+
+      {data?.unhidden && (
+        <Alert severity="info" data-usage-unhidden>
+          {t("usage.admin.unhidden_note", { k })}
+        </Alert>
+      )}
+
+      {unhideError && (
+        <Alert severity="error" onClose={() => setUnhideError(null)} data-usage-unhide-error>
+          {unhideError}
+        </Alert>
+      )}
+
+      <UnhideDialog
+        open={unhideOpen}
+        k={k}
+        onClose={() => setUnhideOpen(false)}
+        onReason={(reason) => {
+          setUnhideOpen(false);
+          setUnhideError(null);
+          setUnhideReason(reason);
+        }}
+      />
 
       {data && (
         <Alert severity="info" variant="outlined" data-usage-k-rule>
@@ -119,6 +199,7 @@ export default function UsagePage() {
             {data && (
               <UsageTotals
                 totals={data.totals}
+                hiddenHint={t("usage.admin.totals_hidden", { k })}
                 before={
                   <StatTile
                     label={t("usage.measures.people")}
@@ -150,21 +231,44 @@ export default function UsagePage() {
         <Box sx={FULL_ROW}>
           <WidgetCard
             title={t(`usage.admin.group_title.${groupBy}`)}
-            subtitle={t("usage.admin.order_note")}
+            subtitle={
+              groupBy === "team"
+                ? `${t("usage.admin.order_note")} ${t(`usage.admin.structure_hint.${structure}`)}`
+                : t("usage.admin.order_note")
+            }
             actions={
-              <RangeToggle
-                value={groupBy}
-                options={GROUP_BYS.map((g) => ({ value: g, label: t(`usage.admin.group_by.${g}`) }))}
-                onChange={setGroupBy}
-                ariaLabel={t("usage.admin.group_by_label")}
-              />
+              <>
+                {groupBy === "team" && <UsageHelpLink doc={USAGE_HELP.teamsTree} />}
+                {groupBy === "team" && (
+                  <RangeToggle
+                    value={structure}
+                    options={(["recorded", "current"] as TeamStructure[]).map((s) => ({
+                      value: s,
+                      label: t(`usage.admin.structure.${s}`),
+                    }))}
+                    onChange={setStructure}
+                    ariaLabel={t("usage.admin.structure_label")}
+                  />
+                )}
+                <RangeToggle
+                  value={groupBy}
+                  options={GROUP_BYS.map((g) => ({ value: g, label: t(`usage.admin.group_by.${g}`) }))}
+                  onChange={setGroupBy}
+                  ariaLabel={t("usage.admin.group_by_label")}
+                />
+              </>
             }
             status={{ loading: loadingFirst, hasData: Boolean(data) }}
             empty={data && data.groups.length === 0 ? <WidgetEmpty message={t("usage.no_data")} /> : undefined}
           >
-            {data && <Groups data={data} />}
+            {/* Keyed by grouping and structure: a new tree starts closed. */}
+            {data && <UsageGroups key={`${data.group_by}-${structure}`} data={data} />}
           </WidgetCard>
         </Box>
+
+        {(data?.sections ?? []).map((section, i) => (
+          <UsageSectionCard key={`${section.kind}-${i}`} section={section} />
+        ))}
 
         {data && (
           <Box sx={FULL_ROW}>
@@ -179,52 +283,5 @@ export default function UsagePage() {
         )}
       </PanelGrid>
     </Box>
-  );
-}
-
-/**
- * The groups by name, the merged row of groups under k last. A group the
- * server marks suppressed shows no figures.
- */
-function Groups({ data }: { data: AdminUsage }) {
-  const { t, i18n } = useTranslation();
-  const lang = i18n.language;
-  const k = data.min_group_size;
-  const named = data.groups.filter((g) => !g.other);
-  const merged = data.groups.filter((g) => g.other);
-  const nameOf = (g: AdminUsageGroup) => g.label ?? g.key ?? t("usage.admin.no_label");
-
-  const rows: MeasuresRow[] = [
-    ...byLabel(named, nameOf, lang).map((g, i) => ({
-      key: g.key ?? `none-${i}`,
-      label: nameOf(g),
-      lead: [g.people == null ? t("usage.admin.people_below_k", { k }) : fmtInt(g.people, lang)],
-      measures: g.suppressed ? null : g,
-      hidden: t("usage.admin.suppressed", { k }),
-    })),
-    ...merged.map((g, i) => ({
-      key: `other-${i}`,
-      label: (
-        <Stack component="span">
-          <Typography component="span" variant="body2" sx={{ fontWeight: 600 }}>
-            {t("usage.admin.other_row", { k })}
-          </Typography>
-          <Typography component="span" variant="caption" color="text.secondary">
-            {t("usage.admin.other_row_hint", { k })}
-          </Typography>
-        </Stack>
-      ),
-      lead: [g.people == null ? t("usage.admin.other_people", { k }) : fmtInt(g.people, lang)],
-      measures: g,
-    })),
-  ];
-
-  return (
-    <MeasuresTable
-      ariaLabel={t(`usage.admin.group_title.${data.group_by}`)}
-      labelHeader={t(`usage.admin.group_by.${data.group_by}`)}
-      leadHeaders={[t("usage.measures.people")]}
-      rows={rows}
-    />
   );
 }

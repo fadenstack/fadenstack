@@ -62,6 +62,8 @@ export default function ChatPage() {
   const agentsAllowed = agentRights(can).open;
   const skillsModule = useSkillsModule();
   const checkAllowed = useContentCheck(can("provenance:check")).state === "on";
+  // The console's Usage page, for someone with `usage:read` who has no admin button (not a superuser).
+  const teamUsageAllowed = !user.is_superuser && can("usage:read");
   const navigate = useNavigate();
   const { t, i18n } = useTranslation("chat");
   const theme = useTheme();
@@ -316,6 +318,7 @@ export default function ChatPage() {
       onAgents: agentsAllowed ? () => navigate("/agents") : undefined,
       onCheckContent: checkAllowed ? () => navigate("/check-content") : undefined,
       onUsage: () => navigate("/usage"),
+      onTeamUsage: teamUsageAllowed ? () => navigate("/admin/usage") : undefined,
       phoneNav: isPhone
         ? { hand: navHand, open: sidebarOpen, onOpen: () => setSidebarOpen(true) }
         : null,
@@ -330,6 +333,7 @@ export default function ChatPage() {
       agentsAllowed,
       checkAllowed,
       navigate,
+      teamUsageAllowed,
     ],
   );
 
