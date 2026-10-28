@@ -632,11 +632,9 @@ export function adminPageTitle(
     const tab = new URLSearchParams(search).get("tab");
     return tab === "audit" ? t("logs.tab_audit") : t("logs.tab_logs");
   }
-  if (
-    pathname.startsWith("/admin/settings") ||
-    pathname.startsWith("/admin/users")
-  ) {
-    return t("settings.title");
+  if (pathname.startsWith("/admin/settings")) {
+    const tab = new URLSearchParams(search).get("tab");
+    return tab === "usage" ? t("usage.settings.tab") : t("settings.title");
   }
   return t("app.title");
 }

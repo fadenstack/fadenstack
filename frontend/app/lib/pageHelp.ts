@@ -363,7 +363,7 @@ const PAGES: PageHelpDef[] = [
   {
     prefix: "/admin/settings",
     id: "settings",
-    actions: ["general", "modules", "appearance"],
+    actions: ["general", "modules", "usage", "appearance"],
     doc: "administer/index",
   },
   {
