@@ -14,7 +14,10 @@ relay accepts. Mail needs Fadenstack Enterprise.
 - You know the mail server: its name, its port (587 for STARTTLS, 465 for TLS from the start), and an account
   that may send as the sender address. For Microsoft 365 you need an app instead of an account (below).
 - This server can reach the mail server on that port. Ask your network team to allow it through firewalls.
-- A new password or client secret needs **root mode**: switch it on in the top bar before you save.
+- For Microsoft 365, the mail service must also reach `https://login.microsoftonline.com` (port 443), directly or
+  through your proxy: it gets its sign-in token there.
+- A new password or client secret, and a change to the trusted certificates, need **root mode**: switch it on in
+  the top bar before you save.
 
 ## Set up mail
 
@@ -42,8 +45,9 @@ mail; nothing restarts.
     - Mail never goes out unencrypted. Fadenstack uses TLS 1.2 or newer and checks the mail server's
       certificate: its name and that a trusted CA issued it. There is no setting to switch this off.
     - **Trusted certificates** takes one or more certificates in PEM format, each from
-      `-----BEGIN CERTIFICATE-----` to `-----END CERTIFICATE-----`. After saving, the page lists each one with its
-      expiry date.
+      `-----BEGIN CERTIFICATE-----` to `-----END CERTIFICATE-----`, and nothing else: never a private key. After
+      saving, the page lists each one with its expiry date. They decide which servers Fadenstack trusts, so
+      changing them needs root mode, as a secret does.
     - A CA must be allowed to sign certificates (key usage, as RFC 5280 requires). The page says so under a CA
       that is not: paste the mail server's own certificate instead, or have the CA reissued.
     - A relay with a self-signed certificate (as Exchange Server has by default): paste that certificate.
@@ -87,10 +91,16 @@ e.g. `noreply@example.com`.
     Set-CASMailbox -Identity noreply@example.com -SmtpClientAuthenticationDisabled $false
     ```
 
-    The last line switches on SMTP for that mailbox, which tenants have off by default.
+    The last line switches SMTP AUTH on for that mailbox. Microsoft recommends keeping it off for the
+    organisation (`Set-TransportConfig -SmtpClientAuthenticationDisabled $true`) and on only for the mailboxes
+    that need it: the mailbox's setting wins over the organisation's. With **security defaults** switched on in
+    Microsoft Entra ID, SMTP AUTH is off in Exchange Online whatever these settings say: it works only once
+    security defaults are switched off.
 
-5. In the console, choose **Sign in with** **Microsoft 365**. The server becomes `smtp.office365.com`, port 587,
-   STARTTLS. Enter the **Mailbox**, the **Tenant**, the **Application (client) ID** and the **Client secret**.
+5. In the console, choose **Sign in with** **Microsoft 365**. The page sets the **Server** to
+   `smtp.office365.com`, port 587, STARTTLS, and says so when it replaces another server: Microsoft 365 takes mail
+   from applications only there, and Fadenstack sends the sign-in to no other server. Enter the **Mailbox**, the
+   **Tenant**, the **Application (client) ID** and the **Client secret**.
 6. Enter the mailbox as the **Sender address**. To send as another address, give the app **Send As** on it
    (`Add-RecipientPermission`).
 7. Send a test mail, then save.
@@ -113,31 +123,46 @@ Fadenstack. If mail lands in spam folders, check those records for the mail serv
 
 **Mail state** at the top says whether mail goes out, and if not, why: the mail module is off, no server is set,
 or the console address is missing. It shows how many mails wait, when the last one went out, and the last
-failure: which mail, the reason in words, the mail server's own reply, how often it was tried, and whether it is
-tried again. Mails are tried again for a while and are deleted, unsent, once they are of no use any more (a
-reset link that expired).
+failure: which mail, the reason in words, the mail server's reply or other details, how often it was tried, and
+whether it is tried again. Mails are tried again for a while and are deleted, unsent, once they are of no use any
+more (a reset link that expired). A mail the mail server refused for good (the sign-in, the sender, the recipient
+or the message) is not tried again.
 
 When mail fails, every console page shows a notice until a mail goes out again.
 
 ## When it does not work
 
-The test mail and the mail state say what went wrong, and show the mail server's own reply below.
+The test mail and the mail state say what went wrong. Below that they show the mail server's own reply, labelled
+as its words, or other details, such as the network's error.
 
 | You see | What to do |
 |---|---|
+| The mail settings are incomplete | The details below name what is missing or cannot be used: no server, a Microsoft 365 field, a trusted certificate text that is not PEM, or characters in the user name or password that an SMTP sign-in cannot send (only ASCII). |
 | The mail server's certificate is not trusted | Paste your organisation's CA under **Trusted certificates**. |
 | The mail service refuses this CA | Paste the mail server's own certificate instead, or have the CA reissued with key usage. |
+| The mail server's certificate has expired | It must be renewed on the mail server. Fadenstack sends no mail to a server whose certificate has expired. |
 | The mail server's certificate is for another name | Enter the server under the name its certificate is issued to. |
 | The mail server did not answer in time | Check the port: STARTTLS on 587, TLS from the start on 465. Check that no firewall drops the connection. |
-| The encrypted connection failed | The encryption does not match the port: STARTTLS on 587, TLS from the start on 465. |
+| The encrypted connection failed | The encryption does not match the port: STARTTLS on 587, TLS from the start on 465. Or the mail server offers only TLS older than 1.2, which Fadenstack refuses (old Exchange receive connectors and appliances): have it updated. |
 | The mail server offers no encryption on this port | Use TLS from the start on 465, or ask for STARTTLS on 587. Fadenstack never sends unencrypted. |
 | No connection to the mail server | Check the server and the port, and that firewalls let this server through. |
 | The server's name cannot be found | Check the spelling, and that this server's DNS knows the name. |
-| The mail server refused the sign-in | Check the user name and the password. For Microsoft 365: the app's permission, consent and mailbox permission (steps 3 and 4). |
-| Microsoft 365 issued no token | Check the tenant, the application ID and the client secret (its value, not its ID). Entra's reason is shown below. |
+| The mail server offers no sign-in of this kind on this port | Check the port: mail servers offer sign-ins on 587 and 465. For Microsoft 365, the server must be `smtp.office365.com`. Or choose another sign-in. |
+| The mail server refused the sign-in | Check the user name and the password. For Microsoft 365: the app's permission, consent and mailbox permission (steps 3 and 4). A reply with `5.7.139` means Microsoft 365 does not allow SMTP AUTH: for the organisation, for the mailbox, or because of security defaults (step 4). Fadenstack does not try a refused sign-in again by itself. |
+| Microsoft 365 issued no token | Check the tenant, the application ID and the client secret (its value, not its ID), and the admin consent. When Entra ID cannot be reached, let the mail service reach `https://login.microsoftonline.com` on port 443, directly or through your proxy. Entra's reason is shown below. |
 | The mail server refused the sender address | The account must be allowed to send as the sender address: use its own address, or give it the right. |
 | The mail server does not pass on mail for this server | Sign in, or have the relay accept this server's address. |
 | The mail server requires a sign-in | Choose a sign-in and enter the account. |
+| The mail server refused the recipient | Check the address. The mail server's reply below says why it refused it. |
+| The mail server refused the message itself, e.g. as too large or as spam | The mail server's reply below says why. Mail taken for spam: check your domain's records for this mail server (above). |
+| The mail server answered with an error | The mail server's reply below says why. A temporary error (a reply that starts with 4) is tried again by itself. |
 | The mail server refused this server's greeting | Enter a **Greeting name** that is a full DNS name, e.g. `ai.example.internal`. |
 | The stored password or secret was saved for another server | Enter it again for this server and save. |
 | The mail service cannot be reached | Start the mail module under **Settings → Modules**. |
+
+Under a field, the page may say:
+
+| You see | What to do |
+|---|---|
+| With Microsoft 365 the server must be smtp.office365.com | Enter `smtp.office365.com` as the **Server**, or choose **Microsoft 365** again under **Sign in with**: the page sets it. |
+| Only certificates | Remove every block from **Trusted certificates** that is no certificate, such as a private key (`-----BEGIN PRIVATE KEY-----`). |
