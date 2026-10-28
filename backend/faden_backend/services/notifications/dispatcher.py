@@ -55,7 +55,9 @@ class NotificationDispatcher:
     (``SELECT ... FOR UPDATE SKIP LOCKED``, then status ``sending`` with a lease in ``next_attempt_at``), so
     only one worker sends it; a worker that stops while sending leaves the message to be claimed again once
     the lease is over. Failures are retried with exponential back-off up to ``_MAX_ATTEMPTS``, never past
-    the message's expiry; a failure the sender marks ``permanent`` is final at once.
+    the message's expiry; a failure the sender marks ``permanent`` is final at once. Every attempt hands the
+    sender the message's key, its id, the same on each attempt, so a sender can send a message once even when
+    an attempt is repeated.
     """
 
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
@@ -163,7 +165,7 @@ class NotificationDispatcher:
             await self._finish(claim, status=PENDING, attempt_count=claim.attempt - 1, next_attempt_at=now)
             return
         try:
-            await sender.send(claim.kind, claim.payload)
+            await sender.send(claim.kind, claim.payload, key=str(claim.id))
         except Exception as exc:
             log.warning("Delivery failed for %s (%s): %s", claim.id, claim.kind, exc)
             now = datetime.now(tz=UTC)

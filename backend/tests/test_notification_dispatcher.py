@@ -3,6 +3,7 @@
 Every backend worker runs a dispatcher. A message is claimed before it is sent, so two workers polling at the
 same moment send it once; a worker that stopped while sending gives the message back when its lease is over,
 and one past its lease writes nothing. A sender may say a failure is permanent: the message fails at once.
+Every attempt of a message gives the sender the same key, the row's id.
 """
 
 from __future__ import annotations
@@ -44,10 +45,10 @@ class _Session:
 class _SlowSender(RecordingMailSender):
     """Takes a while per mail, as a mail server does: another worker polls meanwhile."""
 
-    async def send(self, kind: str, payload: dict[str, Any]) -> None:
+    async def send(self, kind: str, payload: dict[str, Any], *, key: str) -> None:
         """Keeps the message, after a pause."""
         await asyncio.sleep(0.05)
-        await super().send(kind, payload)
+        await super().send(kind, payload, key=key)
 
 
 class _RefusedError(Exception):
@@ -65,9 +66,24 @@ class _FailingSender(RecordingMailSender):
         super().__init__()
         self.error = error
 
-    async def send(self, kind: str, payload: dict[str, Any]) -> None:
+    async def send(self, kind: str, payload: dict[str, Any], *, key: str) -> None:
         """Fails."""
         raise self.error
+
+
+class _FailsOnceSender(RecordingMailSender):
+    """Fails each mail's first attempt, as a mail server that does not answer in time; keeps every key tried."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.tried: list[tuple[str, str]] = []
+
+    async def send(self, kind: str, payload: dict[str, Any], *, key: str) -> None:
+        """Fails the first attempt of a mail; keeps the next."""
+        self.tried.append((payload["to_email"], key))
+        if sum(1 for to, _ in self.tried if to == payload["to_email"]) == 1:
+            raise RuntimeError("no answer")
+        await super().send(kind, payload, key=key)
 
 
 def _mail(to: str, **values: Any) -> NotificationOutbox:
@@ -209,3 +225,32 @@ async def test_after_the_last_attempt_it_gives_up(
 
     await dbsession.refresh(row)
     assert (row.status, row.attempt_count) == ("failed", 5)
+
+
+async def test_every_attempt_of_a_mail_has_its_key_the_row_id(
+    dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sender = _FailsOnceSender()
+    monkeypatch.setattr(registry, "mail_sender", sender)
+    to = f"key-{uuid.uuid4().hex[:6]}@dispatch.example.com"
+    row = _mail(to)
+    dbsession.add(row)
+    await dbsession.flush()
+    monkeypatch.setattr(dbsession, "commit", dbsession.flush)
+    dispatcher = NotificationDispatcher(_Session(dbsession))  # type: ignore[arg-type]
+
+    await dispatcher._poll_once()  # noqa: SLF001
+    await dbsession.refresh(row)
+    assert (row.status, row.attempt_count) == ("pending", 1)
+    # Its pause is over: the next poll tries it again.
+    await dbsession.execute(
+        update(NotificationOutbox).where(NotificationOutbox.id == row.id)
+        .values(next_attempt_at=datetime.now(UTC) - timedelta(seconds=1)),
+    )
+    await dispatcher._poll_once()  # noqa: SLF001
+
+    await dbsession.refresh(row)
+    assert (row.status, row.attempt_count) == ("sent", 2)
+    assert [key for mail, key in sender.tried if mail == to] == [str(row.id), str(row.id)], (
+        "the outbox row's id, the same on the second attempt"
+    )
