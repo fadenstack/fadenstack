@@ -31,6 +31,7 @@ import { errorText } from "~/api/http";
 import { REASON_MAX, REASON_MIN, reasonOk, usageApi, type PeopleUsage } from "~/api/usage";
 import { WidgetCard, WidgetEmpty } from "~/components/dashboard/kit";
 import { MeasuresTable } from "~/components/usage/UsageParts";
+import { USAGE_HELP, UsageHelpLink } from "~/components/usage/UsageHelpLink";
 import { periodLabel, usageErrorText } from "~/components/usage/usageFormat";
 
 type Scope = "person" | "team";
@@ -45,9 +46,12 @@ export default function PeopleView({ from, to }: { from: string; to: string }) {
       title={t("usage.admin.people.title")}
       subtitle={t("usage.admin.people.intro")}
       actions={
-        <Button variant="outlined" size="small" onClick={() => setOpen(true)}>
-          {t("usage.admin.people.open")}
-        </Button>
+        <>
+          <UsageHelpLink doc={USAGE_HELP.onePerson} />
+          <Button variant="outlined" size="small" onClick={() => setOpen(true)}>
+            {t("usage.admin.people.open")}
+          </Button>
+        </>
       }
     >
       {result ? (
@@ -69,7 +73,8 @@ export default function PeopleView({ from, to }: { from: string; to: string }) {
                     <Typography component="span" variant="body2" sx={{ fontWeight: 600 }}>
                       {row.person.name || row.person.email}
                     </Typography>
-                    {row.person.name && (
+                    {/* Core keeps no names: the name is often the address itself. */}
+                    {row.person.name && row.person.name !== row.person.email && (
                       <Typography component="span" variant="caption" color="text.secondary">
                         {row.person.email}
                       </Typography>

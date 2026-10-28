@@ -82,7 +82,7 @@ describe("Usage (administrators)", () => {
     expect(within(totals).getByText("21")).toBeInTheDocument();
 
     const table = screen.getByRole("table", { name: "By usage group" });
-    expect(within(table).getByText("Groups of fewer than 5 people")).toBeInTheDocument();
+    expect(within(table).getByText("Fewer than 5 people")).toBeInTheDocument();
     expect(within(table).getByText("5 or more")).toBeInTheDocument();
     expect(container.querySelector("[data-usage-small-instance]")).toBeNull();
   });
@@ -101,7 +101,7 @@ describe("Usage (administrators)", () => {
     view();
     await screen.findByRole("table", { name: "By usage group" });
 
-    expect(groupOrder()).toEqual(["Alpha", "Zeta", expect.stringContaining("Groups of fewer than 5 people")]);
+    expect(groupOrder()).toEqual(["Alpha", "Zeta", expect.stringContaining("Fewer than 5 people")]);
     const table = screen.getByRole("table", { name: "By usage group" });
     expect(within(table).queryAllByRole("button")).toHaveLength(0);
     expect(screen.getByText("Listed by name; nothing here is ranked.")).toBeInTheDocument();
@@ -188,6 +188,7 @@ describe("per-person figures for a usage auditor", () => {
       rows: [
         { person: { id: "u-1", name: "Pat Example", email: "pat@example.com" }, period: "2026-10-27", ...measures() },
         { person: { id: "u-2", name: null, email: "sam@example.com" }, period: "2026-10-27", ...measures() },
+        { person: { id: "u-3", name: "kim@example.com", email: "kim@example.com" }, period: "2026-10-27", ...measures() },
       ],
     });
     await userEvent.type(within(dialog).getByRole("textbox", { name: "Reason" }), " dispute in Sales");
@@ -205,6 +206,7 @@ describe("per-person figures for a usage auditor", () => {
     const table = await screen.findByRole("table", { name: "Figures per person" });
     expect(within(table).getByText("Pat Example")).toBeInTheDocument();
     expect(within(table).getByText("sam@example.com")).toBeInTheDocument();
+    expect(within(table).getAllByText("kim@example.com")).toHaveLength(1); // a name that is the address, once
     expect(within(table).queryAllByRole("button")).toHaveLength(0);
   });
 

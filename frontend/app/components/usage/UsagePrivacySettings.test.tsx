@@ -133,7 +133,7 @@ describe("usage privacy settings", () => {
     view();
     const section = await privacy();
 
-    const zone = within(section).getByRole("textbox", { name: "Time zone of days" });
+    const zone = within(section).getByRole("textbox", { name: "Time zone" });
     await userEvent.clear(zone);
     await userEvent.type(zone, "Europe/Paris");
     await userEvent.click(within(section).getByRole("button", { name: "Save" }));
@@ -145,7 +145,7 @@ describe("usage privacy settings", () => {
     view();
     const section = await privacy();
 
-    const zone = within(section).getByRole("textbox", { name: "Time zone of days" });
+    const zone = within(section).getByRole("textbox", { name: "Time zone" });
     await userEvent.clear(zone);
     await userEvent.type(zone, "Mars/Olympus");
 
@@ -159,7 +159,7 @@ describe("instance limits", () => {
     usage.updateLimits.mockResolvedValue(usageLimits({ rpm_limit: 600 }));
     const { container } = view();
     const section = (await screen.findByText("Limits of the instance")).closest(".MuiPaper-root") as HTMLElement;
-    const save = within(section).getByRole("button", { name: "Save limits" });
+    const save = within(section).getByRole("button", { name: "Save" });
 
     await userEvent.type(limitField(container, "rpm_limit"), "0");
     expect(within(section).getByText("A whole number above 0, or empty.")).toBeInTheDocument();
@@ -175,11 +175,26 @@ describe("instance limits", () => {
   });
 });
 
+describe("links to Help", () => {
+  it("links each section to the Help section that explains it", async () => {
+    usage.settings.mockResolvedValue(usageSettings());
+    view();
+    await privacy();
+
+    const hrefs = screen.getAllByRole("link", { name: "Help" }).map((a) => a.getAttribute("href"));
+    expect(hrefs).toEqual([
+      "/help/administer/usage-privacy/#the-settings",
+      "/help/administer/usage/#limits-for-the-whole-instance",
+      "/help/administer/usage-documents/",
+    ]);
+  });
+});
+
 describe("configuration statement", () => {
   it("downloads the statement in the chosen language", async () => {
     view();
 
-    const link = await screen.findByRole("link", { name: "Download statement" });
+    const link = await screen.findByRole("link", { name: "Download" });
     expect(link).toHaveAttribute("href", "/api/admin/usage/statement?language=en");
 
     await userEvent.click(screen.getByRole("combobox", { name: "Language" }));

@@ -347,12 +347,12 @@
     },
     "usage": {
       "title": "Usage",
-      "description": "What the instance used of the models, by usage group, agent, model and provider. Every figure covers at least k people; nothing names or ranks a single person.",
+      "description": "What the instance used of the models, by usage group, agent, model and provider. Every figure covers at least the minimum group size of people; nothing names or ranks a single person.",
       "action_totals": "Requests, tokens and estimated cost over 7 days to 12 months, per hour, day or month",
-      "action_groups": "Group by usage group, agent, model or provider; groups of fewer than k people are merged into one row",
-      "action_small": "A banner warns when fewer than k people use the instance: its totals then count as person-level data",
+      "action_groups": "Group by usage group, agent, model or provider; groups below the minimum group size are counted in one row, \"Fewer than ... people\"",
+      "action_small": "A banner warns when fewer people than the minimum group size use the instance: its totals then count as person-level data",
       "action_people": "Usage auditors, with person-level reporting on, see figures per person after giving a reason; each view is recorded",
-      "action_settings": "Settings > Usage and privacy sets k, the retention periods, the limits and person-level reporting"
+      "action_settings": "Settings → Usage and privacy sets the minimum group size, the retention periods, the limits and person-level reporting"
     },
     "logs": {
       "title": "Logs & Audit",

@@ -347,12 +347,12 @@
     },
     "usage": {
       "title": "Utilisation",
-      "description": "Ce que l'instance a utilisé des modèles, par groupe d'usage, agent, modèle et fournisseur. Chaque chiffre couvre au moins k personnes ; rien ne nomme ni ne classe une seule personne.",
+      "description": "Ce que l'instance a utilisé des modèles, par groupe d'usage, agent, modèle et fournisseur. Chaque chiffre couvre au moins la taille minimale de groupe ; rien ne nomme ni ne classe une seule personne.",
       "action_totals": "Requêtes, tokens et coût estimé sur 7 jours à 12 mois, par heure, jour ou mois",
-      "action_groups": "Grouper par groupe d'usage, agent, modèle ou fournisseur ; les groupes de moins de k personnes sont réunis en une ligne",
-      "action_small": "Un bandeau avertit quand moins de k personnes utilisent l'instance : ses totaux comptent alors comme des données personnelles",
+      "action_groups": "Grouper par groupe d'usage, agent, modèle ou fournisseur ; les groupes sous la taille minimale comptent dans une ligne, « Moins de ... personnes »",
+      "action_small": "Un bandeau avertit quand moins de personnes que la taille minimale de groupe utilisent l'instance : ses totaux comptent alors comme des données personnelles",
       "action_people": "Les auditeurs d'utilisation, avec le suivi par personne activé, voient les chiffres par personne après avoir indiqué un motif ; chaque consultation est enregistrée",
-      "action_settings": "Paramètres > Utilisation et confidentialité fixe k, les durées de conservation, les limites et le suivi par personne"
+      "action_settings": "Paramètres → Utilisation et confidentialité fixe la taille minimale de groupe, les durées de conservation, les limites et le suivi par personne"
     },
     "logs": {
       "title": "Journaux et audit",

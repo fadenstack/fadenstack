@@ -64,6 +64,7 @@ describe("My usage", () => {
     expect(screen.getByRole("link", { name: "Download as JSON" })).toHaveAttribute("href", "/api/usage/me/export?format=json");
     expect(screen.getByRole("link", { name: "Download as CSV" })).toHaveAttribute("href", "/api/usage/me/export?format=csv");
     expect(screen.getByRole("img", { name: "Tokens over time" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Help" })).toHaveAttribute("href", "/help/administer/usage/#your-own-usage");
   });
 
   it("says that nobody sees the figures alone while person-level reporting is off", async () => {

@@ -30,6 +30,7 @@ import { UserPageFrame } from "~/components/UserPageFrame";
 import { FULL_ROW, PanelGrid, RangeToggle, WidgetCard, WidgetEmpty } from "~/components/dashboard/kit";
 import { fmtInt } from "~/components/dashboard/format";
 import { MeasuresTable, UsageSeriesChart, UsageTotals } from "~/components/usage/UsageParts";
+import { USAGE_HELP, UsageHelpLink } from "~/components/usage/UsageHelpLink";
 import { fmtWhen, lastDays } from "~/components/usage/usageFormat";
 import { useAsyncData } from "~/lib/useAsyncData";
 
@@ -75,6 +76,7 @@ export default function MyUsagePage() {
             onChange={setBucket}
             ariaLabel={t("usage.bucket_label")}
           />
+          <UsageHelpLink doc={USAGE_HELP.ownUsage} />
         </Stack>
       </Stack>
 

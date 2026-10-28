@@ -26,7 +26,7 @@ interface PageHelpDef {
   id: string;
   actions: string[];
   guide?: string;
-  /** The Help page for it: a path under docs/help/pages, without ".md". */
+  /** The Help page for it: a path under docs/help/pages, without ".md", and a `#section` if one fits. */
   doc?: string;
 }
 
@@ -94,7 +94,7 @@ const PAGES: PageHelpDef[] = [
     prefix: "/admin/usage",
     id: "usage",
     actions: ["totals", "groups", "small", "people", "settings"],
-    doc: "administer/usage",
+    doc: "administer/usage#the-usage-page",
   },
   {
     prefix: "/admin/logs",
@@ -385,18 +385,25 @@ function toEntry(def: PageHelpDef): PageHelpEntry {
   };
 }
 
-/** Where the console serves a Help page (built into the frontend image from docs/help). */
+/**
+ * Where the console serves a Help page (built into the frontend image from docs/help). `doc` may name a
+ * section, `administer/usage#the-usage-page`: the German pages keep the English section names as anchors.
+ */
 export function helpUrl(doc?: string, language?: string): string {
   // Help is in English and German (docs/help/pages-de, served under /help/de); the other console
   // languages read the English one.
   const root = language?.toLowerCase().startsWith("de") ? "/help/de/" : "/help/";
-  return doc ? `${root}${doc}/` : root;
+  if (!doc) return root;
+  const [page, section] = doc.split("#", 2);
+  return `${root}${page}/${section ? `#${section}` : ""}`;
 }
 
-/** Every Help page the console links to: a test holds them to pages that exist. */
+/** Every Help page the console links to (without its section): a test holds them to pages that exist. */
 export function pageHelpDocs(): string[] {
   return [
-    ...new Set(PAGES.map((p) => p.doc).filter((d): d is string => Boolean(d))),
+    ...new Set(
+      PAGES.map((p) => p.doc?.split("#")[0]).filter((d): d is string => Boolean(d)),
+    ),
   ];
 }
 

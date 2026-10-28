@@ -45,6 +45,7 @@ import {
 } from "~/api/usage";
 import { useAsyncData } from "~/lib/useAsyncData";
 
+import { USAGE_HELP, UsageHelpLink } from "./UsageHelpLink";
 import { usageErrorText } from "./usageFormat";
 
 /** The languages the statement is written in. */
@@ -111,6 +112,18 @@ function languageName(code: string): string {
   } catch {
     return code;
   }
+}
+
+/** A section's heading, with a link to the Help section that explains it. */
+function SectionTitle({ title, doc }: { title: string; doc: string }) {
+  return (
+    <Stack direction="row" justifyContent="space-between" alignItems="baseline" gap={1}>
+      <Typography variant="subtitle1" component="h2">
+        {title}
+      </Typography>
+      <UsageHelpLink doc={doc} />
+    </Stack>
+  );
 }
 
 export default function UsagePrivacySettings() {
@@ -227,9 +240,7 @@ function PrivacySection() {
 
   return (
     <Paper sx={{ p: 2 }}>
-      <Typography variant="subtitle1" component="h2">
-        {t("usage.settings.privacy_title")}
-      </Typography>
+      <SectionTitle title={t("usage.settings.privacy_title")} doc={USAGE_HELP.settings} />
       <Typography variant="body2" color="text.secondary">
         {t("usage.settings.privacy_intro")}
       </Typography>
@@ -352,7 +363,8 @@ function LimitsSection() {
       setStatus(t("usage.settings.saved"));
       await loaded.refresh(true);
     } catch (err) {
-      setError(usageErrorText(err, (key) => t(key)));
+      // A limit the server refuses breaks the one rule all three share.
+      setError(err instanceof UsageProblemsError ? t("usage.settings.caps_error") : usageErrorText(err, (key) => t(key)));
     } finally {
       setBusy(false);
     }
@@ -360,9 +372,7 @@ function LimitsSection() {
 
   return (
     <Paper sx={{ p: 2 }}>
-      <Typography variant="subtitle1" component="h2">
-        {t("usage.settings.caps_title")}
-      </Typography>
+      <SectionTitle title={t("usage.settings.caps_title")} doc={USAGE_HELP.limits} />
       <Typography variant="body2" color="text.secondary">
         {t("usage.settings.caps_intro")}
       </Typography>
@@ -392,7 +402,7 @@ function LimitsSection() {
         {status && <Alert severity="success">{status}</Alert>}
         <Box>
           <Button variant="contained" disabled={invalid || busy} onClick={() => void save()}>
-            {busy ? t("common.saving") : t("usage.settings.save_limits")}
+            {busy ? t("common.saving") : t("common.save")}
           </Button>
         </Box>
       </Stack>
@@ -408,9 +418,7 @@ function StatementSection() {
   );
   return (
     <Paper sx={{ p: 2 }}>
-      <Typography variant="subtitle1" component="h2">
-        {t("usage.settings.statement_title")}
-      </Typography>
+      <SectionTitle title={t("usage.settings.statement_title")} doc={USAGE_HELP.documents} />
       <Typography variant="body2" color="text.secondary">
         {t("usage.settings.statement_intro")}
       </Typography>
