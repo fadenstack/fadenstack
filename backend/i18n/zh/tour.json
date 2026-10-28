@@ -485,7 +485,8 @@
       "title": "组",
       "description": "组为其成员授予角色，并在报告中汇总其用量。",
       "action_create": "创建组并指定其角色",
-      "action_members": "添加或移除成员"
+      "action_members": "添加或移除成员",
+      "action_tree": "将一个组放在另一个组之下、为其设置成本中心，或归档已结束的组"
     },
     "api_tokens": {
       "title": "API 令牌",

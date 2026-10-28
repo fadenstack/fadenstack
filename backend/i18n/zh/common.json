@@ -2009,7 +2009,32 @@
     "delete_warning_members": "当前有 {{count}} 个用户在此组中。",
     "failed_delete": "删除组失败。",
     "kept_by": "由 {{provider}} 维护",
-    "kept_by_help": "此登录提供方为组命名并维护其成员；管理员添加的成员会保留。可在此为其分配角色和智能体。"
+    "kept_by_help": "此登录提供方为组命名并维护其成员；管理员添加的成员会保留。可在此为其分配角色和智能体。",
+    "tree": {
+      "cost_center_chip": "成本中心 {{code}}",
+      "archived": "已归档",
+      "archive": "归档",
+      "unarchive": "恢复",
+      "show_archived_one": "显示 {{count}} 个已归档的组",
+      "show_archived_other": "显示 {{count}} 个已归档的组",
+      "parent": "上级组",
+      "parent_help": "此组的上一级组。用量计入此组及其所有上级组；角色不会向下传递。最多 {{max}} 级。",
+      "top": "无（顶级组）",
+      "level": "第 {{level}} 级",
+      "too_deep_option": "层级过深：树将超过 {{max}} 级",
+      "cost_center": "成本中心",
+      "cost_center_help": "用于报表的财务代码，最多 {{max}} 个字符。可选。",
+      "roles_stay": "角色只适用于此组的成员；下级组不会继承。",
+      "archive_title": "归档 {{name}}？",
+      "archive_body": "该组会保留其历史：其用量仍计在原处。它不再接收新成员，不能作为任何人的用量归属组，也不再出现在选择列表中。您可以将其恢复。",
+      "delete_sub_teams": "其下级组将移到它的上级组下。",
+      "archived_name": "{{name}}（已归档）"
+    },
+    "errors": {
+      "team_cycle": "组不能放在自身或其下级组之下。",
+      "team_too_deep": "树将超过六级。请选择更高一级的上级组。",
+      "team_archived": "此组已归档：请先恢复，或选择其他组。"
+    }
   },
   "auth_providers": {
     "title": "登录提供商",

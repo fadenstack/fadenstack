@@ -2150,7 +2150,32 @@
     "delete_warning_members": "{{count}} user(s) are currently in this group.",
     "failed_delete": "Failed to delete group.",
     "kept_by": "Kept by {{provider}}",
-    "kept_by_help": "This sign-in provider names the group and keeps who is in it; members an administrator added stay. Give it roles and agents here."
+    "kept_by_help": "This sign-in provider names the group and keeps who is in it; members an administrator added stay. Give it roles and agents here.",
+    "tree": {
+      "cost_center_chip": "Cost centre {{code}}",
+      "archived": "Archived",
+      "archive": "Archive",
+      "unarchive": "Bring back",
+      "show_archived_one": "Show {{count}} archived group",
+      "show_archived_other": "Show {{count}} archived groups",
+      "parent": "Parent",
+      "parent_help": "The group above this one. Usage counts here and in every group above; roles do not pass down. At most {{max}} levels.",
+      "top": "None (a top-level group)",
+      "level": "Level {{level}}",
+      "too_deep_option": "Too deep: the tree would have more than {{max}} levels",
+      "cost_center": "Cost centre",
+      "cost_center_help": "A finance code for reports, up to {{max}} characters. Optional.",
+      "roles_stay": "Roles apply to this group's members only; groups below it do not get them.",
+      "archive_title": "Archive {{name}}?",
+      "archive_body": "The group keeps its history: its usage stays counted where it was. It gets no new members, cannot be anyone's usage group and is no longer offered for choosing. You can bring it back.",
+      "delete_sub_teams": "Its sub-groups move up to its parent group.",
+      "archived_name": "{{name}} (archived)"
+    },
+    "errors": {
+      "team_cycle": "A group cannot be placed below itself or one of its own sub-groups.",
+      "team_too_deep": "The tree would have more than six levels. Choose a parent group higher up.",
+      "team_archived": "This group is archived: bring it back first, or choose another group."
+    }
   },
   "auth_providers": {
     "title": "Sign-in providers",

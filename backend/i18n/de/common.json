@@ -2009,7 +2009,32 @@
     "delete_warning_members": "{{count}} Benutzer sind derzeit in dieser Gruppe.",
     "failed_delete": "Gruppe konnte nicht gelöscht werden.",
     "kept_by": "Gepflegt von {{provider}}",
-    "kept_by_help": "Dieser Anmeldeanbieter benennt die Gruppe und pflegt, wer dazugehört; Mitglieder, die ein Administrator hinzugefügt hat, bleiben. Rollen und Agenten geben Sie ihr hier."
+    "kept_by_help": "Dieser Anmeldeanbieter benennt die Gruppe und pflegt, wer dazugehört; Mitglieder, die ein Administrator hinzugefügt hat, bleiben. Rollen und Agenten geben Sie ihr hier.",
+    "tree": {
+      "cost_center_chip": "Kostenstelle {{code}}",
+      "archived": "Archiviert",
+      "archive": "Archivieren",
+      "unarchive": "Zurückholen",
+      "show_archived_one": "{{count}} archivierte Gruppe zeigen",
+      "show_archived_other": "{{count}} archivierte Gruppen zeigen",
+      "parent": "Übergeordnete Gruppe",
+      "parent_help": "Die Gruppe über dieser. Die Nutzung zählt hier und in jeder Gruppe darüber; Rollen gehen nicht nach unten weiter. Höchstens {{max}} Ebenen.",
+      "top": "Keine (eine Gruppe der obersten Ebene)",
+      "level": "Ebene {{level}}",
+      "too_deep_option": "Zu tief: Der Baum hätte mehr als {{max}} Ebenen",
+      "cost_center": "Kostenstelle",
+      "cost_center_help": "Ein Code der Buchhaltung für Auswertungen, bis zu {{max}} Zeichen. Optional.",
+      "roles_stay": "Rollen gelten nur für die Mitglieder dieser Gruppe; Gruppen darunter erhalten sie nicht.",
+      "archive_title": "{{name}} archivieren?",
+      "archive_body": "Die Gruppe behält ihre Geschichte: Ihre Nutzung bleibt dort gezählt, wo sie war. Sie erhält keine neuen Mitglieder, kann niemandes Nutzungsgruppe sein und wird nicht mehr zur Auswahl angeboten. Sie können sie zurückholen.",
+      "delete_sub_teams": "Ihre Untergruppen rücken zu ihrer übergeordneten Gruppe auf.",
+      "archived_name": "{{name}} (archiviert)"
+    },
+    "errors": {
+      "team_cycle": "Eine Gruppe kann nicht unter sich selbst oder einer ihrer Untergruppen stehen.",
+      "team_too_deep": "Der Baum hätte mehr als sechs Ebenen. Wählen Sie eine höher stehende übergeordnete Gruppe.",
+      "team_archived": "Diese Gruppe ist archiviert: Holen Sie sie zuerst zurück oder wählen Sie eine andere Gruppe."
+    }
   },
   "auth_providers": {
     "title": "Anmeldeanbieter",

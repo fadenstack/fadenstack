@@ -207,8 +207,8 @@ const PAGES: PageHelpDef[] = [
   {
     prefix: "/admin/groups",
     id: "groups",
-    actions: ["create", "members"],
-    doc: "administer/users",
+    actions: ["create", "members", "tree"],
+    doc: "administer/users#teams-in-a-tree",
   },
   {
     prefix: "/admin/api-tokens",

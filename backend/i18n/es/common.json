@@ -2009,7 +2009,32 @@
     "delete_warning_members": "{{count}} usuario(s) están actualmente en este grupo.",
     "failed_delete": "Error al eliminar grupo.",
     "kept_by": "Gestionado por {{provider}}",
-    "kept_by_help": "Este proveedor de inicio de sesión da nombre al grupo y gestiona quién forma parte; los miembros que añadió un administrador se mantienen. Asígnele roles y agentes aquí."
+    "kept_by_help": "Este proveedor de inicio de sesión da nombre al grupo y gestiona quién forma parte; los miembros que añadió un administrador se mantienen. Asígnele roles y agentes aquí.",
+    "tree": {
+      "cost_center_chip": "Centro de coste {{code}}",
+      "archived": "Archivado",
+      "archive": "Archivar",
+      "unarchive": "Recuperar",
+      "show_archived_one": "Mostrar {{count}} grupo archivado",
+      "show_archived_other": "Mostrar {{count}} grupos archivados",
+      "parent": "Grupo superior",
+      "parent_help": "El grupo por encima de este. El uso cuenta aquí y en cada grupo superior; los roles no bajan. Como máximo {{max}} niveles.",
+      "top": "Ninguno (un grupo de primer nivel)",
+      "level": "Nivel {{level}}",
+      "too_deep_option": "Demasiado profundo: el árbol tendría más de {{max}} niveles",
+      "cost_center": "Centro de coste",
+      "cost_center_help": "Un código contable para los informes, hasta {{max}} caracteres. Opcional.",
+      "roles_stay": "Los roles se aplican solo a los miembros de este grupo; los grupos inferiores no los reciben.",
+      "archive_title": "¿Archivar {{name}}?",
+      "archive_body": "El grupo conserva su historial: su uso sigue contado donde estaba. No recibe nuevos miembros, no puede ser el grupo de uso de nadie y ya no se ofrece para elegir. Puede recuperarlo.",
+      "delete_sub_teams": "Sus subgrupos pasan a su grupo superior.",
+      "archived_name": "{{name}} (archivado)"
+    },
+    "errors": {
+      "team_cycle": "Un grupo no puede colocarse por debajo de sí mismo ni de uno de sus subgrupos.",
+      "team_too_deep": "El árbol tendría más de seis niveles. Elija un grupo superior más arriba.",
+      "team_archived": "Este grupo está archivado: recupérelo primero o elija otro grupo."
+    }
   },
   "auth_providers": {
     "title": "Proveedores de inicio de sesión",

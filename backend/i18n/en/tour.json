@@ -485,7 +485,8 @@
       "title": "Groups",
       "description": "A group gives its members roles, and groups their usage in reports.",
       "action_create": "Create a group with its roles",
-      "action_members": "Add or remove members"
+      "action_members": "Add or remove members",
+      "action_tree": "Place a group below another, give it a cost centre, or archive one that ended"
     },
     "api_tokens": {
       "title": "API tokens",

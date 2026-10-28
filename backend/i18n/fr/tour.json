@@ -485,7 +485,8 @@
       "title": "Groupes",
       "description": "Un groupe donne des rôles à ses membres et regroupe leur usage dans les rapports.",
       "action_create": "Créer un groupe avec ses rôles",
-      "action_members": "Ajouter ou retirer des membres"
+      "action_members": "Ajouter ou retirer des membres",
+      "action_tree": "Placer un groupe sous un autre, lui donner un centre de coûts ou archiver un groupe terminé"
     },
     "api_tokens": {
       "title": "Jetons d'API",

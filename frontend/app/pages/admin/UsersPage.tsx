@@ -13,6 +13,7 @@ import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import { formatDateTime } from "~/lib/dates";
 import { MIN_PASSWORD_LENGTH } from "~/lib/password";
 import { roleHint, roleLabel } from "~/lib/roleLabels";
+import { asTree, type TreeRow } from "~/lib/teamTree";
 import { useAsyncData } from "~/lib/useAsyncData";
 
 import Alert from "@mui/material/Alert";
@@ -53,8 +54,13 @@ function RoleChoice({ label, hint }: { label: string; hint: string | null }) {
   );
 }
 
+/** The teams offered as a home team: the active ones as a tree, and an archived one only while it is the current choice. */
+function homeTeamChoices(groups: Group[], current: string, lang: string): TreeRow<Group>[] {
+  return asTree(groups.filter((g) => !g.archived_at || g.id === current), lang);
+}
+
 export default function UsersPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   // ── Data loading via useAsyncData ──
   const {
@@ -441,9 +447,16 @@ export default function UsersPage() {
             disabled={saving}
           >
             <MenuItem value="">{t("users.usage_group_none")}</MenuItem>
-            {groups.map((g) => (
-              <MenuItem key={g.id} value={g.id}>
-                {g.name}
+            {/* The home team at any level of the tree; an archived team cannot be one (it stays listed,
+                unpickable, only while it still is this person's). */}
+            {homeTeamChoices(groups, selectedUsageGroupId, i18n.language).map(({ team, depth }) => (
+              <MenuItem
+                key={team.id}
+                value={team.id}
+                disabled={Boolean(team.archived_at)}
+                sx={{ pl: 2 + (depth - 1) * 2 }}
+              >
+                {team.archived_at ? t("groups.tree.archived_name", { name: team.name }) : team.name}
               </MenuItem>
             ))}
           </TextField>

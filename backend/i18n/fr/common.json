@@ -2152,7 +2152,32 @@
     "delete_warning_members": "{{count}} utilisateur(s) sont actuellement dans ce groupe.",
     "failed_delete": "Échec de la suppression du groupe.",
     "kept_by": "Géré par {{provider}}",
-    "kept_by_help": "Ce fournisseur de connexion nomme le groupe et gère qui en fait partie ; les membres ajoutés par un administrateur restent. Attribuez-lui des rôles et des agents ici."
+    "kept_by_help": "Ce fournisseur de connexion nomme le groupe et gère qui en fait partie ; les membres ajoutés par un administrateur restent. Attribuez-lui des rôles et des agents ici.",
+    "tree": {
+      "cost_center_chip": "Centre de coûts {{code}}",
+      "archived": "Archivé",
+      "archive": "Archiver",
+      "unarchive": "Restaurer",
+      "show_archived_one": "Afficher {{count}} groupe archivé",
+      "show_archived_other": "Afficher {{count}} groupes archivés",
+      "parent": "Groupe parent",
+      "parent_help": "Le groupe au-dessus de celui-ci. L'utilisation compte ici et dans chaque groupe au-dessus ; les rôles ne descendent pas. Au plus {{max}} niveaux.",
+      "top": "Aucun (un groupe de premier niveau)",
+      "level": "Niveau {{level}}",
+      "too_deep_option": "Trop profond : l'arbre aurait plus de {{max}} niveaux",
+      "cost_center": "Centre de coûts",
+      "cost_center_help": "Un code comptable pour les rapports, jusqu'à {{max}} caractères. Facultatif.",
+      "roles_stay": "Les rôles s'appliquent aux seuls membres de ce groupe ; les groupes en dessous ne les reçoivent pas.",
+      "archive_title": "Archiver {{name}} ?",
+      "archive_body": "Le groupe garde son historique : son utilisation reste comptée là où elle était. Il ne reçoit plus de nouveaux membres, ne peut être le groupe d'usage de personne et n'est plus proposé au choix. Vous pouvez le restaurer.",
+      "delete_sub_teams": "Ses sous-groupes remontent à son groupe parent.",
+      "archived_name": "{{name}} (archivé)"
+    },
+    "errors": {
+      "team_cycle": "Un groupe ne peut pas être placé sous lui-même ni sous l'un de ses sous-groupes.",
+      "team_too_deep": "L'arbre aurait plus de six niveaux. Choisissez un groupe parent plus haut.",
+      "team_archived": "Ce groupe est archivé : restaurez-le d'abord ou choisissez un autre groupe."
+    }
   },
   "auth_providers": {
     "title": "Fournisseurs de connexion",

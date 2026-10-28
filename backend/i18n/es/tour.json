@@ -485,7 +485,8 @@
       "title": "Grupos",
       "description": "Un grupo da roles a sus miembros y agrupa su uso en los informes.",
       "action_create": "Crear un grupo con sus roles",
-      "action_members": "Añadir o quitar miembros"
+      "action_members": "Añadir o quitar miembros",
+      "action_tree": "Colocar un grupo por debajo de otro, darle un centro de coste o archivar uno que terminó"
     },
     "api_tokens": {
       "title": "Tokens de API",
