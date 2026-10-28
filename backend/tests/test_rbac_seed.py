@@ -23,3 +23,20 @@ async def test_every_permission_an_endpoint_asks_for_exists(dbsession: AsyncSess
         ("observability", "write"),
     ]:
         assert wanted in kinds, wanted
+
+
+async def test_usage_figures_for_administrators_and_auditors_people_for_nobody_yet(dbsession: AsyncSession) -> None:
+    """``usage:read`` (aggregates of at least k people) for the admin and auditor roles; the usage of named
+    people (``usage.people:audit``) only in ``usage_auditor``, which nobody has at install (M06).
+    """
+    rbac = RbacDAO(dbsession)
+    await rbac.seed_defaults()
+    holders: dict[tuple[str, str], set[str]] = {}
+    for role in await rbac.list_roles():
+        for perm in role.permissions:
+            holders.setdefault((perm.resource, perm.action), set()).add(role.name)
+    assert holders[("usage", "read")] == {"admin", "auditor"}
+    assert holders[("usage.people", "audit")] == {"usage_auditor"}
+    usage_auditor = await rbac.get_role_by_name("usage_auditor")
+    assert usage_auditor is not None and usage_auditor.is_builtin
+    assert await rbac.count_role_users(usage_auditor.id) == 0
