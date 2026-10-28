@@ -504,7 +504,7 @@ class TraceEventDTO(BaseModel):
     request_id: str
     trace_id: str | None = None
     tenant_id: str
-    user_id: str
+    user_id: str | None = None  # nobody is named (services/llm/calls_service.py)
     model_alias: str | None = None
     provider_instance_id: str | None = None
     status: int
@@ -559,7 +559,7 @@ class LLMCallDTO(BaseModel):
     request_id: str
     trace_id: str | None = None
     tenant_id: str
-    user_id: str
+    user_id: str | None = None  # nobody is named (services/llm/calls_service.py)
     model_alias: str | None = None
     provider_instance_id: str | None = None
     #: The backend provider the instance serves, and its name, when there still is one.
@@ -692,7 +692,7 @@ class LLMTurnDTO(BaseModel):
     agent_id: str | None = None
     device_id: str | None = None
     tenant_id: str
-    user_id: str
+    user_id: str | None = None  # nobody is named (services/llm/calls_service.py)
     started_at: datetime
     ended_at: datetime
     duration_ms: int

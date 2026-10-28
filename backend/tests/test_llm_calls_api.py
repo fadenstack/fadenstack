@@ -22,7 +22,7 @@ from httpx import AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from faden_backend.services.llm.calls_service import CallFilters, LLMCallsService
+from faden_backend.services.llm.calls_service import CallFilters, LLMCallsService, _turn_key
 from faden_backend.services.llm.graph_service import ProviderOwners
 
 pytestmark = pytest.mark.anyio()
@@ -198,6 +198,9 @@ async def test_list_filters_outcome_model_search_and_sorts(gateway: AsyncSession
     assert [c["request_id"] for c in by_conversation["items"]] == [other]
     wildcard = await svc.list_calls(CallFilters(**{**_window().__dict__, "q": "%"}))
     assert wildcard["total"] == 0, "a % in the search is a character, not a wildcard"
+    by_person = await svc.list_calls(CallFilters(**{**_window().__dict__, "q": "u1"}))
+    assert by_person["total"] == 0, "nobody is searched for by their id (M02)"
+    assert all(c["user_id"] is None for c in page["items"]), "nobody is named"
 
     slowest = await svc.list_calls(_window(), sort="slowest", limit=1)
     assert slowest["total"] == 3
@@ -286,7 +289,8 @@ async def test_a_shared_request_id_does_not_mix_calls(gateway: AsyncSession) -> 
     svc = LLMCallsService(_factory(gateway))
     detail = await svc.detail(mine_row)
     assert detail is not None
-    assert detail["call"]["user_id"] == "u1", "the row asked for, not the newest with that request id"
+    assert detail["call"]["id"] == mine_row, "the row asked for, not the newest with that request id"
+    assert detail["call"]["user_id"] is None, "nobody is named"
     assert detail["tool_calls"] == []
     assert detail["policy_decisions"] == []
 
@@ -350,14 +354,15 @@ async def test_turns_group_an_agents_rounds_with_the_tools_its_app_ran(gateway: 
     await _event(gateway, "c1", "tool.executed", 35, tool="insert_text", source="host", outcome="denied")
     await _event(gateway, "c1", "tool.executed", 5, tool="later", outcome="ok")  # a later turn's
     await _event(gateway, "c2", "tool.executed", 45, tool="elsewhere", outcome="ok")
-    await _call(gateway, age_sec=20)  # a call of no turn: a turn of its own
+    lone = await _call(gateway, age_sec=20)  # a call of no turn: a turn of its own
     await _call(gateway, user_id="u2", agent_id="a1", turn_id="t1", age_sec=10)  # same turn id, another user
 
     svc = LLMCallsService(_factory(gateway))
     page = await svc.list_turns(_window())
     assert page["total"] == 3
-    turns = {(t["user_id"], t["turn_id"]): t for t in page["items"]}
-    turn = turns[("u1", "t1")]
+    assert all(t["user_id"] is None and "u1" not in t["key"] for t in page["items"]), "nobody is named"
+    turns = {t["key"]: t for t in page["items"]}
+    turn = turns[_turn_key("u1", "t1")]
     assert turn["calls"] == 3
     assert turn["tool_rounds"] == 2
     assert turn["finish_reason"] == "stop"
@@ -366,8 +371,8 @@ async def test_turns_group_an_agents_rounds_with_the_tools_its_app_ran(gateway: 
     assert turn["duration_ms"] >= 21_000, "from the first call's start to the last call's end"
     assert (turn["client_tools"], turn["client_tool_errors"]) == (2, 1)
     assert (turn["approvals"], turn["approvals_denied"], turn["approval_wait_ms"]) == (1, 1, 2000)
-    assert turns[("u2", "t1")]["calls"] == 1, "a turn id is the app's: another user's is another turn"
-    assert turns[("u1", None)]["calls"] == 1
+    assert turns[_turn_key("u2", "t1")]["calls"] == 1, "a turn id is the app's: another user's is another turn"
+    assert turns[_turn_key("u1", ROW_IDS[lone])]["calls"] == 1
     assert next(t["turn_id"] for t in page["items"]) == "t1", "newest first: u2's call"
 
     errors_only = await svc.list_turns(CallFilters(**{**_window().__dict__, "model_alias": "nope"}))
