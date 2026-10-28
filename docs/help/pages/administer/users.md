@@ -98,7 +98,7 @@ A group gathers people, for three things:
 - **Roles.** A group's roles apply to all its members, on top of their own.
 - **Sharing.** Skills and agents can be shared with a group (see [Skills](skills.md) and [Agents](agents.md)).
 - **Usage.** A person's **Usage group** is the group their requests are counted towards (see
-  [Usage and costs](usage.md)). It is set per person, on **Users**.
+  [Usage and limits](usage.md)). It is set per person, on **Users**.
 
 To make one: open **Access Control → Groups**, select **Create Group**, name it and tick its roles under
 **Assign Roles**, save it, then select **Manage Members** and **Add Members**.

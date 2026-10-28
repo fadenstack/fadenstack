@@ -116,7 +116,7 @@ in der Liste ein Aufruf geöffnet, hebt die Karte seinen Weg hervor.
 Zu jedem Aufruf hält das Gateway fest, wer ihn schickte, welches Modell wo antwortete, die Zeiten, die Tokens,
 das Ergebnis und die geschätzten Kosten; bei einem Agenten auch seine Unterhaltung und Anfrage. Der Text der
 Anfrage und der Antwort wird nicht gespeichert, ebenso wenig, was ein Tool las oder schrieb. Die Zahlen hier
-sind dieselben wie unter [Nutzung und Kosten](usage.md).
+sind dieselben wie unter [Nutzung und Limits](usage.md).
 
 ## Wenn es nicht funktioniert {#when-it-does-not-work}
 
@@ -125,4 +125,4 @@ sind dieselben wie unter [Nutzung und Kosten](usage.md).
 | **Keine passenden Aufrufe** | Im Zeitraum passt nichts zu den Filtern. Wählen Sie einen längeren Zeitraum oder **Filter zurücksetzen**. |
 | Die Anfrage eines Agenten zeigt Runden, aber keine Tools | Das Modell bat um Tools, aber die App meldete keine Ausführung: eine App ohne Tool-Meldungen, oder die Meldungen sind noch unterwegs. Die Runden stehen trotzdem da. |
 | Der Provider steht als **Instanz …** da | Der Provider, der den Aufruf bediente, wurde inzwischen entfernt. |
-| **Gesch. Kosten** zeigt „—" | Die genutzten Modelle haben keinen Preis. Legen Sie einen fest (siehe [Nutzung und Kosten](usage.md#set-prices)). |
+| **Gesch. Kosten** zeigt „—" | Die genutzten Modelle haben keinen Preis. Legen Sie einen fest (siehe [Nutzung und Limits](usage.md#set-prices)). |

@@ -104,7 +104,7 @@ Eine Gruppe fasst Personen zusammen, für drei Dinge:
 - **Teilen.** Skills und Agenten lassen sich mit einer Gruppe teilen (siehe [Skills](skills.md) und
   [Agenten](agents.md)).
 - **Nutzung.** Die **Nutzungsgruppe** einer Person ist die Gruppe, der ihre Anfragen zugerechnet werden (siehe
-  [Nutzung und Kosten](usage.md)). Sie wird pro Person festgelegt, auf der Seite **Benutzer**.
+  [Nutzung und Limits](usage.md)). Sie wird pro Person festgelegt, auf der Seite **Benutzer**.
 
 So erstellen Sie eine: Öffnen Sie **Zugriffskontrolle → Gruppen**, wählen Sie **Gruppe erstellen**, geben Sie ihr
 einen Namen, kreuzen Sie unter **Rollen zuweisen** ihre Rollen an, speichern Sie sie, und wählen Sie dann

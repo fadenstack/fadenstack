@@ -110,7 +110,7 @@ the way it went.
 For each call the gateway keeps who sent it, which model answered and where, the timings, the tokens, the
 outcome and the estimated cost; for an agent, also its conversation and request. The text of the request and
 of the answer is not kept, and neither is what a tool read or wrote. The figures here are the same as on
-[Usage and costs](usage.md).
+[Usage and limits](usage.md).
 
 ## When it does not work
 
@@ -119,4 +119,4 @@ of the answer is not kept, and neither is what a tool read or wrote. The figures
 | **No calls match** | Nothing in the time range matches the filters. Pick a longer range or select **Clear filters**. |
 | An agent's request shows rounds, but no tools | The model asked for tools, but the app did not report running any: an app without tool reports, or reports still on their way. The rounds still show. |
 | The provider shows as **Instance …** | The provider that served the call was removed since. |
-| **Est. cost** shows "—" | The models used have no price. Set one (see [Usage and costs](usage.md#set-prices)). |
+| **Est. cost** shows "—" | The models used have no price. Set one (see [Usage and limits](usage.md#set-prices)). |

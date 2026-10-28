@@ -173,9 +173,14 @@
 
 ["administer/usage.md"]
 "Wo sehe ich Nutzung und Kosten?" = "where-to-see-it"
+"Wo sehe ich meine eigene Nutzung?" = "your-own-usage"
 "Wie lege ich Preise für Modelle fest?" = "set-prices"
-"Wie sehe ich die Nutzung pro Person oder Gruppe?" = "usage-per-person-and-per-group"
-"Kann ich Limits oder Budgets festlegen?" = "limits-and-budgets"
+"Wie sehe ich die Nutzung pro Team, Agent oder Modell?" = "the-usage-page"
+"Warum steht in einer Zeile „weniger als fünf Personen“?" = "the-minimum-group-size"
+"Wie begrenze ich Anfragen oder Tokens pro Minute oder pro Tag?" = "limits-for-the-whole-instance"
+"Kann ich Limits oder Budgets festlegen?" = "limits-for-the-whole-instance"
+"Was bedeutet ein Fehler 429 oder quota_tokens_per_day?" = "what-people-see-when-a-limit-refuses"
+"Sind die Kosten das, was der Provider berechnet?" = "where-the-numbers-come-from"
 
 ["administer/usage-privacy.md"]
 "Können Administratoren sehen, wie viel jede Person nutzt?" = "private-by-default"
