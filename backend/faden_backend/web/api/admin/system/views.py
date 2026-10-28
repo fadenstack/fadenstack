@@ -190,7 +190,7 @@ async def system_settings_update(
     except PermissionError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
 
     await audit_action(
         action="system.settings.update",
@@ -376,7 +376,7 @@ async def system_agent_heartbeat(
         heartbeat_status = InfraAgentStatus(body.status)
     except ValueError as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Invalid status",
         ) from exc
     payload = await service.heartbeat_agent(

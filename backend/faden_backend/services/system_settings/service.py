@@ -78,6 +78,8 @@ class SystemSettingsService:
                 "service_targets": list(item.service_targets),
                 "protected": item.protected,
                 "enum_values": list(item.enum_values),
+                "min_value": item.min_value,
+                "max_value": item.max_value,
             }
             for item in SETTINGS_REGISTRY
         ]
