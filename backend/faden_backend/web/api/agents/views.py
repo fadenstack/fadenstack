@@ -42,6 +42,9 @@ from faden_backend.db.models.users import User, current_active_user
 from faden_backend.services.agents import access, app_review, app_templates, tokens
 from faden_backend.services.extensions import registry
 from faden_backend.services.principals import PrincipalOption, find_principals
+from faden_backend.services.usage import config as usage_config
+from faden_backend.services.usage.measures import Measures
+from faden_backend.services.usage.suppression import Cell, hide
 from faden_backend.web.api.agents.schema import (
     AcceptAppsRequest,
     AccessDTO,
@@ -640,11 +643,17 @@ async def agent_usage(
     rbac: RbacDAO = Depends(),
     days: int = 30,
 ) -> UsageDTO:
-    """Requests, tokens, users and conversations of the agent -- no content."""
+    """Requests, tokens, users and conversations of the agent -- no content, and nobody named.
+
+    The figures show only when at least k distinct people used the agent in the range, and each day only with
+    k people (with complementary suppression, ``services/usage/suppression.py``): an agent of three people
+    shows what each of them did (M04, M05). An agent only the caller used shows them their own figures.
+    """
     agent = await _inspected_agent(dao, rbac, agent_ref, user)
     factory = getattr(request.app.state, "llm_graph_trace_session_factory", None)
     if factory is None:
         raise HTTPException(status_code=503, detail="Gateway database not available")
+    k = (await usage_config.read(dao.session)).k
     since = datetime.now(UTC) - timedelta(days=max(1, min(days, 90)))
     params = {"agent": str(agent.id), "since": since}
     async with factory() as gw:
@@ -664,27 +673,53 @@ async def agent_usage(
                 params,
             )
         ).mappings().one()
-        days_rows = (
+        day_rows = (
             await gw.execute(
                 text("""
-                SELECT date_trunc('day', created_at) AS day, COUNT(*) AS requests,
+                SELECT date_trunc('day', created_at) AS day, user_id, COUNT(*) AS requests,
                        COALESCE(SUM(total_tokens), 0) AS total_tokens
                 FROM llm_gateway_request_log
                 WHERE agent_id = :agent AND created_at >= :since
-                GROUP BY 1 ORDER BY 1
+                GROUP BY 1, 2 ORDER BY 1
                 """),
                 params,
             )
         ).mappings().all()
+    people = {str(row["user_id"]) for row in day_rows}
+    own_only = people <= {str(user.id)}
+    if len(people) < k and not own_only:
+        return UsageDTO(suppressed=True, min_group_size=k, by_day=[])
+    per_day: dict[Any, tuple[Measures, set[str]]] = {}
+    for row in day_rows:
+        measures, users = per_day.setdefault(row["day"].date(), (Measures(), set()))
+        measures.add({"requests": row["requests"], "input_tokens": row["total_tokens"]})
+        users.add(str(row["user_id"]))
+    hidden: set[Any] = set()
+    if not own_only:
+        cells = [Cell(key=day, measures=m, floor=len(users)) for day, (m, users) in per_day.items()]
+
+        async def together(group: list[Cell]) -> int:
+            return len(set().union(*(per_day[cell.key][1] for cell in group)))
+
+        hidden, _ = await hide(cells, k, together)
+    counts = {name: int(value or 0) for name, value in totals.items()}
     return UsageDTO(
-        **{k: int(v or 0) for k, v in totals.items()},
+        requests=counts["requests"],
+        errors=counts["errors"],
+        prompt_tokens=counts["prompt_tokens"],
+        completion_tokens=counts["completion_tokens"],
+        total_tokens=counts["total_tokens"],
+        users=counts["users"],
+        conversations=counts["conversations"],
+        min_group_size=k,
         by_day=[
-            {
-                "day": row["day"].date().isoformat(),
-                "requests": row["requests"],
-                "total_tokens": row["total_tokens"],
+            {"day": day.isoformat(), "requests": None, "total_tokens": None, "suppressed": True}
+            if day in hidden
+            else {
+                "day": day.isoformat(), "requests": measures.requests,
+                "total_tokens": measures.counts["input_tokens"], "suppressed": False,
             }
-            for row in days_rows
+            for day, (measures, _) in sorted(per_day.items())
         ],
     )
 
@@ -700,7 +735,11 @@ async def agent_client_events(
     since: datetime | None = None,
     limit: int = 100,
 ) -> list[ClientEventDTO]:
-    """What the agent's SDKs reported (02 §9), newest first, for its maintainers."""
+    """What the agent's SDKs reported (02 §9), newest first, for its maintainers; nobody else named.
+
+    An event of another person keeps no ``user_id`` (the usage of named people is seen only through
+    ``/api/admin/usage/people``).
+    """
     agent = await _inspected_agent(dao, rbac, agent_ref, user)
     factory = getattr(request.app.state, "llm_graph_trace_session_factory", None)
     if factory is None:
@@ -719,7 +758,11 @@ async def agent_client_events(
                 {"agent": str(agent.id), "type": type, "since": since, "limit": max(1, min(limit, 500))},
             )
         ).mappings().all()
-    return [ClientEventDTO(**row) for row in rows]
+    own = str(user.id)
+    return [
+        ClientEventDTO(**{**row, "user_id": row["user_id"] if str(row["user_id"]) == own else None})
+        for row in rows
+    ]
 
 
 # -- what the apps bring ---------------------------------------------------------------
@@ -765,18 +808,20 @@ async def agent_apps(
     live = review if published is None or latest is None or published.id == latest.id else (
         app_review.review(rows, published, now=now)
     )
-    labels: dict[str, str | None] = {}
-    for app in review.apps:
-        if app.last_user_id not in labels:
-            try:
-                found = await dao.session.get(User, uuid.UUID(app.last_user_id))
-            except ValueError:
-                found = None
-            labels[app.last_user_id] = found.email if found else None
+    # Who reported an app last is named only when it is the caller: nobody else is (as in agent_usage).
+    own = str(user.id)
+
+    def seen(app: Any) -> AppSeenDTO:
+        mine = app.last_user_id == own
+        return AppSeenDTO(**{
+            **vars(app), "last_user_id": app.last_user_id if mine else None,
+            "last_user_label": user.email if mine else None,
+        })
+
     return AppsReviewDTO(
         compared_with=review.compared_with,
         unrestricted=review.unrestricted,
-        apps=[AppSeenDTO(**vars(app), last_user_label=labels.get(app.last_user_id)) for app in review.apps],
+        apps=[seen(app) for app in review.apps],
         tools=[ToolReviewDTO(**vars(tool)) for tool in review.tools],
         ui=review.ui,
         pending=review.pending,

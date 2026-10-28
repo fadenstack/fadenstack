@@ -148,15 +148,21 @@ class AccessDTO(BaseModel):
 
 
 class UsageDTO(BaseModel):
-    """Usage of one agent from the gateway's request log, without content."""
+    """Usage of one agent from the gateway's request log, without content and without names.
 
-    requests: int
-    errors: int
-    prompt_tokens: int
-    completion_tokens: int
-    total_tokens: int
-    users: int
-    conversations: int
+    ``suppressed``: fewer than ``min_group_size`` people used it in the range (and not only the caller), so
+    no figure is shown. A day of ``by_day`` about fewer people is ``suppressed`` too, its figures ``None``.
+    """
+
+    suppressed: bool = False
+    min_group_size: int
+    requests: int | None = None
+    errors: int | None = None
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    total_tokens: int | None = None
+    users: int | None = None
+    conversations: int | None = None
     by_day: list[dict[str, Any]]
 
 
@@ -192,7 +198,8 @@ class ClientEventDTO(BaseModel):
 
     id: uuid.UUID
     type: str
-    user_id: str
+    #: Only the caller's own; another person's events keep none.
+    user_id: str | None = None
     device_id: str | None
     conversation_id: str | None
     data: dict[str, Any]
@@ -224,8 +231,8 @@ class AppSeenDTO(BaseModel):
     first_seen_at: datetime
     last_seen_at: datetime
     reports: int
-    last_user_id: str
-    #: The e-mail address of who reported it last.
+    #: Who reported it last, and their address: only when that was the caller.
+    last_user_id: str | None = None
     last_user_label: str | None = None
     tools: list[str]
     context: list[dict[str, Any]]
