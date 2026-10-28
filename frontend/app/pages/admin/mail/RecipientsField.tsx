@@ -1,6 +1,7 @@
 /**
  * Who gets the alerts for administrators, besides the administrators themselves: a list of addresses. One is
  * added with Enter, the button or by leaving the field; a pasted list (commas, semicolons, spaces) adds each.
+ * The list holds at most {@link MAX_RECIPIENTS}, as the server takes no more: a paste past it adds none.
  */
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -13,7 +14,7 @@ import Typography from "@mui/material/Typography";
 import AddIcon from "@mui/icons-material/Add";
 import CancelIcon from "@mui/icons-material/Cancel";
 
-import { isAddress } from "./model";
+import { isAddress, MAX_RECIPIENTS } from "./model";
 
 export function RecipientsField({
   value,
@@ -27,7 +28,8 @@ export function RecipientsField({
 }) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState("");
-  const [wrong, setWrong] = useState(false);
+  // Why the typed text was not added: not an address, or the list would be too long.
+  const [refused, setRefused] = useState<"not_an_address" | "too_many" | null>(null);
 
   function add() {
     const items = draft
@@ -36,17 +38,26 @@ export function RecipientsField({
       .filter(Boolean);
     if (!items.length) return;
     if (!items.every(isAddress)) {
-      setWrong(true);
+      setRefused("not_an_address");
       return;
     }
     const next = [...value];
     for (const item of items) {
       if (!next.some((known) => known.toLowerCase() === item.toLowerCase())) next.push(item);
     }
+    if (next.length > MAX_RECIPIENTS) {
+      setRefused("too_many");
+      return;
+    }
     onChange(next);
     setDraft("");
-    setWrong(false);
+    setRefused(null);
   }
+
+  const refusal =
+    refused === "too_many"
+      ? t("mail.alerts.too_many", { max: MAX_RECIPIENTS })
+      : refused && t("mail.alerts.not_an_address");
 
   return (
     <Stack spacing={1.5}>
@@ -77,7 +88,7 @@ export function RecipientsField({
           value={draft}
           onChange={(event) => {
             setDraft(event.target.value);
-            setWrong(false);
+            setRefused(null);
           }}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
@@ -86,8 +97,8 @@ export function RecipientsField({
             }
           }}
           onBlur={add}
-          error={wrong || !!error}
-          helperText={wrong ? t("mail.alerts.not_an_address") : (error ?? t("mail.alerts.address_help"))}
+          error={!!refusal || !!error}
+          helperText={refusal || (error ?? t("mail.alerts.address_help"))}
           slotProps={{ htmlInput: { spellCheck: false, autoComplete: "off" } }}
         />
         <Button variant="outlined" startIcon={<AddIcon />} onClick={add} sx={{ flexShrink: 0, minHeight: 40 }}>

@@ -62,8 +62,15 @@ beforeEach(() => {
   >);
 });
 
-function renderTab() {
-  return renderPage(<MailSettingsTab />, { context: { userEmail: "admin@example.com", rootModeActive: false } });
+/** The tab in the admin layout, which polls whether root mode is on (as the server's VIEW says: on). */
+function renderTab(rootModeActive = true) {
+  return renderPage(<MailSettingsTab />, { context: { userEmail: "admin@example.com", rootModeActive } });
+}
+
+/** Picks *option* in the select labelled *name*. */
+function choose(name: string, option: string) {
+  fireEvent.mouseDown(screen.getByRole("combobox", { name }));
+  fireEvent.click(within(screen.getByRole("listbox")).getByText(option));
 }
 
 const textbox = (name: RegExp) => screen.getByRole("textbox", { name });
@@ -163,14 +170,58 @@ describe("the mail form", () => {
 
   it("says that a new password needs root mode while it is off", async () => {
     get.mockResolvedValue({ ...VIEW, root_mode: false });
-    const { unmount } = renderTab();
+    const { unmount } = renderTab(false);
     expect(await screen.findByTestId("mail-root-mode-hint")).toHaveTextContent("needs root mode");
     unmount();
 
     // Switched on in the top bar after the page loaded: the layout says so.
-    renderPage(<MailSettingsTab />, { context: { userEmail: "admin@example.com", rootModeActive: true } });
+    renderTab(true);
     await screen.findByDisplayValue("mail.example.com");
     expect(screen.queryByTestId("mail-root-mode-hint")).not.toBeInTheDocument();
+  });
+
+  it("says it again once root mode has ended while the page was open", async () => {
+    // The server said on when the page loaded; the layout's poll says it is off now.
+    renderTab(false);
+    expect(await screen.findByTestId("mail-root-mode-hint")).toHaveTextContent("needs root mode");
+  });
+
+  it("goes by the server's word on root mode outside the admin layout", async () => {
+    get.mockResolvedValue({ ...VIEW, root_mode: false });
+    renderPage(<MailSettingsTab />);
+    expect(await screen.findByTestId("mail-root-mode-hint")).toBeInTheDocument();
+  });
+
+  it("says that changed trusted certificates need root mode, and where the server refused it", async () => {
+    save.mockRejectedValue(
+      new ApiError("root mode", 403, undefined, { problems: [{ field: "ca_bundle", code: "root_mode" }] }),
+    );
+    renderTab(false);
+    await screen.findByDisplayValue("mail.example.com");
+    expect(screen.queryByTestId("mail-certificates-root-mode-hint")).not.toBeInTheDocument();
+
+    fireEvent.change(textbox(/^Certificates/), { target: { value: "-----BEGIN CERTIFICATE-----\nMII\n-----END CERTIFICATE-----" } });
+    expect(screen.getByTestId("mail-certificates-root-mode-hint")).toHaveTextContent(
+      "Changing the trusted certificates needs root mode",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByTestId("mail-save-result")).toHaveTextContent(
+      "A new password or client secret, or changed trusted certificates, need root mode",
+    );
+    expect(textbox(/^Certificates/)).toHaveAccessibleDescription("Changing it needs root mode: switch it on in the top bar.");
+  });
+
+  it("says in words that the trusted certificates hold something else than certificates", async () => {
+    save.mockRejectedValue(
+      new ApiError("refused", 422, undefined, { problems: [{ field: "ca_bundle", code: "not_certificate" }] }),
+    );
+    renderTab();
+    await screen.findByDisplayValue("mail.example.com");
+    fireEvent.change(textbox(/^Certificates/), { target: { value: "-----BEGIN PRIVATE KEY-----\nMII\n-----END PRIVATE KEY-----" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByTestId("mail-save-result")).toHaveTextContent("Some fields need attention");
+    expect(textbox(/^Certificates/)).toHaveAccessibleDescription(/^Only certificates: this text holds another kind of PEM block/);
   });
 
   it("words a failed test mail and shows the mail server's own reply", async () => {
@@ -193,11 +244,33 @@ describe("the mail form", () => {
     expect(within(result).getByTestId("mail-failure-text")).toHaveTextContent(
       "The mail server refused the sign-in: check the user name and the password",
     );
+    expect(within(result).getByTestId("mail-failure-reason-label")).toHaveTextContent("The mail server's own words:");
     expect(within(result).getByTestId("mail-failure-reason")).toHaveTextContent(
       "535 5.7.8 Authentication credentials invalid",
     );
     // The form's values go with it, unsaved: the admin tries them before saving.
     expect(test).toHaveBeenCalledWith("admin@example.com", expect.objectContaining({ host: "mail.example.com", password: null }));
+  });
+
+  it("does not pass the mail service's own words off as the mail server's", async () => {
+    test.mockResolvedValue({
+      ok: false,
+      code: "tls_failed",
+      reason: "TLSV1_ALERT_PROTOCOL_VERSION (this port may expect STARTTLS)",
+      tls_version: "",
+      auth: "",
+      elapsed_ms: null,
+    });
+    renderTab();
+    await screen.findByDisplayValue("mail.example.com");
+    fireEvent.click(screen.getByRole("button", { name: "Send a test mail" }));
+
+    const result = await screen.findByTestId("mail-test-result");
+    expect(within(result).getByTestId("mail-failure-text")).toHaveTextContent(
+      "and that the mail server offers TLS 1.2 or newer",
+    );
+    expect(within(result).getByTestId("mail-failure-reason-label")).toHaveTextContent(/^Details:$/);
+    expect(within(result).getByTestId("mail-failure-reason")).toHaveTextContent("TLSV1_ALERT_PROTOCOL_VERSION");
   });
 
   it("says how a test mail went out", async () => {
@@ -246,12 +319,91 @@ describe("the mail form", () => {
     get.mockResolvedValue({ ...VIEW, settings: { ...VIEW.settings, host: "", password_set: false, secrets_server: "" } });
     renderTab();
     await screen.findByTestId("mail-settings");
-    fireEvent.mouseDown(screen.getByRole("combobox", { name: "Sign in with" }));
-    fireEvent.click(within(screen.getByRole("listbox")).getByText("Microsoft 365"));
+    choose("Sign in with", "Microsoft 365");
     expect(textbox(/^Server/)).toHaveValue("smtp.office365.com");
     expect(textbox(/^Port/)).toHaveValue("587");
     expect(textbox(/^Tenant/)).toBeInTheDocument();
     expect(screen.getByTestId("mail-m365_client_secret")).toBeInTheDocument();
+    expect(screen.queryByTestId("mail-m365-server")).not.toBeInTheDocument();
+  });
+
+  it("switching to Microsoft 365 replaces another server, and says so", async () => {
+    get.mockResolvedValue({
+      ...VIEW,
+      settings: { ...VIEW.settings, host: "smtp.gmail.com", port: 465, security: "tls", secrets_server: "smtp.gmail.com:465" },
+    });
+    renderTab();
+    await screen.findByDisplayValue("smtp.gmail.com");
+    choose("Sign in with", "Microsoft 365");
+
+    expect(textbox(/^Server/)).toHaveValue("smtp.office365.com");
+    expect(textbox(/^Port/)).toHaveValue("587");
+    expect(screen.getByRole("combobox", { name: "Encryption" })).toHaveTextContent("STARTTLS (port 587)");
+    expect(screen.getByTestId("mail-m365-server")).toHaveTextContent(
+      "The server is now smtp.office365.com, port 587, STARTTLS, in place of smtp.gmail.com",
+    );
+  });
+
+  it("never sends a Microsoft 365 sign-in toward another server", async () => {
+    renderTab();
+    await screen.findByDisplayValue("mail.example.com");
+    choose("Sign in with", "Microsoft 365");
+    fireEvent.change(textbox(/^Server/), { target: { value: "smtp.gmail.com" } });
+    expect(screen.queryByTestId("mail-m365-server")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Send a test mail" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByTestId("mail-save-result")).toHaveTextContent("Some fields need attention");
+    expect(textbox(/^Server/)).toHaveAccessibleDescription(
+      "With Microsoft 365 the server must be smtp.office365.com: the sign-in goes nowhere else.",
+    );
+    expect(test).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+
+    // Microsoft's own server, as typed by hand (any case, a trailing dot): fine.
+    fireEvent.change(textbox(/^Server/), { target: { value: "SMTP.Office365.com." } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+  });
+
+  it("puts the server's refusal of another server for Microsoft 365 on the Server field", async () => {
+    save.mockRejectedValue(new ApiError("refused", 422, undefined, { problems: [{ field: "host", code: "m365_host" }] }));
+    renderTab();
+    await screen.findByDisplayValue("mail.example.com");
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await screen.findByTestId("mail-save-result");
+    expect(textbox(/^Server/)).toHaveAccessibleDescription(/^With Microsoft 365 the server must be smtp\.office365\.com/);
+  });
+
+  it("links the Help page, and its Microsoft 365 steps", async () => {
+    renderTab();
+    await screen.findByDisplayValue("mail.example.com");
+    expect(screen.getByTestId("mail-help")).toHaveAttribute("href", "/help/administer/mail/");
+    choose("Sign in with", "Microsoft 365");
+    expect(screen.getByTestId("mail-m365-help")).toHaveAttribute("href", "/help/administer/mail/#microsoft-365");
+  });
+
+  it("takes at most 50 alert recipients, and no longer texts than the server", async () => {
+    const many = Array.from({ length: 49 }, (_, i) => `ops${i}@example.com`);
+    get.mockResolvedValue({ ...VIEW, settings: { ...VIEW.settings, admin_recipients: many } });
+    renderTab();
+    await screen.findByDisplayValue("mail.example.com");
+    const add = textbox(/^Add an address/);
+
+    fireEvent.change(add, { target: { value: "a@example.com, b@example.com" } });
+    fireEvent.keyDown(add, { key: "Enter" });
+    expect(add).toHaveAccessibleDescription("At most 50 addresses.");
+    expect(add).toHaveValue("a@example.com, b@example.com");
+    expect(screen.queryByText("a@example.com")).not.toBeInTheDocument();
+
+    fireEvent.change(add, { target: { value: "a@example.com" } });
+    fireEvent.keyDown(add, { key: "Enter" });
+    expect(screen.getByText("a@example.com")).toBeInTheDocument();
+
+    expect(textbox(/^Server/)).toHaveAttribute("maxLength", "253");
+    expect(textbox(/^Sender name/)).toHaveAttribute("maxLength", "200");
+    expect(screen.getByTestId("mail-password")).toHaveAttribute("maxLength", "1024");
   });
 });
 

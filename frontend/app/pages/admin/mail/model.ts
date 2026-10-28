@@ -28,8 +28,37 @@ export interface MailFormState {
 /** Each encryption's usual port. */
 export const DEFAULT_PORT: Record<MailSecurity, string> = { starttls: "587", tls: "465" };
 
-/** Where Microsoft 365 takes mail from applications (SMTP AUTH with OAuth). */
+/** Where Microsoft 365 takes mail from applications (SMTP AUTH with OAuth); its sign-in goes nowhere else. */
 export const M365_HOST = "smtp.office365.com";
+
+/** The most alert recipients the server takes. */
+export const MAX_RECIPIENTS = 50;
+
+/** The longest text the server takes in each field. */
+export const MAX_LENGTH = {
+  host: 253,
+  username: 320,
+  password: 1024,
+  ca_bundle: 200_000,
+  helo_name: 253,
+  from_email: 320,
+  from_name: 200,
+  link_base: 2048,
+  m365_tenant_id: 100,
+  m365_client_id: 100,
+  m365_client_secret: 1024,
+  to: 320,
+} as const;
+
+/** A host name as the server compares it: lower case, without a trailing dot. */
+function hostName(host: string): string {
+  return host.trim().toLowerCase().replace(/\.$/, "");
+}
+
+/** Whether *host* is Microsoft 365's (the only server its sign-in goes to). */
+export function isM365Host(host: string): boolean {
+  return hostName(host) === M365_HOST;
+}
 
 /** The server's address check, so an address is refused before it is added to a list. */
 const ADDRESS = /^[^@\s<>"(),;:]+@[^@\s<>"(),;:]+\.[^@\s<>"(),;:]+$/;
@@ -68,7 +97,13 @@ export function portNumber(port: string): number | null {
 
 /** What the form itself can tell is wrong before anything is sent. */
 export function localProblems(form: MailFormState): MailProblem[] {
-  return portNumber(form.port) === null ? [{ field: "port", code: form.port.trim() ? "invalid" : "required" }] : [];
+  const problems: MailProblem[] = [];
+  if (portNumber(form.port) === null) problems.push({ field: "port", code: form.port.trim() ? "invalid" : "required" });
+  // The Microsoft 365 sign-in is never sent to another server (the server refuses it too).
+  if (form.auth === "microsoft365" && form.host.trim() && !isM365Host(form.host)) {
+    problems.push({ field: "host", code: "m365_host" });
+  }
+  return problems;
 }
 
 /**
@@ -105,17 +140,27 @@ export function withSecurity(form: MailFormState, security: MailSecurity): Parti
   return usual ? { security, port: DEFAULT_PORT[security] } : { security };
 }
 
-/** The change to make when the sign-in changes: Microsoft 365 brings its server when none is set yet. */
+/**
+ * The change to make when the sign-in changes: Microsoft 365 always brings its server (smtp.office365.com, 587,
+ * STARTTLS), as its sign-in goes nowhere else. The other sign-ins keep the server.
+ */
 export function withAuth(form: MailFormState, auth: MailAuth): Partial<MailFormState> {
-  if (auth === "microsoft365" && !form.host.trim()) {
+  if (auth === "microsoft365") {
     return { auth, host: M365_HOST, port: DEFAULT_PORT.starttls, security: "starttls" };
   }
   return { auth };
 }
 
+/** The server a switch to *auth* replaces, to say so; `null` when none is replaced. */
+export function replacedServer(form: MailFormState, auth: MailAuth): string | null {
+  if (auth !== "microsoft365" || form.auth === "microsoft365") return null;
+  const host = form.host.trim();
+  return host && !isM365Host(host) ? host : null;
+}
+
 /** `host:port`, as the server compares it with the one the stored secrets were saved for. */
 export function serverOf(form: MailFormState): string {
-  return `${form.host.trim().toLowerCase().replace(/\.$/, "")}:${portNumber(form.port) ?? form.port.trim()}`;
+  return `${hostName(form.host)}:${portNumber(form.port) ?? form.port.trim()}`;
 }
 
 /** The problems by field (the first one each), for the fields' helper texts. */

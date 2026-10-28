@@ -104,7 +104,7 @@ export interface MailTestResult {
   ok: boolean;
   /** One of {@link MAIL_FAILURES} when it failed. */
   code: string | null;
-  /** The mail server's own words. */
+  /** Why, as given: the mail server's reply, or the mail service's own account (in English). */
   reason: string;
   tls_version: string;
   auth: MailAuth | "";
@@ -139,7 +139,11 @@ export const MAIL_FAILURES = [
 /** What is wrong with one field of the form. */
 export interface MailProblem {
   field: string;
-  /** `required`, `invalid`, `not_https`, `again_for_new_server`, `root_mode`. */
+  /**
+   * `required`, `invalid`, `not_https`, `again_for_new_server`, `root_mode` (a secret or the trusted certificates
+   * changed without it), `m365_host` (Microsoft 365 with another server than smtp.office365.com),
+   * `not_certificate` (a PEM block that is no certificate, e.g. a private key).
+   */
   code: string;
 }
 

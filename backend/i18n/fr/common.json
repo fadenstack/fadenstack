@@ -1000,6 +1000,7 @@
   },
   "mail": {
     "intro": "Comment ce serveur envoie les e-mails (réinitialisations de mot de passe, codes pour lier une connexion, alertes pour les administrateurs) : via le serveur de messagerie de votre organisation, sur cette machine ou une autre. Les e-mails ne partent jamais sans chiffrement.",
+    "help": "Configurer la messagerie pas à pas (Aide)",
     "state": {
       "title": "État de la messagerie",
       "goes_out": "Les e-mails partent.",
@@ -1048,6 +1049,8 @@
       "auth_none_help": "Pour un relais de votre réseau qui accepte les e-mails de ce serveur sans connexion.",
       "auth_password_help": "Le compte sur le serveur de messagerie, comme la boîte aux lettres d'un hébergeur.",
       "auth_microsoft365_help": "Se connecte en OAuth comme application enregistrée dans Microsoft Entra ID ; aucun mot de passe d'une personne n'est enregistré.",
+      "m365_help": "L'application dans Microsoft Entra ID et la boîte aux lettres dans Exchange Online, pas à pas (Aide)",
+      "m365_server": "Le serveur est désormais smtp.office365.com, port 587, STARTTLS, au lieu de {{host}} : Microsoft 365 n'accepte le courrier des applications que là, et la connexion ne va nulle part ailleurs.",
       "username": "Nom d'utilisateur",
       "username_help": "Souvent l'adresse de la boîte aux lettres.",
       "password": "Mot de passe",
@@ -1076,7 +1079,8 @@
       "expired": "Expiré le {{date}}",
       "ca_without_key_usage": "Le service de messagerie refuse cette CA : elle ne peut pas signer de certificats (pas d'usage de clé, RFC 5280). Collez plutôt le certificat propre du serveur de messagerie, ou faites réémettre la CA.",
       "unreadable": "Le texte enregistré ne contient aucun certificat lisible : collez de nouveau les certificats.",
-      "unsaved": "Modifié : les certificats sont lus à l'enregistrement."
+      "unsaved": "Modifié : les certificats sont lus à l'enregistrement.",
+      "root_mode_hint": "Modifier les certificats de confiance nécessite le mode Root : activez-le dans la barre du haut avant d'enregistrer."
     },
     "sender": {
       "title": "Expéditeur",
@@ -1099,6 +1103,7 @@
       "address": "Ajouter une adresse",
       "address_help": "Appuyez sur Entrée pour l'ajouter. Plusieurs à la fois : séparez-les par des virgules.",
       "not_an_address": "Ce n'est pas une adresse e-mail.",
+      "too_many": "{{max}} adresses au maximum.",
       "remove": "Retirer {{address}}",
       "add": "Ajouter"
     },
@@ -1118,7 +1123,7 @@
     "save": {
       "saved": "Paramètres de messagerie enregistrés. Le prochain e-mail part avec eux.",
       "problems": "Certains champs demandent votre attention : voir les remarques en dessous.",
-      "root_mode": "Un nouveau mot de passe ou secret client nécessite le mode Root : activez-le dans la barre du haut, puis enregistrez de nouveau."
+      "root_mode": "Un nouveau mot de passe ou secret client, ou des certificats de confiance modifiés, nécessitent le mode Root : activez-le dans la barre du haut, puis enregistrez de nouveau."
     },
     "problems": {
       "required": "Obligatoire.",
@@ -1126,6 +1131,8 @@
       "not_https": "Doit commencer par https:// (http seulement pour localhost).",
       "again_for_new_server": "La valeur enregistrée l'a été pour un autre serveur : saisissez-la de nouveau pour l'utiliser avec celui-ci.",
       "root_mode": "La modifier nécessite le mode Root : activez-le dans la barre du haut.",
+      "m365_host": "Avec Microsoft 365, le serveur doit être smtp.office365.com : la connexion ne va nulle part ailleurs.",
+      "not_certificate": "Uniquement des certificats : ce texte contient un autre type de bloc PEM, par exemple une clé privée. Collez uniquement les blocs de -----BEGIN CERTIFICATE----- à -----END CERTIFICATE-----.",
       "host_invalid": "Ce n'est ni un nom ni une adresse de serveur.",
       "port_invalid": "Un nombre de 1 à 65535.",
       "helo_name_invalid": "Ce n'est pas un nom de serveur.",
@@ -1141,6 +1148,7 @@
     },
     "failure": {
       "server_said": "Les mots du serveur de messagerie :",
+      "details": "Détails :",
       "unknown": "Le service de messagerie a signalé {{code}}.",
       "not_configured": "Les paramètres de messagerie sont incomplets : vérifiez le serveur, la connexion et l'expéditeur.",
       "dns_failed": "Le nom du serveur est introuvable : vérifiez l'orthographe et que le DNS de ce serveur le connaît.",
@@ -1150,13 +1158,13 @@
       "tls_untrusted": "Le certificat du serveur de messagerie n'est pas reconnu : ajoutez la CA de votre organisation sous Certificats de confiance.",
       "tls_expired": "Le certificat du serveur de messagerie a expiré : il doit être renouvelé sur le serveur de messagerie.",
       "tls_name_mismatch": "Le certificat du serveur de messagerie est établi pour un autre nom : utilisez le nom auquel il est délivré.",
-      "tls_failed": "La connexion chiffrée a échoué : vérifiez que le chiffrement correspond au port (STARTTLS sur 587, TLS sur 465).",
+      "tls_failed": "La connexion chiffrée a échoué : vérifiez que le chiffrement correspond au port (STARTTLS sur 587, TLS sur 465) et que le serveur de messagerie propose TLS 1.2 ou plus récent.",
       "greeting_refused": "Le serveur de messagerie a refusé la salutation de ce serveur : indiquez un nom de salutation qu'il accepte, en général un nom DNS complet.",
       "login_unsupported": "Le serveur de messagerie ne propose pas ce type de connexion sur ce port : vérifiez le port ou choisissez une autre connexion.",
       "login_required": "Le serveur de messagerie exige une connexion : choisissez une connexion et indiquez le compte.",
       "login_refused": "Le serveur de messagerie a refusé la connexion : vérifiez le nom d'utilisateur et le mot de passe, ou les droits de l'application dans Microsoft 365.",
       "secret_for_other_server": "Le mot de passe ou le secret enregistré l'a été pour un autre serveur : saisissez-le de nouveau pour celui-ci et enregistrez.",
-      "oauth_failed": "Microsoft 365 n'a délivré aucun jeton : vérifiez le locataire, l'ID d'application et le secret client, ainsi que le consentement de l'application.",
+      "oauth_failed": "Microsoft 365 n'a délivré aucun jeton : vérifiez le locataire, l'ID d'application et le secret client, le consentement de l'application, et que le service de messagerie atteint login.microsoftonline.com (HTTPS, port 443).",
       "sender_refused": "Le serveur de messagerie a refusé l'adresse de l'expéditeur : le compte doit pouvoir envoyer en son nom.",
       "relay_refused": "Le serveur de messagerie ne relaie pas les e-mails de ce serveur : autorisez ce serveur à relayer, ou connectez-vous.",
       "recipient_refused": "Le serveur de messagerie a refusé le destinataire : vérifiez l'adresse.",

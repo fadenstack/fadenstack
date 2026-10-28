@@ -18,7 +18,15 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import { MAIL_FAILURES, type MailState } from "~/api/mailSettings";
 import { formatDateTime } from "~/lib/dates";
 
-/** The failure code as a sentence with what to do, and the mail server's reply as it gave it. */
+/** Whether *reason* is a mail server's reply (it starts with an SMTP reply code), not the mail service's words. */
+export function isServerReply(reason: string): boolean {
+  return /^[2-5]\d\d[\s-]/.test(reason.trim());
+}
+
+/**
+ * The failure code as a sentence with what to do, and the reason as given: labelled as the mail server's words
+ * only when it is its reply; otherwise (the network's or the mail service's own account) as details.
+ */
 export function FailureText({ code, reason }: { code: string; reason: string }) {
   const { t } = useTranslation();
   const known = (MAIL_FAILURES as readonly string[]).includes(code);
@@ -29,8 +37,8 @@ export function FailureText({ code, reason }: { code: string; reason: string }) 
       </Typography>
       {reason && (
         <Box>
-          <Typography variant="caption" color="text.secondary">
-            {t("mail.failure.server_said")}
+          <Typography variant="caption" color="text.secondary" data-testid="mail-failure-reason-label">
+            {isServerReply(reason) ? t("mail.failure.server_said") : t("mail.failure.details")}
           </Typography>
           <Box
             component="pre"

@@ -1000,6 +1000,7 @@
   },
   "mail": {
     "intro": "How this server sends mail (password resets, codes to link a sign-in, alerts for administrators): through your organisation's mail server, on this machine or another. Mail never goes out unencrypted.",
+    "help": "How to set up mail, step by step (Help)",
     "state": {
       "title": "Mail state",
       "goes_out": "Mail goes out.",
@@ -1048,6 +1049,8 @@
       "auth_none_help": "For a relay in your network that accepts mail from this server without a sign-in.",
       "auth_password_help": "The account on the mail server, as with a hosting provider's mailbox.",
       "auth_microsoft365_help": "Signs in with OAuth as an app registered in Microsoft Entra ID; no person's password is stored.",
+      "m365_help": "The app in Microsoft Entra ID and the mailbox in Exchange Online, step by step (Help)",
+      "m365_server": "The server is now smtp.office365.com, port 587, STARTTLS, in place of {{host}}: Microsoft 365 takes mail from applications only there, and the sign-in goes nowhere else.",
       "username": "User name",
       "username_help": "Often the mailbox's address.",
       "password": "Password",
@@ -1076,7 +1079,8 @@
       "expired": "Expired on {{date}}",
       "ca_without_key_usage": "The mail service refuses this CA: it may not sign certificates (no key usage, RFC 5280). Paste the mail server's own certificate instead, or have the CA reissued.",
       "unreadable": "The saved text holds no certificate that can be read: paste the certificates again.",
-      "unsaved": "Changed: the certificates are read when you save."
+      "unsaved": "Changed: the certificates are read when you save.",
+      "root_mode_hint": "Changing the trusted certificates needs root mode: switch it on in the top bar before you save."
     },
     "sender": {
       "title": "Sender",
@@ -1099,6 +1103,7 @@
       "address": "Add an address",
       "address_help": "Press Enter to add it. Several at once: separate them with commas.",
       "not_an_address": "Not a mail address.",
+      "too_many": "At most {{max}} addresses.",
       "remove": "Remove {{address}}",
       "add": "Add"
     },
@@ -1118,7 +1123,7 @@
     "save": {
       "saved": "Mail settings saved. The next mail goes out with them.",
       "problems": "Some fields need attention: see the notes under them.",
-      "root_mode": "A new password or client secret needs root mode: switch it on in the top bar, then save again."
+      "root_mode": "A new password or client secret, or changed trusted certificates, need root mode: switch it on in the top bar, then save again."
     },
     "problems": {
       "required": "Required.",
@@ -1126,6 +1131,8 @@
       "not_https": "Must start with https:// (http only for localhost).",
       "again_for_new_server": "The stored one was saved for another server: type it again to use it with this one.",
       "root_mode": "Changing it needs root mode: switch it on in the top bar.",
+      "m365_host": "With Microsoft 365 the server must be smtp.office365.com: the sign-in goes nowhere else.",
+      "not_certificate": "Only certificates: this text holds another kind of PEM block, e.g. a private key. Paste only the blocks from -----BEGIN CERTIFICATE----- to -----END CERTIFICATE-----.",
       "host_invalid": "Not a server name or address.",
       "port_invalid": "A number from 1 to 65535.",
       "helo_name_invalid": "Not a server name.",
@@ -1141,6 +1148,7 @@
     },
     "failure": {
       "server_said": "The mail server's own words:",
+      "details": "Details:",
       "unknown": "The mail service reported {{code}}.",
       "not_configured": "The mail settings are incomplete: check the server, the sign-in and the sender.",
       "dns_failed": "The server's name cannot be found: check the spelling, and that this server's DNS knows it.",
@@ -1150,13 +1158,13 @@
       "tls_untrusted": "The mail server's certificate is not trusted: add your organisation's CA under Trusted certificates.",
       "tls_expired": "The mail server's certificate has expired: it must be renewed on the mail server.",
       "tls_name_mismatch": "The mail server's certificate is for another name: use the name it is issued to.",
-      "tls_failed": "The encrypted connection failed: check that the encryption matches the port (STARTTLS on 587, TLS on 465).",
+      "tls_failed": "The encrypted connection failed: check that the encryption matches the port (STARTTLS on 587, TLS on 465), and that the mail server offers TLS 1.2 or newer.",
       "greeting_refused": "The mail server refused this server's greeting: set a greeting name it accepts, usually a full DNS name.",
       "login_unsupported": "The mail server offers no sign-in of this kind on this port: check the port, or choose another sign-in.",
       "login_required": "The mail server requires a sign-in: choose a sign-in and enter the account.",
       "login_refused": "The mail server refused the sign-in: check the user name and the password, or the app's rights in Microsoft 365.",
       "secret_for_other_server": "The stored password or secret was saved for another server: type it again for this one and save.",
-      "oauth_failed": "Microsoft 365 issued no token: check the tenant, the application ID and the client secret, and the app's consent.",
+      "oauth_failed": "Microsoft 365 issued no token: check the tenant, the application ID and the client secret, the app's consent, and that the mail service reaches login.microsoftonline.com (HTTPS, port 443).",
       "sender_refused": "The mail server refused the sender address: the account must be allowed to send as it.",
       "relay_refused": "The mail server does not pass on mail for this server: allow this server to relay, or sign in.",
       "recipient_refused": "The mail server refused the recipient: check the address.",

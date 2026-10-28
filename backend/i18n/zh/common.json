@@ -1005,6 +1005,7 @@
   },
   "mail": {
     "intro": "本服务器如何发送邮件（密码重置、关联登录的验证码、管理员告警）：通过贵组织的邮件服务器发送，它可以在本机，也可以在另一台机器上。邮件绝不会以未加密的方式发出。",
+    "help": "逐步设置邮件（帮助）",
     "state": {
       "title": "邮件状态",
       "goes_out": "邮件可以发出。",
@@ -1053,6 +1054,8 @@
       "auth_none_help": "适用于您网络中无需登录即接受本服务器邮件的中继。",
       "auth_password_help": "邮件服务器上的账户，例如托管服务商提供的邮箱。",
       "auth_microsoft365_help": "以在 Microsoft Entra ID 中注册的应用身份通过 OAuth 登录；不保存任何个人的密码。",
+      "m365_help": "逐步设置 Microsoft Entra ID 中的应用和 Exchange Online 中的邮箱（帮助）",
+      "m365_server": "服务器已从 {{host}} 改为 smtp.office365.com，端口 587，STARTTLS：Microsoft 365 只在此处接收应用程序的邮件，登录信息也不会发往其他地方。",
       "username": "用户名",
       "username_help": "通常是邮箱地址。",
       "password": "密码",
@@ -1081,7 +1084,8 @@
       "expired": "已于 {{date}} 过期",
       "ca_without_key_usage": "邮件服务拒绝此 CA：它不能签发证书（缺少密钥用法，RFC 5280）。请改为粘贴邮件服务器自己的证书，或让 CA 重新签发。",
       "unreadable": "保存的文本中没有可读取的证书：请重新粘贴证书。",
-      "unsaved": "已更改：保存时会读取证书。"
+      "unsaved": "已更改：保存时会读取证书。",
+      "root_mode_hint": "更改受信任的证书需要 Root 模式：请在保存前于顶部栏中启用它。"
     },
     "sender": {
       "title": "发件人",
@@ -1104,6 +1108,7 @@
       "address": "添加地址",
       "address_help": "按 Enter 添加。一次添加多个：用逗号分隔。",
       "not_an_address": "不是邮件地址。",
+      "too_many": "最多 {{max}} 个地址。",
       "remove": "移除 {{address}}",
       "add": "添加"
     },
@@ -1123,7 +1128,7 @@
     "save": {
       "saved": "邮件设置已保存。下一封邮件将按此发送。",
       "problems": "有些字段需要处理：请查看字段下方的说明。",
-      "root_mode": "新的密码或客户端密码需要 Root 模式：请在顶部栏中启用它，然后再次保存。"
+      "root_mode": "新的密码或客户端密码，或更改后的受信任证书，需要 Root 模式：请在顶部栏中启用它，然后再次保存。"
     },
     "problems": {
       "required": "必填。",
@@ -1131,6 +1136,8 @@
       "not_https": "必须以 https:// 开头（仅 localhost 可用 http）。",
       "again_for_new_server": "保存的值属于另一台服务器：请重新输入，以便用于这台服务器。",
       "root_mode": "更改它需要 Root 模式：请在顶部栏中启用。",
+      "m365_host": "使用 Microsoft 365 时，服务器必须是 smtp.office365.com：登录信息不会发往其他地方。",
+      "not_certificate": "只能是证书：此文本包含其他类型的 PEM 块，例如私钥。只粘贴从 -----BEGIN CERTIFICATE----- 到 -----END CERTIFICATE----- 的块。",
       "host_invalid": "不是服务器名称或地址。",
       "port_invalid": "1 到 65535 之间的数字。",
       "helo_name_invalid": "不是服务器名称。",
@@ -1146,6 +1153,7 @@
     },
     "failure": {
       "server_said": "邮件服务器的原话：",
+      "details": "详细信息：",
       "unknown": "邮件服务报告了 {{code}}。",
       "not_configured": "邮件设置不完整：请检查服务器、登录和发件人。",
       "dns_failed": "找不到服务器名称：请检查拼写，并确认本服务器的 DNS 能解析它。",
@@ -1155,13 +1163,13 @@
       "tls_untrusted": "邮件服务器的证书不受信任：请在“受信任的证书”中添加贵组织的 CA。",
       "tls_expired": "邮件服务器的证书已过期：必须在邮件服务器上更新。",
       "tls_name_mismatch": "邮件服务器的证书属于另一个名称：请使用证书所颁发给的名称。",
-      "tls_failed": "加密连接失败：请检查加密方式是否与端口匹配（587 用 STARTTLS，465 用 TLS）。",
+      "tls_failed": "加密连接失败：请检查加密方式是否与端口匹配（587 用 STARTTLS，465 用 TLS），以及邮件服务器是否支持 TLS 1.2 或更高版本。",
       "greeting_refused": "邮件服务器拒绝了本服务器的问候：请填写它接受的问候名称，通常是完整的 DNS 名称。",
       "login_unsupported": "邮件服务器在此端口上不提供这种登录方式：请检查端口，或选择其他登录方式。",
       "login_required": "邮件服务器要求登录：请选择一种登录方式并填写账户。",
       "login_refused": "邮件服务器拒绝了登录：请检查用户名和密码，或应用在 Microsoft 365 中的权限。",
       "secret_for_other_server": "保存的密码或客户端密码属于另一台服务器：请为这台服务器重新输入并保存。",
-      "oauth_failed": "Microsoft 365 未颁发令牌：请检查租户、应用程序 ID 和客户端密码，以及应用的同意授权。",
+      "oauth_failed": "Microsoft 365 未颁发令牌：请检查租户、应用程序 ID 和客户端密码、应用的同意授权，以及邮件服务能否访问 login.microsoftonline.com（HTTPS，端口 443）。",
       "sender_refused": "邮件服务器拒绝了发件人地址：该账户必须有权以此地址发送。",
       "relay_refused": "邮件服务器不为本服务器转发邮件：请允许本服务器中继，或改为登录。",
       "recipient_refused": "邮件服务器拒绝了收件人：请检查地址。",

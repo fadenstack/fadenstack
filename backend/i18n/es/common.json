@@ -1005,6 +1005,7 @@
   },
   "mail": {
     "intro": "Cómo envía correo este servidor (restablecimientos de contraseña, códigos para vincular un inicio de sesión, alertas para administradores): a través del servidor de correo de su organización, en esta máquina o en otra. El correo nunca sale sin cifrar.",
+    "help": "Cómo configurar el correo, paso a paso (Ayuda)",
     "state": {
       "title": "Estado del correo",
       "goes_out": "El correo sale.",
@@ -1053,6 +1054,8 @@
       "auth_none_help": "Para un relé de su red que acepta el correo de este servidor sin inicio de sesión.",
       "auth_password_help": "La cuenta en el servidor de correo, como el buzón de un proveedor de alojamiento.",
       "auth_microsoft365_help": "Inicia sesión con OAuth como una aplicación registrada en Microsoft Entra ID; no se guarda la contraseña de ninguna persona.",
+      "m365_help": "La aplicación en Microsoft Entra ID y el buzón en Exchange Online, paso a paso (Ayuda)",
+      "m365_server": "El servidor es ahora smtp.office365.com, puerto 587, STARTTLS, en lugar de {{host}}: Microsoft 365 solo acepta correo de aplicaciones allí, y el inicio de sesión no va a ningún otro sitio.",
       "username": "Usuario",
       "username_help": "A menudo, la dirección del buzón.",
       "password": "Contraseña",
@@ -1081,7 +1084,8 @@
       "expired": "Caducó el {{date}}",
       "ca_without_key_usage": "El servicio de correo rechaza esta CA: no puede firmar certificados (sin uso de clave, RFC 5280). Pegue en su lugar el certificado propio del servidor de correo, o haga que se vuelva a emitir la CA.",
       "unreadable": "El texto guardado no contiene ningún certificado legible: pegue los certificados de nuevo.",
-      "unsaved": "Modificado: los certificados se leen al guardar."
+      "unsaved": "Modificado: los certificados se leen al guardar.",
+      "root_mode_hint": "Cambiar los certificados de confianza requiere el modo root: actívelo en la barra superior antes de guardar."
     },
     "sender": {
       "title": "Remitente",
@@ -1104,6 +1108,7 @@
       "address": "Añadir una dirección",
       "address_help": "Pulse Intro para añadirla. Varias a la vez: sepárelas con comas.",
       "not_an_address": "No es una dirección de correo.",
+      "too_many": "Como máximo {{max}} direcciones.",
       "remove": "Quitar {{address}}",
       "add": "Añadir"
     },
@@ -1123,7 +1128,7 @@
     "save": {
       "saved": "Ajustes de correo guardados. El próximo correo sale con ellos.",
       "problems": "Algunos campos necesitan atención: vea las notas debajo de ellos.",
-      "root_mode": "Una contraseña o un secreto de cliente nuevos requieren el modo root: actívelo en la barra superior y vuelva a guardar."
+      "root_mode": "Una contraseña o un secreto de cliente nuevos, o unos certificados de confianza cambiados, requieren el modo root: actívelo en la barra superior y vuelva a guardar."
     },
     "problems": {
       "required": "Obligatorio.",
@@ -1131,6 +1136,8 @@
       "not_https": "Debe empezar por https:// (http solo para localhost).",
       "again_for_new_server": "El valor guardado era para otro servidor: escríbalo de nuevo para usarlo con este.",
       "root_mode": "Cambiarlo requiere el modo root: actívelo en la barra superior.",
+      "m365_host": "Con Microsoft 365, el servidor debe ser smtp.office365.com: el inicio de sesión no va a ningún otro sitio.",
+      "not_certificate": "Solo certificados: este texto contiene otro tipo de bloque PEM, p. ej. una clave privada. Pegue solo los bloques de -----BEGIN CERTIFICATE----- a -----END CERTIFICATE-----.",
       "host_invalid": "No es un nombre ni una dirección de servidor.",
       "port_invalid": "Un número de 1 a 65535.",
       "helo_name_invalid": "No es un nombre de servidor.",
@@ -1146,6 +1153,7 @@
     },
     "failure": {
       "server_said": "Las palabras del propio servidor de correo:",
+      "details": "Detalles:",
       "unknown": "El servicio de correo informó {{code}}.",
       "not_configured": "Los ajustes de correo están incompletos: compruebe el servidor, el inicio de sesión y el remitente.",
       "dns_failed": "No se encuentra el nombre del servidor: compruebe cómo está escrito y que el DNS de este servidor lo conoce.",
@@ -1155,13 +1163,13 @@
       "tls_untrusted": "El certificado del servidor de correo no es de confianza: añada la CA de su organización en Certificados de confianza.",
       "tls_expired": "El certificado del servidor de correo ha caducado: hay que renovarlo en el servidor de correo.",
       "tls_name_mismatch": "El certificado del servidor de correo es para otro nombre: use el nombre para el que se emitió.",
-      "tls_failed": "Falló la conexión cifrada: compruebe que el cifrado corresponde al puerto (STARTTLS en 587, TLS en 465).",
+      "tls_failed": "Falló la conexión cifrada: compruebe que el cifrado corresponde al puerto (STARTTLS en 587, TLS en 465) y que el servidor de correo ofrece TLS 1.2 o posterior.",
       "greeting_refused": "El servidor de correo rechazó el saludo de este servidor: indique un nombre de saludo que acepte, normalmente un nombre DNS completo.",
       "login_unsupported": "El servidor de correo no ofrece un inicio de sesión de este tipo en este puerto: compruebe el puerto o elija otro inicio de sesión.",
       "login_required": "El servidor de correo exige iniciar sesión: elija un inicio de sesión e indique la cuenta.",
       "login_refused": "El servidor de correo rechazó el inicio de sesión: compruebe el usuario y la contraseña, o los permisos de la aplicación en Microsoft 365.",
       "secret_for_other_server": "La contraseña o el secreto guardados eran para otro servidor: escríbalos de nuevo para este y guarde.",
-      "oauth_failed": "Microsoft 365 no emitió ningún token: compruebe el inquilino, el ID de aplicación y el secreto de cliente, y el consentimiento de la aplicación.",
+      "oauth_failed": "Microsoft 365 no emitió ningún token: compruebe el inquilino, el ID de aplicación y el secreto de cliente, el consentimiento de la aplicación, y que el servicio de correo llega a login.microsoftonline.com (HTTPS, puerto 443).",
       "sender_refused": "El servidor de correo rechazó la dirección del remitente: la cuenta debe poder enviar como ella.",
       "relay_refused": "El servidor de correo no reenvía correo para este servidor: permita que este servidor haga relé, o inicie sesión.",
       "recipient_refused": "El servidor de correo rechazó al destinatario: compruebe la dirección.",

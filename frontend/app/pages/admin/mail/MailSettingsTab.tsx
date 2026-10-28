@@ -17,6 +17,7 @@ import Button from "@mui/material/Button";
 import CircularProgress from "@mui/material/CircularProgress";
 import Divider from "@mui/material/Divider";
 import InputAdornment from "@mui/material/InputAdornment";
+import Link from "@mui/material/Link";
 import MenuItem from "@mui/material/MenuItem";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
@@ -37,6 +38,7 @@ import {
   type MailView,
 } from "~/api/mailSettings";
 import { formatDateTime } from "~/lib/dates";
+import { helpUrl } from "~/lib/pageHelp";
 
 import { FailureText, MailStatePanel } from "./MailState";
 import {
@@ -44,6 +46,8 @@ import {
   formFromSettings,
   isAddress,
   localProblems,
+  MAX_LENGTH,
+  replacedServer,
   serverOf,
   toBody,
   withAuth,
@@ -143,6 +147,8 @@ export default function MailSettingsTab() {
   const [toTouched, setToTouched] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testOutcome, setTestOutcome] = useState<TestOutcome | null>(null);
+  // The server that switching to Microsoft 365 replaced, to say so until the server is edited.
+  const [m365Replaced, setM365Replaced] = useState<string | null>(null);
 
   async function load() {
     setLoadError(null);
@@ -196,7 +202,9 @@ export default function MailSettingsTab() {
   }
 
   const stored = view.settings;
-  const rootMode = view.root_mode || !!context?.rootModeActive;
+  // The layout's polled state when it gives one (root mode ends while the page is open); else the server's.
+  const rootMode = typeof context?.rootModeActive === "boolean" ? context.rootModeActive : view.root_mode;
+  const helpPage = helpUrl("administer/mail", i18n.language);
   // The stored secrets go only to the server they were saved for (the server checks the same).
   const otherServer = serverOf(form) !== stored.secrets_server;
 
@@ -312,7 +320,7 @@ export default function MailSettingsTab() {
                 </InputAdornment>
               ) : undefined,
           },
-          htmlInput: { "data-testid": `mail-${field}` },
+          htmlInput: { "data-testid": `mail-${field}`, maxLength: MAX_LENGTH[field] },
         }}
       />
     );
@@ -327,7 +335,10 @@ export default function MailSettingsTab() {
   return (
     <Stack spacing={2} sx={{ maxWidth: 960, pb: 2 }} data-testid="mail-settings">
       <Typography variant="body2" color="text.secondary">
-        {t("mail.intro")}
+        {t("mail.intro")}{" "}
+        <Link href={helpPage} target="_blank" rel="noopener" data-testid="mail-help">
+          {t("mail.help")}
+        </Link>
       </Typography>
 
       {loadError && (
@@ -345,9 +356,12 @@ export default function MailSettingsTab() {
             fullWidth
             label={t("mail.server.host")}
             value={form.host}
-            onChange={(event) => set({ host: event.target.value })}
+            onChange={(event) => {
+              setM365Replaced(null);
+              set({ host: event.target.value });
+            }}
             {...check("host", t("mail.server.host_help"))}
-            slotProps={{ htmlInput: { spellCheck: false, dir: "ltr" } }}
+            slotProps={{ htmlInput: { spellCheck: false, dir: "ltr", maxLength: MAX_LENGTH.host } }}
           />
           <TextField
             size="small"
@@ -383,7 +397,11 @@ export default function MailSettingsTab() {
           select
           label={t("mail.sign_in.auth")}
           value={form.auth}
-          onChange={(event) => set(withAuth(form, event.target.value as MailAuth))}
+          onChange={(event) => {
+            const auth = event.target.value as MailAuth;
+            setM365Replaced(replacedServer(form, auth));
+            set(withAuth(form, auth));
+          }}
           {...check("auth", t(`mail.sign_in.auth_${form.auth}_help`))}
         >
           {AUTH.map((auth) => (
@@ -402,7 +420,9 @@ export default function MailSettingsTab() {
               value={form.username}
               onChange={(event) => set({ username: event.target.value })}
               {...check("username", t("mail.sign_in.username_help"))}
-              slotProps={{ htmlInput: { spellCheck: false, autoComplete: "off", dir: "ltr" } }}
+              slotProps={{
+                htmlInput: { spellCheck: false, autoComplete: "off", dir: "ltr", maxLength: MAX_LENGTH.username },
+              }}
             />
             {secretField("password", t("mail.sign_in.password"), stored.password_set, t("mail.sign_in.password_help"))}
             {rootModeHint}
@@ -411,6 +431,20 @@ export default function MailSettingsTab() {
 
         {form.auth === "microsoft365" && (
           <>
+            {m365Replaced && (
+              <Alert severity="info" variant="outlined" data-testid="mail-m365-server">
+                {t("mail.sign_in.m365_server", { host: m365Replaced })}
+              </Alert>
+            )}
+            <Link
+              href={`${helpPage}#microsoft-365`}
+              target="_blank"
+              rel="noopener"
+              variant="body2"
+              data-testid="mail-m365-help"
+            >
+              {t("mail.sign_in.m365_help")}
+            </Link>
             <TextField
               size="small"
               fullWidth
@@ -419,7 +453,9 @@ export default function MailSettingsTab() {
               value={form.username}
               onChange={(event) => set({ username: event.target.value })}
               {...check("username", t("mail.sign_in.mailbox_help"))}
-              slotProps={{ htmlInput: { spellCheck: false, autoComplete: "off", dir: "ltr" } }}
+              slotProps={{
+                htmlInput: { spellCheck: false, autoComplete: "off", dir: "ltr", maxLength: MAX_LENGTH.username },
+              }}
             />
             <TextField
               size="small"
@@ -428,7 +464,7 @@ export default function MailSettingsTab() {
               value={form.m365_tenant_id}
               onChange={(event) => set({ m365_tenant_id: event.target.value })}
               {...check("m365_tenant_id", t("mail.sign_in.tenant_help"))}
-              slotProps={{ htmlInput: { spellCheck: false, dir: "ltr" } }}
+              slotProps={{ htmlInput: { spellCheck: false, dir: "ltr", maxLength: MAX_LENGTH.m365_tenant_id } }}
             />
             <TextField
               size="small"
@@ -437,7 +473,7 @@ export default function MailSettingsTab() {
               value={form.m365_client_id}
               onChange={(event) => set({ m365_client_id: event.target.value })}
               {...check("m365_client_id", t("mail.sign_in.client_id_help"))}
-              slotProps={{ htmlInput: { spellCheck: false, dir: "ltr" } }}
+              slotProps={{ htmlInput: { spellCheck: false, dir: "ltr", maxLength: MAX_LENGTH.m365_client_id } }}
             />
             {secretField(
               "m365_client_secret",
@@ -462,7 +498,12 @@ export default function MailSettingsTab() {
           onChange={(event) => set({ ca_bundle: event.target.value })}
           {...check("ca_bundle", t("mail.certificates.pem_help"))}
           slotProps={{
-            htmlInput: { spellCheck: false, dir: "ltr", style: { fontFamily: "monospace", fontSize: "0.8125rem" } },
+            htmlInput: {
+              spellCheck: false,
+              dir: "ltr",
+              maxLength: MAX_LENGTH.ca_bundle,
+              style: { fontFamily: "monospace", fontSize: "0.8125rem" },
+            },
           }}
         />
         {view.certificates === null ? (
@@ -523,6 +564,12 @@ export default function MailSettingsTab() {
             {t("mail.certificates.unsaved")}
           </Typography>
         )}
+        {/* What the mail service trusts is protected, as a secret is. */}
+        {form.ca_bundle !== stored.ca_bundle && !rootMode && (
+          <Alert severity="info" variant="outlined" data-testid="mail-certificates-root-mode-hint">
+            {t("mail.certificates.root_mode_hint")}
+          </Alert>
+        )}
       </Section>
 
       <Section title={t("mail.sender.title")}>
@@ -534,7 +581,7 @@ export default function MailSettingsTab() {
           value={form.from_email}
           onChange={(event) => set({ from_email: event.target.value })}
           {...check("from_email", t("mail.sender.from_email_help"))}
-          slotProps={{ htmlInput: { spellCheck: false, dir: "ltr" } }}
+          slotProps={{ htmlInput: { spellCheck: false, dir: "ltr", maxLength: MAX_LENGTH.from_email } }}
         />
         <TextField
           size="small"
@@ -543,6 +590,7 @@ export default function MailSettingsTab() {
           value={form.from_name}
           onChange={(event) => set({ from_name: event.target.value })}
           {...check("from_name", t("mail.sender.from_name_help"))}
+          slotProps={{ htmlInput: { maxLength: MAX_LENGTH.from_name } }}
         />
         <TextField
           size="small"
@@ -551,7 +599,7 @@ export default function MailSettingsTab() {
           value={form.helo_name}
           onChange={(event) => set({ helo_name: event.target.value })}
           {...check("helo_name", t("mail.sender.helo_name_help"))}
-          slotProps={{ htmlInput: { spellCheck: false, dir: "ltr" } }}
+          slotProps={{ htmlInput: { spellCheck: false, dir: "ltr", maxLength: MAX_LENGTH.helo_name } }}
         />
       </Section>
 
@@ -564,7 +612,7 @@ export default function MailSettingsTab() {
           value={form.link_base}
           onChange={(event) => set({ link_base: event.target.value })}
           {...check("link_base", t("mail.links.link_base_help"))}
-          slotProps={{ htmlInput: { spellCheck: false, dir: "ltr" } }}
+          slotProps={{ htmlInput: { spellCheck: false, dir: "ltr", maxLength: MAX_LENGTH.link_base } }}
         />
       </Section>
 
@@ -595,7 +643,7 @@ export default function MailSettingsTab() {
               });
             }}
             {...check("to")}
-            slotProps={{ htmlInput: { spellCheck: false, dir: "ltr" } }}
+            slotProps={{ htmlInput: { spellCheck: false, dir: "ltr", maxLength: MAX_LENGTH.to } }}
           />
           <Button
             variant="outlined"

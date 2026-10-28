@@ -1005,6 +1005,7 @@
   },
   "mail": {
     "intro": "Wie dieser Server Mail verschickt (Passwort-Zurücksetzungen, Codes zum Verknüpfen einer Anmeldung, Warnungen für Administratoren): über den Mailserver Ihrer Organisation, auf diesem oder einem anderen Rechner. Mail geht nie unverschlüsselt hinaus.",
+    "help": "Mail Schritt für Schritt einrichten (Hilfe)",
     "state": {
       "title": "Mail-Status",
       "goes_out": "Mail geht hinaus.",
@@ -1053,6 +1054,8 @@
       "auth_none_help": "Für ein Relay in Ihrem Netz, das Mail von diesem Server ohne Anmeldung annimmt.",
       "auth_password_help": "Das Konto auf dem Mailserver, etwa das Postfach bei einem Hosting-Anbieter.",
       "auth_microsoft365_help": "Meldet sich per OAuth als App an, die in Microsoft Entra ID registriert ist; das Passwort einer Person wird nicht gespeichert.",
+      "m365_help": "Die App in Microsoft Entra ID und das Postfach in Exchange Online, Schritt für Schritt (Hilfe)",
+      "m365_server": "Der Server ist jetzt smtp.office365.com, Port 587, STARTTLS, statt {{host}}: Nur dort nimmt Microsoft 365 Mail von Anwendungen an, und die Anmeldung geht nirgendwo anders hin.",
       "username": "Benutzername",
       "username_help": "Oft die Adresse des Postfachs.",
       "password": "Passwort",
@@ -1081,7 +1084,8 @@
       "expired": "Abgelaufen am {{date}}",
       "ca_without_key_usage": "Der Mail-Dienst lehnt diese CA ab: Sie darf keine Zertifikate signieren (keine Schlüsselverwendung, RFC 5280). Fügen Sie stattdessen das eigene Zertifikat des Mailservers ein oder lassen Sie die CA neu ausstellen.",
       "unreadable": "Der gespeicherte Text enthält kein lesbares Zertifikat: Fügen Sie die Zertifikate erneut ein.",
-      "unsaved": "Geändert: Die Zertifikate werden beim Speichern gelesen."
+      "unsaved": "Geändert: Die Zertifikate werden beim Speichern gelesen.",
+      "root_mode_hint": "Eine Änderung der vertrauenswürdigen Zertifikate braucht den Root-Modus: Aktivieren Sie ihn in der oberen Leiste, bevor Sie speichern."
     },
     "sender": {
       "title": "Absender",
@@ -1104,6 +1108,7 @@
       "address": "Adresse hinzufügen",
       "address_help": "Mit Enter hinzufügen. Mehrere auf einmal: durch Kommas getrennt.",
       "not_an_address": "Keine Mailadresse.",
+      "too_many": "Höchstens {{max}} Adressen.",
       "remove": "{{address}} entfernen",
       "add": "Hinzufügen"
     },
@@ -1123,7 +1128,7 @@
     "save": {
       "saved": "Mail-Einstellungen gespeichert. Die nächste Mail geht damit hinaus.",
       "problems": "Einige Felder brauchen Ihre Aufmerksamkeit: Siehe die Hinweise darunter.",
-      "root_mode": "Ein neues Passwort oder ein neuer geheimer Schlüssel braucht den Root-Modus: Aktivieren Sie ihn in der oberen Leiste und speichern Sie erneut."
+      "root_mode": "Ein neues Passwort, ein neuer geheimer Schlüssel oder geänderte vertrauenswürdige Zertifikate brauchen den Root-Modus: Aktivieren Sie ihn in der oberen Leiste und speichern Sie erneut."
     },
     "problems": {
       "required": "Erforderlich.",
@@ -1131,6 +1136,8 @@
       "not_https": "Muss mit https:// beginnen (http nur für localhost).",
       "again_for_new_server": "Der gespeicherte Wert wurde für einen anderen Server gespeichert: Geben Sie ihn erneut ein, um ihn mit diesem zu verwenden.",
       "root_mode": "Eine Änderung braucht den Root-Modus: Aktivieren Sie ihn in der oberen Leiste.",
+      "m365_host": "Mit Microsoft 365 muss der Server smtp.office365.com sein: Die Anmeldung geht nirgendwo anders hin.",
+      "not_certificate": "Nur Zertifikate: Dieser Text enthält einen anderen PEM-Block, etwa einen privaten Schlüssel. Fügen Sie nur die Blöcke von -----BEGIN CERTIFICATE----- bis -----END CERTIFICATE----- ein.",
       "host_invalid": "Weder ein Servername noch eine Adresse.",
       "port_invalid": "Eine Zahl von 1 bis 65535.",
       "helo_name_invalid": "Kein Servername.",
@@ -1146,6 +1153,7 @@
     },
     "failure": {
       "server_said": "Die Worte des Mailservers:",
+      "details": "Einzelheiten:",
       "unknown": "Der Mail-Dienst meldete {{code}}.",
       "not_configured": "Die Mail-Einstellungen sind unvollständig: Prüfen Sie den Server, die Anmeldung und den Absender.",
       "dns_failed": "Der Name des Servers lässt sich nicht auflösen: Prüfen Sie die Schreibweise und ob das DNS dieses Servers ihn kennt.",
@@ -1155,13 +1163,13 @@
       "tls_untrusted": "Dem Zertifikat des Mailservers wird nicht vertraut: Tragen Sie die CA Ihrer Organisation unter Vertrauenswürdige Zertifikate ein.",
       "tls_expired": "Das Zertifikat des Mailservers ist abgelaufen: Es muss auf dem Mailserver erneuert werden.",
       "tls_name_mismatch": "Das Zertifikat des Mailservers gilt für einen anderen Namen: Verwenden Sie den Namen, auf den es ausgestellt ist.",
-      "tls_failed": "Die verschlüsselte Verbindung ist gescheitert: Prüfen Sie, ob die Verschlüsselung zum Port passt (STARTTLS auf 587, TLS auf 465).",
+      "tls_failed": "Die verschlüsselte Verbindung ist gescheitert: Prüfen Sie, ob die Verschlüsselung zum Port passt (STARTTLS auf 587, TLS auf 465) und ob der Mailserver TLS 1.2 oder neuer anbietet.",
       "greeting_refused": "Der Mailserver hat die Begrüßung dieses Servers abgelehnt: Tragen Sie einen Begrüßungsnamen ein, den er annimmt, meist einen vollständigen DNS-Namen.",
       "login_unsupported": "Der Mailserver bietet auf diesem Port keine Anmeldung dieser Art an: Prüfen Sie den Port oder wählen Sie eine andere Anmeldung.",
       "login_required": "Der Mailserver verlangt eine Anmeldung: Wählen Sie eine Anmeldung und tragen Sie das Konto ein.",
       "login_refused": "Der Mailserver hat die Anmeldung abgelehnt: Prüfen Sie Benutzername und Passwort oder die Rechte der App in Microsoft 365.",
       "secret_for_other_server": "Das gespeicherte Passwort oder der geheime Schlüssel gilt für einen anderen Server: Geben Sie ihn für diesen erneut ein und speichern Sie.",
-      "oauth_failed": "Microsoft 365 hat kein Token ausgestellt: Prüfen Sie Mandant, Anwendungs-ID und geheimen Clientschlüssel sowie die Zustimmung für die App.",
+      "oauth_failed": "Microsoft 365 hat kein Token ausgestellt: Prüfen Sie Mandant, Anwendungs-ID und geheimen Clientschlüssel, die Zustimmung für die App und ob der Mail-Dienst login.microsoftonline.com erreicht (HTTPS, Port 443).",
       "sender_refused": "Der Mailserver hat die Absenderadresse abgelehnt: Das Konto muss als diese Adresse senden dürfen.",
       "relay_refused": "Der Mailserver leitet für diesen Server keine Mail weiter: Erlauben Sie diesem Server das Relaying oder melden Sie sich an.",
       "recipient_refused": "Der Mailserver hat den Empfänger abgelehnt: Prüfen Sie die Adresse.",
