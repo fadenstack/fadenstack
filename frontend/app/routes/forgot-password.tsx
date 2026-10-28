@@ -14,7 +14,7 @@ import Typography from "@mui/material/Typography";
 import AppBrand from "~/components/AppBrand";
 import BrandMark from "~/components/BrandMark";
 
-import { auth } from "~/api/auth";
+import { auth, NotAnAddress } from "~/api/auth";
 
 export default function ForgotPasswordPage() {
   const { t } = useTranslation();
@@ -48,7 +48,7 @@ export default function ForgotPasswordPage() {
       await auth.forgotPassword(email);
       setSubmitted(true);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : t("auth.forgot_password_failed"));
+      setError(t(err instanceof NotAnAddress ? "auth.forgot_password_not_an_address" : "auth.forgot_password_failed"));
     } finally {
       setLoading(false);
     }
