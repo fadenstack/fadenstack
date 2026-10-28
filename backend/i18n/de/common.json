@@ -1087,7 +1087,10 @@
       "expired": "Abgelaufen am {{date}}",
       "ca_without_key_usage": "Der Mail-Dienst lehnt diese CA ab: Sie darf keine Zertifikate signieren (keine Schlüsselverwendung, RFC 5280). Fügen Sie stattdessen das eigene Zertifikat des Mailservers ein oder lassen Sie die CA neu ausstellen.",
       "unreadable": "Der gespeicherte Text enthält kein lesbares Zertifikat: Fügen Sie die Zertifikate erneut ein.",
-      "unsaved": "Geändert: Die Zertifikate werden beim Speichern gelesen.",
+      "unsaved": "Geändert: noch nicht gespeichert.",
+      "pasted": "Eingefügte Zertifikate, noch nicht gespeichert:",
+      "pasted_unreadable": "Der eingefügte Text enthält kein lesbares Zertifikat: Fügen Sie jedes Zertifikat vollständig ein, von -----BEGIN CERTIFICATE----- bis -----END CERTIFICATE-----.",
+      "pasted_not_certificate": "Der eingefügte Text enthält etwas anderes als Zertifikate, etwa einen privaten Schlüssel, und lässt sich nicht speichern: Fügen Sie nur die Blöcke von -----BEGIN CERTIFICATE----- bis -----END CERTIFICATE----- ein.",
       "root_mode_hint": "Eine Änderung der vertrauenswürdigen Zertifikate braucht den Root-Modus: Aktivieren Sie ihn in der oberen Leiste, bevor Sie speichern."
     },
     "sender": {

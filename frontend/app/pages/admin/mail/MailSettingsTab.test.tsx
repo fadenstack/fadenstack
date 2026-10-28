@@ -3,17 +3,25 @@
  * kept unless typed; the server's problems on the fields they name; a test mail's failure in words with the
  * mail server's own reply; and why no mail goes out.
  */
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 
 import { hasFeature } from "~/api/about";
 import { ApiError } from "~/api/http";
 import { llmSettings } from "~/api/llm";
-import { MAIL_SETTINGS, mailApi, type MailFailure, type MailView } from "~/api/mailSettings";
+import {
+  MAIL_SETTINGS,
+  mailApi,
+  type MailCertificate,
+  type MailCertificatesRead,
+  type MailFailure,
+  type MailView,
+} from "~/api/mailSettings";
 import { systemSettingsApi } from "~/api/systemSettings";
 import { renderPage } from "~/test/renderPage";
 
 import SettingsPage from "../SettingsPage";
+import { READ_DELAY_MS } from "./Certificates";
 import MailSettingsTab from "./MailSettingsTab";
 
 vi.mock("~/api/about", () => ({ hasFeature: vi.fn() }));
@@ -49,12 +57,14 @@ const VIEW: MailView = {
 let get: MockInstance<typeof mailApi.get>;
 let save: MockInstance<typeof mailApi.save>;
 let test: MockInstance<typeof mailApi.test>;
+let certificates: MockInstance<typeof mailApi.certificates>;
 
 beforeEach(() => {
   vi.mocked(hasFeature).mockResolvedValue(true);
   get = vi.spyOn(mailApi, "get").mockResolvedValue(VIEW);
   save = vi.spyOn(mailApi, "save").mockResolvedValue(VIEW);
   test = vi.spyOn(mailApi, "test");
+  certificates = vi.spyOn(mailApi, "certificates").mockResolvedValue({ certificates: null, problem: null });
   vi.spyOn(systemSettingsApi, "schema").mockResolvedValue([]);
   vi.spyOn(systemSettingsApi, "values").mockResolvedValue({ items: {} });
   vi.spyOn(llmSettings, "getHFToken").mockResolvedValue({ configured: false } as Awaited<
@@ -436,6 +446,103 @@ describe("the mail form", () => {
     expect(textbox(/^Server/)).toHaveAttribute("maxLength", "253");
     expect(textbox(/^Sender name/)).toHaveAttribute("maxLength", "200");
     expect(screen.getByTestId("mail-password")).toHaveAttribute("maxLength", "1024");
+  });
+});
+
+describe("pasted certificates", () => {
+  const PEM = "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n";
+  const CA: MailCertificate = {
+    subject: "CN=Example Root CA",
+    issuer: "CN=Example Root CA",
+    not_after: "2030-01-01T00:00:00+00:00",
+    expired: false,
+    ca_without_key_usage: true,
+  };
+  const field = () => textbox(/^Certificates/);
+
+  it("are read before Save, with the warning under a CA the mail service refuses", async () => {
+    certificates.mockResolvedValue({ certificates: [CA], problem: null });
+    renderTab();
+    await screen.findByDisplayValue("mail.example.com");
+    fireEvent.change(field(), { target: { value: PEM } });
+
+    const pasted = await screen.findByTestId("mail-certificates-pasted");
+    expect(certificates).toHaveBeenCalledTimes(1);
+    expect(certificates).toHaveBeenCalledWith(PEM);
+    expect(within(pasted).getByRole("heading", { name: "Pasted certificates, not saved yet:" })).toBeInTheDocument();
+    expect(within(pasted).getByTestId("mail-certificate")).toHaveTextContent("CN=Example Root CA");
+    expect(within(pasted).getByTestId("mail-certificate")).toHaveTextContent("Valid until");
+    expect(within(pasted).getByTestId("mail-certificate-no-key-usage")).toHaveTextContent(
+      "The mail service refuses this CA: it may not sign certificates (no key usage, RFC 5280).",
+    );
+    expect(screen.queryByText("Changed: not saved yet.")).not.toBeInTheDocument();
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("says a paste that is no certificate, and one that cannot be read", async () => {
+    renderTab();
+    await screen.findByDisplayValue("mail.example.com");
+
+    certificates.mockResolvedValueOnce({ certificates: null, problem: "not_certificate" });
+    fireEvent.change(field(), { target: { value: "-----BEGIN PRIVATE KEY-----\nMII\n-----END PRIVATE KEY-----" } });
+    expect(await screen.findByTestId("mail-certificates-pasted-not-certificate")).toHaveTextContent(
+      "The pasted text holds something other than certificates, e.g. a private key, and cannot be saved",
+    );
+
+    certificates.mockResolvedValueOnce({ certificates: null, problem: null });
+    fireEvent.change(field(), { target: { value: "-----BEGIN CERTIFICATE-----\ncut off" } });
+    expect(await screen.findByTestId("mail-certificates-pasted-unreadable")).toHaveTextContent(
+      "The pasted text holds no certificate that can be read",
+    );
+    expect(screen.queryByTestId("mail-certificates-pasted-not-certificate")).not.toBeInTheDocument();
+  });
+
+  it("reads once typing pauses, and shows the answer for the latest text whichever answers last", async () => {
+    const answers: ((read: MailCertificatesRead) => void)[] = [];
+    certificates.mockImplementation(() => new Promise((resolve) => answers.push(resolve)));
+    renderTab();
+    await screen.findByDisplayValue("mail.example.com");
+
+    // Typed in quick succession: one read, of the last text.
+    fireEvent.change(field(), { target: { value: "-----BEGIN" } });
+    fireEvent.change(field(), { target: { value: PEM } });
+    await waitFor(() => expect(certificates).toHaveBeenCalledTimes(1));
+    expect(certificates).toHaveBeenLastCalledWith(PEM);
+
+    fireEvent.change(field(), { target: { value: PEM + PEM } });
+    await waitFor(() => expect(certificates).toHaveBeenCalledTimes(2));
+    await act(async () => answers[1]({ certificates: [{ ...CA, subject: "CN=second" }], problem: null }));
+    await act(async () => answers[0]({ certificates: [{ ...CA, subject: "CN=first" }], problem: null }));
+
+    const pasted = await screen.findByTestId("mail-certificates-pasted");
+    expect(pasted).toHaveTextContent("CN=second");
+    expect(pasted).not.toHaveTextContent("CN=first");
+  });
+
+  it("asks nothing for the saved text or an empty field", async () => {
+    get.mockResolvedValue({ ...VIEW, settings: { ...VIEW.settings, ca_bundle: PEM }, certificates: [CA] });
+    renderTab();
+    await screen.findAllByTestId("mail-certificate");
+
+    fireEvent.change(field(), { target: { value: "" } });
+    expect(screen.getByText("Changed: not saved yet.")).toBeInTheDocument();
+    fireEvent.change(field(), { target: { value: PEM } });
+    expect(screen.queryByText("Changed: not saved yet.")).not.toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, READ_DELAY_MS + 200));
+
+    expect(certificates).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("mail-certificates-pasted")).not.toBeInTheDocument();
+  });
+
+  it("says only that the change is not saved yet when the text cannot be read now", async () => {
+    certificates.mockRejectedValue(new ApiError("not found", 404));
+    renderTab();
+    await screen.findByDisplayValue("mail.example.com");
+    fireEvent.change(field(), { target: { value: PEM } });
+
+    await waitFor(() => expect(certificates).toHaveBeenCalledTimes(1));
+    expect(screen.getByText("Changed: not saved yet.")).toBeInTheDocument();
+    expect(screen.queryByTestId("mail-certificates-pasted-unreadable")).not.toBeInTheDocument();
   });
 });
 

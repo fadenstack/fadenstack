@@ -45,8 +45,10 @@ mail; nothing restarts.
     - Mail never goes out unencrypted. Fadenstack uses TLS 1.2 or newer and checks the mail server's
       certificate: its name and that a trusted CA issued it. There is no setting to switch this off.
     - **Trusted certificates** takes one or more certificates in PEM format, each from
-      `-----BEGIN CERTIFICATE-----` to `-----END CERTIFICATE-----`, and nothing else: never a private key. After
-      saving, the page lists each one with its expiry date. They decide which servers Fadenstack trusts, so
+      `-----BEGIN CERTIFICATE-----` to `-----END CERTIFICATE-----`, and nothing else: never a private key. The page
+      reads what you paste before you save: it lists each certificate with its expiry date under **Pasted
+      certificates, not saved yet**, or says that the text holds none it can read, or holds another kind of block.
+      After saving, they are listed under **Saved certificates**. They decide which servers Fadenstack trusts, so
       changing them needs root mode, as a secret does.
     - A CA must be allowed to sign certificates (key usage, as RFC 5280 requires). The page says so under a CA
       that is not: paste the mail server's own certificate instead, or have the CA reissued.

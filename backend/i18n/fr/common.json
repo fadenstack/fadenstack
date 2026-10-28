@@ -1082,7 +1082,10 @@
       "expired": "Expiré le {{date}}",
       "ca_without_key_usage": "Le service de messagerie refuse cette CA : elle ne peut pas signer de certificats (pas d'usage de clé, RFC 5280). Collez plutôt le certificat propre du serveur de messagerie, ou faites réémettre la CA.",
       "unreadable": "Le texte enregistré ne contient aucun certificat lisible : collez de nouveau les certificats.",
-      "unsaved": "Modifié : les certificats sont lus à l'enregistrement.",
+      "unsaved": "Modifié : pas encore enregistré.",
+      "pasted": "Certificats collés, pas encore enregistrés :",
+      "pasted_unreadable": "Le texte collé ne contient aucun certificat lisible : collez chaque certificat en entier, de -----BEGIN CERTIFICATE----- à -----END CERTIFICATE-----.",
+      "pasted_not_certificate": "Le texte collé contient autre chose que des certificats, par exemple une clé privée, et ne peut pas être enregistré : collez uniquement les blocs de -----BEGIN CERTIFICATE----- à -----END CERTIFICATE-----.",
       "root_mode_hint": "Modifier les certificats de confiance nécessite le mode Root : activez-le dans la barre du haut avant d'enregistrer."
     },
     "sender": {

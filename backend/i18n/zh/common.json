@@ -1087,7 +1087,10 @@
       "expired": "已于 {{date}} 过期",
       "ca_without_key_usage": "邮件服务拒绝此 CA：它不能签发证书（缺少密钥用法，RFC 5280）。请改为粘贴邮件服务器自己的证书，或让 CA 重新签发。",
       "unreadable": "保存的文本中没有可读取的证书：请重新粘贴证书。",
-      "unsaved": "已更改：保存时会读取证书。",
+      "unsaved": "已更改：尚未保存。",
+      "pasted": "已粘贴的证书（尚未保存）：",
+      "pasted_unreadable": "粘贴的文本中没有可读取的证书：请完整粘贴每个证书，从 -----BEGIN CERTIFICATE----- 到 -----END CERTIFICATE-----。",
+      "pasted_not_certificate": "粘贴的文本包含证书以外的内容（例如私钥），无法保存：只粘贴从 -----BEGIN CERTIFICATE----- 到 -----END CERTIFICATE----- 的块。",
       "root_mode_hint": "更改受信任的证书需要 Root 模式：请在保存前于顶部栏中启用它。"
     },
     "sender": {

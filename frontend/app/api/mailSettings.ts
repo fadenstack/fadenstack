@@ -38,7 +38,7 @@ export interface MailSettings {
   secrets_server: string;
 }
 
-/** A trusted certificate as read from the saved PEM text. */
+/** A trusted certificate as read from PEM text, saved or pasted. */
 export interface MailCertificate {
   subject: string;
   issuer: string;
@@ -84,6 +84,14 @@ export interface MailView {
   state: MailState;
   /** Root mode is active: a stored secret may be changed. */
   root_mode: boolean;
+}
+
+/** Pasted certificates as the server reads them before a save (nothing is stored). */
+export interface MailCertificatesRead {
+  /** As {@link MailView.certificates}: `null` when the text holds no certificate that can be read, or `problem`. */
+  certificates: MailCertificate[] | null;
+  /** `not_certificate`: the text holds another kind of PEM block, e.g. a private key, which a save refuses. */
+  problem: "not_certificate" | null;
 }
 
 /** The whole form, as a save (and an unsaved test) sends it. `null` for a secret keeps the stored one. */
@@ -205,4 +213,7 @@ export const mailApi = {
   /** A test mail to *to*, with the form's (unsaved) settings, or the saved ones without. */
   test: (to: string, settings?: MailForm) =>
     request<MailTestResult>("/test", json("POST", settings ? { to, settings } : { to })),
+  /** Reads pasted certificates as a save would, before it: nothing is stored. */
+  certificates: (ca_bundle: string) =>
+    request<MailCertificatesRead>("/certificates", json("POST", { ca_bundle })),
 };

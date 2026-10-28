@@ -1087,7 +1087,10 @@
       "expired": "Caducó el {{date}}",
       "ca_without_key_usage": "El servicio de correo rechaza esta CA: no puede firmar certificados (sin uso de clave, RFC 5280). Pegue en su lugar el certificado propio del servidor de correo, o haga que se vuelva a emitir la CA.",
       "unreadable": "El texto guardado no contiene ningún certificado legible: pegue los certificados de nuevo.",
-      "unsaved": "Modificado: los certificados se leen al guardar.",
+      "unsaved": "Modificado: aún sin guardar.",
+      "pasted": "Certificados pegados, aún sin guardar:",
+      "pasted_unreadable": "El texto pegado no contiene ningún certificado legible: pegue cada certificado completo, desde -----BEGIN CERTIFICATE----- hasta -----END CERTIFICATE-----.",
+      "pasted_not_certificate": "El texto pegado contiene algo distinto de certificados, p. ej. una clave privada, y no se puede guardar: pegue solo los bloques de -----BEGIN CERTIFICATE----- a -----END CERTIFICATE-----.",
       "root_mode_hint": "Cambiar los certificados de confianza requiere el modo root: actívelo en la barra superior antes de guardar."
     },
     "sender": {

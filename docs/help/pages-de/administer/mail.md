@@ -49,8 +49,11 @@ der nächsten Mail; nichts wird neu gestartet.
       die das abschaltet.
     - **Vertrauenswürdige Zertifikate** nimmt ein oder mehrere Zertifikate im PEM-Format, jedes von
       `-----BEGIN CERTIFICATE-----` bis `-----END CERTIFICATE-----`, und nichts anderes: nie einen privaten
-      Schlüssel. Nach dem Speichern zeigt die Seite jedes mit seinem Ablaufdatum. Sie bestimmen, welchen Servern
-      Fadenstack vertraut; eine Änderung braucht daher den Root-Modus, wie ein Geheimnis.
+      Schlüssel. Die Seite liest, was Sie einfügen, schon vor dem Speichern: Sie zeigt jedes Zertifikat mit seinem
+      Ablaufdatum unter **Eingefügte Zertifikate, noch nicht gespeichert** oder sagt, dass der Text keines enthält,
+      das sie lesen kann, oder einen anderen Block. Nach dem Speichern stehen sie unter **Gespeicherte
+      Zertifikate**. Sie bestimmen, welchen Servern Fadenstack vertraut; eine Änderung braucht daher den
+      Root-Modus, wie ein Geheimnis.
     - Eine CA muss Zertifikate signieren dürfen (Schlüsselverwendung, wie RFC 5280 es verlangt). Unter einer CA,
       die das nicht darf, sagt die Seite es: Fügen Sie stattdessen das eigene Zertifikat des Mailservers ein oder
       lassen Sie die CA neu ausstellen.

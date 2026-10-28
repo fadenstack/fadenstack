@@ -1082,7 +1082,10 @@
       "expired": "Expired on {{date}}",
       "ca_without_key_usage": "The mail service refuses this CA: it may not sign certificates (no key usage, RFC 5280). Paste the mail server's own certificate instead, or have the CA reissued.",
       "unreadable": "The saved text holds no certificate that can be read: paste the certificates again.",
-      "unsaved": "Changed: the certificates are read when you save.",
+      "unsaved": "Changed: not saved yet.",
+      "pasted": "Pasted certificates, not saved yet:",
+      "pasted_unreadable": "The pasted text holds no certificate that can be read: paste each certificate whole, from -----BEGIN CERTIFICATE----- to -----END CERTIFICATE-----.",
+      "pasted_not_certificate": "The pasted text holds something other than certificates, e.g. a private key, and cannot be saved: paste only the blocks from -----BEGIN CERTIFICATE----- to -----END CERTIFICATE-----.",
       "root_mode_hint": "Changing the trusted certificates needs root mode: switch it on in the top bar before you save."
     },
     "sender": {

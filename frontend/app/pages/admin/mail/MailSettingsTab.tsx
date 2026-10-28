@@ -1,7 +1,8 @@
 /**
  * Settings > Mail: how this server sends mail (password resets, sign-in codes, alerts for administrators)
  * through the organisation's mail server. One form, one Save; a test mail with the form's values, saved or
- * not; and whether mail goes out, and if not why. Shown while the server offers `mail_settings` (Enterprise).
+ * not; pasted certificates read before they are saved; and whether mail goes out, and if not why. Shown while
+ * the server offers `mail_settings` (Enterprise).
  *
  * Secrets are never shown: a stored one leaves its field empty, and typing replaces it. A stored secret
  * belongs to the server (host:port) it was saved for: a form pointing elsewhere must bring it again.
@@ -38,9 +39,9 @@ import {
   type MailTestResult,
   type MailView,
 } from "~/api/mailSettings";
-import { formatDateTime } from "~/lib/dates";
 import { helpUrl } from "~/lib/pageHelp";
 
+import { CertificateList, PastedCertificates } from "./Certificates";
 import { FailureText, MailStatePanel } from "./MailState";
 import {
   byField,
@@ -516,58 +517,14 @@ export default function MailSettingsTab() {
           </Alert>
         ) : (
           view.certificates.length > 0 && (
-            <Stack spacing={1} data-testid="mail-certificates">
-              <Typography variant="caption" color="text.secondary">
-                {t("mail.certificates.saved")}
-              </Typography>
-              {view.certificates.map((cert, index) => (
-                <Box
-                  key={`${cert.subject}-${index}`}
-                  data-testid="mail-certificate"
-                  sx={{
-                    p: 1.5,
-                    border: 1,
-                    borderColor: cert.expired ? "error.main" : cert.ca_without_key_usage ? "warning.main" : "divider",
-                    borderRadius: 1,
-                  }}
-                >
-                  <Typography variant="body2" dir="ltr" sx={{ overflowWrap: "anywhere", textAlign: "start" }}>
-                    {cert.subject}
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    display="block"
-                    sx={{ overflowWrap: "anywhere" }}
-                  >
-                    {t("mail.certificates.issuer", { issuer: cert.issuer })}
-                  </Typography>
-                  <Typography variant="caption" color={cert.expired ? "error" : "text.secondary"} display="block">
-                    {cert.expired
-                      ? t("mail.certificates.expired", { date: formatDateTime(cert.not_after) })
-                      : t("mail.certificates.expires", { date: formatDateTime(cert.not_after) })}
-                  </Typography>
-                  {cert.ca_without_key_usage && (
-                    <Typography
-                      variant="caption"
-                      color="warning"
-                      display="block"
-                      sx={{ mt: 0.5 }}
-                      data-testid="mail-certificate-no-key-usage"
-                    >
-                      {t("mail.certificates.ca_without_key_usage")}
-                    </Typography>
-                  )}
-                </Box>
-              ))}
-            </Stack>
+            <CertificateList
+              heading={t("mail.certificates.saved")}
+              certificates={view.certificates}
+              testId="mail-certificates"
+            />
           )
         )}
-        {form.ca_bundle !== stored.ca_bundle && (
-          <Typography variant="caption" color="text.secondary">
-            {t("mail.certificates.unsaved")}
-          </Typography>
-        )}
+        <PastedCertificates text={form.ca_bundle} saved={stored.ca_bundle} />
         {/* What the mail service trusts is protected, as a secret is. */}
         {form.ca_bundle !== stored.ca_bundle && !rootMode && (
           <Alert severity="info" variant="outlined" data-testid="mail-certificates-root-mode-hint">
