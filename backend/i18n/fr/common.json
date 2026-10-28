@@ -4822,7 +4822,9 @@
         "result_note": "Par {{granularity}}, triés par nom. Cette consultation a été enregistrée.",
         "no_rows": "Aucune utilisation pour ce choix sur cette période.",
         "col_person": "Personne",
-        "col_period": "Période"
+        "col_period": "Période",
+        "export_title": "Télécharger les données d'une personne",
+        "export_note": "Chaque téléchargement est enregistré avec le motif indiqué pour cette consultation."
       }
     },
     "errors": {

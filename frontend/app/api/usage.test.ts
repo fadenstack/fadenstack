@@ -61,6 +61,9 @@ describe("usage API", () => {
   it("names the downloads", () => {
     expect(usageApi.meExportUrl("csv")).toBe("/api/usage/me/export?format=csv");
     expect(usageApi.statementUrl("de")).toBe("/api/admin/usage/statement?language=de");
+    expect(usageApi.peopleExportUrl("u 1", "csv", "Access request by the person")).toBe(
+      "/api/admin/usage/people/u%201/export?format=csv&reason=Access+request+by+the+person",
+    );
   });
 
   it("carries a refusal's code", async () => {

@@ -4822,7 +4822,9 @@
         "result_note": "按{{granularity}}统计，按姓名排序。此次查看已被记录。",
         "no_rows": "该时间段内此选择没有用量。",
         "col_person": "人员",
-        "col_period": "时间段"
+        "col_period": "时间段",
+        "export_title": "下载某个人的数据",
+        "export_note": "每次下载都会连同您为此次查看说明的理由一起记录。"
       }
     },
     "errors": {

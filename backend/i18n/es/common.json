@@ -4822,7 +4822,9 @@
         "result_note": "Por {{granularity}}, ordenado por nombre. Esta consulta quedó registrada.",
         "no_rows": "Sin uso para esta selección en este periodo.",
         "col_person": "Persona",
-        "col_period": "Periodo"
+        "col_period": "Periodo",
+        "export_title": "Descargar los datos de una persona",
+        "export_note": "Cada descarga se registra con el motivo que indicó para esta consulta."
       }
     },
     "errors": {

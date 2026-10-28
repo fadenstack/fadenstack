@@ -208,6 +208,16 @@ describe("per-person figures for a usage auditor", () => {
     expect(within(table).getByText("sam@example.com")).toBeInTheDocument();
     expect(within(table).getAllByText("kim@example.com")).toHaveLength(1); // a name that is the address, once
     expect(within(table).queryAllByRole("button")).toHaveLength(0);
+
+    // One person's data, downloaded under the same reason.
+    const json = screen.getByRole("link", { name: "Download as JSON" });
+    expect(json).toHaveAttribute("href", "/api/admin/usage/people/u-1/export?format=json&reason=budget+dispute+in+Sales");
+    await userEvent.click(screen.getByRole("combobox", { name: "Person" }));
+    await userEvent.click(await screen.findByRole("option", { name: "sam@example.com" }));
+    expect(screen.getByRole("link", { name: "Download as CSV" })).toHaveAttribute(
+      "href",
+      "/api/admin/usage/people/u-2/export?format=csv&reason=budget+dispute+in+Sales",
+    );
   });
 
   it.each([
@@ -223,5 +233,6 @@ describe("per-person figures for a usage auditor", () => {
 
     await waitFor(() => expect(dialog.querySelector("[data-usage-people-error]")).not.toBeNull());
     expect(dialog.querySelector("[data-usage-people-error]")!.textContent).toMatch(words);
+    expect(document.querySelector("[data-usage-person-export]")).toBeNull(); // nothing to download without a view
   });
 });

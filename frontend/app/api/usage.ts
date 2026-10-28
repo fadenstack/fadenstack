@@ -15,7 +15,7 @@
  * Refusals the console words itself carry a code (`USAGE_ERROR_CODES`);
  * a settings write the server rejects field by field carries `problems`.
  */
-import { ApiError, query, readError } from "./http";
+import { ApiError, query, readError, segment } from "./http";
 
 const ME = "/api/usage/me";
 const ADMIN = "/api/admin/usage";
@@ -273,6 +273,14 @@ export const usageApi = {
   /** Per-person figures of a team or a person; refused with a code unless allowed. */
   people(params: PeopleQuery) {
     return request<PeopleUsage>(`${ADMIN}/people${query({ ...params })}`);
+  },
+
+  /**
+   * Where a usage auditor downloads one person's data: the same gate as `people` (switch on, the grant,
+   * a reason of 10-500 characters), and each download recorded with that reason (M07, M13).
+   */
+  peopleExportUrl(userId: string, format: "json" | "csv", reason: string) {
+    return `${ADMIN}/people/${segment(userId)}/export${query({ format, reason })}`;
   },
 
   settings() {

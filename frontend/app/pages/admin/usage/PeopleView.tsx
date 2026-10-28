@@ -6,7 +6,9 @@
  * Nothing is fetched before a reason is given: the dialog asks whose figures
  * (one person or one team) and why, 10 to 500 characters, and only then calls
  * the server, which records the view with that reason. The rows come sorted by
- * name, then period, and stay so -- no column sorts by usage (M11).
+ * name, then period, and stay so -- no column sorts by usage (M11). One person
+ * of the view can then be downloaded (JSON, CSV) under the same reason, each
+ * download recorded by the server too (M07, M13).
  */
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -25,6 +27,7 @@ import TextField from "@mui/material/TextField";
 import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
+import DownloadIcon from "@mui/icons-material/Download";
 
 import { adminGroups, adminUsers, type AdminUser, type Group } from "~/api/admin";
 import { errorText } from "~/api/http";
@@ -36,10 +39,33 @@ import { periodLabel, usageErrorText } from "~/components/usage/usageFormat";
 
 type Scope = "person" | "team";
 
+interface Someone {
+  id: string;
+  label: string;
+}
+
+/** A view that was granted: its rows, the reason it was given for, and whose data may be downloaded. */
+interface Shown {
+  answer: PeopleUsage;
+  reason: string;
+  people: Someone[];
+}
+
+/** The people of a view, by first appearance (the rows come sorted by name); the chosen person too. */
+function peopleOf(answer: PeopleUsage, chosen: Someone | null): Someone[] {
+  const seen = new Map<string, Someone>();
+  for (const row of answer.rows) {
+    if (!seen.has(row.person.id)) seen.set(row.person.id, { id: row.person.id, label: row.person.name || row.person.email });
+  }
+  if (chosen && !seen.has(chosen.id)) seen.set(chosen.id, chosen);
+  return [...seen.values()];
+}
+
 export default function PeopleView({ from, to }: { from: string; to: string }) {
   const { t, i18n } = useTranslation();
   const [open, setOpen] = useState(false);
-  const [result, setResult] = useState<PeopleUsage | null>(null);
+  const [shown, setShown] = useState<Shown | null>(null);
+  const result = shown?.answer ?? null;
 
   return (
     <WidgetCard
@@ -92,17 +118,76 @@ export default function PeopleView({ from, to }: { from: string; to: string }) {
           {t("usage.admin.people.none_yet")}
         </Typography>
       )}
+      {shown && shown.people.length > 0 && (
+        <PersonExport key={shown.people.map((p) => p.id).join(",")} people={shown.people} reason={shown.reason} />
+      )}
       <PeopleDialog
         open={open}
         from={from}
         to={to}
         onClose={() => setOpen(false)}
-        onResult={(answer) => {
-          setResult(answer);
+        onResult={(answer, reason, chosen) => {
+          setShown({ answer, reason, people: peopleOf(answer, chosen) });
           setOpen(false);
         }}
       />
     </WidgetCard>
+  );
+}
+
+/**
+ * Download one person's data, under the reason the view was given for: the
+ * server checks it again and records each download (M07). Links, so the
+ * browser downloads with the session; nothing is fetched until one is used.
+ */
+function PersonExport({ people, reason }: { people: Someone[]; reason: string }) {
+  const { t } = useTranslation();
+  const [id, setId] = useState(people[0].id);
+  return (
+    <Stack gap={1} sx={{ mt: 2 }} data-usage-person-export>
+      <Typography variant="subtitle2" component="h3">
+        {t("usage.admin.people.export_title")}
+      </Typography>
+      <Stack direction={{ xs: "column", sm: "row" }} gap={1} alignItems={{ sm: "center" }}>
+        <TextField
+          select
+          size="small"
+          label={t("usage.admin.people.person_label")}
+          value={id}
+          onChange={(e) => setId(e.target.value)}
+          sx={{ minWidth: 240 }}
+        >
+          {people.map((p) => (
+            <MenuItem key={p.id} value={p.id}>
+              {p.label}
+            </MenuItem>
+          ))}
+        </TextField>
+        <Button
+          variant="outlined"
+          size="small"
+          startIcon={<DownloadIcon />}
+          component="a"
+          href={usageApi.peopleExportUrl(id, "json", reason)}
+          download
+        >
+          {t("usage.my.export_json")}
+        </Button>
+        <Button
+          variant="outlined"
+          size="small"
+          startIcon={<DownloadIcon />}
+          component="a"
+          href={usageApi.peopleExportUrl(id, "csv", reason)}
+          download
+        >
+          {t("usage.my.export_csv")}
+        </Button>
+      </Stack>
+      <Typography variant="caption" color="text.secondary">
+        {t("usage.admin.people.export_note")}
+      </Typography>
+    </Stack>
   );
 }
 
@@ -117,7 +202,8 @@ function PeopleDialog({
   from: string;
   to: string;
   onClose: () => void;
-  onResult: (answer: PeopleUsage) => void;
+  /** The answer, the reason it was granted for, and the person chosen (none for a team). */
+  onResult: (answer: PeopleUsage, reason: string, chosen: Someone | null) => void;
 }) {
   const { t } = useTranslation();
   const [scope, setScope] = useState<Scope>("person");
@@ -166,7 +252,7 @@ function PeopleDialog({
         reason: trimmed,
       });
       setReason("");
-      onResult(answer);
+      onResult(answer, trimmed, scope === "person" && person ? { id: person.id, label: person.email } : null);
     } catch (err) {
       setError(usageErrorText(err, (key) => t(key)));
     } finally {

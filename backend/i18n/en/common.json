@@ -4820,7 +4820,9 @@
         "result_note": "Per {{granularity}}, sorted by name. This view was recorded.",
         "no_rows": "No usage for this choice in this period.",
         "col_person": "Person",
-        "col_period": "Period"
+        "col_period": "Period",
+        "export_title": "Download one person's data",
+        "export_note": "Each download is recorded with the reason you gave for this view."
       }
     },
     "errors": {

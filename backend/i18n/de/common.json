@@ -4822,7 +4822,9 @@
         "result_note": "Pro {{granularity}}, nach Namen sortiert. Diese Einsicht wurde protokolliert.",
         "no_rows": "Keine Nutzung für diese Auswahl in diesem Zeitraum.",
         "col_person": "Person",
-        "col_period": "Zeitraum"
+        "col_period": "Zeitraum",
+        "export_title": "Daten einer Person herunterladen",
+        "export_note": "Jeder Download wird mit der Begründung protokolliert, die Sie für diese Einsicht angegeben haben."
       }
     },
     "errors": {
