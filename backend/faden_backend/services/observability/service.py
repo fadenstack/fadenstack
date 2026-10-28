@@ -3,6 +3,11 @@
 All queries run against the gateway (``llm_api``) database via the
 secondary ``llm_graph_trace_session_factory`` engine.  Queries use raw
 SQL with ``text()`` and bind parameters — no ORM coupling.
+
+Nothing here names the person who made a request: ``user_id`` is read as ``NULL`` in the request list, its
+detail and the CSV export, there is no breakdown or search by person, and no ranking of people (GDPR Art.
+25(2); M02, M11 of the usage compliance report). The usage of named people is seen only through
+``/api/admin/usage/people``, behind its switch, grant and reason.
 """
 
 from __future__ import annotations
@@ -18,6 +23,9 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 log = logging.getLogger(__name__)
+
+#: The person column as every query here reads it: never filled.
+_NOBODY = "CAST(NULL AS TEXT) AS user_id"
 
 # Hard caps
 MAX_QUERY_ROWS = 500
@@ -117,27 +125,11 @@ class ObservabilityService:
         model_result = await self._session.execute(model_q, {"start": start, "end": end})
         by_model = [dict(r) for r in model_result.mappings().all()]
 
-        # Top users
-        user_q = text("""
-            SELECT
-                user_id,
-                COUNT(*)                  AS total_requests,
-                COALESCE(SUM(total_tokens), 0)  AS total_tokens,
-                SUM(estimated_total_cost) AS estimated_total_cost
-            FROM llm_gateway_request_log
-            WHERE created_at >= :start AND created_at < :end
-            GROUP BY user_id
-            ORDER BY total_requests DESC
-            LIMIT 20
-        """)
-        user_result = await self._session.execute(user_q, {"start": start, "end": end})
-        top_users = [dict(r) for r in user_result.mappings().all()]
-
+        # No breakdown by person (module docstring).
         return {
             **totals,
             "by_provider": by_provider,
             "by_model": by_model,
-            "top_users": top_users,
         }
 
     # ── Timeseries ────────────────────────────────────────────────
@@ -318,10 +310,9 @@ class ObservabilityService:
         page: int = 1,
         limit: int = 50,
         model_alias: str | None = None,
-        user_id: str | None = None,
         status_code: int | None = None,
     ) -> dict:
-        """Paginated request list."""
+        """Paginated request list; nobody named, no filter by person (module docstring)."""
         limit = min(limit, MAX_QUERY_ROWS)
         offset = (max(page, 1) - 1) * limit
 
@@ -330,9 +321,6 @@ class ObservabilityService:
         if model_alias:
             filters += " AND model_alias = :model_alias"
             params["model_alias"] = model_alias
-        if user_id:
-            filters += " AND user_id = :user_id"
-            params["user_id"] = user_id
         if status_code is not None:
             filters += " AND status_code = :status_code"
             params["status_code"] = status_code
@@ -343,7 +331,7 @@ class ObservabilityService:
 
         data_q = text(f"""
             SELECT
-                id, request_id, trace_id, tenant_id, user_id,
+                id, request_id, trace_id, tenant_id, {_NOBODY},
                 model_alias, CAST(provider_instance_id AS TEXT) AS provider_instance_id,
                 endpoint, status_code, latency_ms, ttft_ms,
                 prompt_tokens, completion_tokens, total_tokens, error_code,
@@ -371,9 +359,9 @@ class ObservabilityService:
 
     async def get_request_detail(self, request_id: str) -> dict | None:
         """Single request by request_id."""
-        q = text("""
+        q = text(f"""
             SELECT
-                id, request_id, trace_id, tenant_id, user_id,
+                id, request_id, trace_id, tenant_id, {_NOBODY},
                 model_alias, CAST(provider_instance_id AS TEXT) AS provider_instance_id,
                 endpoint, status_code, latency_ms, ttft_ms,
                 prompt_tokens, completion_tokens, total_tokens, error_code,
@@ -388,7 +376,7 @@ class ObservabilityService:
             WHERE request_id = :request_id
             ORDER BY created_at DESC
             LIMIT 1
-        """)
+        """)  # noqa: S608 - only the fixed _NOBODY is formatted in
         result = await self._session.execute(q, {"request_id": request_id})
         row = result.mappings().first()
         if row is None:
@@ -401,9 +389,9 @@ class ObservabilityService:
 
     async def get_request_by_trace_id(self, trace_id: str) -> dict | None:
         """Single request by trace_id (most recent if multiple)."""
-        q = text("""
+        q = text(f"""
             SELECT
-                id, request_id, trace_id, tenant_id, user_id,
+                id, request_id, trace_id, tenant_id, {_NOBODY},
                 model_alias, CAST(provider_instance_id AS TEXT) AS provider_instance_id,
                 endpoint, status_code, latency_ms, ttft_ms,
                 prompt_tokens, completion_tokens, total_tokens, error_code,
@@ -418,7 +406,7 @@ class ObservabilityService:
             WHERE trace_id = :trace_id
             ORDER BY created_at DESC
             LIMIT 1
-        """)
+        """)  # noqa: S608 - only the fixed _NOBODY is formatted in
         result = await self._session.execute(q, {"trace_id": trace_id})
         row = result.mappings().first()
         if row is None:
@@ -473,10 +461,10 @@ class ObservabilityService:
         start: datetime,
         end: datetime,
     ) -> AsyncGenerator[str, None]:
-        """Stream CSV rows for request log data (capped at 5K rows)."""
+        """Stream CSV rows for request log data (capped at 5K rows); ``user_id`` always empty."""
         q = text(f"""
             SELECT
-                request_id, created_at, tenant_id, user_id,
+                request_id, created_at, tenant_id, {_NOBODY},
                 model_alias, CAST(provider_instance_id AS TEXT) AS provider_instance_id,
                 endpoint, status_code, latency_ms, ttft_ms,
                 prompt_tokens, completion_tokens, total_tokens,

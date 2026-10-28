@@ -26,14 +26,9 @@ class ModelBreakdownDTO(BaseModel):
     estimated_total_cost: Decimal | None = None
 
 
-class TopUserDTO(BaseModel):
-    user_id: str
-    total_requests: int = 0
-    total_tokens: int = 0
-    estimated_total_cost: Decimal | None = None
-
-
 class SummaryDTO(BaseModel):
+    """Totals, by provider and by model; never by person (no rankings of people, M11)."""
+
     total_requests: int = 0
     total_prompt_tokens: int = 0
     total_completion_tokens: int = 0
@@ -43,7 +38,6 @@ class SummaryDTO(BaseModel):
     avg_latency_ms: float | None = None
     by_provider: list[ProviderBreakdownDTO] = Field(default_factory=list)
     by_model: list[ModelBreakdownDTO] = Field(default_factory=list)
-    top_users: list[TopUserDTO] = Field(default_factory=list)
 
 
 # ── Timeseries ────────────────────────────────────────────────────
@@ -82,7 +76,9 @@ class RequestLogDTO(BaseModel):
     request_id: str
     trace_id: str | None = None
     tenant_id: str
-    user_id: str
+    #: ``None`` unless it is the caller's own request, or person-level reporting is on and the caller is a
+    #: usage auditor who gave a reason (recorded as ``usage.people.view``).
+    user_id: str | None = None
     model_alias: str | None = None
     provider_instance_id: str | None = None
     endpoint: str
