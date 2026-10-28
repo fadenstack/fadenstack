@@ -56,7 +56,7 @@ The agent's page opens. Its list status is **Draft**, **Published** or **Retired
 | **Definition** | The version people get: **Instructions**, **Model**, **Knowledge** (collections it may search), **Server tools** (**What a chat gets**, **Only these**, or **None**), **Local MCP servers**, **Host tools** (the application's tools and their classes), **Appearance** (greeting and suggested prompts) and **Privacy**. |
 | **Versions** | Every version. **Publish** one, **Roll back** to an earlier one, see the **Changes**. |
 | **Access** | **Who may use it**, the **Excluded people** (Enterprise) and its **Maintainers** (with Enterprise: **Maintainers and auditors**). **Check someone's access** says whether a person may use the agent, and why. |
-| **Activity** | Usage over a time range (requests, errors, tokens, users, conversations: counts only, never content), what the applications reported (tools that ran, approvals), and the **Signed-in devices**. |
+| **Activity** | Usage over a time range (requests, errors, tokens, users, conversations: counts only, never content), shown only when at least five people used the agent in the range; the owner of a personal agent sees its figures all the same. What the applications reported (tools that ran, approvals), and the **Signed-in devices**. It names nobody but you. |
 | **Apps** | What the applications bring, compared with the agent's version (see [When an application brings new tools](#when-an-application-brings-new-tools)). |
 
 ??? info "More about server tools"

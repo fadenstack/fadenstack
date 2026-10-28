@@ -23,6 +23,9 @@ Nach der Installation, und solange Sie keine Einstellung ändern:
   stehen (siehe [Die Mindestgruppengröße](usage.md#the-minimum-group-size)).
 - **Keine Seite listet Anfragen nach Person.** **Kosten-Observability** und **LLM-Aufrufe** zeigen nie, wer eine
   Anfrage gesendet hat, und finden Anfragen nicht nach Person.
+- **Auch die Zahlen eines Agenten brauchen fünf Personen.** Sein Reiter **Aktivität** zeigt sie nur, wenn
+  mindestens fünf Personen den Agenten im Zeitraum genutzt haben, und nennt niemanden; der Eigentümer eines
+  persönlichen Agenten sieht seine eigenen (siehe [Agenten und Add-ins](agents.md)).
 - **Jede Person sieht ihre eigenen**, unter **Meine Nutzung**, und kann sie herunterladen.
 - **Nichts stellt Personen in eine Rangfolge oder vergleicht sie**: keine Top-Benutzer, keine Bestenlisten,
   keine Punktwerte.
@@ -177,10 +180,6 @@ sieht Datum und Grund der Einsichten in ihre eigenen Zahlen.
     Sie dienen dem Betrieb und der Sicherheit des Dienstes; sie gehören nicht zu den Nutzungszahlen, und die
     Einstellungen auf dieser Seite ändern sie nicht. Nennen Sie sie in Ihrer Vereinbarung ebenfalls.
 
-    - Der Reiter **Aktivität** eines Agenten nennt, wer sich auf welchem Gerät beim Agenten angemeldet hat, und
-      listet, was die Anwendungen gemeldet haben, etwa ausgeführte Tools und erteilte Freigaben. Seine Zahlen zu
-      Anfragen und Tokens gelten pro Agent, auch für einen Agenten, den nur eine Person nutzt (siehe
-      [Agenten und Add-ins](agents.md)).
     - Die Chat-Seiten zeigen, wer welche Chats, Projekte und Dateien hat und seit wann, aber nicht deren Inhalt
       (siehe [Ihre Daten und Datenschutz](../use/privacy.md)).
     - **Zugriffskontrolle → API-Tokens** zeigt die Verwendungen jedes Tokens: wann, von welcher Adresse, mit

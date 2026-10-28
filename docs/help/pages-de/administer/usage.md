@@ -15,7 +15,7 @@ Was die Zahlen für die Daten der Beschäftigten bedeuten und wer wessen Zahlen 
 | [Dashboard](dashboard.md) | Administratoren | Den heutigen Tag auf einen Blick: **Anfragen heute**, **Aktive Benutzer heute**, **Intern bearbeitet**, **Kosten diesen Monat**, **Fehlerquote (1 Std.)**; **KI-Datenverkehr** (wo Anfragen bedient wurden) und **Nutzung** (Anfragen pro Tag, nach Ort der Bearbeitung). |
 | **Observability → Kosten-Dashboard** | Administratoren | Ausgaben, Anfragen, Tokens, Geschwindigkeit und Fehler der ganzen Instanz sowie die Preise (siehe [Die Kosten- und Nutzungsseiten](#the-cost-and-usage-pages)). |
 | **Observability → LLM-Aufrufe** | Administratoren | Jede Anfrage und jeder Aufruf: warum einer fehlschlug, was ein Agent für eine Frage tat, wohin Aufrufe gingen (siehe [LLM-Aufrufe](llm-calls.md)). |
-| Der Reiter **Aktivität** eines Agenten | Administratoren | Anfragen, Fehler, Tokens, Benutzer und Unterhaltungen dieses Agenten, nur als Zahlen (siehe [Agenten und Add-ins](agents.md)). |
+| Der Reiter **Aktivität** eines Agenten | Administratoren; der Eigentümer eines persönlichen Agenten | Anfragen, Fehler, Tokens, Benutzer und Unterhaltungen dieses Agenten, nur als Zahlen, wenn mindestens fünf Personen ihn im Zeitraum genutzt haben; die Zahlen eines persönlichen Agenten sieht sein Eigentümer (siehe [Agenten und Add-ins](agents.md)). |
 | Die Seite einer Bereitstellung | Administratoren | Anfragen, Geschwindigkeit und Fehler dieses Modells in den letzten Minuten (siehe [Bereitstellungen](deployments.md)). |
 | **Observability → Datenresidenz** | Administratoren | Wie viele Daten an Ihre Maschinen, in Ihr Netz und nach außen gingen (siehe [Datenresidenz](providers.md#data-residency)). |
 

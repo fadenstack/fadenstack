@@ -14,7 +14,7 @@ and who may see whose, is on [Usage and privacy](usage-privacy.md).
 | [Dashboard](dashboard.md) | Administrators | Today at a glance: **Requests today**, **Active users today**, **Kept in-house**, **Spend this month**, **Error rate (1 h)**; **AI traffic** (where requests were served) and **Usage** (requests per day, by where they were served). |
 | **Observability → Cost Dashboard** | Administrators | Spend, requests, tokens, speed and errors of the whole instance, and the prices (see [The cost and usage pages](#the-cost-and-usage-pages)). |
 | **Observability → LLM Calls** | Administrators | Each request and call: why one failed, what an agent did for one question, where calls went (see [LLM calls](llm-calls.md)). |
-| An agent's **Activity** tab | Administrators | Requests, errors, tokens, users and conversations of that agent, counts only (see [Agents and add-ins](agents.md)). |
+| An agent's **Activity** tab | Administrators; the owner of a personal agent | Requests, errors, tokens, users and conversations of that agent, counts only, when at least five people used it in the range; its owner sees a personal agent's figures (see [Agents and add-ins](agents.md)). |
 | A deployment's page | Administrators | Requests, speed and failures of that model over the last minutes (see [Deployments](deployments.md)). |
 | **Observability → Data Residency** | Administrators | How much data went to your machines, your network and outside (see [Data residency](providers.md#data-residency)). |
 

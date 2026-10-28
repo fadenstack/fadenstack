@@ -21,6 +21,9 @@ As installed, and until you change a setting:
   [The minimum group size](usage.md#the-minimum-group-size)).
 - **No page lists requests by person.** **Cost Observability** and **LLM Calls** never show who sent a request,
   and do not find requests by person.
+- **An agent's figures need five people too.** Its **Activity** tab shows them only when at least five people
+  used the agent in the range, and names nobody; the owner of a personal agent sees their own (see
+  [Agents and add-ins](agents.md)).
 - **Everyone sees their own**, under **My usage**, and can download it.
 - **Nothing ranks or compares people**: no top users, no leaderboards, no scores.
 - **Person-level figures are kept per day at most, for 90 days.** The request log they come from is kept for 90
@@ -159,9 +162,6 @@ administrators and auditors; the person sees the date and reason of the looks at
     These serve running and securing the service; they are not part of the usage figures, and the settings on this
     page do not change them. Name them in your agreement too.
 
-    - An agent's **Activity** tab names who signed in to the agent on which device, and lists what the
-      applications reported, such as tools that ran and approvals given. Its request and token counts are per
-      agent, also for an agent only one person uses (see [Agents and add-ins](agents.md)).
     - The chat pages show who has which chats, projects and files, and when, but not their content (see
       [Your data and privacy](../use/privacy.md)).
     - **Access Control → API tokens** shows each token's uses: when, from which address, with which application.
