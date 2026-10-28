@@ -919,6 +919,7 @@
     "title": "Configuracion",
     "search_placeholder": "Buscar ajustes...",
     "no_results": "Ningun ajuste coincide con la busqueda.",
+    "protected_help": "Cambiarlo requiere el modo root: actívelo en la barra superior.",
     "generate_secret": "Generar Token Seguro",
     "secret_generated": "Token seguro generado.",
     "secret_generate_failed": "No se pudo generar el token seguro.",

@@ -919,6 +919,7 @@
     "title": "设置",
     "search_placeholder": "搜索设置...",
     "no_results": "没有匹配的设置项。",
+    "protected_help": "更改它需要 Root 模式：请在顶部栏中启用。",
     "generate_secret": "生成安全令牌",
     "secret_generated": "已生成安全令牌。",
     "secret_generate_failed": "生成安全令牌失败。",

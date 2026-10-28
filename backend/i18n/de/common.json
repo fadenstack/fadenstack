@@ -919,6 +919,7 @@
     "title": "Einstellungen",
     "search_placeholder": "Einstellungen suchen...",
     "no_results": "Keine passenden Einstellungen gefunden.",
+    "protected_help": "Eine Änderung braucht den Root-Modus: Aktivieren Sie ihn in der oberen Leiste.",
     "generate_secret": "Sicheres Token erzeugen",
     "secret_generated": "Sicheres Token wurde erzeugt.",
     "secret_generate_failed": "Sicheres Token konnte nicht erzeugt werden.",

@@ -233,6 +233,21 @@ describe("ModulesTab: mailer", () => {
     expect(screen.getByRole("button", { name: "Stop" })).toBeEnabled();
   });
 
+  it("says that changing a protected setting needs root mode", async () => {
+    vi.spyOn(systemSettingsApi, "schema").mockResolvedValue([
+      { ...setting("faden_mailer.service_url", "Mail Service URL"), description: "Where the mail service runs.",
+        protected: true },
+      { ...setting("faden_mailer.alert_cooldown_minutes", "Alert Cooldown"), description: "Minutes between alerts." },
+    ]);
+    render(<ModulesTab onOpenMail={() => {}} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Module settings" }));
+    expect(await screen.findByRole("textbox", { name: "Mail Service URL" })).toHaveAccessibleDescription(
+      "Where the mail service runs. Changing it needs root mode: switch it on in the top bar.",
+    );
+    expect(screen.getByRole("textbox", { name: "Alert Cooldown" })).toHaveAccessibleDescription("Minutes between alerts.");
+  });
+
   it("shows the raw fields where the server offers no Mail page", async () => {
     render(<ModulesTab />);
 

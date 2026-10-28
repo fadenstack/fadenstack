@@ -321,6 +321,11 @@ export default function ModulesTab({ onOpenMail }: ModulesTabProps = {}) {
     setSettingsValues((prev) => ({ ...prev, [key]: parsed }));
   }
 
+  /** A setting's description, and for a protected one that changing it needs root mode. */
+  function describe(item: SystemSettingSchemaItem): string {
+    return item.protected ? `${item.description} ${t("settings.protected_help")}`.trim() : item.description;
+  }
+
   async function saveSetting(
     item: SystemSettingSchemaItem,
     overrideValue?: unknown,
@@ -712,7 +717,7 @@ export default function ModulesTab({ onOpenMail }: ModulesTabProps = {}) {
                                           variant="caption"
                                           color="text.secondary"
                                         >
-                                          {item.description}
+                                          {describe(item)}
                                         </Typography>
                                       </Box>
                                     }
@@ -733,7 +738,7 @@ export default function ModulesTab({ onOpenMail }: ModulesTabProps = {}) {
                                         item.type,
                                       )
                                     }
-                                    helperText={item.description}
+                                    helperText={describe(item)}
                                   >
                                     {(item.enum_values ?? []).map((v) => (
                                       <MenuItem key={v} value={v}>
@@ -763,7 +768,7 @@ export default function ModulesTab({ onOpenMail }: ModulesTabProps = {}) {
                                         item.type,
                                       )
                                     }
-                                    helperText={item.description}
+                                    helperText={describe(item)}
                                   />
                                 )}
                                 <Button

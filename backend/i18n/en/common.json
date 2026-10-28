@@ -914,6 +914,7 @@
     "title": "Settings",
     "search_placeholder": "Search settings...",
     "no_results": "No settings match your search.",
+    "protected_help": "Changing it needs root mode: switch it on in the top bar.",
     "generate_secret": "Generate Secure Token",
     "secret_generated": "Secure token generated.",
     "secret_generate_failed": "Failed to generate secure token.",

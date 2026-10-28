@@ -914,6 +914,7 @@
     "title": "Paramètres",
     "search_placeholder": "Rechercher des paramètres…",
     "no_results": "Aucun paramètre ne correspond à votre recherche.",
+    "protected_help": "Le modifier nécessite le mode Root : activez-le dans la barre du haut.",
     "generate_secret": "Générer un jeton sécurisé",
     "secret_generated": "Jeton sécurisé généré.",
     "secret_generate_failed": "Échec de la génération du jeton sécurisé.",

@@ -88,6 +88,11 @@ function isMailerSettingKey(key: string): boolean {
   return key.startsWith("faden_mailer.");
 }
 
+/** A setting's description, and for a protected one that changing it needs root mode. */
+function describe(item: SystemSettingSchemaItem, rootModeNote: string): string {
+  return item.protected ? `${item.description} ${rootModeNote}`.trim() : item.description;
+}
+
 export default function SettingsPage() {
   const { t } = useTranslation();
   const location = useLocation();
@@ -395,7 +400,7 @@ export default function SettingsPage() {
                                     variant="caption"
                                     color="text.secondary"
                                   >
-                                    {item.description}
+                                    {describe(item, t("settings.protected_help"))}
                                   </Typography>
                                 </Box>
                               }
@@ -415,7 +420,7 @@ export default function SettingsPage() {
                                   item.type,
                                 )
                               }
-                              helperText={item.description}
+                              helperText={describe(item, t("settings.protected_help"))}
                             />
                           ) : item.type === "enum" ? (
                             <TextField
@@ -431,7 +436,7 @@ export default function SettingsPage() {
                                   item.type,
                                 )
                               }
-                              helperText={item.description}
+                              helperText={describe(item, t("settings.protected_help"))}
                             >
                               {(item.enum_values ?? []).map((v) => (
                                 <MenuItem key={v} value={v}>
@@ -455,7 +460,7 @@ export default function SettingsPage() {
                                   item.type,
                                 )
                               }
-                              helperText={`${item.description}${item.is_secret && secretMasked[item.key] ? ` ${t("settings.current_value", { value: secretMasked[item.key] })}` : ""}`}
+                              helperText={`${describe(item, t("settings.protected_help"))}${item.is_secret && secretMasked[item.key] ? ` ${t("settings.current_value", { value: secretMasked[item.key] })}` : ""}`}
                             />
                           )}
                           <Chip
