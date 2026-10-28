@@ -2118,7 +2118,13 @@
     "delete_title": "Delete Role",
     "delete_confirm": "Are you sure you want to delete role \"{{name}}\"?",
     "delete_warning_users": "{{count}} user(s) currently have this role and will lose it.",
-    "failed_delete": "Failed to delete role."
+    "failed_delete": "Failed to delete role.",
+    "builtin_names": {
+      "usage_auditor": "Usage auditor"
+    },
+    "builtin_hints": {
+      "usage_auditor": "usage_auditor: may look at one person's usage figures while person-level reporting is on, giving a reason each time. Being a superuser does not give this."
+    }
   },
   "groups": {
     "title": "Group Management",

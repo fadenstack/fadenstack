@@ -1977,7 +1977,13 @@
     "delete_title": "Rolle löschen",
     "delete_confirm": "Sind Sie sicher, dass Sie die Rolle \"{{name}}\" löschen möchten?",
     "delete_warning_users": "{{count}} Benutzer haben derzeit diese Rolle.",
-    "failed_delete": "Rolle konnte nicht gelöscht werden."
+    "failed_delete": "Rolle konnte nicht gelöscht werden.",
+    "builtin_names": {
+      "usage_auditor": "Nutzungsprüfer"
+    },
+    "builtin_hints": {
+      "usage_auditor": "usage_auditor: darf die Nutzungszahlen einer einzelnen Person ansehen, solange die personenbezogene Auswertung eingeschaltet ist, jedes Mal mit Begründung. Superuser zu sein gibt dieses Recht nicht."
+    }
   },
   "groups": {
     "title": "Gruppenverwaltung",

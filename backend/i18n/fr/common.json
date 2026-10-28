@@ -2120,7 +2120,13 @@
     "delete_title": "Supprimer le rôle",
     "delete_confirm": "Êtes-vous sûr de vouloir supprimer le rôle \"{{name}}\" ?",
     "delete_warning_users": "{{count}} utilisateur(s) ont actuellement ce rôle et le perdront.",
-    "failed_delete": "Échec de la suppression du rôle."
+    "failed_delete": "Échec de la suppression du rôle.",
+    "builtin_names": {
+      "usage_auditor": "Auditeur d'utilisation"
+    },
+    "builtin_hints": {
+      "usage_auditor": "usage_auditor : peut consulter les chiffres d'utilisation d'une personne tant que le suivi par personne est activé, en indiquant un motif à chaque fois. Être superutilisateur ne donne pas ce droit."
+    }
   },
   "groups": {
     "title": "Gestion des groupes",

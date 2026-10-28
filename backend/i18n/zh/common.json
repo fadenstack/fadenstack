@@ -1977,7 +1977,13 @@
     "delete_title": "删除角色",
     "delete_confirm": "确定要删除角色 \"{{name}}\" 吗？",
     "delete_warning_users": "当前有 {{count}} 个用户拥有此角色。",
-    "failed_delete": "删除角色失败。"
+    "failed_delete": "删除角色失败。",
+    "builtin_names": {
+      "usage_auditor": "用量审计员"
+    },
+    "builtin_hints": {
+      "usage_auditor": "usage_auditor：在按人员统计开启时，每次说明理由后可查看单个人员的用量数据。超级用户身份并不自动拥有此权限。"
+    }
   },
   "groups": {
     "title": "组管理",

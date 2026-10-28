@@ -1977,7 +1977,13 @@
     "delete_title": "Eliminar rol",
     "delete_confirm": "¿Está seguro de que desea eliminar el rol \"{{name}}\"?",
     "delete_warning_users": "{{count}} usuario(s) tienen actualmente este rol.",
-    "failed_delete": "Error al eliminar rol."
+    "failed_delete": "Error al eliminar rol.",
+    "builtin_names": {
+      "usage_auditor": "Auditor de uso"
+    },
+    "builtin_hints": {
+      "usage_auditor": "usage_auditor: puede ver las cifras de uso de una persona mientras el informe por persona está activado, indicando un motivo cada vez. Ser superusuario no lo concede."
+    }
   },
   "groups": {
     "title": "Gestión de grupos",
