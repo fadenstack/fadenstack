@@ -115,6 +115,32 @@ Wenn Sie jemanden aus einer Gruppe entfernen, verliert die Person die Rollen der
 geteilte Skills erreichen ihre Chats sofort nicht mehr. Der Eintritt in eine Gruppe oder der Austritt meldet die
 Person ab, wie jede Änderung ihrer Rechte (siehe [Anmeldungen und API-Tokens](#sign-ins-and-api-tokens)).
 
+### Teams als Baum {#teams-in-a-tree}
+
+Gruppen können einen Baum bilden, so wie Ihre Organisation: Abteilungen, ihre Teams und Teams darin. Der Baum
+bestimmt, wo Nutzung gezählt wird (siehe [Nutzung und Limits](usage.md#teams-on-the-usage-page)); er gibt
+niemandem Rechte.
+
+1. Öffnen Sie **Zugriffskontrolle → Gruppen** und bearbeiten Sie die Gruppe.
+2. Wählen Sie ihre **Übergeordnete Gruppe**. Die Liste bietet nur Gruppen an, mit denen der Baum ein Baum bleibt,
+   und zeigt die Ebene jeder Gruppe.
+3. Tragen Sie ihre **Kostenstelle** ein, wenn Ihre Finanzabteilung eine verwendet (freier Text).
+4. Speichern Sie. Die Liste unter **Gruppen** zeigt den Baum.
+
+- **Eine übergeordnete Gruppe je Gruppe**, und höchstens sechs Ebenen von der obersten Gruppe abwärts. Eine
+  Gruppe kann nicht unter eine ihrer eigenen Untergruppen gesetzt werden.
+- **Die Nutzungsgruppe einer Person ist ihr Stammteam**, auf jeder Ebene, festgelegt hier in Fadenstack unter
+  **Benutzer**. Ihre Nutzung zählt für diese Gruppe und für jede Gruppe darüber.
+- **Rollen wirken nicht im Baum nach unten.** Die Rollen einer Gruppe gelten für ihre eigenen Mitglieder, nicht
+  für die Mitglieder ihrer Untergruppen.
+- **Wird eine Gruppe gelöscht**, rücken ihre Untergruppen zu ihrer übergeordneten Gruppe auf.
+- **Archivieren** Sie eine Gruppe, die es nicht mehr gibt: Sie behält ihre Geschichte in den Nutzungszahlen,
+  kann aber niemandes Nutzungsgruppe mehr sein, keine neuen Mitglieder bekommen und wird nicht mehr angeboten, wo
+  man eine Gruppe auswählt.
+- **Eine Gruppe, die ein Anmeldeanbieter verwaltet** (siehe [Provisionierung](sign-in-provisioning.md)), kann
+  trotzdem eine übergeordnete Gruppe und eine Kostenstelle bekommen: Der Baum gehört Ihrer Organisation, der
+  Anbieter benennt die Gruppe und ihre Mitglieder.
+
 ## Entwicklermodus {#developer-mode}
 
 ![Entwicklermodus für eine Person: der Schalter und „Endet“, um festzulegen, wann er aufhört](../images/administer/users-developer-mode.png)

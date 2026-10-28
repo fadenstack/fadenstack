@@ -38,13 +38,11 @@ Jede Zahl auf den Nutzungsseiten zählt:
 
 | Zahl | Was sie zählt |
 |---|---|
-| **Anfragen** | Jede Anfrage, die das Gateway erreicht hat, fehlgeschlagene und abgelehnte eingeschlossen. |
-| **Fehlgeschlagen** | Anfragen, die mit einem Fehler endeten (HTTP-Status 400 oder höher). Ablehnungen durch ein Limit zählen hier nicht. |
-| **Abgelehnt** | Anfragen, die ein Limit abgelehnt hat, bevor sie liefen (siehe [Limits für die ganze Instanz](#limits-for-the-whole-instance)). Sie haben keine Tokens verbraucht. |
-| **Eingabe-Tokens** | Was an das Modell ging, einschließlich zwischengespeicherter Tokens. |
-| **Zwischengespeicherte Eingabe-Tokens** | Der Teil der Eingabe, den das Modell oder sein Provider aus einem Cache genommen hat. Bereits in den Eingabe-Tokens enthalten. |
-| **Ausgabe-Tokens** | Was das Modell geschrieben hat, einschließlich seines Nachdenkens. |
-| **Reasoning-Tokens** | Der Teil der Ausgabe, den ein Reasoning-Modell zum Nachdenken brauchte, bevor es antwortete. Bereits in den Ausgabe-Tokens enthalten. |
+| **Anfragen** | Jede Anfrage, die das Gateway erreicht hat, fehlgeschlagene und abgelehnte eingeschlossen. Darunter, wie viele davon: |
+| … fehlgeschlagen | Mit einem Fehler geendet (HTTP-Status 400 oder höher). Ablehnungen durch ein Limit zählen hier nicht. |
+| … von einem Limit abgelehnt | Abgelehnt, bevor sie liefen (siehe [Limits für die ganze Instanz](#limits-for-the-whole-instance)). Sie haben keine Tokens verbraucht. |
+| **Eingabe-Tokens** | Was an das Modell ging, einschließlich zwischengespeicherter Tokens. Darunter, wie viele *davon aus dem Cache*: der Teil, den das Modell oder sein Provider aus einem Cache genommen hat. |
+| **Ausgabe-Tokens** | Was das Modell geschrieben hat, einschließlich seines Nachdenkens. Darunter, wie viele *davon für Reasoning*: der Teil, den ein Reasoning-Modell zum Nachdenken brauchte, bevor es antwortete. |
 | **Geschätzte Kosten** | Die Tokens zum Preis des Modells (siehe [Woher die Zahlen kommen](#where-the-numbers-come-from)), je Währung. |
 | **Personen** | Wie viele verschiedene Personen die Zahl umfasst. |
 
@@ -61,8 +59,9 @@ Konto-Schaltfläche:
 - ihre Tokens und geschätzten Kosten nach Tag oder Monat, nach Modell, nach Agent und nach Chat-Projekt;
 - die Limits, die für die Instanz gelten, und wie viel davon gerade verbraucht ist;
 - ob die personenbezogene Auswertung eingeschaltet ist, wie fein und wie lange ihre Zahlen aufbewahrt werden
-  und wie oft ein Nutzungsprüfer sie angesehen hat;
-- einen Download ihrer Daten als JSON oder CSV.
+  und wie oft ein Nutzungsprüfer sie angesehen hat, mit einem Link zu Ihren Datenschutzhinweisen, wenn Sie
+  einen gesetzt haben (siehe [Nutzung und Datenschutz](usage-privacy.md#the-settings));
+- unter **Ihre Daten** **Als JSON herunterladen** und **Als CSV herunterladen**.
 
 Der Download enthält ihre täglichen Zahlen, ihre Einträge, die noch im Anfrageprotokoll stehen (Zeit, Modell,
 Agent, Tokens, Kosten und Ergebnis; nie, was geschrieben wurde, nie das Gerät), sowie Datum und angegebenen
@@ -73,16 +72,35 @@ eine Person nach Art. 15 DSGVO über ihre Nutzung erfragen kann (siehe
 ## Die Seite „Nutzung“ {#the-usage-page}
 
 Die Seite **Nutzung** zeigt, wie viel die Instanz verbraucht und wo, ohne die Zahlen einzelner Personen zu
-zeigen. Administratoren und Personen mit der Rolle `auditor` können sie öffnen.
+zeigen. Administratoren können sie öffnen, ebenso Personen mit der Rolle `auditor`, die dafür keine
+Administratorrechte brauchen (siehe [Administratoren und Prüfer](users.md#administrators-and-auditors)).
 
 1. Öffnen Sie **Observability → Nutzung**.
-2. Wählen Sie einen Zeitraum und ob er nach Stunde, Tag oder Monat gezeigt wird.
-3. Wählen Sie, was eine Zeile ist: ein Team (die **Nutzungsgruppe**), ein Agent, ein Modell oder ein Provider.
+2. Wählen Sie den **Zeitraum** (**7 Tage** bis **12 Monate**) und **Zahlen pro** **Stunde**, **Tag** oder
+   **Monat**.
+3. Wählen Sie unter **Gruppieren nach** **Nutzungsgruppe** (das Team), **Agent**, **Modell** oder **Anbieter**.
 
-Die Seite zeigt die Summen, den Verlauf und eine Zeile je Team, Agent, Modell oder Provider, mit den Zahlen aus
+Die Seite zeigt die **Summen**, **Tokens im Zeitverlauf** und eine Zeile je Team, Agent, Modell oder Provider, mit den Zahlen aus
 [Was gezählt wird](#what-is-counted). Sie zeigt nie eine Person, einen Namen oder eine Rangfolge von Personen.
 Wer die Zahlen einer einzelnen Person ansehen darf und wie, steht unter
 [Nutzung und Datenschutz](usage-privacy.md#looking-at-one-persons-figures).
+
+### Teams auf der Seite „Nutzung“ {#teams-on-the-usage-page}
+
+Mit **Gruppieren nach** **Nutzungsgruppe** erscheinen die Teams als Baum, wie unter **Zugriffskontrolle →
+Gruppen** festgelegt (siehe [Teams als Baum](users.md#teams-in-a-tree)). Öffnen Sie ein Team, um seine Unterteams
+zu sehen.
+
+- **Die Zahlen eines Teams enthalten die seiner Unterteams.** Die Nutzung einer Person zählt für ihre
+  Nutzungsgruppe und für jedes Team darüber.
+- **Ein Team erscheint, wenn in ihm und seinen Unterteams zusammen mindestens fünf Personen aktiv waren.**
+  Kleinere Unterteams werden in einer Zeile „kleinere Teams“ unter ihrem übergeordneten Team zusammengefasst,
+  geschützt wie die Zeile **Weniger als 5 Personen** (siehe [Die Mindestgruppengröße](#the-minimum-group-size)).
+- **Personen ohne Nutzungsgruppe** werden unter **Nicht zugeordnet** gezählt.
+- **Wie erfasst** oder **Heutige Struktur** bestimmt, welchem Baum die Zahlen folgen. **Wie erfasst**, die
+  Voreinstellung, zählt die Nutzung für die Teams, wie sie zum Zeitpunkt der Nutzung bestanden; eine
+  Umorganisation schreibt die Vergangenheit also nicht um. **Heutige Struktur** zählt alles für den heutigen
+  Baum, etwa um das Vorjahr mit den neuen Abteilungen zu vergleichen.
 
 ### Die Mindestgruppengröße {#the-minimum-group-size}
 
@@ -90,8 +108,7 @@ Jede Zahl auf der Seite umfasst mindestens fünf verschiedene Personen: die **Mi
 sie unter **Einstellungen → Nutzung und Datenschutz** erhöhen, aber nicht unter fünf setzen.
 
 - Ein Team, ein Agent, ein Modell oder ein Provider, den im Zeitraum weniger Personen genutzt haben, bekommt keine
-  eigene Zeile. Er wird in einer eigenen Sammelzeile „weniger als fünf Personen“ gezählt, die alle diese Gruppen
-  enthält.
+  eigene Zeile. Er wird in der Zeile **Weniger als 5 Personen** gezählt, die alle diese Gruppen enthält.
 - Auch diese Zeile umfasst mindestens fünf Personen. Sind die kleinen Gruppen zusammen weniger, kommen die
   kleinsten angezeigten Gruppen hinzu, bis es reicht. So lässt sich keine Gruppe aus der Summe minus den übrigen
   Zeilen errechnen.
@@ -99,15 +116,18 @@ sie unter **Einstellungen → Nutzung und Datenschutz** erhöhen, aber nicht unt
   Stunden erscheinen nur, wenn mindestens fünf Personen die Instanz in dieser Stunde genutzt haben.
 - Dasselbe gilt über die Zeit: Ließe sich ein ausgeblendeter Zeitraum aus der Summe minus den angezeigten
   errechnen, wird ein weiterer mit ihm ausgeblendet.
-- Die Zahl der Personen in der Summe erscheint erst ab fünf.
+- **Summen** und **Tokens im Zeitverlauf** zeigen nur Zahlen, wenn mindestens fünf Personen die Instanz im
+  Zeitraum genutzt haben. Ein Nutzungsprüfer sieht sie trotzdem, solange die personenbezogene Auswertung
+  eingeschaltet ist.
 
 Ein Team aus drei Personen oder ein Agent, den eine Person nutzt, erscheint daher nie allein: Seine Zahlen wären
 die einer Person unter anderem Namen.
 
 !!! note "Kleine Instanzen"
-    Haben im Zeitraum weniger als fünf Personen die Instanz genutzt, sagt die Seite das. Jede Zahl liegt dann
-    nahe an den Zahlen einer einzelnen Person; behandeln Sie die Seite deshalb wie personenbezogene Daten (siehe
-    [Nutzung und Datenschutz](usage-privacy.md)).
+    Haben im Zeitraum weniger als fünf Personen die Instanz genutzt, sagt die Seite das (**Eine kleine
+    Instanz**), und die Summen zeigen keine Zahlen: Sie lägen nahe an den Zahlen einer einzelnen Person. Ein
+    Nutzungsprüfer, der sie bei eingeschalteter personenbezogener Auswertung trotzdem sieht, behandelt sie wie
+    personenbezogene Daten (siehe [Nutzung und Datenschutz](usage-privacy.md)).
 
 ## Die Kosten- und Nutzungsseiten {#the-cost-and-usage-pages}
 
@@ -143,7 +163,7 @@ die API, und hält nichts über einzelne Personen fest.
 | **Tokens pro Tag** | Eingabe- und Ausgabe-Tokens aller zusammen | Um Mitternacht in der Zeitzone der Nutzungsmessung |
 
 1. Öffnen Sie **Einstellungen** und wählen Sie den Reiter **Nutzung und Datenschutz**.
-2. Tragen Sie bei den Limits für jedes Limit, das Sie wollen, eine Zahl ein. Lassen Sie ein Feld leer, wenn es
+2. Tragen Sie unter **Limits der Instanz** für jedes Limit, das Sie wollen, eine Zahl ein. Lassen Sie ein Feld leer, wenn es
    kein Limit geben soll.
 3. Wählen Sie **Speichern**.
 
@@ -224,7 +244,7 @@ zeigt, wie viele es waren („Anfragen ohne Preis“), damit Sie wissen, dass di
 |---|---|
 | Die Zahlen sind leer | Im Zeitraum gibt es keine Anfragen, oder das Gateway kann sein Protokoll nicht schreiben. Senden Sie eine Nachricht im Chat, warten Sie ein paar Minuten und aktualisieren Sie dann die Seite. |
 | Eine Anfrage von eben fehlt unter **Nutzung** oder **Meine Nutzung** | Die Nutzungsseiten fassen das Anfrageprotokoll alle paar Minuten zusammen. Aktualisieren Sie etwas später. |
-| Eine Zeile lautet „weniger als fünf Personen“, oder ein Tag zeigt keine Zahlen | Weniger als fünf Personen haben dieses Team, diesen Agenten, dieses Modell oder diesen Tag genutzt: Ihre Zahlen werden absichtlich zusammengefasst (siehe [Die Mindestgruppengröße](#the-minimum-group-size)). |
+| Eine Zeile lautet **Weniger als 5 Personen**, oder ein Tag zeigt keine Zahlen | Weniger als fünf Personen haben dieses Team, diesen Agenten, dieses Modell oder diesen Tag genutzt: Ihre Zahlen werden absichtlich zusammengefasst (siehe [Die Mindestgruppengröße](#the-minimum-group-size)). |
 | Die Kosten zeigen „Keine“ oder wirken zu niedrig | Die verwendeten Modelle haben keinen Preis. Legen Sie ihn wie oben beschrieben fest. |
 | Benutzer erhalten eine Meldung über das Limit der Instanz | Ein Limit für die ganze Instanz ist erreicht. Erhöhen Sie es unter **Einstellungen → Nutzung und Datenschutz** oder warten Sie, bis es neu beginnt: in der nächsten Minute oder, beim Tageslimit, um Mitternacht. |
 | Eine Anwendung bricht mit `429` und `quota_tokens_per_day` ab | Das Tageslimit für Tokens ist erreicht; der Client versucht es nicht von selbst erneut. Es geht nach Mitternacht in der Zeitzone der Nutzungsmessung wieder, oder sobald Sie das Limit erhöhen. |

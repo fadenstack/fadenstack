@@ -87,7 +87,7 @@ They need a state the test install does not have, or a dialog the script does no
   the German Edit dialog; the skill editor and a skill's Settings tab; the PII dashboard; one request opened under
   Cost Observability → Requests; the **Provenance** card with **Marking engine** and **Public check page**, and its
   **Disable Provenance?** dialog (`administer/content-marking.md`); **My usage** with its download, the **Usage**
-  page with a "fewer than five people" row and the small-instance note, the person-level view asking for a reason,
+  page with a **Fewer than 5 people** row and the small-instance note, the person-level view asking for a reason,
   and **Settings → Usage and privacy** with the limits (`administer/usage.md`, `administer/usage-privacy.md`).
 - **Operate**: a machine waiting for approval, Skip the approval step opened, the "Agent version available" chip;
   Create a cluster step 3; a cluster starting, one needing attention and one failed with **Try again**; a selected

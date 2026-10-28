@@ -37,13 +37,11 @@ Each figure on the usage pages counts:
 
 | Figure | What it counts |
 |---|---|
-| **Requests** | Every request that reached the gateway, failed and refused ones included. |
-| **Failed** | Requests that ended in an error (HTTP status 400 or higher). Refusals by a limit are not counted here. |
-| **Refused** | Requests a limit refused before they ran (see [Limits for the whole instance](#limits-for-the-whole-instance)). They used no tokens. |
-| **Input tokens** | What was sent to the model, cached tokens included. |
-| **Cached input tokens** | The part of the input the model or its provider took from a cache. Already part of the input tokens. |
-| **Output tokens** | What the model wrote, its reasoning included. |
-| **Reasoning tokens** | The part of the output a reasoning model spent thinking before it answered. Already part of the output tokens. |
+| **Requests** | Every request that reached the gateway, failed and refused ones included. Below it, how many of them: |
+| … failed | Ended in an error (HTTP status 400 or higher). Refusals by a limit are not counted here. |
+| … refused by a limit | Refused before they ran (see [Limits for the whole instance](#limits-for-the-whole-instance)). They used no tokens. |
+| **Input tokens** | What was sent to the model, cached tokens included. Below it, how many *of them cached*: the part the model or its provider took from a cache. |
+| **Output tokens** | What the model wrote, its reasoning included. Below it, how many *of them reasoning*: the part a reasoning model spent thinking before it answered. |
 | **Estimated cost** | The tokens at the model's price (see [Where the numbers come from](#where-the-numbers-come-from)), per currency. |
 | **People** | How many different people the figure covers. |
 
@@ -59,8 +57,9 @@ Everyone who signs in sees their own usage under **My usage**, in the menu behin
 - their tokens and estimated cost by day or month, by model, by agent and by chat project;
 - the limits that apply to the instance, and how much of each is used at the moment;
 - whether person-level reporting is on, how finely and for how long their figures are kept, and how often a
-  usage auditor looked at them;
-- a download of their data, as JSON or CSV.
+  usage auditor looked at them, with a link to your privacy notice when you have set one (see
+  [Usage and privacy](usage-privacy.md#the-settings));
+- under **Your data**, **Download as JSON** and **Download as CSV**.
 
 The download holds their daily figures, their request records still in the request log (time, model, agent,
 tokens, cost and outcome; never what was written, never the device), and the date and the stated reason of
@@ -70,38 +69,57 @@ may ask under Art. 15 GDPR about their usage (see [Usage and privacy](usage-priv
 ## The Usage page
 
 The **Usage** page shows how much the instance uses, and where, without showing anyone's own figures.
-Administrators and people with the `auditor` role can open it.
+Administrators can open it, and so can people with the role `auditor`, who need no administrator rights for it
+(see [Administrators and auditors](users.md#administrators-and-auditors)).
 
 1. Open **Observability → Usage**.
-2. Pick a time range, and whether to show it by hour, day or month.
-3. Choose what each row is: a team (the **Usage group**), an agent, a model or a provider.
+2. Pick the **Period** (**7 days** to **12 months**), and **Figures per** **Hour**, **Day** or **Month**.
+3. Under **Group by**, choose **Usage group** (the team), **Agent**, **Model** or **Provider**.
 
-The page shows the totals, the figures over time, and one row per team, agent, model or provider, with the
+The page shows the **Totals**, **Tokens over time**, and one row per team, agent, model or provider, with the
 figures of [What is counted](#what-is-counted). It never shows a person, a name or a ranking of people. Who may
 look at one person's figures, and how, is on
 [Usage and privacy](usage-privacy.md#looking-at-one-persons-figures).
+
+### Teams on the Usage page
+
+With **Group by** **Usage group**, the teams appear as a tree, as set on **Access Control → Groups** (see
+[Teams in a tree](users.md#teams-in-a-tree)). Open a team to see its sub-teams.
+
+- **A team's figures include its sub-teams'.** A person's usage counts toward their usage group and every team
+  above it.
+- **A team is shown when at least five people were active in it and its sub-teams together.** Smaller sub-teams
+  are counted together in one "smaller teams" row under their parent, protected like the **Fewer than 5 people**
+  row (see [The minimum group size](#the-minimum-group-size)).
+- **People without a usage group** are counted under **Unassigned**.
+- **As recorded** or **Today's structure** decides which tree the figures follow. **As recorded**, the default,
+  counts usage toward the teams as they stood when it happened, so a reorganisation does not rewrite the past.
+  **Today's structure** counts all of it toward today's tree, for example to compare last year with the new
+  departments.
 
 ### The minimum group size
 
 Every figure on the page covers at least five different people: the **minimum group size**, which you can raise
 under **Settings → Usage and privacy** but not set below five.
 
-- A team, agent, model or provider used by fewer people in the range gets no row of its own. It is counted in a
-  row of its own kind, "fewer than five people", that holds all of them.
+- A team, agent, model or provider used by fewer people in the range gets no row of its own. It is counted in the
+  row **Fewer than 5 people**, which holds all of them.
 - That row covers at least five people as well. Where the small groups together are fewer, the smallest groups
   shown are moved into it until it does, so no group's figures follow from the total minus the other rows.
 - An hour, a day or a month in which fewer people used the instance shows no figures. Hours show only where at
   least five people used it.
 - The same holds over time: where hiding a period would let it be worked out from the total minus the periods
   shown, another period is hidden with it.
-- The number of people in the total shows only from five upwards.
+- **Totals** and **Tokens over time** show figures only when at least five people used the instance in the
+  range. A usage auditor sees them anyway while person-level reporting is on.
 
 A team of three, or an agent one person uses, is therefore never shown on its own: its figures would be one
 person's under another name.
 
 !!! note "Small instances"
-    When fewer than five people used the instance in the range, the page says so. Every figure is then close to
-    one person's own, so handle the page as person-level data (see [Usage and privacy](usage-privacy.md)).
+    When fewer than five people used the instance in the range, the page says so (**A small instance**) and the
+    totals show no figures: they would be close to one person's own. A usage auditor who still sees them while
+    person-level reporting is on handles them as person-level data (see [Usage and privacy](usage-privacy.md)).
 
 ## The cost and usage pages
 
@@ -135,7 +153,7 @@ everyone's requests together, through the chat, the agents and the API, and keep
 | **Tokens per day** | Input and output tokens of everyone together | At midnight in the usage time zone |
 
 1. Open **Settings** and select the **Usage and privacy** tab.
-2. Under the limits, enter a number for each limit you want. Leave a field empty for no limit.
+2. Under **Limits of the instance**, enter a number for each limit you want. Leave a field empty for no limit.
 3. Select **Save**.
 
 The change is recorded in the audit log with your name (`usage.limits.update`). **My usage** shows everyone the
@@ -210,7 +228,7 @@ how many there were ("Requests without a price"), so you know the estimate is sh
 |---|---|
 | The figures are empty | No requests in the range, or the gateway cannot write its log. Send a message in the chat, wait a few minutes, then refresh. |
 | A request from a moment ago is missing on **Usage** or **My usage** | The usage pages add up the request log every few minutes. Refresh a little later. |
-| A row says "fewer than five people", or a day shows no figures | Fewer than five people used that team, agent, model or day: their figures are kept together on purpose (see [The minimum group size](#the-minimum-group-size)). |
+| A row says **Fewer than 5 people**, or a day shows no figures | Fewer than five people used that team, agent, model or day: their figures are kept together on purpose (see [The minimum group size](#the-minimum-group-size)). |
 | Spend shows "None" or looks too low | The models used have no price. Set them as above. |
 | People get a message about the instance's limit | A limit for the whole instance was reached. Raise it under **Settings → Usage and privacy**, or wait until it starts again: the next minute, or midnight for the daily limit. |
 | An application stops with `429` and `quota_tokens_per_day` | The daily token limit was reached; the client does not retry by itself. It works again after midnight in the usage time zone, or as soon as you raise the limit. |

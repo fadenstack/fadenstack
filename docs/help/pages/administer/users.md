@@ -108,6 +108,28 @@ Removing someone from a group takes away the group's roles, and the skills share
 reaching their chats at once. Joining or leaving a group signs the person out, as any change of their
 rights does (see [Sign-ins and API tokens](#sign-ins-and-api-tokens)).
 
+### Teams in a tree
+
+Groups can form a tree, as your organisation does: departments, their teams, and teams within those. The tree
+decides where usage is counted (see [Usage and limits](usage.md#teams-on-the-usage-page)); it gives nobody any
+rights.
+
+1. Open **Access Control → Groups** and edit the group.
+2. Pick its **Parent**. The list offers only groups that keep the tree a tree, and shows each one's level.
+3. Enter its **Cost centre**, if your finance department uses one (free text).
+4. Save. The list on **Groups** shows the tree.
+
+- **One parent per group**, and at most six levels from the top group down. A group cannot be placed under one
+  of its own sub-groups.
+- **A person's usage group is their home team**, at any level, set here in Fadenstack on **Users**. Their usage
+  counts toward it and toward every group above it.
+- **Roles do not flow down the tree.** A group's roles reach its own members, not the members of its sub-groups.
+- **Deleting a group** moves its sub-groups up to its parent.
+- **Archive** a group that has ended: it keeps its history in the usage figures, but cannot be anyone's usage
+  group or get new members, and is no longer offered where people pick a group.
+- **A group a sign-in provider keeps** (see [Provisioning](sign-in-provisioning.md)) can still get a parent and a
+  cost centre: the tree is your organisation's, the provider names the group and its members.
+
 ## Developer mode
 
 ![Developer mode for one person: the switch, and Ends to set when it stops](../images/administer/users-developer-mode.png)

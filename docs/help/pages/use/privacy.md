@@ -82,13 +82,13 @@ The model list does not always show where a model runs. If it matters for what y
 
 ## Your usage
 
-**My usage**, in the menu behind your account button, shows how much you used: your tokens and estimated cost by day or month, by model, agent and project, and the limits that apply to everyone. **Download** gives you your data as JSON or CSV: your daily figures, your request records (time, model, tokens, cost, outcome; never what you wrote) and when someone looked at your figures, and why.
+**My usage**, in the menu behind your account button, shows how much you used: your tokens and estimated cost by day or month, by model, agent and project, and the limits that apply to everyone. Under **Your data**, **Download as JSON** and **Download as CSV** give you your data: your daily figures, your request records (time, model, tokens, cost, outcome; never what you wrote) and when someone looked at your figures, and why.
 
 - **You** see your own figures.
 - **Administrators** see totals for groups of at least five people, never your figures alone. When they look into a failed request, its record does not show who sent it.
 - **If your organisation has switched on person-level reporting**, **My usage** says so. A few named people may then look at your figures, by day or by month, each time giving a reason. **My usage** shows how often that happened; your download shows the date and the reason of each look, not who looked.
 
-Your figures are kept for the time **My usage** names (90 days unless your organisation chose otherwise), and are erased when your account is deleted. Your organisation uses them for costs and capacity, not to judge your work. See [Usage and privacy](../administer/usage-privacy.md).
+Your figures are kept for the time **My usage** names (90 days unless your organisation chose otherwise), and are erased when your account is deleted. Your organisation uses them for costs and capacity, not to judge your work; where it has a privacy notice for employees, **My usage** links to it. See [Usage and privacy](../administer/usage-privacy.md).
 
 When a limit stops a request, the message names the limit, for example the instance's daily token limit. Ask your administrator if you need more.
 

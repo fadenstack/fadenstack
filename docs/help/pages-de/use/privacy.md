@@ -82,13 +82,13 @@ Die Modellliste zeigt nicht immer, wo ein Modell läuft. Wenn das für das, was 
 
 ## Ihre Nutzung {#your-usage}
 
-**Meine Nutzung**, im Menü hinter Ihrer Konto-Schaltfläche, zeigt, wie viel Sie genutzt haben: Ihre Tokens und geschätzten Kosten nach Tag oder Monat, nach Modell, Agent und Projekt, und die Limits, die für alle gelten. **Download** liefert Ihnen Ihre Daten als JSON oder CSV: Ihre täglichen Zahlen, Ihre Einträge zu Anfragen (Zeit, Modell, Tokens, Kosten, Ergebnis; nie, was Sie geschrieben haben) und wann jemand Ihre Zahlen angesehen hat und warum.
+**Meine Nutzung**, im Menü hinter Ihrer Konto-Schaltfläche, zeigt, wie viel Sie genutzt haben: Ihre Tokens und geschätzten Kosten nach Tag oder Monat, nach Modell, Agent und Projekt, und die Limits, die für alle gelten. Unter **Ihre Daten** liefern **Als JSON herunterladen** und **Als CSV herunterladen** Ihre Daten: Ihre täglichen Zahlen, Ihre Einträge zu Anfragen (Zeit, Modell, Tokens, Kosten, Ergebnis; nie, was Sie geschrieben haben) und wann jemand Ihre Zahlen angesehen hat und warum.
 
 - **Sie** sehen Ihre eigenen Zahlen.
 - **Administratoren** sehen Summen für Gruppen von mindestens fünf Personen, nie Ihre Zahlen allein. Gehen sie einer fehlgeschlagenen Anfrage nach, zeigt deren Eintrag nicht, wer sie gesendet hat.
 - **Hat Ihre Organisation die personenbezogene Auswertung eingeschaltet**, steht das unter **Meine Nutzung**. Dann dürfen einige benannte Personen Ihre Zahlen ansehen, nach Tag oder nach Monat, jedes Mal mit Begründung. **Meine Nutzung** zeigt, wie oft das geschah; Ihr Download zeigt Datum und Grund jeder Einsicht, nicht, wer hineingesehen hat.
 
-Ihre Zahlen werden so lange aufbewahrt, wie **Meine Nutzung** angibt (90 Tage, wenn Ihre Organisation nichts anderes gewählt hat), und mit Ihrem Konto gelöscht. Ihre Organisation verwendet sie für Kosten und Kapazität, nicht, um Ihre Arbeit zu beurteilen. Siehe [Nutzung und Datenschutz](../administer/usage-privacy.md).
+Ihre Zahlen werden so lange aufbewahrt, wie **Meine Nutzung** angibt (90 Tage, wenn Ihre Organisation nichts anderes gewählt hat), und mit Ihrem Konto gelöscht. Ihre Organisation verwendet sie für Kosten und Kapazität, nicht, um Ihre Arbeit zu beurteilen; hat sie Datenschutzhinweise für Beschäftigte, verlinkt **Meine Nutzung** darauf. Siehe [Nutzung und Datenschutz](../administer/usage-privacy.md).
 
 Hält ein Limit eine Anfrage an, nennt die Meldung das Limit, etwa das Tageslimit der Instanz für Tokens. Fragen Sie Ihren Administrator, wenn Sie mehr brauchen.
 
