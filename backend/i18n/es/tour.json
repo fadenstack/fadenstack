@@ -345,6 +345,15 @@
       "action_pricing": "Definir los precios por millón de tokens",
       "action_export": "Exportar los datos en CSV"
     },
+    "usage": {
+      "title": "Uso",
+      "description": "Lo que la instancia usó de los modelos, por grupo de uso, agente, modelo y proveedor. Cada cifra abarca al menos k personas; nada nombra ni clasifica a una sola persona.",
+      "action_totals": "Solicitudes, tokens y coste estimado de 7 días a 12 meses, por hora, día o mes",
+      "action_groups": "Agrupar por grupo de uso, agente, modelo o proveedor; los grupos de menos de k personas se juntan en una fila",
+      "action_small": "Un aviso advierte cuando menos de k personas usan la instancia: sus totales cuentan entonces como datos personales",
+      "action_people": "Los auditores de uso, con el informe por persona activado, ven cifras por persona tras indicar un motivo; cada consulta se registra",
+      "action_settings": "Configuración > Uso y privacidad fija k, los plazos de conservación, los límites y el informe por persona"
+    },
     "logs": {
       "title": "Logs y auditoría",
       "description": "Los logs de cada máquina y contenedor, y el registro de auditoría de quién cambió qué.",
@@ -626,9 +635,10 @@
     },
     "settings": {
       "title": "Configuración",
-      "description": "La configuración de todo el sistema, en tres pestañas.",
+      "description": "Ajustes de todo el sistema, en cuatro pestañas.",
       "action_general": "General: todos los ajustes del sistema, con búsqueda, y el token de Hugging Face",
       "action_modules": "Módulos: activar o desactivar los módulos opcionales, con sus ajustes",
+      "action_usage": "Uso y privacidad: quién ve las cifras de uso, cuánto tiempo se conservan, los límites de la instancia y la declaración de configuración",
       "action_appearance": "Apariencia: el color de acento"
     },
     "profile": {

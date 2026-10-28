@@ -345,6 +345,15 @@
       "action_pricing": "Définir les prix par million de tokens",
       "action_export": "Exporter les données en CSV"
     },
+    "usage": {
+      "title": "Utilisation",
+      "description": "Ce que l'instance a utilisé des modèles, par groupe d'usage, agent, modèle et fournisseur. Chaque chiffre couvre au moins k personnes ; rien ne nomme ni ne classe une seule personne.",
+      "action_totals": "Requêtes, tokens et coût estimé sur 7 jours à 12 mois, par heure, jour ou mois",
+      "action_groups": "Grouper par groupe d'usage, agent, modèle ou fournisseur ; les groupes de moins de k personnes sont réunis en une ligne",
+      "action_small": "Un bandeau avertit quand moins de k personnes utilisent l'instance : ses totaux comptent alors comme des données personnelles",
+      "action_people": "Les auditeurs d'utilisation, avec le suivi par personne activé, voient les chiffres par personne après avoir indiqué un motif ; chaque consultation est enregistrée",
+      "action_settings": "Paramètres > Utilisation et confidentialité fixe k, les durées de conservation, les limites et le suivi par personne"
+    },
     "logs": {
       "title": "Journaux et audit",
       "description": "Les journaux de chaque machine et de chaque conteneur, et la piste d'audit de qui a modifié quoi.",
@@ -626,9 +635,10 @@
     },
     "settings": {
       "title": "Paramètres",
-      "description": "Les paramètres de tout le système, en trois onglets.",
+      "description": "Les paramètres de tout le système, en quatre onglets.",
       "action_general": "Général : tous les paramètres système, avec recherche, et le jeton Hugging Face",
       "action_modules": "Modules : activer ou désactiver les modules optionnels, avec leurs paramètres",
+      "action_usage": "Utilisation et confidentialité : qui voit les chiffres d'utilisation, combien de temps ils sont conservés, les limites de l'instance et la déclaration de configuration",
       "action_appearance": "Apparence : la couleur d'accent"
     },
     "profile": {

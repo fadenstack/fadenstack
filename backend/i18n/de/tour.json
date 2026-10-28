@@ -345,6 +345,15 @@
       "action_pricing": "Die Preise pro Million Tokens festlegen",
       "action_export": "Die Daten als CSV exportieren"
     },
+    "usage": {
+      "title": "Nutzung",
+      "description": "Was die Instanz von den Modellen genutzt hat, nach Nutzungsgruppe, Agent, Modell und Anbieter. Jede Zahl umfasst mindestens k Personen; nichts nennt eine einzelne Person oder bringt Personen in eine Rangfolge.",
+      "action_totals": "Anfragen, Tokens und geschätzte Kosten über 7 Tage bis 12 Monate, pro Stunde, Tag oder Monat",
+      "action_groups": "Nach Nutzungsgruppe, Agent, Modell oder Anbieter gruppieren; Gruppen mit weniger als k Personen werden zu einer Zeile zusammengefasst",
+      "action_small": "Ein Hinweis warnt, wenn weniger als k Personen die Instanz nutzen: Ihre Summen gelten dann als personenbezogene Daten",
+      "action_people": "Nutzungsprüfer sehen bei eingeschalteter Auswertung pro Person die Zahlen pro Person nach Angabe einer Begründung; jede Einsicht wird protokolliert",
+      "action_settings": "Einstellungen > Nutzung und Datenschutz legt k, die Aufbewahrungsfristen, die Limits und die Auswertung pro Person fest"
+    },
     "logs": {
       "title": "Logs & Audit",
       "description": "Logs aller Maschinen und Container und das Audit-Protokoll, wer was geändert hat.",
@@ -626,9 +635,10 @@
     },
     "settings": {
       "title": "Einstellungen",
-      "description": "Einstellungen für das ganze System, in drei Reitern.",
+      "description": "Einstellungen für das ganze System, in vier Reitern.",
       "action_general": "Allgemein: jede Systemeinstellung, durchsuchbar, und das Hugging-Face-Token",
       "action_modules": "Module: optionale Module ein- oder ausschalten, mit ihren Einstellungen",
+      "action_usage": "Nutzung und Datenschutz: wer Nutzungszahlen sieht, wie lange sie aufbewahrt werden, die Limits der Instanz und die Konfigurationserklärung",
       "action_appearance": "Darstellung: die Akzentfarbe"
     },
     "profile": {
