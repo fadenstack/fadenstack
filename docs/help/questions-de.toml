@@ -177,6 +177,17 @@
 "Wie sehe ich die Nutzung pro Person oder Gruppe?" = "usage-per-person-and-per-group"
 "Kann ich Limits oder Budgets festlegen?" = "limits-and-budgets"
 
+["administer/usage-privacy.md"]
+"Können Administratoren sehen, wie viel jede Person nutzt?" = "private-by-default"
+"Wie schalte ich die personenbezogene Auswertung der Nutzung ein?" = "the-settings"
+"Wie lange werden Nutzungsdaten aufbewahrt?" = "retention-and-erasure"
+"Wer darf die Nutzung einer einzelnen Person ansehen, und wird das festgehalten?" = "looking-at-one-persons-figures"
+"Was ist die Rolle usage_auditor?" = "looking-at-one-persons-figures"
+"Wie bekommt jemand eine Kopie seiner Nutzungsdaten (Auskunft nach DSGVO)?" = "your-own-view-and-the-download"
+"Werden Nutzungsdaten gelöscht, wenn ein Konto gelöscht wird?" = "retention-and-erasure"
+"Welche Datenfelder zur Nutzung werden gespeichert?" = "the-data-fields"
+"Dürfen wir Nutzungsdaten zur Bewertung von Beschäftigten verwenden?" = "what-usage-data-is-for"
+
 ["administer/llm-calls.md"]
 "Warum ist eine Anfrage an ein Modell fehlgeschlagen?" = "why-a-call-failed"
 "Wie finde ich einen Aufruf oder eine Anfrage?" = "find-a-call"
