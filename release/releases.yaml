@@ -25,6 +25,23 @@
 series: []
 
 releases:
+  - version: 0.5.1
+    channel: stable
+    date: ""
+    severity: normal
+    summary: >-
+      The server comes back by itself after a reboot. API token use is recorded, and changes to a person's rights
+      apply at once; with Fadenstack Enterprise, sign-in through your identity provider and provisioning.
+    highlights:
+      - "After a reboot the server comes back by itself: the message broker no longer runs out of memory while it starts, and the services wait for it instead of giving up."
+      - "API tokens: every use is recorded, and Access Control, API tokens shows who used which token and when."
+      - "A change to a person's rights applies at their next request and ends their sign-ins."
+      - "Administrators can give a person a one-time link to set a new password, without mail."
+      - "With Fadenstack Enterprise: sign-in through your organisation's identity provider (OpenID Connect, SAML with Single Logout, LDAP and Active Directory), provisioning from Entra ID, Okta and others (SCIM), linked sign-ins, and mail in each person's language."
+      - "The gateway keeps an idle connection open longer than its clients do: no more occasional 502 answers. The MCP image runs Node.js 24 LTS."
+    upgrade_from: 0.4.0
+    components:
+      agent: 0.2.11
   - version: 0.5.0
     channel: stable
     date: ""
