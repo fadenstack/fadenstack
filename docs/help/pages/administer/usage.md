@@ -37,7 +37,7 @@ Each figure on the usage pages counts:
 
 | Figure | What it counts |
 |---|---|
-| **Requests** | Requests that reached the gateway. |
+| **Requests** | Every request that reached the gateway, failed and refused ones included. |
 | **Failed** | Requests that ended in an error (HTTP status 400 or higher). Refusals by a limit are not counted here. |
 | **Refused** | Requests a limit refused before they ran (see [Limits for the whole instance](#limits-for-the-whole-instance)). They used no tokens. |
 | **Input tokens** | What was sent to the model, cached tokens included. |
@@ -92,6 +92,8 @@ under **Settings → Usage and privacy** but not set below five.
   shown are moved into it until it does, so no group's figures follow from the total minus the other rows.
 - An hour, a day or a month in which fewer people used the instance shows no figures. Hours show only where at
   least five people used it.
+- The same holds over time: where hiding a period would let it be worked out from the total minus the periods
+  shown, another period is hidden with it.
 - The number of people in the total shows only from five upwards.
 
 A team of three, or an agent one person uses, is therefore never shown on its own: its figures would be one

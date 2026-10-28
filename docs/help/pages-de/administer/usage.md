@@ -38,7 +38,7 @@ Jede Zahl auf den Nutzungsseiten zählt:
 
 | Zahl | Was sie zählt |
 |---|---|
-| **Anfragen** | Anfragen, die das Gateway erreicht haben. |
+| **Anfragen** | Jede Anfrage, die das Gateway erreicht hat, fehlgeschlagene und abgelehnte eingeschlossen. |
 | **Fehlgeschlagen** | Anfragen, die mit einem Fehler endeten (HTTP-Status 400 oder höher). Ablehnungen durch ein Limit zählen hier nicht. |
 | **Abgelehnt** | Anfragen, die ein Limit abgelehnt hat, bevor sie liefen (siehe [Limits für die ganze Instanz](#limits-for-the-whole-instance)). Sie haben keine Tokens verbraucht. |
 | **Eingabe-Tokens** | Was an das Modell ging, einschließlich zwischengespeicherter Tokens. |
@@ -97,6 +97,8 @@ sie unter **Einstellungen → Nutzung und Datenschutz** erhöhen, aber nicht unt
   Zeilen errechnen.
 - Eine Stunde, ein Tag oder ein Monat, in dem weniger Personen die Instanz genutzt haben, zeigt keine Zahlen.
   Stunden erscheinen nur, wenn mindestens fünf Personen die Instanz in dieser Stunde genutzt haben.
+- Dasselbe gilt über die Zeit: Ließe sich ein ausgeblendeter Zeitraum aus der Summe minus den angezeigten
+  errechnen, wird ein weiterer mit ihm ausgeblendet.
 - Die Zahl der Personen in der Summe erscheint erst ab fünf.
 
 Ein Team aus drei Personen oder ein Agent, den eine Person nutzt, erscheint daher nie allein: Seine Zahlen wären
