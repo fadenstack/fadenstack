@@ -66,6 +66,7 @@ async def test_only_the_callers_own_figures(client: AsyncClient, gateway: AsyncS
     assert {row["key"]: row["label"] for row in body["by_project"]} == {None: None, "p-1": None}
     assert body["privacy"] == {
         "person_reporting": False, "granularity": "day", "retention_days": 90, "views_of_my_data": 0,
+        "notice_url": None,
     }
     assert body["caps"] == [] and body["sections"] == []
 
@@ -80,9 +81,13 @@ async def test_by_month(client: AsyncClient, gateway: AsyncSession, me: Any) -> 
 
 
 async def test_the_privacy_notice_follows_the_settings(client: AsyncClient, gateway: AsyncSession, me: Any) -> None:
-    await set_usage(gateway, person_reporting=True, person_granularity="month", person_retention_days=120)
+    await set_usage(gateway, person_reporting=True, person_granularity="month", person_retention_days=120,
+                    privacy_notice_url="https://intranet.example.com/privacy#usage")
     privacy = (await client.get("/api/usage/me")).json()["privacy"]
-    assert privacy == {"person_reporting": True, "granularity": "month", "retention_days": 120, "views_of_my_data": 0}
+    assert privacy == {
+        "person_reporting": True, "granularity": "month", "retention_days": 120, "views_of_my_data": 0,
+        "notice_url": "https://intranet.example.com/privacy#usage",
+    }
 
 
 async def test_the_caps_and_todays_use_only_with_k_others_that_day(

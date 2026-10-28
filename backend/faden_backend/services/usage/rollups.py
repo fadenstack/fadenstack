@@ -134,6 +134,41 @@ async def total_cell(gw: AsyncSession, days: DayRange) -> Cell:
     return _cells(rows.mappings()).get("total") or Cell(key="total")
 
 
+async def team_cells(gw: AsyncSession, days: DayRange) -> list[dict[str, Any]]:
+    """Per home team and recorded path (``group_path``, root first): figures and the largest ``people``."""
+    rows = await gw.execute(
+        text(f"""
+            SELECT group_id, group_path, currency, {SUMS_SQL}, MAX(COALESCE(people, 0)) AS floor
+            FROM usage_daily
+            WHERE day BETWEEN :first AND :last
+            GROUP BY group_id, group_path, currency
+        """),  # noqa: S608 - only the fixed sums are formatted in
+        days.params(),
+    )
+    return [dict(row) for row in rows.mappings()]
+
+
+async def team_people(gw: AsyncSession, days: DayRange) -> list[tuple[str | None, list[str] | None, str]]:
+    """Every ``(home team, recorded path, person)`` of *days* (from the per-person rollup)."""
+    rows = await gw.execute(
+        text("""
+            SELECT DISTINCT group_id, group_path, user_id FROM usage_daily_person
+            WHERE day BETWEEN :first AND :last
+        """),
+        days.params(),
+    )
+    return [(row[0], list(row[1]) if row[1] else None, str(row[2])) for row in rows]
+
+
+async def people_ids(gw: AsyncSession, days: DayRange) -> list[str]:
+    """The people active in *days* (from the per-person rollup)."""
+    rows = await gw.execute(
+        text("SELECT DISTINCT user_id FROM usage_daily_person WHERE day BETWEEN :first AND :last"),
+        days.params(),
+    )
+    return [str(row[0]) for row in rows]
+
+
 # ── Distinct people (from the per-person rollup) ────────────────────
 
 

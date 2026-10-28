@@ -1,9 +1,11 @@
 """Usage for administrators: aggregates, the usage auditor's view, the settings, the limits, the statement.
 
-- ``GET /api/admin/usage`` (``usage:read``): totals, a series by hour, day or month, and groups by team,
-  agent, model or provider, with no person in them. Every figure about fewer than k people is hidden, with
-  complementary suppression (M04, M05; ``services/usage/suppression.py``); hours only where at least k people
-  are (M10). ``small_instance`` when the range's figures are about fewer than k people (S12).
+- ``GET /api/admin/usage`` (``usage:read``): totals, a series by hour, day or month, and groups by team (a
+  tree, ``services/usage/tree.py``), agent, model or provider, with no person in them. Every figure about
+  fewer than k people is hidden, with complementary suppression (M04, M05; ``services/usage/suppression.py``);
+  hours only where at least k people are (M10). Below k for the whole range the totals and the series are
+  hidden too, and ``small_instance`` is set (S12); a usage auditor who gives a reason sees them while
+  person-level reporting is on, recorded like a view of named people (M07).
 - ``GET /api/admin/usage/people``: named people's figures, per day or month, sorted by name, never by usage
   (M11). Only with the switch on, the explicit grant, and a reason, and recorded (M02, M06, M07).
 - ``GET``/``PUT /api/admin/usage/settings``: the ``usage.*`` settings; the switch needs Root Mode (M08: each
@@ -33,9 +35,10 @@ from faden_backend.db.dependencies import get_db_session
 from faden_backend.db.models.api_tokens import ACCOUNT_TENANT
 from faden_backend.db.models.containers import AuditResult
 from faden_backend.db.models.users import User, current_active_user
+from faden_backend.services import teams
 from faden_backend.services.extensions import usage_sections
 from faden_backend.services.usage import config as usage_config
-from faden_backend.services.usage import labels, people, rollups, statement
+from faden_backend.services.usage import labels, people, rollups, statement, tree
 from faden_backend.services.usage.measures import Measures, hidden
 from faden_backend.services.usage.people import PeopleRefusal
 from faden_backend.services.usage.suppression import Cell, hide
@@ -112,11 +115,34 @@ async def _groups(
     return rows
 
 
-async def _series(
-    gw: AsyncSession, days: rollups.DayRange, bucket: rollups.Bucket, config: usage_config.UsageSettings,
+async def _team_tree(
+    session: AsyncSession, gw: AsyncSession, days: rollups.DayRange, structure: tree.Structure, k: int,
 ) -> list[dict[str, Any]]:
-    """Every period of the range; one about fewer than k people (with its complement) carries no figures."""
-    k = config.k
+    """The teams as a tree, each with its sub-teams, k people per row at least (services/usage/tree.py)."""
+    now_tree = await teams.load(session)
+    built = tree.Built()
+    for row in await rollups.team_cells(gw, days):
+        built.add_cells(tree.path_of(row["group_id"], row["group_path"], structure, now_tree), row)
+    for group_id, group_path, user_id in await rollups.team_people(gw, days):
+        built.add_person(tree.path_of(group_id, group_path, structure, now_tree), user_id)
+    keys = {key for path in built.subtree for key in path}
+    names = await labels.label(session, gw, "team", keys)
+    return tree.rows(built, k, names.get)
+
+
+async def _series(
+    gw: AsyncSession,
+    days: rollups.DayRange,
+    bucket: rollups.Bucket,
+    config: usage_config.UsageSettings,
+    *,
+    unhidden: bool = False,
+) -> list[dict[str, Any]]:
+    """Every period of the range; one about fewer than k people (with its complement) carries no figures.
+
+    *unhidden*: a usage auditor's look with a reason (person-level reporting on): nothing is hidden.
+    """
+    k = 0 if unhidden else config.k
     if bucket == "hour":
         start, end = utc_bounds(days, config.zone)
         cells = await rollups.hour_cells(gw, start, end)
@@ -155,28 +181,77 @@ async def admin_usage(
     last: str | None = Query(default=None, alias="to"),
     bucket: rollups.Bucket = "day",
     group_by: rollups.GroupBy = "team",
+    structure: tree.Structure = "recorded",
+    reason: str | None = Query(default=None, max_length=2000),
 ) -> dict[str, Any]:
-    """Usage of teams, agents, models or providers over the range (default the last 30 days); no person."""
+    """Usage of teams, agents, models or providers over the range (default the last 30 days); no person.
+
+    With a *reason*, a usage auditor (person-level reporting on) sees the totals and the series unhidden;
+    refused like ``/people`` otherwise, and recorded either way.
+    """
     config = await usage_config.read(session)
     k = config.k
     days = day_range(first, last, config.zone, max_days=MAX_HOUR_DAYS if bucket == "hour" else MAX_DAYS)
     total = await rollups.total_cell(gw, days)
     total_people = max(total.floor, await rollups.people_in(gw, days, None, []))
+    small = total.measures.requests > 0 and total_people < k
+    unhidden = reason is not None and await _auditor_look(session, gw, user, config, days, reason, small)
+    shown_totals = not small or unhidden
+    if group_by == "team":
+        groups = await _team_tree(session, gw, days, structure, k)
+    else:
+        groups = await _groups(session, gw, days, group_by, k)
     return {
         "time_zone": config.time_zone,
         "from": days.first.isoformat(),
         "to": days.last.isoformat(),
         "bucket": bucket,
         "group_by": group_by,
+        "structure": structure,
         "min_group_size": k,
-        "small_instance": total.measures.requests > 0 and total_people < k,
-        "totals": {**total.measures.as_json(), "people": total_people if total_people >= k else None},
-        "series": await _series(gw, days, bucket, config),
-        "groups": await _groups(session, gw, days, group_by, k),
+        "small_instance": small,
+        "totals": {
+            **(total.measures.as_json() if shown_totals else hidden()),
+            "people": total_people if total_people >= k or unhidden else None,
+        },
+        "series": await _series(gw, days, bucket, config, unhidden=unhidden),
+        "groups": groups,
         "person_reporting": config.person_reporting,
         "can_view_people": config.person_reporting and await people.holds_audit_grant(session, user),
+        "unhidden": unhidden,
         "sections": await usage_sections(session, user, "admin"),
     }
+
+
+async def _auditor_look(
+    session: AsyncSession,
+    gw: AsyncSession,
+    user: User,
+    config: usage_config.UsageSettings,
+    days: rollups.DayRange,
+    reason: str,
+    small: bool,
+) -> bool:
+    """A usage auditor's look at totals and series below k: allowed and recorded, or refused and recorded.
+
+    The people of the range are named in the record when the range holds fewer than k of them: the look was at
+    their figures, and each sees it in their own list (S03).
+    """
+    try:
+        cleaned = await people.entitled(session, user, config, reason)
+    except PeopleRefusal as refusal:
+        await people.record_view(
+            session, user, target_type="usage_aggregate", target_id="instance", person_ids=[],
+            details={"from": days.first.isoformat(), "to": days.last.isoformat()},
+            reason=reason.strip()[:500] or None, refused=refusal.code,
+        )
+        refuse(refusal)
+    await people.record_view(
+        session, user, target_type="usage_aggregate", target_id="instance",
+        person_ids=await rollups.people_ids(gw, days) if small else [],
+        details={"from": days.first.isoformat(), "to": days.last.isoformat()}, reason=cleaned,
+    )
+    return True
 
 
 # ── Named people (the usage auditor's view) ─────────────────────────

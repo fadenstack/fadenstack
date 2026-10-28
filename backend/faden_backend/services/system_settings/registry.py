@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from faden_backend.db.models.system_settings import SystemApplyScope
@@ -54,6 +55,20 @@ def check_time_zone(value: object) -> None:
     except (ZoneInfoNotFoundError, ValueError) as exc:
         msg = f"Not a time zone name: {name!r}."
         raise ValueError(msg) from exc
+
+
+def check_https_url(value: object) -> None:
+    """Empty, or an ``https`` address with a host (no spaces, at most 2000 characters)."""
+    address = str(value)
+    if not address:
+        return
+    parts = urlsplit(address)
+    if (
+        parts.scheme != "https" or not parts.hostname or len(address) > 2000
+        or any(ch.isspace() or ord(ch) < 32 for ch in address)
+    ):
+        msg = f"Not an https address: {address!r}."
+        raise ValueError(msg)
 
 
 def _usage(
@@ -126,6 +141,12 @@ USAGE_SETTINGS: list[SettingDefinition] = [
         "usage.time_zone", "string", "time", "Time zone of days and months",
         "Where a day and a month of usage begin and end, e.g. Europe/Berlin (an IANA name).",
         "UTC", check=check_time_zone,
+    ),
+    _usage(
+        "usage.privacy_notice_url", "string", "privacy", "Privacy notice",
+        "The address of your privacy notice on usage metering (https). A person's own usage page links to "
+        "it (M14). Empty: no link.",
+        "", check=check_https_url,
     ),
 ]
 
