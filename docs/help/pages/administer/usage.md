@@ -79,6 +79,22 @@ figures of [What is counted](#what-is-counted). It never shows a person, a name 
 look at one person's figures, and how, is on
 [Usage and privacy](usage-privacy.md#looking-at-one-persons-figures).
 
+### Teams on the Usage page
+
+With **Group by** **Usage group**, the teams appear as a tree, as set on **Access Control → Groups** (see
+[Teams in a tree](users.md#teams-in-a-tree)). Open a team to see its sub-teams.
+
+- **A team's figures include its sub-teams'.** A person's usage counts toward their usage group and every team
+  above it.
+- **A team is shown when at least five people were active in it and its sub-teams together.** Smaller sub-teams
+  are counted together in one "smaller teams" row under their parent, protected like the **Fewer than 5 people**
+  row (see [The minimum group size](#the-minimum-group-size)).
+- **People without a usage group** are counted under **Unassigned**.
+- **As recorded** or **Today's structure** decides which tree the figures follow. **As recorded**, the default,
+  counts usage toward the teams as they stood when it happened, so a reorganisation does not rewrite the past.
+  **Today's structure** counts all of it toward today's tree, for example to compare last year with the new
+  departments.
+
 ### The minimum group size
 
 Every figure on the page covers at least five different people: the **minimum group size**, which you can raise

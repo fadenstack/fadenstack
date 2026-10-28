@@ -83,6 +83,23 @@ Die Seite zeigt die **Summen**, **Tokens im Zeitverlauf** und eine Zeile je Team
 Wer die Zahlen einer einzelnen Person ansehen darf und wie, steht unter
 [Nutzung und Datenschutz](usage-privacy.md#looking-at-one-persons-figures).
 
+### Teams auf der Seite „Nutzung“ {#teams-on-the-usage-page}
+
+Mit **Gruppieren nach** **Nutzungsgruppe** erscheinen die Teams als Baum, wie unter **Zugriffskontrolle →
+Gruppen** festgelegt (siehe [Teams als Baum](users.md#teams-in-a-tree)). Öffnen Sie ein Team, um seine Unterteams
+zu sehen.
+
+- **Die Zahlen eines Teams enthalten die seiner Unterteams.** Die Nutzung einer Person zählt für ihre
+  Nutzungsgruppe und für jedes Team darüber.
+- **Ein Team erscheint, wenn in ihm und seinen Unterteams zusammen mindestens fünf Personen aktiv waren.**
+  Kleinere Unterteams werden in einer Zeile „kleinere Teams“ unter ihrem übergeordneten Team zusammengefasst,
+  geschützt wie die Zeile **Weniger als 5 Personen** (siehe [Die Mindestgruppengröße](#the-minimum-group-size)).
+- **Personen ohne Nutzungsgruppe** werden unter **Nicht zugeordnet** gezählt.
+- **Wie erfasst** oder **Heutige Struktur** bestimmt, welchem Baum die Zahlen folgen. **Wie erfasst**, die
+  Voreinstellung, zählt die Nutzung für die Teams, wie sie zum Zeitpunkt der Nutzung bestanden; eine
+  Umorganisation schreibt die Vergangenheit also nicht um. **Heutige Struktur** zählt alles für den heutigen
+  Baum, etwa um das Vorjahr mit den neuen Abteilungen zu vergleichen.
+
 ### Die Mindestgruppengröße {#the-minimum-group-size}
 
 Jede Zahl auf der Seite umfasst mindestens fünf verschiedene Personen: die **Mindestgruppengröße**. Sie können
