@@ -535,4 +535,27 @@ describe("the mail state", () => {
     );
     expect(within(failure).getByTestId("mail-failure-reason-label")).toHaveTextContent("The mail server's own words:");
   });
+
+  it("words mail that waits after a refused sign-in, and tries it again", async () => {
+    const failure = await lastFailure({
+      code: "login_paused",
+      reason:
+        "the server refused this sign-in at 08:00 UTC (535 5.7.8 Authentication credentials invalid); it is not " +
+        "tried again before 08:15 UTC, unless the sign-in changes or a test mail goes through",
+    });
+    const text = within(failure).getByTestId("mail-failure-text");
+    expect(text).toHaveTextContent("The mail server refused this sign-in a short while ago");
+    expect(text).toHaveTextContent("mail waits up to 15 minutes before the next sign-in");
+    expect(text).toHaveTextContent("send a test mail to try at once");
+    expect(within(failure).getByTestId("mail-failure-reason-label")).toHaveTextContent(/^Details:$/);
+    expect(within(failure).getByTestId("mail-failure-outcome")).toHaveTextContent(/^Tries again /);
+  });
+
+  it("words a mail the mail service is still sending, with nothing to do", async () => {
+    const failure = await lastFailure({ code: "still_sending", reason: "an earlier attempt is still being sent" });
+    expect(within(failure).getByTestId("mail-failure-text")).toHaveTextContent(
+      "This mail is still being sent by the mail service: it is checked again shortly, nothing to do.",
+    );
+    expect(within(failure).getByTestId("mail-failure-outcome")).toHaveTextContent(/^Tries again /);
+  });
 });

@@ -1167,6 +1167,7 @@
       "login_unsupported": "The mail server offers no sign-in of this kind on this port: check the port, or choose another sign-in.",
       "login_required": "The mail server requires a sign-in: choose a sign-in and enter the account.",
       "login_refused": "The mail server refused the sign-in: check the user name and the password, or the app's rights in Microsoft 365.",
+      "login_paused": "The mail server refused this sign-in a short while ago: to spare it more failed sign-ins (mail servers ban the address they come from), mail waits up to 15 minutes before the next sign-in. Fix the sign-in, or send a test mail to try at once.",
       "secret_for_other_server": "The stored password or secret was saved for another server: type it again for this one and save.",
       "oauth_failed": "Microsoft 365 issued no token: check the tenant, the application ID and the client secret, the app's consent, and that the mail service reaches login.microsoftonline.com (HTTPS, port 443).",
       "sender_refused": "The mail server refused the sender address: the account must be allowed to send as it.",
@@ -1175,7 +1176,8 @@
       "message_refused": "The mail server refused the message itself, e.g. as too large or as spam.",
       "temporarily_refused": "The mail server refused for now: mail is tried again later by itself. If this keeps happening, its reply below says why (e.g. too many connections, greylisting).",
       "server_error": "The mail server answered with an error.",
-      "mailer_unreachable": "The mail service cannot be reached: check under Settings → Modules that the mail module is running."
+      "mailer_unreachable": "The mail service cannot be reached: check under Settings → Modules that the mail module is running.",
+      "still_sending": "This mail is still being sent by the mail service: it is checked again shortly, nothing to do."
     }
   },
   "users": {

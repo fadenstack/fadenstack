@@ -139,6 +139,14 @@ und ungesendet gelöscht, sobald sie nicht mehr nützen (ein abgelaufener Link).
 endgültig abgelehnt hat (die Anmeldung, den Absender, den Empfänger oder die Nachricht), wird nicht erneut
 versucht.
 
+Jede Mail geht einmal hinaus, auch wenn Fadenstack eine Zustellung wiederholt, etwa weil der Mailserver zu spät
+geantwortet hat.
+
+Hat der Mailserver eine Anmeldung abgelehnt, meldet sich Fadenstack mit denselben Einstellungen 15 Minuten lang
+nicht erneut an: Viele gescheiterte Anmeldungen hintereinander bringen Mailserver dazu, die Adresse zu sperren, von
+der sie kommen. Eine Testmail versucht es sofort, und eine, die hinausgeht, beendet das Warten. Geänderte
+Anmeldeeinstellungen warten nicht.
+
 Eine Testmail nach der anderen: Solange Ihre unterwegs ist, bittet die Seite, ihr Ergebnis abzuwarten.
 
 Scheitert Mail, zeigt jede Seite der Konsole einen Hinweis, bis wieder eine Mail hinausgeht.
@@ -162,6 +170,7 @@ seine Worte bezeichnet, oder andere Einzelheiten, etwa den Fehler des Netzes.
 | Der Name des Servers lässt sich nicht auflösen | Prüfen Sie die Schreibweise und ob das DNS dieses Servers den Namen kennt. |
 | Der Mailserver bietet auf diesem Port keine Anmeldung dieser Art an | Prüfen Sie den Port: Mailserver bieten Anmeldungen auf 587 und 465 an. Bei Microsoft 365 muss der Server `smtp.office365.com` sein. Oder wählen Sie eine andere Anmeldung. |
 | Der Mailserver hat die Anmeldung abgelehnt | Prüfen Sie Benutzername und Passwort. Bei Microsoft 365: Berechtigung, Zustimmung und Postfachberechtigung der App (Schritte 3 und 4). Eine Antwort mit `5.7.139` heißt, dass Microsoft 365 SMTP AUTH nicht erlaubt: für die Organisation, für das Postfach oder wegen der Sicherheitsstandards (Schritt 4). Eine abgelehnte Anmeldung versucht Fadenstack nicht von selbst erneut. |
+| Der Mailserver hat diese Anmeldung vor Kurzem abgelehnt | Mail wartet bis zu 15 Minuten bis zur nächsten Anmeldung mit denselben Einstellungen (oben). Beheben Sie die Anmeldung: das Konto auf dem Mailserver oder die Einstellungen hier. Senden Sie dann eine Testmail: Sie versucht es sofort, und sobald sie hinausgeht, geht wieder Mail hinaus. |
 | Microsoft 365 hat kein Token ausgestellt | Prüfen Sie Mandant, Anwendungs-ID und geheimen Clientschlüssel (seinen Wert, nicht seine ID) und die Administratorzustimmung. Ist Entra ID nicht erreichbar, lassen Sie den Mail-Dienst `https://login.microsoftonline.com` auf Port 443 erreichen, direkt oder über Ihren Proxy. Der Grund von Entra steht darunter. |
 | Der Mailserver hat die Absenderadresse abgelehnt | Das Konto muss als Absenderadresse senden dürfen: Verwenden Sie seine eigene Adresse oder geben Sie ihm das Recht. |
 | Der Mailserver leitet für diesen Server keine Mail weiter | Melden Sie sich an oder lassen Sie das Relay die Adresse dieses Servers annehmen. |
@@ -173,6 +182,7 @@ seine Worte bezeichnet, oder andere Einzelheiten, etwa den Fehler des Netzes.
 | Der Mailserver hat die Begrüßung dieses Servers abgelehnt | Tragen Sie als **Begrüßungsname** einen vollständigen DNS-Namen ein, z. B. `ai.example.internal`. |
 | Das gespeicherte Passwort oder der geheime Schlüssel gilt für einen anderen Server | Ein gespeichertes Passwort oder Geheimnis gilt nur für die Einstellungen, für die es gespeichert wurde: denselben Server und Port, dieselben vertrauenswürdigen Zertifikate und dieselbe Anmeldung (bei Microsoft 365 denselben Mandanten und dieselbe App). Geben Sie es erneut ein, um andere Einstellungen zu testen oder zu speichern. |
 | Der Mail-Dienst ist nicht erreichbar | Starten Sie das Mail-Modul unter **Einstellungen → Module**. |
+| Diese Mail wird vom Mail-Dienst noch gesendet | Eine frühere Zustellung dieser Mail ist noch unterwegs. Sie wird in Kürze erneut geprüft; es ist nichts zu tun. |
 
 Unter einem Feld kann die Seite sagen:
 

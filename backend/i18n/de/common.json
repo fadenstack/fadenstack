@@ -1172,6 +1172,7 @@
       "login_unsupported": "Der Mailserver bietet auf diesem Port keine Anmeldung dieser Art an: Prüfen Sie den Port oder wählen Sie eine andere Anmeldung.",
       "login_required": "Der Mailserver verlangt eine Anmeldung: Wählen Sie eine Anmeldung und tragen Sie das Konto ein.",
       "login_refused": "Der Mailserver hat die Anmeldung abgelehnt: Prüfen Sie Benutzername und Passwort oder die Rechte der App in Microsoft 365.",
+      "login_paused": "Der Mailserver hat diese Anmeldung vor Kurzem abgelehnt: Um ihm weitere gescheiterte Anmeldungen zu ersparen (Mailserver sperren die Adresse, von der sie kommen), wartet Mail bis zu 15 Minuten bis zur nächsten Anmeldung. Beheben Sie die Anmeldung oder senden Sie eine Testmail, um es sofort zu versuchen.",
       "secret_for_other_server": "Das gespeicherte Passwort oder der geheime Schlüssel gilt für einen anderen Server: Geben Sie ihn für diesen erneut ein und speichern Sie.",
       "oauth_failed": "Microsoft 365 hat kein Token ausgestellt: Prüfen Sie Mandant, Anwendungs-ID und geheimen Clientschlüssel, die Zustimmung für die App und ob der Mail-Dienst login.microsoftonline.com erreicht (HTTPS, Port 443).",
       "sender_refused": "Der Mailserver hat die Absenderadresse abgelehnt: Das Konto muss als diese Adresse senden dürfen.",
@@ -1180,7 +1181,8 @@
       "message_refused": "Der Mailserver hat die Nachricht selbst abgelehnt, etwa als zu groß oder als Spam.",
       "temporarily_refused": "Der Mailserver hat vorerst abgelehnt: Mail wird später von selbst erneut versucht. Geschieht das immer wieder, sagt seine Antwort darunter, warum (etwa zu viele Verbindungen, Greylisting).",
       "server_error": "Der Mailserver hat mit einem Fehler geantwortet.",
-      "mailer_unreachable": "Der Mail-Dienst ist nicht erreichbar: Prüfen Sie unter Einstellungen → Module, ob das Mail-Modul läuft."
+      "mailer_unreachable": "Der Mail-Dienst ist nicht erreichbar: Prüfen Sie unter Einstellungen → Module, ob das Mail-Modul läuft.",
+      "still_sending": "Diese Mail wird vom Mail-Dienst noch gesendet: Sie wird in Kürze erneut geprüft, es ist nichts zu tun."
     }
   },
   "users": {

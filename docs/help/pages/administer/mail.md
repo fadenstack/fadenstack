@@ -128,6 +128,13 @@ whether it is tried again, or being sent right now. Mails are tried again for a 
 they are of no use any more (a reset link that expired). A mail the mail server refused for good (the sign-in, the
 sender, the recipient or the message) is not tried again.
 
+Each mail goes out once, even when Fadenstack repeats a delivery, for example after the mail server answered too
+late.
+
+After the mail server refuses a sign-in, Fadenstack does not sign in again with the same settings for 15 minutes:
+many failed sign-ins in a row make mail servers ban the address they come from. A test mail tries at once, and one
+that goes through ends the wait. Changed sign-in settings do not wait.
+
 One test mail at a time: while yours is on its way, the page asks you to wait for its result.
 
 When mail fails, every console page shows a notice until a mail goes out again.
@@ -151,6 +158,7 @@ as its words, or other details, such as the network's error.
 | The server's name cannot be found | Check the spelling, and that this server's DNS knows the name. |
 | The mail server offers no sign-in of this kind on this port | Check the port: mail servers offer sign-ins on 587 and 465. For Microsoft 365, the server must be `smtp.office365.com`. Or choose another sign-in. |
 | The mail server refused the sign-in | Check the user name and the password. For Microsoft 365: the app's permission, consent and mailbox permission (steps 3 and 4). A reply with `5.7.139` means Microsoft 365 does not allow SMTP AUTH: for the organisation, for the mailbox, or because of security defaults (step 4). Fadenstack does not try a refused sign-in again by itself. |
+| The mail server refused this sign-in a short while ago | Mail waits up to 15 minutes before the next sign-in with the same settings (above). Fix the sign-in: the account on the mail server, or the settings here. Then send a test mail: it tries at once, and once it goes through, mail goes out again. |
 | Microsoft 365 issued no token | Check the tenant, the application ID and the client secret (its value, not its ID), and the admin consent. When Entra ID cannot be reached, let the mail service reach `https://login.microsoftonline.com` on port 443, directly or through your proxy. Entra's reason is shown below. |
 | The mail server refused the sender address | The account must be allowed to send as the sender address: use its own address, or give it the right. |
 | The mail server does not pass on mail for this server | Sign in, or have the relay accept this server's address. |
@@ -162,6 +170,7 @@ as its words, or other details, such as the network's error.
 | The mail server refused this server's greeting | Enter a **Greeting name** that is a full DNS name, e.g. `ai.example.internal`. |
 | The stored password or secret was saved for another server | A stored password or secret goes only with the settings it was saved for: the same server and port, trusted certificates and sign-in (for Microsoft 365, the same tenant and app). Enter it again to test or save other settings. |
 | The mail service cannot be reached | Start the mail module under **Settings → Modules**. |
+| This mail is still being sent by the mail service | An earlier delivery of this mail is still on its way. It is checked again shortly; nothing to do. |
 
 Under a field, the page may say:
 

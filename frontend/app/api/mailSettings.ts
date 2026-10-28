@@ -131,6 +131,7 @@ export const MAIL_FAILURES = [
   "login_unsupported",
   "login_required",
   "login_refused",
+  "login_paused",
   "secret_for_other_server",
   "oauth_failed",
   "sender_refused",
@@ -140,6 +141,7 @@ export const MAIL_FAILURES = [
   "temporarily_refused",
   "server_error",
   "mailer_unreachable",
+  "still_sending",
 ] as const;
 
 /** The failures that are final: the mail server refused for good, and the mail is not tried again. */

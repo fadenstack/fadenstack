@@ -1167,6 +1167,7 @@
       "login_unsupported": "Le serveur de messagerie ne propose pas ce type de connexion sur ce port : vérifiez le port ou choisissez une autre connexion.",
       "login_required": "Le serveur de messagerie exige une connexion : choisissez une connexion et indiquez le compte.",
       "login_refused": "Le serveur de messagerie a refusé la connexion : vérifiez le nom d'utilisateur et le mot de passe, ou les droits de l'application dans Microsoft 365.",
+      "login_paused": "Le serveur de messagerie a refusé cette connexion il y a peu : pour lui épargner d'autres connexions échouées (les serveurs de messagerie bannissent l'adresse d'où elles viennent), les e-mails attendent jusqu'à 15 minutes avant la prochaine connexion. Corrigez la connexion, ou envoyez un e-mail de test pour essayer tout de suite.",
       "secret_for_other_server": "Le mot de passe ou le secret enregistré l'a été pour un autre serveur : saisissez-le de nouveau pour celui-ci et enregistrez.",
       "oauth_failed": "Microsoft 365 n'a délivré aucun jeton : vérifiez le locataire, l'ID d'application et le secret client, le consentement de l'application, et que le service de messagerie atteint login.microsoftonline.com (HTTPS, port 443).",
       "sender_refused": "Le serveur de messagerie a refusé l'adresse de l'expéditeur : le compte doit pouvoir envoyer en son nom.",
@@ -1175,7 +1176,8 @@
       "message_refused": "Le serveur de messagerie a refusé le message lui-même, p. ex. comme trop volumineux ou comme spam.",
       "temporarily_refused": "Le serveur de messagerie a refusé pour le moment : l'e-mail est réessayé plus tard automatiquement. Si cela se répète, sa réponse ci-dessous dit pourquoi (par exemple trop de connexions, greylisting).",
       "server_error": "Le serveur de messagerie a répondu par une erreur.",
-      "mailer_unreachable": "Le service de messagerie est injoignable : vérifiez sous Paramètres → Modules que le module de messagerie fonctionne."
+      "mailer_unreachable": "Le service de messagerie est injoignable : vérifiez sous Paramètres → Modules que le module de messagerie fonctionne.",
+      "still_sending": "Le service de messagerie est encore en train d'envoyer cet e-mail : il est vérifié de nouveau sous peu, rien à faire."
     }
   },
   "users": {

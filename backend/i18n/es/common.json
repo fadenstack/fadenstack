@@ -1172,6 +1172,7 @@
       "login_unsupported": "El servidor de correo no ofrece un inicio de sesión de este tipo en este puerto: compruebe el puerto o elija otro inicio de sesión.",
       "login_required": "El servidor de correo exige iniciar sesión: elija un inicio de sesión e indique la cuenta.",
       "login_refused": "El servidor de correo rechazó el inicio de sesión: compruebe el usuario y la contraseña, o los permisos de la aplicación en Microsoft 365.",
+      "login_paused": "El servidor de correo rechazó este inicio de sesión hace poco: para ahorrarle más inicios de sesión fallidos (los servidores de correo bloquean la dirección de la que vienen), el correo espera hasta 15 minutos antes del siguiente inicio de sesión. Corrija el inicio de sesión, o envíe un correo de prueba para intentarlo de inmediato.",
       "secret_for_other_server": "La contraseña o el secreto guardados eran para otro servidor: escríbalos de nuevo para este y guarde.",
       "oauth_failed": "Microsoft 365 no emitió ningún token: compruebe el inquilino, el ID de aplicación y el secreto de cliente, el consentimiento de la aplicación, y que el servicio de correo llega a login.microsoftonline.com (HTTPS, puerto 443).",
       "sender_refused": "El servidor de correo rechazó la dirección del remitente: la cuenta debe poder enviar como ella.",
@@ -1180,7 +1181,8 @@
       "message_refused": "El servidor de correo rechazó el propio mensaje, por ejemplo por demasiado grande o como spam.",
       "temporarily_refused": "El servidor de correo lo rechazó por ahora: el correo se vuelve a intentar más tarde por sí solo. Si sigue ocurriendo, su respuesta de abajo dice por qué (p. ej. demasiadas conexiones, greylisting).",
       "server_error": "El servidor de correo respondió con un error.",
-      "mailer_unreachable": "No se puede contactar con el servicio de correo: compruebe en Configuración → Módulos que el módulo de correo está en marcha."
+      "mailer_unreachable": "No se puede contactar con el servicio de correo: compruebe en Configuración → Módulos que el módulo de correo está en marcha.",
+      "still_sending": "El servicio de correo sigue enviando este correo: se vuelve a comprobar en breve, no hay nada que hacer."
     }
   },
   "users": {
