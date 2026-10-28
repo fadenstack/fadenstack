@@ -28,18 +28,20 @@ import SearchIcon from "@mui/icons-material/Search";
 
 import AppearanceSettings from "~/components/AppearanceSettings";
 import ModulesTab from "~/components/ModulesTab";
+import UsagePrivacySettings from "~/components/usage/UsagePrivacySettings";
 import {
   systemSettingsApi,
   type SystemSettingSchemaItem,
 } from "~/api/systemSettings";
 
-type SettingsTab = "general" | "modules" | "appearance";
+type SettingsTab = "general" | "modules" | "usage" | "appearance";
 
 function getCurrentTab(
   _pathname: string,
   tabQuery: string | null,
 ): SettingsTab {
   if (tabQuery === "modules") return "modules";
+  if (tabQuery === "usage") return "usage";
   if (tabQuery === "appearance") return "appearance";
   return "general";
 }
@@ -82,6 +84,11 @@ function isPiiSettingKey(key: string): boolean {
 
 function isMailerSettingKey(key: string): boolean {
   return key.startsWith("faden_mailer.");
+}
+
+/** The usage settings have their own tab (Usage and privacy), with their ranges and what they mean. */
+function isUsageSettingKey(key: string): boolean {
+  return key.startsWith("usage.");
 }
 
 export default function SettingsPage() {
@@ -151,6 +158,7 @@ export default function SettingsPage() {
       (item) =>
         !isPiiSettingKey(item.key) &&
         !isMailerSettingKey(item.key) &&
+        !isUsageSettingKey(item.key) &&
         item.category.toLowerCase() !== "modules",
     );
     const items = q
@@ -255,12 +263,18 @@ export default function SettingsPage() {
         <Typography variant="h5" sx={{ mb: 1 }}>
           {t("settings.title")}
         </Typography>
-        <Tabs value={tab} onChange={handleTabChange}>
+        <Tabs
+          value={tab}
+          onChange={handleTabChange}
+          variant="scrollable"
+          scrollButtons={false}
+        >
           <Tab label={t("settings.general.title")} value="general" />
           <Tab
             label={t("settings.modules.title", { defaultValue: "Modules" })}
             value="modules"
           />
+          <Tab label={t("usage.settings.tab")} value="usage" />
           <Tab label={t("settings.appearance.title")} value="appearance" />
         </Tabs>
       </Box>
@@ -499,6 +513,8 @@ export default function SettingsPage() {
         )}
 
         {tab === "modules" && <ModulesTab />}
+
+        {tab === "usage" && <UsagePrivacySettings />}
 
         {tab === "appearance" && (
           <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, maxWidth: 720 }}>

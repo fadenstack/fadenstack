@@ -26,6 +26,8 @@ export interface ChatShell {
   onAgents?: () => void;
   /** Open the content check; no entry without the right to or while the provenance module is off. */
   onCheckContent?: () => void;
+  /** Open the user's own usage page; everyone has it. */
+  onUsage?: () => void;
   /** Set on a phone (below 600 px). */
   phoneNav: ChatPhoneNav | null;
 }

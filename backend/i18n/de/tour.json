@@ -341,9 +341,18 @@
       "title": "Kosten-Dashboard",
       "description": "Kosten, Nutzung und Geschwindigkeit der Anfragen, die das Gateway bedient hat. Die Kosten sind Schätzungen aus den von Ihnen gesetzten Preisen; sie wirken sich nicht auf Abrechnungen aus.",
       "action_overview": "Ausgaben, Anfragen, Tokens, Latenz und Fehler über 7 bis 90 Tage",
-      "action_requests": "Anfragen durchsehen, nach Modell oder Person filtern und eine öffnen, um ihre Pipeline zu sehen",
+      "action_requests": "Anfragen durchsehen, nach Modell filtern und eine öffnen, um ihre Pipeline zu sehen",
       "action_pricing": "Die Preise pro Million Tokens festlegen",
       "action_export": "Die Daten als CSV exportieren"
+    },
+    "usage": {
+      "title": "Nutzung",
+      "description": "Was die Instanz von den Modellen genutzt hat, nach Nutzungsgruppe, Agent, Modell und Anbieter. Jede Zahl umfasst mindestens so viele Personen wie die Mindestgruppengröße; nichts nennt eine einzelne Person oder bringt Personen in eine Rangfolge.",
+      "action_totals": "Anfragen, Tokens und geschätzte Kosten über 7 Tage bis 12 Monate, pro Stunde, Tag oder Monat",
+      "action_groups": "Nach Nutzungsgruppe, Agent, Modell oder Anbieter gruppieren; Gruppen unter der Mindestgruppengröße zählen in einer Zeile „Weniger als … Personen“",
+      "action_small": "Ein Hinweis warnt, wenn weniger Personen als die Mindestgruppengröße die Instanz nutzen: Ihre Summen gelten dann als personenbezogene Daten",
+      "action_people": "Nutzungsprüfer sehen bei eingeschalteter personenbezogener Auswertung die Zahlen pro Person nach Angabe einer Begründung; jede Einsicht wird protokolliert",
+      "action_settings": "Einstellungen → Nutzung und Datenschutz legt die Mindestgruppengröße, die Aufbewahrungsfristen, die Limits und die personenbezogene Auswertung fest"
     },
     "logs": {
       "title": "Logs & Audit",
@@ -626,9 +635,10 @@
     },
     "settings": {
       "title": "Einstellungen",
-      "description": "Einstellungen für das ganze System, in drei Reitern.",
+      "description": "Einstellungen für das ganze System, in vier Reitern.",
       "action_general": "Allgemein: jede Systemeinstellung, durchsuchbar, und das Hugging-Face-Token",
       "action_modules": "Module: optionale Module ein- oder ausschalten, mit ihren Einstellungen",
+      "action_usage": "Nutzung und Datenschutz: wer Nutzungszahlen sieht, wie lange sie aufbewahrt werden, die Limits der Instanz und die Konfigurationsbeschreibung",
       "action_appearance": "Darstellung: die Akzentfarbe"
     },
     "profile": {

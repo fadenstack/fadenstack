@@ -31,6 +31,8 @@ export default [
     route("/agents/:slug", "pages/agents/MyAgentPage.tsx"),
     // Checking content for marks of AI generation (provenance:check).
     route("/check-content", "pages/check/CheckContentPage.tsx"),
+    // Everyone's own usage of the models, its limits and who may see it.
+    route("/usage", "pages/usage/MyUsagePage.tsx"),
   ]),
   layout("routes/admin.tsx", [
     route("/admin", "pages/admin/AdminRouteRedirectPage.tsx"),
@@ -89,6 +91,8 @@ export default [
     route("/admin/security-map", "pages/admin/SecurityMapPage.tsx"),
     // Observability dashboard (cost, usage, performance)
     route("/admin/observability", "pages/admin/observability/ObservabilityPage.tsx"),
+    // Usage for teams, agents, models and providers (usage:read)
+    route("/admin/usage", "pages/admin/usage/UsagePage.tsx"),
     // User profile
     route("/admin/profile", "pages/admin/ProfilePage.tsx"),
     // Chat routes — guarded by the chat-guard layout that checks module status

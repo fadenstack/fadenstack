@@ -69,6 +69,7 @@ import PsychologyIcon from "@mui/icons-material/Psychology";
 import BuildIcon from "@mui/icons-material/Build";
 import TuneIcon from "@mui/icons-material/Tune";
 import MonetizationOnIcon from "@mui/icons-material/MonetizationOn";
+import DataUsageIcon from "@mui/icons-material/DataUsage";
 import GavelIcon from "@mui/icons-material/Gavel";
 import SystemUpdateAltIcon from "@mui/icons-material/SystemUpdateAlt";
 import FactCheckIcon from "@mui/icons-material/FactCheck";
@@ -227,6 +228,12 @@ export const NAV: NavEntry[] = [
         labelKey: "nav.cost_dashboard",
         icon: <MonetizationOnIcon />,
         permission: "observability:read",
+      },
+      {
+        to: "/admin/usage",
+        labelKey: "usage.admin.nav",
+        icon: <DataUsageIcon />,
+        permission: "usage:read",
       },
       {
         to: "/admin/security-map",
@@ -558,6 +565,7 @@ export function adminPageTitle(
     return t("nav.data_residency");
   if (pathname.startsWith("/admin/observability"))
     return t("nav.cost_dashboard");
+  if (pathname.startsWith("/admin/usage")) return t("usage.admin.title");
   if (pathname.startsWith("/admin/profile")) return t("profile.title");
   if (pathname.startsWith("/admin/containers/new"))
     return t("create_container.title");
@@ -624,11 +632,9 @@ export function adminPageTitle(
     const tab = new URLSearchParams(search).get("tab");
     return tab === "audit" ? t("logs.tab_audit") : t("logs.tab_logs");
   }
-  if (
-    pathname.startsWith("/admin/settings") ||
-    pathname.startsWith("/admin/users")
-  ) {
-    return t("settings.title");
+  if (pathname.startsWith("/admin/settings")) {
+    const tab = new URLSearchParams(search).get("tab");
+    return tab === "usage" ? t("usage.settings.tab") : t("settings.title");
   }
   return t("app.title");
 }

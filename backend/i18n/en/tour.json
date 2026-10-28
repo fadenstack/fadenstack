@@ -341,9 +341,18 @@
       "title": "Cost Observability",
       "description": "Cost, usage and speed of the requests the gateway served. Costs are estimates from the prices you set; they do not affect billing.",
       "action_overview": "Spend, requests, tokens, latency and errors over 7 to 90 days",
-      "action_requests": "Browse requests, filter by model or user, and open one to see its pipeline",
+      "action_requests": "Browse requests, filter by model, and open one to see its pipeline",
       "action_pricing": "Set the prices per million tokens",
       "action_export": "Export the data as CSV"
+    },
+    "usage": {
+      "title": "Usage",
+      "description": "What the instance used of the models, by usage group, agent, model and provider. Every figure covers at least the minimum group size of people; nothing names or ranks a single person.",
+      "action_totals": "Requests, tokens and estimated cost over 7 days to 12 months, per hour, day or month",
+      "action_groups": "Group by usage group, agent, model or provider; groups below the minimum group size are counted in one row, \"Fewer than ... people\"",
+      "action_small": "A banner warns when fewer people than the minimum group size use the instance: its totals then count as person-level data",
+      "action_people": "Usage auditors, with person-level reporting on, see figures per person after giving a reason; each view is recorded",
+      "action_settings": "Settings → Usage and privacy sets the minimum group size, the retention periods, the limits and person-level reporting"
     },
     "logs": {
       "title": "Logs & Audit",
@@ -626,9 +635,10 @@
     },
     "settings": {
       "title": "Settings",
-      "description": "Settings for the whole system, in three tabs.",
+      "description": "Settings for the whole system, in four tabs.",
       "action_general": "General: every system setting, searchable, and the Hugging Face token",
       "action_modules": "Modules: turn optional modules on or off, with their settings",
+      "action_usage": "Usage and privacy: who sees usage figures, how long they are kept, the instance's limits and the configuration statement",
       "action_appearance": "Appearance: the accent color"
     },
     "profile": {
