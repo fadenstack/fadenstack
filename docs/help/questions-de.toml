@@ -178,7 +178,7 @@
 "Wo sehe ich meine eigene Nutzung?" = "your-own-usage"
 "Wie lege ich Preise für Modelle fest?" = "set-prices"
 "Wie sehe ich die Nutzung pro Team, Agent oder Modell?" = "the-usage-page"
-"Warum steht in einer Zeile „weniger als fünf Personen“?" = "the-minimum-group-size"
+"Warum steht in einer Zeile „Weniger als 5 Personen“?" = "the-minimum-group-size"
 "Wie begrenze ich Anfragen oder Tokens pro Minute oder pro Tag?" = "limits-for-the-whole-instance"
 "Kann ich Limits oder Budgets festlegen?" = "limits-for-the-whole-instance"
 "Was bedeutet ein Fehler 429 oder quota_tokens_per_day?" = "what-people-see-when-a-limit-refuses"

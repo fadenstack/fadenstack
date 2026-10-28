@@ -82,7 +82,7 @@ The model list does not always show where a model runs. If it matters for what y
 
 ## Your usage
 
-**My usage**, in the menu behind your account button, shows how much you used: your tokens and estimated cost by day or month, by model, agent and project, and the limits that apply to everyone. **Download** gives you your data as JSON or CSV: your daily figures, your request records (time, model, tokens, cost, outcome; never what you wrote) and when someone looked at your figures, and why.
+**My usage**, in the menu behind your account button, shows how much you used: your tokens and estimated cost by day or month, by model, agent and project, and the limits that apply to everyone. Under **Your data**, **Download as JSON** and **Download as CSV** give you your data: your daily figures, your request records (time, model, tokens, cost, outcome; never what you wrote) and when someone looked at your figures, and why.
 
 - **You** see your own figures.
 - **Administrators** see totals for groups of at least five people, never your figures alone. When they look into a failed request, its record does not show who sent it.

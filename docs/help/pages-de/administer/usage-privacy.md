@@ -46,8 +46,8 @@ Minuten; nichts wird neu gestartet.
 | Einstellung | Voreinstellung | Bereich | Was eine Änderung bedeutet |
 |---|---|---|---|
 | **Personenbezogene Auswertung** (`usage.person_reporting`) | Aus | Aus, ein | Ein: Personen mit der Rolle `usage_auditor` können die Zahlen einer Person oder eines Teams pro Person ansehen, jedes Mal mit Begründung (siehe [Die Zahlen einer Person ansehen](#looking-at-one-persons-figures)). **Meine Nutzung** sagt das dann allen. Das ist eine Auswertung von Beschäftigtendaten pro Person: Sie unterliegt der Mitbestimmung des Betriebsrats (§ 87 Abs. 1 Nr. 6 BetrVG); vereinbaren Sie sie also, bevor Sie sie einschalten. Gehen Sie davon aus, dass eine Datenschutz-Folgenabschätzung nötig ist, und informieren Sie die Beschäftigten (die Fassung für die personenbezogene Auswertung unter [Unterlagen](usage-documents.md#employee-notice)). |
-| **Mindestgruppengröße** (`usage.min_group_size`) | 5 | 5 bis 50 | Jede Zahl unter **Nutzung** umfasst mindestens so viele Personen. Erhöhen Sie sie, wenn Ihre Betriebsvereinbarung mehr verlangt; unter 5 geht es nicht. Je höher sie ist, desto mehr Teams, Agenten und Tage erscheinen nur in der Sammelzeile „weniger als …“. |
-| **Granularität personenbezogener Zahlen** (`usage.person_granularity`) | Tag | Tag, Monat | Wie fein die personenbezogene Auswertung die Zahlen einer Person zeigt. Monat lässt weniger darauf schließen, wie jemand arbeitet. Feiner geht es nicht: Stündliche Zahlen einer Person gibt es nicht. |
+| **Mindestgruppengröße** (`usage.min_group_size`) | 5 | 5 bis 50 | Jede Zahl unter **Nutzung** umfasst mindestens so viele Personen. Erhöhen Sie sie, wenn Ihre Betriebsvereinbarung mehr verlangt; unter 5 geht es nicht. Je höher sie ist, desto mehr Teams, Agenten und Tage erscheinen nur in der Zeile **Weniger als … Personen**. |
+| **Granularität personenbezogener Zahlen** (`usage.person_granularity`) | **Pro Tag** | **Pro Tag**, **Pro Monat** | Wie fein die personenbezogene Auswertung die Zahlen einer Person zeigt. Monat lässt weniger darauf schließen, wie jemand arbeitet. Feiner geht es nicht: Stündliche Zahlen einer Person gibt es nicht. |
 | **Anfrageprotokoll** (`usage.request_log_retention_days`) | 90 Tage | 7 bis 365 Tage | Wie lange der Eintrag jeder Anfrage aufbewahrt wird: die Person, die Zeit auf die Sekunde, das Modell, die Tokens und bei Agenten das Gerät. Bewahren Sie ihn nur aus einem Grund länger auf, den Sie benennen können, etwa der Aufklärung von Sicherheitsvorfällen, und halten Sie den Grund schriftlich fest. |
 | **Personenbezogene Zahlen** (`usage.person_retention_days`) | 90 Tage | 31 bis 400 Tage | Wie lange die täglichen Zahlen jeder Person aufbewahrt werden, für **Meine Nutzung** und die personenbezogene Auswertung. 90 Tage decken den laufenden Zeitraum, den davor und Zeit für die Klärung von Streitfragen ab; für eine längere Dauer halten Sie den Grund fest. |
 | **Stündliche Zahlen** (`usage.hourly_retention_days`) | 90 Tage | 31 bis 180 Tage | Zahlen pro Stunde nach Team, Agent, Modell und Provider, für die Kapazitätsplanung. Sie enthalten keine Person. |
@@ -55,8 +55,9 @@ Minuten; nichts wird neu gestartet.
 | **Zeitzone** (`usage.time_zone`) | Die Zeitzone des Servers oder UTC | Ein Zeitzonenname wie `Europe/Berlin` | Wo Tage und Monate beginnen und wann das Tageslimit neu beginnt. Ohne Einfluss auf den Datenschutz. |
 
 ??? info "Die Konfigurationsbeschreibung"
-    Derselbe Reiter lädt eine **Konfigurationsbeschreibung** herunter: ein Dokument mit den Einstellungen, wie
-    sie gerade sind, auf Deutsch, Englisch, Spanisch, Französisch oder Chinesisch. Fügen Sie sie der Anlage zur
+    Wählen Sie auf demselben Reiter unter **Konfigurationsbeschreibung** die **Sprache** (Deutsch, Englisch,
+    Spanisch, Französisch oder Chinesisch) und dann **Download**: ein Dokument mit den Einstellungen, wie sie
+    gerade sind. Fügen Sie sie der Anlage zur
     Betriebsvereinbarung und der Datenschutz-Folgenabschätzung bei, und laden Sie sie nach jeder Änderung neu
     herunter.
 
@@ -75,17 +76,22 @@ die Rolle ebenfalls.
    `usage_auditor` ankreuzen, **Speichern**.
 3. Schalten Sie **Personenbezogene Auswertung** ein (siehe [Die Einstellungen](#the-settings)).
 
-Ein Nutzungsprüfer findet die personenbezogene Auswertung dann unter **Observability → Nutzung**:
+Ein Nutzungsprüfer findet die personenbezogene Auswertung dann unter **Observability → Nutzung**, bei **Zahlen
+pro Person**:
 
-1. Wählen Sie eine Person oder ein Team und einen Zeitraum.
-2. Geben Sie den Grund der Einsicht an: 10 bis 500 Zeichen.
-3. Die Zahlen erscheinen pro Person und pro Tag (oder Monat), nach Namen sortiert, nie danach, wie viel jemand
-   genutzt hat.
+1. Wählen Sie den **Zeitraum** der Seite und dann **Zahlen pro Person ansehen**.
+2. Wählen Sie unter **Wessen Zahlen** **Eine Person** oder **Eine Nutzungsgruppe** und dann die **Person** oder
+   die **Nutzungsgruppe**.
+3. Geben Sie die **Begründung** der Einsicht an (10 bis 500 Zeichen) und wählen Sie **Zahlen anzeigen**.
 
-Ein Nutzungsprüfer kann außerdem die Daten einer einzelnen Person herunterladen, als JSON oder CSV: dasselbe, was
-die Person unter **Meine Nutzung** erhält (siehe [Die eigene Ansicht und der Download](#your-own-view-and-the-download)),
-etwa um ein Auskunftsersuchen von jemandem zu beantworten, der sich nicht anmelden kann. Auch das braucht eine
-Begründung.
+Die Zahlen erscheinen pro Person und pro Tag (oder Monat), nach Namen sortiert, nie danach, wie viel jemand
+genutzt hat.
+
+Unter **Daten einer Person herunterladen** lädt **Als JSON herunterladen** oder **Als CSV herunterladen** neben
+einer Person deren Daten herunter: dasselbe, was die Person unter **Meine Nutzung** erhält (siehe
+[Die eigene Ansicht und der Download](#your-own-view-and-the-download)), etwa um ein Auskunftsersuchen von
+jemandem zu beantworten, der sich nicht anmelden kann. Der Download wird mit der Begründung der Einsicht
+aufgezeichnet.
 
 Jede Einsicht und jeder Download wird im Audit-Protokoll festgehalten: wer, in wessen Zahlen, für welchen
 Zeitraum und mit welchem Grund. Die Person sieht in ihrem eigenen Download Datum und angegebenen Grund jeder
@@ -104,7 +110,7 @@ Tokens und geschätzten Kosten nach Tag oder Monat, nach Modell, Agent und Chat-
 gelten. Ist die personenbezogene Auswertung eingeschaltet, steht das dort, mit der Angabe, wer ihre Zahlen sehen
 kann (die Nutzungsprüfer), wie fein und wie lange.
 
-**Download** liefert ihre Daten als JSON oder CSV:
+Unter **Ihre Daten** liefern **Als JSON herunterladen** und **Als CSV herunterladen**:
 
 - ihre täglichen Zahlen;
 - ihre Einträge, die noch im Anfrageprotokoll stehen: Zeit, Modell, Agent, Tokens, Kosten und Ergebnis, nie,
@@ -241,9 +247,9 @@ Nutzungszahlen handeln von Ihren Kolleginnen und Kollegen. Bevor Sie damit arbei
 
 | Sie sehen | Was Sie tun |
 |---|---|
-| Die personenbezogene Auswertung sagt, sie sei ausgeschaltet | Sie ist aus, solange niemand sie eingeschaltet hat. Schalten Sie sie unter **Einstellungen → Nutzung und Datenschutz** mit dem **Root-Modus** ein, sobald sie vereinbart ist. |
-| Die personenbezogene Auswertung sagt, Sie seien kein Nutzungsprüfer | Ihrem Konto fehlt die Rolle `usage_auditor`. Superuser zu sein genügt nicht: Ein Administrator kreuzt sie unter **Zugriffskontrolle → Benutzer**, **Rollen bearbeiten** an. |
-| Die personenbezogene Auswertung verlangt einen Grund | Geben Sie in 10 bis 500 Zeichen an, warum Sie hineinsehen. Der Grund wird festgehalten, und die Person sieht ihn. |
-| Das Speichern von **Personenbezogene Auswertung** verlangt den Root-Modus | Starten Sie den **Root-Modus** in der oberen Leiste und speichern Sie erneut. |
-| Eine Einstellung wird als außerhalb des Bereichs abgelehnt | Die Bereiche stehen unter [Die Einstellungen](#the-settings): Die Mindestgruppengröße kann nicht unter 5 gehen, eine Aufbewahrungsdauer nicht unter ihren kleinsten Wert. |
+| **Die personenbezogene Auswertung ist ausgeschaltet: Niemand sieht die Zahlen einer einzelnen Person.** | Sie ist aus, solange niemand sie eingeschaltet hat. Schalten Sie sie unter **Einstellungen → Nutzung und Datenschutz** mit dem **Root-Modus** ein, sobald sie vereinbart ist. |
+| **Die personenbezogene Auswertung ist eingeschaltet. Nur Personen mit der Rolle Nutzungsprüfer sehen die Zahlen einzelner Personen.** oder **Zahlen einzelner Personen erfordern die Rolle Nutzungsprüfer. Administrator zu sein genügt nicht.** | Ihrem Konto fehlt die Rolle `usage_auditor`. Superuser zu sein genügt nicht: Ein Administrator kreuzt sie unter **Zugriffskontrolle → Benutzer**, **Rollen bearbeiten** an. |
+| **Geben Sie eine Begründung mit 10 bis 500 Zeichen an.** | Geben Sie an, warum Sie hineinsehen. Der Grund wird festgehalten, und die Person sieht ihn. |
+| **Schalten Sie den Root-Modus ein, um diesen Schalter zu ändern.** oder **Das Ein- oder Ausschalten der personenbezogenen Auswertung erfordert den Root-Modus.** | Starten Sie den **Root-Modus** in der oberen Leiste und speichern Sie erneut. |
+| **Eine ganze Zahl von … bis ….** unter einer Einstellung | Die Bereiche stehen unter [Die Einstellungen](#the-settings): Die Mindestgruppengröße kann nicht unter 5 gehen, eine Aufbewahrungsdauer nicht unter ihren kleinsten Wert. |
 | **Nutzung** zeigt fast nichts | Im Zeitraum haben wenige Personen die Instanz genutzt, oder die Mindestgruppengröße ist hoch: siehe [Die Mindestgruppengröße](usage.md#the-minimum-group-size). |

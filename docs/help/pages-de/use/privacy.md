@@ -82,7 +82,7 @@ Die Modellliste zeigt nicht immer, wo ein Modell läuft. Wenn das für das, was 
 
 ## Ihre Nutzung {#your-usage}
 
-**Meine Nutzung**, im Menü hinter Ihrer Konto-Schaltfläche, zeigt, wie viel Sie genutzt haben: Ihre Tokens und geschätzten Kosten nach Tag oder Monat, nach Modell, Agent und Projekt, und die Limits, die für alle gelten. **Download** liefert Ihnen Ihre Daten als JSON oder CSV: Ihre täglichen Zahlen, Ihre Einträge zu Anfragen (Zeit, Modell, Tokens, Kosten, Ergebnis; nie, was Sie geschrieben haben) und wann jemand Ihre Zahlen angesehen hat und warum.
+**Meine Nutzung**, im Menü hinter Ihrer Konto-Schaltfläche, zeigt, wie viel Sie genutzt haben: Ihre Tokens und geschätzten Kosten nach Tag oder Monat, nach Modell, Agent und Projekt, und die Limits, die für alle gelten. Unter **Ihre Daten** liefern **Als JSON herunterladen** und **Als CSV herunterladen** Ihre Daten: Ihre täglichen Zahlen, Ihre Einträge zu Anfragen (Zeit, Modell, Tokens, Kosten, Ergebnis; nie, was Sie geschrieben haben) und wann jemand Ihre Zahlen angesehen hat und warum.
 
 - **Sie** sehen Ihre eigenen Zahlen.
 - **Administratoren** sehen Summen für Gruppen von mindestens fünf Personen, nie Ihre Zahlen allein. Gehen sie einer fehlgeschlagenen Anfrage nach, zeigt deren Eintrag nicht, wer sie gesendet hat.

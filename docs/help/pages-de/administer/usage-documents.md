@@ -19,7 +19,7 @@ Anfragen von Betroffenen und die Zweckbestimmung. Diese Seite enthält für jede
    Auswertung ein oder aus, Mindestgruppengröße, Granularität, Aufbewahrungsdauern und Limits (siehe
    [Nutzung und Datenschutz](usage-privacy.md#the-settings)).
 2. Stellen Sie sie unter **Einstellungen → Nutzung und Datenschutz** ein.
-3. Laden Sie auf demselben Reiter die **Konfigurationsbeschreibung** herunter. Sie hält die Einstellungen fest,
+3. Wählen Sie auf demselben Reiter unter **Konfigurationsbeschreibung** **Download**. Sie hält die Einstellungen fest,
    wie sie sind; fügen Sie sie der Anlage und der Datenschutz-Folgenabschätzung bei.
 
 Die Liste aller gespeicherten Felder und was jede Einstellung bedeutet, steht unter

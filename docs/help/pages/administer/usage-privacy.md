@@ -40,8 +40,8 @@ when. A change applies within minutes; nothing restarts.
 | Setting | Default | Range | What changing it means |
 |---|---|---|---|
 | **Person-level reporting** (`usage.person_reporting`) | Off | Off, on | On: people with the role `usage_auditor` can look at one person's or one team's figures per person, giving a reason each time (see [Looking at one person's figures](#looking-at-one-persons-figures)). Everyone's **My usage** then says so. This is an evaluation of employee data per person: in Germany it is co-determined by the works council (§ 87(1) no. 6 BetrVG), so agree it before switching it on; assume a data protection impact assessment is needed; and tell employees (the person-level notice on [Documents](usage-documents.md#employee-notice)). |
-| **Minimum group size** (`usage.min_group_size`) | 5 | 5 to 50 | Every figure on **Usage** covers at least this many people. Raise it if your works agreement asks for more; it cannot go below 5. The higher it is, the more teams, agents and days are shown only in the "fewer than" row. |
-| **Person-level granularity** (`usage.person_granularity`) | Day | Day, month | How finely the person-level view shows a person's figures. Month shows less of how someone works. There is no finer setting: no person's figures exist by the hour. |
+| **Minimum group size** (`usage.min_group_size`) | 5 | 5 to 50 | Every figure on **Usage** covers at least this many people. Raise it if your works agreement asks for more; it cannot go below 5. The higher it is, the more teams, agents and days are shown only in the **Fewer than … people** row. |
+| **Person-level granularity** (`usage.person_granularity`) | **Per day** | **Per day**, **Per month** | How finely the person-level view shows a person's figures. Month shows less of how someone works. There is no finer setting: no person's figures exist by the hour. |
 | **Request log** (`usage.request_log_retention_days`) | 90 days | 7 to 365 days | How long each request's record is kept: the person, the time to the second, the model, the tokens and, for agents, the device. Keep it longer only for a reason you can name, such as investigating security incidents, and write that reason down. |
 | **Person-level figures** (`usage.person_retention_days`) | 90 days | 31 to 400 days | How long each person's daily figures are kept, for **My usage** and the person-level view. 90 days covers the current period, the one before and time to settle a dispute; for longer, write down why. |
 | **Hourly figures** (`usage.hourly_retention_days`) | 90 days | 31 to 180 days | Figures per hour by team, agent, model and provider, for capacity planning. They hold no person. |
@@ -49,9 +49,9 @@ when. A change applies within minutes; nothing restarts.
 | **Time zone** (`usage.time_zone`) | The server's time zone, or UTC | A time zone name such as `Europe/Berlin` | Where days and months begin, and when the daily limit starts again. No effect on privacy. |
 
 ??? info "The configuration statement"
-    The same tab downloads a **configuration statement**: a document of the settings as they are, in English,
-    German, Spanish, French or Chinese. Attach it to the works agreement's annex and to the data protection
-    impact assessment, and download it again after each change.
+    Under **Configuration statement** on the same tab, pick the **Language** (English, German, Spanish, French or
+    Chinese) and select **Download**: a document of the settings as they are. Attach it to the works agreement's
+    annex and to the data protection impact assessment, and download it again after each change.
 
 ## Looking at one person's figures
 
@@ -66,15 +66,19 @@ administrator who is to look at person-level figures needs the role too.
    **Save**.
 3. Switch on **Person-level reporting** (see [The settings](#the-settings)).
 
-A usage auditor then finds the person-level view on **Observability → Usage**:
+A usage auditor then finds the person-level view on **Observability → Usage**, under **Figures per person**:
 
-1. Choose one person, or one team, and a time range.
-2. Give the reason for looking: 10 to 500 characters.
-3. The figures appear per person and per day (or month), sorted by name, never by how much someone used.
+1. Pick the page's **Period**, and select **View figures per person**.
+2. Under **Whose figures**, choose **One person** or **One usage group**, and pick the **Person** or the
+   **Usage group**.
+3. Enter the **Reason** for looking (10 to 500 characters) and select **Show figures**.
 
-A usage auditor can also download one person's data, as JSON or CSV: the same the person gets under **My usage**
-(see [Your own view and the download](#your-own-view-and-the-download)), for example to answer an access request
-from someone who cannot sign in. It needs a reason too.
+The figures appear per person and per day (or month), sorted by name, never by how much someone used.
+
+Under **Download one person's data**, **Download as JSON** or **Download as CSV** beside a person downloads their
+data: the same the person gets under **My usage** (see
+[Your own view and the download](#your-own-view-and-the-download)), for example to answer an access request from
+someone who cannot sign in. The download is recorded with the reason given for the view.
 
 Every look and every download is recorded in the audit log: who, at whose figures, which range, and the reason.
 The person sees, in their own download, the date and the stated reason of each, never who looked; **My usage**
@@ -91,7 +95,7 @@ Everyone who signs in has **My usage**, in the menu behind their account button:
 estimated cost by day or month, by model, agent and chat project, and the limits that apply. When person-level
 reporting is on, it says so, with who can see their figures (the usage auditors), how finely and for how long.
 
-**Download** gives them their data as JSON or CSV:
+Under **Your data**, **Download as JSON** and **Download as CSV** give them:
 
 - their daily figures;
 - their request records still in the request log: time, model, agent, tokens, cost and outcome, never what was
@@ -218,9 +222,9 @@ Usage figures are about your colleagues. Before you work with them:
 
 | You see | What to do |
 |---|---|
-| The person-level view says person-level reporting is off | It is off unless someone switched it on. Switch it on under **Settings → Usage and privacy** with **Root Mode**, once it is agreed. |
-| The person-level view says you are not a usage auditor | Your account lacks the role `usage_auditor`. Being a superuser does not give it: an administrator ticks it under **Access Control → Users**, **Edit Roles**. |
-| The person-level view asks for a reason | Enter why you look, in 10 to 500 characters. It is recorded, and the person sees it. |
-| Saving **Person-level reporting** asks for Root Mode | Start **Root Mode** in the top bar, then save again. |
-| A setting is refused as out of range | The ranges are in [The settings](#the-settings): the minimum group size cannot go below 5, nor a retention below its lowest value. |
+| **Person-level reporting is off: nobody sees the figures of a single person.** | It is off unless someone switched it on. Switch it on under **Settings → Usage and privacy** with **Root Mode**, once it is agreed. |
+| **Person-level reporting is on. Only people with the usage auditor role see the figures of single people.**, or **The figures of single people need the usage auditor role. Being an administrator is not enough.** | Your account lacks the role `usage_auditor`. Being a superuser does not give it: an administrator ticks it under **Access Control → Users**, **Edit Roles**. |
+| **Give a reason of 10 to 500 characters.** | Enter why you look. It is recorded, and the person sees it. |
+| **Turn on root mode to change this switch.**, or **Turning person-level reporting on or off needs root mode.** | Start **Root Mode** in the top bar, then save again. |
+| **A whole number from … to ….** under a setting | The ranges are in [The settings](#the-settings): the minimum group size cannot go below 5, nor a retention below its lowest value. |
 | **Usage** shows almost nothing | Few people used the instance in the range, or the minimum group size is high: see [The minimum group size](usage.md#the-minimum-group-size). |
