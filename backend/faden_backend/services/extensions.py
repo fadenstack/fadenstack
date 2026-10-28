@@ -108,7 +108,12 @@ class MailSender(Protocol):
         ...
 
     async def send(self, kind: str, payload: dict[str, Any]) -> None:
-        """Deliver one message of *kind* (``password_reset``, ``link_code``, ``admin_alert``), or raise."""
+        """Deliver one message of *kind* (``password_reset``, ``link_code``, ``admin_alert``), or raise.
+
+        The outbox tries a failed message again later, unless the exception's ``permanent`` attribute is
+        ``True`` (the same attempt would fail the same way, e.g. a refused sign-in): the message then fails at
+        once. Either way the exception's text is kept as the message's ``last_error``.
+        """
         ...
 
     def link_base(self) -> str:
