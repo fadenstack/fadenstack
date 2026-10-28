@@ -27,6 +27,7 @@ import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import TextField from "@mui/material/TextField";
+import Tooltip from "@mui/material/Tooltip";
 import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
 import Typography from "@mui/material/Typography";
@@ -88,6 +89,9 @@ export default function RequestsTab({ start, end }: Props) {
   }, [load]);
 
   const totalPages = data ? Math.ceil(data.total / data.limit) : 0;
+  // Filtering by person only where the server names people to this caller
+  // (a usage auditor, person-level reporting on); a filter already typed stays.
+  const peopleNamed = Boolean(userFilter) || Boolean(data?.items.some((r) => r.user_id));
 
   return (
     <Box>
@@ -103,16 +107,18 @@ export default function RequestsTab({ start, end }: Props) {
           }}
           sx={{ width: 200 }}
         />
-        <TextField
-          size="small"
-          label={t("observability.filter_user_id")}
-          value={userFilter}
-          onChange={(e) => {
-            setUserFilter(e.target.value);
-            setPage(1);
-          }}
-          sx={{ width: 200 }}
-        />
+        {peopleNamed && (
+          <TextField
+            size="small"
+            label={t("observability.filter_user_id")}
+            value={userFilter}
+            onChange={(e) => {
+              setUserFilter(e.target.value);
+              setPage(1);
+            }}
+            sx={{ width: 200 }}
+          />
+        )}
         <Button variant="outlined" size="small" onClick={load}>
           {t("observability.search")}
         </Button>
@@ -251,7 +257,7 @@ function RequestRow({
         <TableCell
           sx={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis" }}
         >
-          {row.user_id}
+          <UserCell userId={row.user_id} />
         </TableCell>
       </TableRow>
       <TableRow>
@@ -284,6 +290,10 @@ function RequestRow({
                     <Detail
                       label={t("observability.request_id")}
                       value={row.request_id}
+                    />
+                    <Detail
+                      label={t("observability.col_user")}
+                      value={row.user_id ?? t("observability.user_hidden")}
                     />
                     <Detail
                       label={t("observability.trace_id")}
@@ -405,6 +415,22 @@ function RequestRow({
         </TableCell>
       </TableRow>
     </>
+  );
+}
+
+/**
+ * Who sent a request: the server names the person only to a usage auditor
+ * while person-level reporting is on (M02, M06); otherwise "hidden".
+ */
+function UserCell({ userId }: { userId: string | null }) {
+  const { t } = useTranslation();
+  if (userId) return <>{userId}</>;
+  return (
+    <Tooltip title={t("observability.user_hidden_hint")}>
+      <Typography component="span" variant="body2" color="text.secondary" data-user-hidden>
+        {t("observability.user_hidden")}
+      </Typography>
+    </Tooltip>
   );
 }
 

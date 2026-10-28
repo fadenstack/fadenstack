@@ -1142,7 +1142,6 @@
     "request_throughput": "Request Throughput",
     "latency_percentiles": "Latency Percentiles",
     "spend_by_model": "Spend by Model",
-    "top_users": "Top Users",
     "no_data": "No data for this period",
     "no_data_short": "No data",
     "col_user": "User",
@@ -1238,12 +1237,13 @@
     "tokens_split": "{{prompt}} prompt · {{completion}} completion",
     "latency_total": "Total latency",
     "latency_ttft": "Time to first token",
-    "top_user_value": "{{requests}} req · {{cost}}",
     "input_price_per_1m": "Input price (USD per 1M tokens)",
     "output_price_per_1m": "Output price (USD per 1M tokens)",
     "price_per_1m_help": "Per million tokens, as providers list them (OpenRouter, OpenAI, …).",
     "col_input_price_1m": "Input $/1M",
-    "col_output_price_1m": "Output $/1M"
+    "col_output_price_1m": "Output $/1M",
+    "user_hidden": "Hidden",
+    "user_hidden_hint": "Shown only to usage auditors while person-level reporting is on."
   },
   "llm_providers": {
     "title": "LLM Providers",

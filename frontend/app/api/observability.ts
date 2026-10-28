@@ -22,13 +22,7 @@ export interface ModelBreakdown {
   estimated_total_cost: number | null;
 }
 
-export interface TopUser {
-  user_id: string;
-  total_requests: number;
-  total_tokens: number;
-  estimated_total_cost: number | null;
-}
-
+/** The summary has no per-person ranking: usage figures do not rank people (M11). */
 export interface Summary {
   total_requests: number;
   total_prompt_tokens: number;
@@ -39,7 +33,6 @@ export interface Summary {
   avg_latency_ms: number | null;
   by_provider: ProviderBreakdown[];
   by_model: ModelBreakdown[];
-  top_users: TopUser[];
 }
 
 export interface TimeseriesBucket {
@@ -69,7 +62,11 @@ export interface RequestLog {
   request_id: string;
   trace_id: string | null;
   tenant_id: string;
-  user_id: string;
+  /**
+   * Null unless person-level reporting is on and the caller is a usage
+   * auditor (then the server records the view); shown as "hidden".
+   */
+  user_id: string | null;
   model_alias: string | null;
   provider_instance_id: string | null;
   endpoint: string;

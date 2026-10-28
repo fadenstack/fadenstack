@@ -1147,7 +1147,6 @@
     "request_throughput": "请求吞吐量",
     "latency_percentiles": "延迟百分位",
     "spend_by_model": "按模型支出",
-    "top_users": "活跃用户",
     "no_data": "该时间段无数据",
     "no_data_short": "无数据",
     "col_user": "用户",
@@ -1243,12 +1242,13 @@
     "tokens_split": "{{prompt}} 提示 · {{completion}} 回复",
     "latency_total": "总延迟",
     "latency_ttft": "首个令牌时间",
-    "top_user_value": "{{requests}} 次请求 · {{cost}}",
     "input_price_per_1m": "输入价格（美元 / 100 万 token）",
     "output_price_per_1m": "输出价格（美元 / 100 万 token）",
     "price_per_1m_help": "按每百万 token 计价，与各提供商公布的方式一致（OpenRouter、OpenAI 等）。",
     "col_input_price_1m": "输入 $/百万",
-    "col_output_price_1m": "输出 $/百万"
+    "col_output_price_1m": "输出 $/百万",
+    "user_hidden": "已隐藏",
+    "user_hidden_hint": "仅在按人员统计开启时向用量审计员显示。"
   },
   "llm_providers": {
     "title": "LLM 提供商",
