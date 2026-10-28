@@ -126,7 +126,8 @@ rights.
 - **Roles do not flow down the tree.** A group's roles reach its own members, not the members of its sub-groups.
 - **Deleting a group** moves its sub-groups up to its parent.
 - **Archive** a group that has ended: it keeps its history in the usage figures, but cannot be anyone's usage
-  group or get new members, and is no longer offered where people pick a group.
+  group or get new members, and is no longer offered where people pick a group. The list hides archived groups
+  until you switch **Show 2 archived groups** (with their number) on; **Bring back** makes one active again.
 - **A group a sign-in provider keeps** (see [Provisioning](sign-in-provisioning.md)) can still get a parent and a
   cost centre: the tree is your organisation's, the provider names the group and its members.
 

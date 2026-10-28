@@ -136,7 +136,8 @@ niemandem Rechte.
 - **Wird eine Gruppe gelöscht**, rücken ihre Untergruppen zu ihrer übergeordneten Gruppe auf.
 - **Archivieren** Sie eine Gruppe, die es nicht mehr gibt: Sie behält ihre Geschichte in den Nutzungszahlen,
   kann aber niemandes Nutzungsgruppe mehr sein, keine neuen Mitglieder bekommen und wird nicht mehr angeboten, wo
-  man eine Gruppe auswählt.
+  man eine Gruppe auswählt. Die Liste blendet archivierte Gruppen aus, bis Sie **2 archivierte Gruppen zeigen** (mit
+  ihrer Anzahl) einschalten; **Zurückholen** macht eine wieder aktiv.
 - **Eine Gruppe, die ein Anmeldeanbieter verwaltet** (siehe [Provisionierung](sign-in-provisioning.md)), kann
   trotzdem eine übergeordnete Gruppe und eine Kostenstelle bekommen: Der Baum gehört Ihrer Organisation, der
   Anbieter benennt die Gruppe und ihre Mitglieder.
