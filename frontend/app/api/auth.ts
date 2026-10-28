@@ -31,6 +31,13 @@ async function assertOk(res: Response): Promise<void> {
   }
 }
 
+/** What was entered for a password reset is no email address (``user@domain``, no spaces). */
+export class NotAnAddress extends Error {
+  constructor() {
+    super("not_an_address");
+  }
+}
+
 /**
  * A refused password sign-in: ``code`` is the backend's (``LOGIN_BAD_CREDENTIALS``,
  * ``LOGIN_USE_SIGN_IN_PROVIDER``, ...), or ``TOO_MANY`` when the server is rate-limiting, or ``OTHER``.
@@ -143,13 +150,15 @@ export const auth = {
     return (await res.json()) as SignInOptions;
   },
 
+  /** Ask for a reset mail; the same answer whether or not an account has *email*. */
   async forgotPassword(email: string): Promise<void> {
     const res = await fetch("/api/auth/forgot-password", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email: email.trim() }),
     });
+    if (res.status === 422) throw new NotAnAddress();
     if (res.status !== 202) {
       await assertOk(res);
     }
