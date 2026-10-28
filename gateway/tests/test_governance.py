@@ -476,19 +476,7 @@ async def test_a_rate_limit_says_when_to_retry_and_is_logged(
     policy.rpm_limit = 1
     await db_session.flush()
     _Model(monkeypatch, _say("One."), _say("Two."))
-
-    class _Counter:
-        def __init__(self) -> None:
-            self.n = 0
-
-        async def incr(self, key: str, amount: int, *, ttl_sec: int) -> int:
-            self.n += amount if key.startswith("ratelimit:rpm") else 0
-            return self.n
-
-    from faden_gateway.services.gateway.ratelimit import RateLimiter  # noqa: PLC0415
-
-    counter = _Counter()
-    monkeypatch.setattr(RateLimiter, "__init__", lambda self, cache: setattr(self, "cache", counter))
+    # The caps count in the app's (fake) Redis, with their Lua script.
     body = {"model": ALIAS, "messages": [{"role": "user", "content": "hi"}]}
     assert (await client.post("/v1/chat/completions", headers=_headers(), json=body)).status_code == 200
     r = await client.post("/v1/chat/completions", headers=_headers(), json=body)

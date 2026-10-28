@@ -26,6 +26,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from faden_gateway.db.base import Base
 from faden_gateway.db.crypto import EncryptedJSON, EncryptedText
+from faden_gateway.db.models.usage import GROUP_PATH
 
 
 class ProviderType(enum.StrEnum):
@@ -311,6 +312,9 @@ class TenantLLMPolicy(Base):
     )
     rpm_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
     tpm_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: Tokens (input and output) the tenant may use in a calendar day of the usage time zone
+    #: (``usage.time_zone``); NULL: no cap (services/gateway/ratelimit.py).
+    tokens_per_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # ----- PII policy (nullable = feature disabled) -----
     pii_config: Mapped[dict[str, Any] | None] = mapped_column(
@@ -342,6 +346,11 @@ class TenantLLMPolicy(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
+
+
+#: ``LLMGatewayRequestLog.usage_source``: the provider reported the tokens, the gateway counted them, or
+#: estimated them.
+USAGE_SOURCES = ("provider", "counted", "estimated")
 
 
 class LLMGatewayRequestLog(Base):
@@ -393,7 +402,17 @@ class LLMGatewayRequestLog(Base):
     cost_estimate_status: Mapped[str | None] = mapped_column(
         String(16), nullable=True,
     )
+    # The counting rules of the OpenTelemetry GenAI conventions: the input includes what was read from and
+    # written to the provider's prompt cache, the output includes the model's reasoning.
+    #: Of the input, read from the provider's prompt cache (``prompt_tokens_details.cached_tokens``).
     cached_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: Of the input, written to the provider's prompt cache (Anthropic's ``cache_creation_input_tokens``).
+    cache_write_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: Of the output, the model's reasoning (``completion_tokens_details.reasoning_tokens``).
+    reasoning_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: Where the token counts come from (``USAGE_SOURCES``): the provider reported them, the gateway counted
+    #: them, or estimated them (a model that reported none); NULL with no tokens (refused, failed early).
+    usage_source: Mapped[str | None] = mapped_column(String(16), nullable=True)
     stream: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     # Pipeline observability columns
     session_id: Mapped[str | None] = mapped_column(
@@ -402,6 +421,9 @@ class LLMGatewayRequestLog(Base):
     # Who the usage is attributed to beyond the user: the usage group the
     # backend stores on the user, and the chat project the session is in.
     group_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    #: The usage group's path at request time: its ancestors from the root down to it
+    #: (services/gateway/usage_group.py), so usage stays booked where it was after a reorganisation.
+    group_path: Mapped[list[str] | None] = mapped_column(GROUP_PATH, nullable=True)
     project_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     # A request of an agent (``/v1/agents/{agent}/...``): the agent, the device
     # signed in to it, and the conversation and turn the SDK names -- the

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import jwt
 import pytest
@@ -21,9 +21,12 @@ from faden_gateway.db.models.gateway import (
     ChatProject,
     ChatSession,
     ExtractionStatus,
+    LLMGatewayRequestLog,
+    LLMToolCallLog,
     MemoryFact,
     SessionStatus,
 )
+from faden_gateway.db.models.usage import UsageDaily, UsageDailyPerson
 from faden_gateway.services.gateway import erasure
 from faden_gateway.services.gateway.auth import AuthContext, get_auth_context
 from faden_gateway.settings import settings
@@ -116,6 +119,34 @@ async def test_erasing_a_person_takes_their_projects_chats_files_and_memory(db_s
     assert len(store.deleted) == 2
     assert set((await db_session.execute(select(ChatSession.id))).scalars()) == {other.id}
     assert set((await db_session.execute(select(MemoryFact.user_id))).scalars()) == {"u2"}
+
+
+async def test_erasing_a_person_takes_their_usage_and_leaves_the_sums(db_session: AsyncSession) -> None:
+    def logged(user: str) -> LLMGatewayRequestLog:
+        return LLMGatewayRequestLog(
+            request_id=f"r-{user}", tenant_id="t1", user_id=user, endpoint="/v1/chat/completions",
+            status_code=200, latency_ms=1, prompt_tokens=5,
+        )
+
+    mine, theirs = logged("u1"), logged("u2")
+    db_session.add_all([mine, theirs])
+    await db_session.flush()
+    day = date(2026, 10, 1)
+    db_session.add_all([
+        LLMToolCallLog(request_log_id=mine.id, request_id="r-u1", tool_name="search"),
+        UsageDailyPerson(day=day, tenant_id="t1", user_id="u1", requests=1, input_tokens=5),
+        UsageDailyPerson(day=day, tenant_id="t1", user_id="u2", requests=1, input_tokens=5),
+        UsageDaily(day=day, tenant_id="t1", requests=2, input_tokens=10, people=2),
+    ])
+    await db_session.flush()
+
+    erased = await erasure.erase_user(db_session, _Store(), "u1")
+
+    assert (erased.request_logs, erased.usage_days) == (1, 1)
+    assert set((await db_session.execute(select(LLMGatewayRequestLog.user_id))).scalars()) == {"u2"}
+    assert await _count(db_session, LLMToolCallLog) == 0
+    assert set((await db_session.execute(select(UsageDailyPerson.user_id))).scalars()) == {"u2"}
+    assert (await db_session.execute(select(UsageDaily.requests))).scalar_one() == 2, "the sums keep their totals"
 
 
 def _grant(scope: str, target: str, *, typ: str = "chat_erase") -> str:

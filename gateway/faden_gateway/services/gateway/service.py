@@ -24,7 +24,9 @@ from faden_gateway.db.models.gateway import (
     TurnStatus,
 )
 from faden_gateway.services.gateway.audit import AuditService
-from faden_gateway.services.gateway.usage_group import UsageGroupResolver
+from faden_gateway.services.gateway.usage_group import UsageGroupResolver, usage_team
+from faden_gateway.services.gateway import usage_hooks, usage_settings
+from faden_gateway.services.extensions import AdmissionContext
 from faden_gateway.services.gateway.auth import AuthContext
 from faden_gateway.services.gateway import (
     answer_variety,
@@ -68,14 +70,18 @@ from faden_gateway.services.gateway.pii_restore import (
 )
 from faden_gateway.services.gateway.proxy import UpstreamProxy, UpstreamResult
 from faden_gateway.services.gateway.rag_lite_client import RagLiteClient
-from faden_gateway.services.gateway.ratelimit import RateLimiter
+from faden_gateway.services.gateway.ratelimit import Caps, CapRefusal, RateLimiter, Reservation
 from faden_gateway.services.gateway.routing import RouterService, RoutingDecision
 from faden_gateway.services.gateway.skills_client import ResolvedSkill, SkillsClient
 from faden_gateway.services.gateway.stream import StreamStats, wrap_sse_stream
 from faden_gateway.services.gateway.stream_buffer import StreamBuffer
 from faden_gateway.services.gateway.tool_stream import DONE, ToolCalls, sse, sse_events
 from faden_gateway.services.gateway.usage import (
-    estimate_input_tokens,
+    NO_USAGE,
+    Usage,
+    add_usage,
+    estimated_usage,
+    reserved_tokens,
     usage_from_payload,
 )
 from faden_gateway.services.gateway.file_store import FileStore
@@ -183,6 +189,8 @@ class GatewayResponse:
     provenance: tuple[str, ...] = ()
     #: The route answered without a mark, as an administrator allowed it (``text_marking``).
     unmarked: bool = False
+    #: The caps' ``x-ratelimit-*`` headers (``ratelimit.py``): every answer of a tenant with caps has them.
+    headers: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(slots=True, frozen=True)
@@ -198,6 +206,8 @@ class StreamingGatewayResponse:
     turn_id: str | None = None
     #: The route answers without a mark, as an administrator allowed it (``text_marking``).
     unmarked: bool = False
+    #: The caps' ``x-ratelimit-*`` headers (``ratelimit.py``): every answer of a tenant with caps has them.
+    headers: dict[str, str] = field(default_factory=dict)
 
 
 #: What each endpoint can be sent to: the kinds a route declares
@@ -844,13 +854,9 @@ def _mcp_server(name: str) -> str | None:
     return parts[1] if len(parts) >= 2 else None
 
 
-def _add_usage(total: dict[str, int], usage: Any) -> None:
-    """Add one round's token usage to the answer's."""
-    if not isinstance(usage, dict):
-        return
-    for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
-        if isinstance(usage.get(key), int):
-            total[key] = total.get(key, 0) + usage[key]
+def _add_usage(total: dict[str, Any], usage: Any) -> None:
+    """Add one round's token usage to the answer's, its cached and reasoning tokens too."""
+    add_usage(total, usage)
 
 
 def _insert_after_system(payload: dict[str, Any], message: dict[str, Any]) -> dict[str, Any]:
@@ -1078,7 +1084,15 @@ class _Prepared:
     pii_policy_saved: bool = False
     session_id: str | None = None
     group_id: str | None = None  # the user's usage group, for attribution
+    #: The usage group's path at the time of use, root first (``usage_group.py``); empty without one.
+    group_path: tuple[str, ...] = ()
     project_id: str | None = None  # the session's chat project, for attribution
+    #: What admission reserved against the tenant's token caps (``usage.reserved_tokens``).
+    estimated_tokens: int = 0
+    #: The caps and the admission checks let the request in.
+    admitted: bool = False
+    #: What the request holds on the tenant's caps until its real usage is known (``ratelimit.py``).
+    reservation: Reservation | None = None
     skills: list[ResolvedSkill] = field(default_factory=list)
     #: Skills the user asked for by name (the chat's skill picker).
     requested_skills: list[str] = field(default_factory=list)
@@ -1172,6 +1186,11 @@ class _Prepared:
             return "pii_fallback_to_local_succeeded"
         return None
 
+    @property
+    def caps_headers(self) -> dict[str, str]:
+        """The ``x-ratelimit-*`` headers of the request's answer: none for a tenant without caps."""
+        return dict(self.reservation.headers) if self.reservation is not None else {}
+
 
 class GatewayService:
     """Core shared pipeline for chat + embeddings + models."""
@@ -1194,7 +1213,7 @@ class GatewayService:
         mcp_tool_cache: MCPToolCache | None = None,
         skills_client: SkillsClient | None = None,
         tool_router: ToolRouter | None = None,
-        usage_groups: UsageGroupResolver[str] | None = None,
+        usage_groups: UsageGroupResolver[Any] | None = None,
         group_memberships: UsageGroupResolver[tuple[str, ...]] | None = None,
         provenance_client: ProvenanceClient | None = None,
     ) -> None:
@@ -1284,6 +1303,7 @@ class GatewayService:
         usage_prompt = None
         usage_completion = None
         usage_total = None
+        usage: Usage = NO_USAGE
         # ── Observability tracking ──────────────────────────────────────
         retry_count = 0
         finish_reason: str | None = None
@@ -1291,7 +1311,8 @@ class GatewayService:
             # Inside the try: a request refused here (rate limit, unknown
             # model) gets its audit row like any other; it got none.
             candidates = await self._admit(
-                auth=auth, payload=payload, policy=policy, endpoint=endpoint, model_alias=model_alias,
+                req, auth=auth, payload=payload, policy=policy, endpoint=endpoint, model_alias=model_alias,
+                request_id=request_id, session_id=session_id,
             )
             if rerank is not None:
                 candidates = _rerank_routes(model_alias, candidates)
@@ -1472,9 +1493,11 @@ class GatewayService:
                 trace_id=req.trace_id,
                 provenance=receipts,
                 unmarked=req.unmarked,
+                headers=req.caps_headers,
             )
         except GatewayError as exc:
             exc.logged = True  # the finally below writes its row
+            exc.headers = {**req.caps_headers, **exc.headers}
             error_code = exc.code
             status_code = exc.status_code
             if req.trace_context is None:
@@ -1502,6 +1525,12 @@ class GatewayService:
             await self._release(req)
             if status_code >= 400:
                 await self._mark_turn(req, TurnStatus.FAILED.value)
+            metered, source = _metered(
+                usage, reached=req.decision is not None, status_code=status_code,
+                input_obj=_input_of(req.egress_payload or payload),
+                answer=_answer_text(result.payload) if result is not None and images is None else None,
+            )
+            await self._settle(req, metered)
             await self.audit.log(
                 request_id=request_id,
                 trace_id=req.trace_id,
@@ -1513,9 +1542,8 @@ class GatewayService:
                 status_code=status_code,
                 latency_ms=int((time.perf_counter() - started) * 1000),
                 ttft_ms=None,
-                prompt_tokens=usage_prompt,
-                completion_tokens=usage_completion,
-                total_tokens=usage_total,
+                **_usage_fields(metered, source),
+                estimated_tokens=req.estimated_tokens if req.admitted else 0,
                 error_code=error_code or req.fallback_error_code,
                 stream=False,
                 provider_name=(
@@ -1524,6 +1552,7 @@ class GatewayService:
                 ),
                 session_id=req.session_id or session_id,
                 group_id=req.group_id,
+                group_path=req.group_path,
                 project_id=req.project_id,
                 finish_reason=finish_reason,
                 retry_count=retry_count,
@@ -1711,7 +1740,8 @@ class GatewayService:
         pre_stream_error = "The request failed before the model answered."
         try:
             candidates = await self._admit(
-                auth=auth, payload=payload, policy=policy, endpoint=endpoint, model_alias=model_alias,
+                req, auth=auth, payload=payload, policy=policy, endpoint=endpoint, model_alias=model_alias,
+                request_id=request_id, session_id=session_id,
             )
             if background:
                 await self._check_turn_limits(auth, str(session_id))
@@ -1823,6 +1853,7 @@ class GatewayService:
                     trace_id=req.trace_id,
                     turn_id=req.turn_id,
                     unmarked=req.unmarked,
+                    headers=req.caps_headers,
                 )
 
             async def _stream_with_finalize() -> AsyncIterator[bytes]:
@@ -1889,9 +1920,11 @@ class GatewayService:
                 trace_id=req.trace_id,
                 turn_id=req.turn_id,
                 unmarked=req.unmarked,
+                headers=req.caps_headers,
             )
         except GatewayError as exc:
             exc.logged = True  # the finally below writes its row
+            exc.headers = {**req.caps_headers, **exc.headers}
             pre_stream_status_code = exc.status_code
             pre_stream_error_code = exc.code
             pre_stream_error = exc.message
@@ -1934,6 +1967,8 @@ class GatewayService:
                         )
                     except Exception:
                         logger.warning("Failed to keep the failed reply", exc_info=True)
+                # It never reached the model: it used nothing of what it reserved.
+                await self._settle(req, NO_USAGE)
                 await self.audit.log(
                     request_id=request_id,
                     trace_id=req.trace_id,
@@ -1948,6 +1983,7 @@ class GatewayService:
                     prompt_tokens=None,
                     completion_tokens=None,
                     total_tokens=None,
+                    estimated_tokens=req.estimated_tokens if req.admitted else 0,
                     error_code=pre_stream_error_code or req.fallback_error_code,
                     stream=True,
                     provider_name=(
@@ -1956,6 +1992,7 @@ class GatewayService:
                     ),
                     session_id=session_id,
                     group_id=req.group_id,
+                    group_path=req.group_path,
                     project_id=req.project_id,
                     finish_reason=None,
                     retry_count=0,
@@ -1972,19 +2009,100 @@ class GatewayService:
     # ------------------------------------------------------------------
 
     async def _admit(
-        self, *, auth: AuthContext, payload: dict[str, Any], policy: Any | None, endpoint: str, model_alias: str,
+        self,
+        req: _Prepared,
+        *,
+        auth: AuthContext,
+        payload: dict[str, Any],
+        policy: Any | None,
+        endpoint: str,
+        model_alias: str,
+        request_id: str,
+        session_id: str | None,
     ) -> list[Any]:
-        """Rate limits, then the routes for the model; raises when the request cannot go on."""
-        await _check_limits(
-            limiter=self.limiter,
-            tenant_id=auth.tenant_id,
-            payload=payload,
-            rpm_limit=policy.rpm_limit if policy else None,
-            tpm_limit=policy.tpm_limit if policy else None,
-        )
+        """The tenant's caps, the extensions' admission checks, then the routes; raises when it cannot go on.
+
+        The request reserves its estimate against the caps (``req.reservation``, settled with the real
+        usage once it is known: :meth:`_settle`). A refusal counts nothing: an extension's refusal gives
+        the caps' reservation back, the request with it.
+        """
+        req.estimated_tokens = reserved_tokens(payload, endpoint)
+        caps = Caps.of(policy)
+        if caps:
+            admitted = await self.limiter.admit(
+                tenant_id=auth.tenant_id, caps=caps, tokens=req.estimated_tokens,
+                zone=usage_settings.current().zone,
+            )
+            if isinstance(admitted, CapRefusal):
+                raise admitted.error()
+            req.reservation = admitted
+        checks = extension_registry.admission_checks
+        if checks:  # none in core: no lookups for them either
+            context = await self._admission_context(
+                req, auth, model_alias=model_alias, endpoint=endpoint, request_id=request_id,
+                session_id=session_id,
+            )
+            refusal = await usage_hooks.first_refusal(checks, context)
+            if refusal is not None:
+                if req.reservation is not None:
+                    await self.limiter.release(req.reservation)
+                raise usage_hooks.refused(refusal, req.caps_headers)
+        req.admitted = True
         candidates = await self.router.resolve_alias(alias=model_alias, tenant_id=auth.tenant_id)
         _check_kind(endpoint, model_alias, candidates)
         return candidates
+
+    async def _admission_context(
+        self, req: _Prepared, auth: AuthContext, *, model_alias: str, endpoint: str, request_id: str,
+        session_id: str | None,
+    ) -> AdmissionContext:
+        """The request as an admission check sees it: the person's team and its path, the chat's project."""
+        if self.usage_groups is not None:
+            self._book_on(req, await self.usage_groups.resolve(auth.user_id))
+        return AdmissionContext(
+            tenant_id=auth.tenant_id,
+            user_id=auth.user_id,
+            group_id=req.group_id,
+            project_id=await self._project_of(auth, session_id),
+            agent_id=req.agent.id if req.agent is not None else None,
+            model_alias=model_alias,
+            endpoint=endpoint,
+            request_id=request_id,
+            estimated_tokens=req.estimated_tokens,
+            group_path=req.group_path,
+        )
+
+    async def _project_of(self, auth: AuthContext, session_id: str | None) -> str | None:
+        """The project the caller's chat *session_id* is in, if any."""
+        if not session_id or self.session_dao is None:
+            return None
+        try:
+            sid = uuid.UUID(session_id)
+        except ValueError:
+            return None
+        sess = await self.session_dao.get_session(
+            session_id=sid, tenant_id=auth.tenant_id, user_id=auth.user_id,
+        )
+        return str(sess.project_id) if sess is not None and sess.project_id else None
+
+    @staticmethod
+    def _book_on(req: _Prepared, value: Any) -> None:
+        """Book the request on the team the resolver answered (``UsageTeam``, or its id), with its path."""
+        team = usage_team(value)
+        req.group_id = team.group_id if team is not None else None
+        req.group_path = team.path if team is not None else ()
+
+    async def _settle(self, req: _Prepared, usage: Usage) -> None:
+        """Replace the request's reservation on the caps by its real input and output, once.
+
+        A request that did not reach a model (or reported nothing) used none.
+        """
+        if req.reservation is None or req.reservation.settled:
+            return
+        try:
+            await self.limiter.settle(req.reservation, usage.tokens)
+        except Exception:
+            logger.warning("Settling request %s on the caps failed", req.request_id, exc_info=True)
 
     # ------------------------------------------------------------------
     # Governance (services/gateway/governance.py)
@@ -2446,7 +2564,7 @@ class GatewayService:
             (payload, req.session_id, req.project_id),
             req.skills,
             mcp_tools,
-            req.group_id,
+            team,
             req.knowledge_to_search,
         ) = await _together(
             self._inject_session_context(
@@ -2472,6 +2590,7 @@ class GatewayService:
             # turns wait for nothing.
             self._knowledge_to_search(req, auth, payload, candidates) if chat else _value(None),
         )
+        self._book_on(req, team)
         insert_skill = (
             _insert_before_question if settings.session_skills_position == "tail" else _insert_after_system
         )
@@ -3331,9 +3450,13 @@ class GatewayService:
         again, at most ``mcp_tool_loop_max_iterations`` times. A round that
         asks for a tool the gateway cannot run -- one the client defined --
         goes back to the client as it is.
+
+        The answer's ``usage`` is that of every round, as a streamed answer's is: each round was
+        processed, and the last alone under-counted what the request used.
         """
         payload = req.egress_payload
         assert payload is not None  # noqa: S101
+        used: dict[str, Any] = {}
         for iteration in range(settings.mcp_tool_loop_max_iterations):
             choices = (result.payload or {}).get("choices") or []
             message = choices[0].get("message") if choices else None
@@ -3352,7 +3475,15 @@ class GatewayService:
                 req.faden_whole.extend([*starts, *self._take_faden_events(req, [turn, *answers])])
             payload = {**payload, "messages": [*payload["messages"], turn, *answers]}
             payload = await self._offering_found(req, payload)
+            _add_usage(used, (result.payload or {}).get("usage"))
             result = await self._complete(req, payload)
+        if used and isinstance(result.payload, dict):
+            _add_usage(used, result.payload.get("usage"))
+            result = UpstreamResult(
+                status_code=result.status_code,
+                payload={**result.payload, "usage": used},
+                headers=result.headers,
+            )
         return result
 
     async def _stream_tool_rounds(
@@ -3367,7 +3498,7 @@ class GatewayService:
         """
         payload = req.egress_payload
         assert payload is not None and req.decision is not None  # noqa: S101
-        usage: dict[str, int] = {}
+        usage: dict[str, Any] = {}
         head: dict[str, Any] = {}
         for iteration in range(settings.mcp_tool_loop_max_iterations + 1):
             raw = await self.adapter.completion(
@@ -3884,6 +4015,12 @@ class GatewayService:
         _in_background(self._record_skills_usage(req.skills, auth, session_id=req.session_id))
         final_error_code = error_code or req.fallback_error_code
         latency_ms = int((time.perf_counter() - started) * 1000)
+        # The answer is whole, or as far as it went: what it used replaces what it reserved on the caps,
+        # once its row is written.
+        metered, source = _metered(
+            stats.usage if stats is not None else NO_USAGE, reached=req.decision is not None,
+            status_code=status_code, input_obj=_input_of(req.egress_payload or req.payload), answer=content,
+        )
         try:
             await self._audit_on_own_session(
                 request_id=request_id,
@@ -3896,9 +4033,8 @@ class GatewayService:
                 status_code=status_code,
                 latency_ms=latency_ms,
                 ttft_ms=stats.ttft_ms if stats is not None else None,
-                prompt_tokens=stats.usage.prompt_tokens if stats is not None else None,
-                completion_tokens=stats.usage.completion_tokens if stats is not None else None,
-                total_tokens=stats.usage.total_tokens if stats is not None else None,
+                **_usage_fields(metered, source),
+                estimated_tokens=req.estimated_tokens if req.admitted else 0,
                 error_code=final_error_code,
                 stream=True,
                 provider_name=(
@@ -3907,6 +4043,7 @@ class GatewayService:
                 ),
                 session_id=req.session_id or session_id,
                 group_id=req.group_id,
+                group_path=req.group_path,
                 project_id=req.project_id,
                 finish_reason=req.finish_reason,
                 retry_count=0,
@@ -3919,6 +4056,7 @@ class GatewayService:
             )
         except Exception:
             logger.warning("Failed to write the request log", exc_info=True)
+        await self._settle(req, metered)
         if req.trace_context is not None:
             try:
                 self.observability.finalize_stream(
@@ -4261,38 +4399,47 @@ def _require_model(payload: dict[str, Any]) -> str:
     return model
 
 
-async def _check_limits(
-    *,
-    limiter: RateLimiter,
-    tenant_id: str,
-    payload: dict[str, Any],
-    rpm_limit: int | None,
-    tpm_limit: int | None,
-) -> None:
-    rpm = await limiter.check_rpm(tenant_id=tenant_id, limit=rpm_limit)
-    if rpm and not rpm.allowed:
-        raise _rate_limited("Rate limit exceeded (RPM).", "rate_limit_rpm", rpm.retry_after_sec)
-    estimated_tokens = estimate_input_tokens(
-        payload.get("input") or payload.get("messages"),
-    )
-    tpm = await limiter.check_tpm(
-        tenant_id=tenant_id, tokens=estimated_tokens, limit=tpm_limit,
-    )
-    if tpm and not tpm.allowed:
-        raise _rate_limited("Rate limit exceeded (TPM).", "rate_limit_tpm", tpm.retry_after_sec)
+def _input_of(payload: dict[str, Any]) -> Any:
+    """What a request sends the model: its ``input`` or its ``messages``."""
+    return payload.get("input") or payload.get("messages")
 
 
-def _rate_limited(message: str, code: str, retry_after_sec: int) -> GatewayError:
-    """A 429 as OpenAI clients read it: ``rate_limit_error``, and when to retry.
+def _answer_text(payload: Any) -> str:
+    """A whole answer's text, for an estimate of its tokens when the model reported none."""
+    choices = (payload or {}).get("choices") if isinstance(payload, dict) else None
+    texts: list[str] = []
+    for choice in choices or []:
+        content = (choice.get("message") or {}).get("content") if isinstance(choice, dict) else None
+        if isinstance(content, str):
+            texts.append(content)
+        elif isinstance(content, list):
+            texts.extend(str(p.get("text", "")) for p in content if isinstance(p, dict))
+    return "".join(texts)
 
-    It said ``invalid_request_error`` with no ``Retry-After``, so clients that
-    back off on 429 guessed; the window's remaining seconds were computed and
-    dropped.
+
+def _metered(
+    usage: Usage, *, reached: bool, status_code: int, input_obj: Any, answer: str | None,
+) -> tuple[Usage, str | None]:
+    """The usage the log keeps for a request, and where it comes from (``usage_source``).
+
+    What the provider reported; for an answer the model gave without counts, the gateway's estimate
+    (four characters to a token); nothing for a request that was refused or did not reach a model.
     """
-    return GatewayError(
-        status_code=429,
-        message=message,
-        error_type="rate_limit_error",
-        code=code,
-        headers={"Retry-After": str(max(int(retry_after_sec), 1))},
-    )
+    if usage.reported:
+        return usage, "provider"
+    if reached and status_code < 400:
+        return estimated_usage(input_obj, answer), "estimated"
+    return usage, None
+
+
+def _usage_fields(usage: Usage, source: str | None) -> dict[str, Any]:
+    """The request log's token columns for *usage*."""
+    return {
+        "prompt_tokens": usage.prompt_tokens,
+        "completion_tokens": usage.completion_tokens,
+        "total_tokens": usage.total_tokens,
+        "cached_tokens": usage.cached_tokens,
+        "cache_write_tokens": usage.cache_write_tokens,
+        "reasoning_tokens": usage.reasoning_tokens,
+        "usage_source": source,
+    }
