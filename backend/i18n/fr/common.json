@@ -4636,6 +4636,8 @@
     "licence_missing": "Enterprise est installé mais n'a pas de licence : les fonctions Enterprise sont désactivées.",
     "licence_seats_over": "{{used}} comptes actifs pour {{seats}} places dans la licence. Rien n'est bloqué ; étendez la licence ou désactivez les comptes inutiles.",
     "mail_link_base_missing": "La messagerie est activée mais n'a pas d'adresse de la console pour ses liens, aucun e-mail ne part donc : indiquez-la dans Paramètres → Modules → Mailer → Frontend Base URL.",
+    "usage_purge_pending_one": "Les enregistrements de requêtes de plus de {{days}} jour seront supprimés à partir du {{date}}. Modifiez la durée de conservation sous Paramètres → Utilisation et confidentialité.",
+    "usage_purge_pending_other": "Les enregistrements de requêtes de plus de {{days}} jours seront supprimés à partir du {{date}}. Modifiez la durée de conservation sous Paramètres → Utilisation et confidentialité.",
     "unknown": "Un avis pour les administrateurs : {{code}}",
     "hide": "Masquer jusqu'à la fermeture du navigateur",
     "restriction_tool_mode_ceilings": "Les limites du mode des outils nécessitent Fadenstack Enterprise : jusqu'à son retour, les outils de chaque chat sont en lecture seule.",

@@ -4636,6 +4636,8 @@
     "licence_missing": "已安装 Enterprise，但没有许可证：Enterprise 功能已关闭。",
     "licence_seats_over": "有 {{used}} 个活跃账户，而许可证只有 {{seats}} 个席位。不会阻止任何操作；请扩展许可证或停用不需要的账户。",
     "mail_link_base_missing": "邮件已开启，但没有用于链接的控制台地址，因此不会发出任何邮件：请在 设置 → 模块 → Mailer → Frontend Base URL 中填写。",
+    "usage_purge_pending_one": "超过 {{days}} 天的请求记录将从 {{date}} 起删除。可在 设置 → 用量与隐私 中更改保留期限。",
+    "usage_purge_pending_other": "超过 {{days}} 天的请求记录将从 {{date}} 起删除。可在 设置 → 用量与隐私 中更改保留期限。",
     "unknown": "给管理员的提示：{{code}}",
     "hide": "隐藏，直到关闭浏览器",
     "restriction_tool_mode_ceilings": "工具模式限制需要 Fadenstack Enterprise：在其恢复之前，所有聊天中的工具都是只读的。",

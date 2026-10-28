@@ -4636,6 +4636,8 @@
     "licence_missing": "Enterprise ist installiert, hat aber keine Lizenz: Die Enterprise-Funktionen sind aus.",
     "licence_seats_over": "{{used}} aktive Konten bei {{seats}} Plätzen in der Lizenz. Gesperrt wird nichts; erweitern Sie die Lizenz oder schalten Sie nicht benötigte Konten ab.",
     "mail_link_base_missing": "Mail ist eingeschaltet, hat aber keine Konsolenadresse für ihre Links, daher geht keine Mail hinaus: Tragen Sie sie unter Einstellungen → Module → Mailer → Frontend Base URL ein.",
+    "usage_purge_pending_one": "Einträge im Anfrageprotokoll, die älter als {{days}} Tag sind, werden ab dem {{date}} gelöscht. Die Aufbewahrung ändern Sie unter Einstellungen → Nutzung und Datenschutz.",
+    "usage_purge_pending_other": "Einträge im Anfrageprotokoll, die älter als {{days}} Tage sind, werden ab dem {{date}} gelöscht. Die Aufbewahrung ändern Sie unter Einstellungen → Nutzung und Datenschutz.",
     "unknown": "Ein Hinweis für die Administration: {{code}}",
     "hide": "Ausblenden, bis der Browser geschlossen wird",
     "restriction_tool_mode_ceilings": "Grenzen für den Tool-Modus benötigen Fadenstack Enterprise: Bis es zurück ist, sind Tools in jedem Chat nur lesend.",

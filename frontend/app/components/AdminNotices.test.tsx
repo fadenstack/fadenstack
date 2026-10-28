@@ -26,6 +26,16 @@ describe("admin notices", () => {
     expect(screen.getByTestId("admin-notice-licence_seats_over")).toHaveTextContent("12 active accounts");
   });
 
+  it("says when old request records will be deleted, and where to change it", async () => {
+    list.mockResolvedValue([
+      { code: "usage_purge_pending", severity: "warning", params: { days: 90, date: "2026-11-04" } },
+    ]);
+    render(<AdminNotices isSuperuser />);
+    expect(await screen.findByTestId("admin-notice-usage_purge_pending")).toHaveTextContent(
+      "Request records older than 90 days will be deleted from Nov 4, 2026. Change the retention under Settings → Usage and privacy.",
+    );
+  });
+
   it("counts one day as one", async () => {
     list.mockResolvedValue([{ code: "licence_grace", severity: "error", params: { days: 1, date: "2026-11-20" } }]);
     render(<AdminNotices isSuperuser />);
