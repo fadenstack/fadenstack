@@ -51,7 +51,7 @@ async def configure(db: AsyncSession, backend: _Backend, name: str = "nc_actions
 
 
 @pytest.mark.anyio
-@pytest.mark.parametrize("name", ["nc_actions_undo", "nc_actions_redo", "nc_actions_reconcile"])
+@pytest.mark.parametrize("name", ["nc_actions_undo", "nc_actions_redo", "nc_actions_reconcile", "nc_actions_revalidate"])
 async def test_direct_command_is_individual_and_the_actor_is_authenticated(
     name: str, client: AsyncClient, db_session: AsyncSession, backend: _Backend,
 ) -> None:
