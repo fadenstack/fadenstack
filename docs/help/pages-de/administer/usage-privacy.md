@@ -119,7 +119,7 @@ und gibt das Ersuchen als Grund an (siehe [Die Zahlen einer Person ansehen](#loo
 
 ## Aufbewahrung und Löschung {#retention-and-erasure}
 
-Fadenstack löscht regelmäßig und von selbst, was seine Aufbewahrungsdauer überschritten hat: Einträge des
+Alle fünf Minuten löscht Fadenstack von selbst, was seine Aufbewahrungsdauer überschritten hat: Einträge des
 Anfrageprotokolls, die älter sind als **Anfrageprotokoll**, personenbezogene Zahlen, die älter sind als
 **Personenbezogene Zahlen**, stündliche und tägliche Zahlen, die älter sind als ihre Einstellung. Verkürzen Sie
 eine Dauer, wird beim nächsten Lauf gelöscht, was nun zu alt ist.
@@ -127,7 +127,7 @@ eine Dauer, wird beim nächsten Lauf gelöscht, was nun zu alt ist.
 | Ereignis | Was geschieht |
 |---|---|
 | Ein Konto wird gelöscht | Seine Einträge im Anfrageprotokoll und seine personenbezogenen Zahlen werden mit ihm gelöscht. Die Zahlen nach Team, Agent und Modell behalten seinen Anteil, ohne die Person. |
-| Das Upgrade auf diese Version | Der erste Lauf fasst das vorhandene Anfrageprotokoll zu stündlichen und täglichen Zahlen zusammen und löscht dann Einträge, die älter sind als die Einstellung **Anfrageprotokoll** (90 Tage, wenn nicht geändert). |
+| Das Upgrade auf diese Version | Der erste Lauf fasst das vorhandene Anfrageprotokoll zu stündlichen und täglichen Zahlen zusammen. Danach wird sieben Tage lang nichts gelöscht: Ein Hinweis über den Seiten der Konsole nennt das Datum, ab dem Einträge gelöscht werden, die älter sind als ihre Aufbewahrungsdauer, sodass Sie die Dauern vorher ändern können. Dann beginnt das Löschen, mit der Einstellung **Anfrageprotokoll** (90 Tage, wenn nicht geändert) und den übrigen. |
 | Die Minute oder der Tag eines Limits endet | Seine Zählung ist weg: Die Limits bewahren keinen Verlauf auf. |
 
 ??? info "Was nicht mit den Zahlen gelöscht wird"

@@ -106,14 +106,14 @@ sign in, a usage auditor downloads the same for them, giving the request as the 
 
 ## Retention and erasure
 
-Fadenstack regularly deletes, by itself, what has outlived its setting: request records older than
+Every five minutes, Fadenstack deletes by itself what has outlived its setting: request records older than
 **Request log**, person-level figures older than **Person-level figures**, hourly and daily figures older than
 theirs. Shortening a period deletes what is now too old at the next run.
 
 | Event | What happens |
 |---|---|
 | An account is deleted | Its request records and its person-level figures are erased with it. The figures by team, agent and model keep its share, without the person. |
-| The upgrade to this release | The first run adds the existing request log up into hourly and daily figures, then deletes request records older than the **Request log** setting (90 days unless changed). |
+| The upgrade to this release | The first run adds the existing request log up into hourly and daily figures. For seven days after that, nothing is deleted: a notice above the console's pages says from which date records older than their period will be deleted, so you can change the periods first. Then deletion starts, with the **Request log** setting (90 days unless changed) and the others. |
 | A limit's minute or day ends | Its count is gone: the limits keep no history. |
 
 ??? info "What is not deleted with the figures"
