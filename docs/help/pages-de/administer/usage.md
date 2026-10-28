@@ -124,10 +124,9 @@ Zeitraum.
 
 **CSV exportieren** lädt die Anfragen des Zeitraums (bis zu 5.000 Zeilen) für eine Tabellenkalkulation herunter.
 
-Wer eine Anfrage gesendet hat, zeigen die Anfragen nur Nutzungsprüfern (Rolle `usage_auditor`), und nur,
-solange die personenbezogene Auswertung eingeschaltet ist; jede solche Einsicht wird im Audit-Protokoll
-festgehalten (siehe [Nutzung und Datenschutz](usage-privacy.md#looking-at-one-persons-figures)). Alle anderen
-sehen die Anfragen ohne die Person, in der Liste, in den Details und im Export.
+Die Anfragen zeigen nie, wer sie gesendet hat: weder in der Liste noch in den Details oder im Export, und auch
+nicht unter **LLM-Aufrufe**. Die Nutzung einer einzelnen Person zeigt nur die personenbezogene Auswertung unter
+**Nutzung** (siehe [Nutzung und Datenschutz](usage-privacy.md#looking-at-one-persons-figures)).
 
 ## Limits für die ganze Instanz {#limits-for-the-whole-instance}
 

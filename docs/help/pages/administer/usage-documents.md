@@ -59,8 +59,8 @@ while person-level reporting is off; add the second before you switch it on.
 >
 > **Who sees what.** You see your own usage under **My usage** on the platform, and can download it. The
 > administrators [positions] see totals for teams, agents and models only where at least [5] people are behind a
-> figure. To find the cause of a failure, they can look up the record of a single request. Nobody evaluates your
-> individual usage.
+> figure. The request records they use to find the cause of a failure do not show who sent a request. Nobody
+> evaluates your individual usage.
 >
 > **How long.** Request records [90] days; your daily figures [90] days; figures without persons [90] days by the
 > hour and [25] months by the day. When your account is deleted, your records and daily figures are erased with
@@ -270,8 +270,8 @@ can still be taken into account (§ 90(2) BetrVG).
 > models, without persons; per day for each person.
 >
 > **Who sees what.** Every employee sees their own figures. Administrators see totals only where at least [5]
-> people are behind a figure; to trace failures they can look up single requests. Nobody sees rankings or
-> comparisons of people. [Planned: [number] named persons may look at individual figures for [reasons], each time
+> people are behind a figure; the request records they use to trace failures do not show who sent a request.
+> Nobody sees rankings or comparisons of people. [Planned: [number] named persons may look at individual figures for [reasons], each time
 > with a reason, recorded.]
 >
 > **Limits.** [None / requests per minute [ ], tokens per minute [ ], tokens per day [ ]] for the whole platform.

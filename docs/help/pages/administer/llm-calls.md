@@ -37,8 +37,8 @@ Select the arrow in front of a request to see its rounds.
 
 1. Pick a time range at the top: **15m** to **30d**.
 2. Narrow the list: **All models** for one model, **Errors** or **Succeeded** for the outcome, or type in the
-   search box. The search finds a call by its request, trace, session, conversation, user or agent id, and by
-   part of a model name or error code.
+   search box. The search finds a call by its request, trace, session, conversation or agent id, and by part of
+   a model name or error code.
 3. Sort by **Time**, **Duration** or **Tokens** with the column headers.
 
 **Live** brings in new calls every few seconds while you look at the first page; select it again to pause.
@@ -64,8 +64,8 @@ the `j` and `k` keys, to go to the next or the previous one, and `Esc` to close 
 
 ![The Request timeline of an agent's request: nine rounds, each followed by the approval and the tool run the model asked for](../images/administer/llm-calls-request-timeline.png)
 
-**Details** lists every recorded field, with a button to filter the list by the call's model, user or
-conversation. **JSON** shows the record as it is, to copy into a bug report.
+**Details** lists every recorded field but the person, with a button to filter the list by the call's model
+or conversation. **JSON** shows the record as it is, to copy into a bug report.
 
 ??? info "Where the app's tools come from"
     An agent's tools run in its app, on the person's computer, not on the server. The app reports which tools
@@ -111,6 +111,10 @@ For each call the gateway keeps who sent it, which model answered and where, the
 outcome and the estimated cost; for an agent, also its conversation and request. The text of the request and
 of the answer is not kept, and neither is what a tool read or wrote. The figures here are the same as on
 [Usage and limits](usage.md).
+
+This page never shows who sent a call, and does not find calls by person. One person's usage is shown only in
+the person-level view on **Usage**, to a usage auditor, with a reason, and recorded (see
+[Usage and privacy](usage-privacy.md#looking-at-one-persons-figures)).
 
 ## When it does not work
 

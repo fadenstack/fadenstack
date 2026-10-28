@@ -65,8 +65,8 @@ Sie sie einschalten.
 >
 > **Wer was sieht.** Sie sehen Ihre eigene Nutzung auf der Plattform unter **Meine Nutzung** und können sie
 > herunterladen. Die Administratoren [Funktionen] sehen Summen für Teams, Agenten und Modelle nur dort, wo
-> mindestens [5] Personen hinter einer Zahl stehen. Um die Ursache eines Fehlers zu finden, können sie den Eintrag
-> einer einzelnen Anfrage aufrufen. Niemand wertet Ihre persönliche Nutzung aus.
+> mindestens [5] Personen hinter einer Zahl stehen. Die Einträge zu Anfragen, mit denen sie die Ursache eines
+> Fehlers suchen, zeigen nicht, wer eine Anfrage gesendet hat. Niemand wertet Ihre persönliche Nutzung aus.
 >
 > **Speicherdauer.** Einträge zu Anfragen [90] Tage; Ihre täglichen Zahlen [90] Tage; Zahlen ohne Personenbezug
 > [90] Tage pro Stunde und [25] Monate pro Tag. Wird Ihr Konto gelöscht, werden Ihre Einträge und täglichen Zahlen
@@ -291,8 +291,9 @@ noch berücksichtigt werden können (§ 90 Abs. 2 BetrVG).
 > Agenten und Modelle, ohne Personen; pro Tag für jede Person.
 >
 > **Wer was sieht.** Alle Beschäftigten sehen ihre eigenen Zahlen. Administratoren sehen Summen nur dort, wo
-> mindestens [5] Personen hinter einer Zahl stehen; um Fehler nachzuverfolgen, können sie einzelne Anfragen
-> aufrufen. Niemand sieht Rangfolgen oder Vergleiche von Personen. [Geplant: [Anzahl] benannte Personen dürfen
+> mindestens [5] Personen hinter einer Zahl stehen; die Einträge zu Anfragen, mit denen sie Fehler
+> nachverfolgen, zeigen nicht, wer eine Anfrage gesendet hat. Niemand sieht Rangfolgen oder Vergleiche von
+> Personen. [Geplant: [Anzahl] benannte Personen dürfen
 > persönliche Zahlen aus [Gründe] ansehen, jedes Mal mit Begründung, aufgezeichnet.]
 >
 > **Limits.** [Keine / Anfragen pro Minute [ ], Tokens pro Minute [ ], Tokens pro Tag [ ]] für die gesamte

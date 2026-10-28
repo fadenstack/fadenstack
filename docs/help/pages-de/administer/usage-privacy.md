@@ -21,6 +21,8 @@ Nach der Installation, und solange Sie keine Einstellung ändern:
 - **Niemand sieht die Nutzungszahlen einer anderen Person.** Die personenbezogene Auswertung ist aus. Die Seite
   **Nutzung** zeigt Teams, Agenten, Modelle und Provider nur dort, wo mindestens fünf Personen hinter einer Zahl
   stehen (siehe [Die Mindestgruppengröße](usage.md#the-minimum-group-size)).
+- **Keine Seite listet Anfragen nach Person.** **Kosten-Observability** und **LLM-Aufrufe** zeigen nie, wer eine
+  Anfrage gesendet hat, und finden Anfragen nicht nach Person.
 - **Jede Person sieht ihre eigenen**, unter **Meine Nutzung**, und kann sie herunterladen.
 - **Nichts stellt Personen in eine Rangfolge oder vergleicht sie**: keine Top-Benutzer, keine Bestenlisten,
   keine Punktwerte.
@@ -40,7 +42,7 @@ Minuten; nichts wird neu gestartet.
 
 | Einstellung | Voreinstellung | Bereich | Was eine Änderung bedeutet |
 |---|---|---|---|
-| **Personenbezogene Auswertung** (`usage.person_reporting`) | Aus | Aus, ein | Ein: Personen mit der Rolle `usage_auditor` können die Zahlen einer Person oder eines Teams pro Person ansehen, jedes Mal mit Begründung (siehe [Die Zahlen einer Person ansehen](#looking-at-one-persons-figures)), und sehen auf den Kostenseiten, wer jede Anfrage gesendet hat. **Meine Nutzung** sagt das dann allen. Das ist eine Auswertung von Beschäftigtendaten pro Person: Sie unterliegt der Mitbestimmung des Betriebsrats (§ 87 Abs. 1 Nr. 6 BetrVG); vereinbaren Sie sie also, bevor Sie sie einschalten. Gehen Sie davon aus, dass eine Datenschutz-Folgenabschätzung nötig ist, und informieren Sie die Beschäftigten (die Fassung für die personenbezogene Auswertung unter [Unterlagen](usage-documents.md#employee-notice)). |
+| **Personenbezogene Auswertung** (`usage.person_reporting`) | Aus | Aus, ein | Ein: Personen mit der Rolle `usage_auditor` können die Zahlen einer Person oder eines Teams pro Person ansehen, jedes Mal mit Begründung (siehe [Die Zahlen einer Person ansehen](#looking-at-one-persons-figures)). **Meine Nutzung** sagt das dann allen. Das ist eine Auswertung von Beschäftigtendaten pro Person: Sie unterliegt der Mitbestimmung des Betriebsrats (§ 87 Abs. 1 Nr. 6 BetrVG); vereinbaren Sie sie also, bevor Sie sie einschalten. Gehen Sie davon aus, dass eine Datenschutz-Folgenabschätzung nötig ist, und informieren Sie die Beschäftigten (die Fassung für die personenbezogene Auswertung unter [Unterlagen](usage-documents.md#employee-notice)). |
 | **Mindestgruppengröße** (`usage.min_group_size`) | 5 | 5 bis 50 | Jede Zahl unter **Nutzung** umfasst mindestens so viele Personen. Erhöhen Sie sie, wenn Ihre Betriebsvereinbarung mehr verlangt; unter 5 geht es nicht. Je höher sie ist, desto mehr Teams, Agenten und Tage erscheinen nur in der Sammelzeile „weniger als …“. |
 | **Granularität personenbezogener Zahlen** (`usage.person_granularity`) | Tag | Tag, Monat | Wie fein die personenbezogene Auswertung die Zahlen einer Person zeigt. Monat lässt weniger darauf schließen, wie jemand arbeitet. Feiner geht es nicht: Stündliche Zahlen einer Person gibt es nicht. |
 | **Anfrageprotokoll** (`usage.request_log_retention_days`) | 90 Tage | 7 bis 365 Tage | Wie lange der Eintrag jeder Anfrage aufbewahrt wird: die Person, die Zeit auf die Sekunde, das Modell, die Tokens und bei Agenten das Gerät. Bewahren Sie ihn nur aus einem Grund länger auf, den Sie benennen können, etwa der Aufklärung von Sicherheitsvorfällen, und halten Sie den Grund schriftlich fest. |
@@ -57,8 +59,9 @@ Minuten; nichts wird neu gestartet.
 
 ## Die Zahlen einer Person ansehen {#looking-at-one-persons-figures}
 
-Die Zahlen einer einzelnen Person sieht nur, wer die Rolle `usage_auditor` hat, und nur, solange
-**Personenbezogene Auswertung** eingeschaltet ist. Die Rolle ist eingebaut, bei der Installation hat sie niemand,
+Die Zahlen einer einzelnen Person sieht nur, wer die Rolle `usage_auditor` hat, nur, solange **Personenbezogene
+Auswertung** eingeschaltet ist, und nur in der personenbezogenen Auswertung unter **Nutzung**: Keine andere Seite
+der Konsole zeigt sie. Die Rolle ist eingebaut, bei der Installation hat sie niemand,
 und ein Superuser hat sie nicht von selbst: Ein Administrator, der personenbezogene Zahlen ansehen soll, braucht
 die Rolle ebenfalls.
 
@@ -78,9 +81,7 @@ Ein Nutzungsprüfer findet die personenbezogene Auswertung dann unter **Observab
 
 Jede Einsicht wird im Audit-Protokoll festgehalten (`usage.people.view`): wer hineingesehen hat, in wessen
 Zahlen, für welchen Zeitraum und mit welchem Grund. Die Person sieht in ihrem Download Datum und Grund jeder
-Einsicht in ihre Zahlen, aber nicht, wer hineingesehen hat; **Meine Nutzung** zeigt, wie viele es waren. Solange
-die personenbezogene Auswertung eingeschaltet ist, sehen Nutzungsprüfer außerdem unter **Kosten-Observability →
-Anfragen** und in deren CSV-Export, wer jede Anfrage gesendet hat; auch das wird so festgehalten.
+Einsicht in ihre Zahlen, aber nicht, wer hineingesehen hat; **Meine Nutzung** zeigt, wie viele es waren.
 
 ??? info "Wer die Aufzeichnung prüft"
     Die eingebaute Rolle `auditor` liest das Audit-Protokoll und die Seite **Nutzung** und ändert nichts: eine
@@ -137,7 +138,7 @@ Aufbewahrt 90 Tage (**Anfrageprotokoll**, `usage.request_log_retention_days`); g
 
 | Felder | Wozu | Wer sie sieht |
 |---|---|---|
-| `user_id` | Die Person, die die Anfrage gesendet hat: ihre Konto-ID, nicht ihr Name oder ihre E-Mail-Adresse | Die Person, in ihrem Download. Administratoren, bei jedem Aufruf unter **LLM-Aufrufe**, um einen Fehler nachzuverfolgen. Auf den Kostenseiten nur Nutzungsprüfer, solange die personenbezogene Auswertung eingeschaltet ist |
+| `user_id` | Die Person, die die Anfrage gesendet hat: ihre Konto-ID, nicht ihr Name oder ihre E-Mail-Adresse | Die Person, in ihrem Download. Nutzungsprüfer, in der personenbezogenen Auswertung, solange sie eingeschaltet ist. Keine andere Seite zeigt sie, auch nicht **Kosten-Observability** und **LLM-Aufrufe** |
 | `group_id`, `project_id`, `agent_id` | Die Nutzungsgruppe (das Team) der Person, das Chat-Projekt, der Agent | Administratoren unter **LLM-Aufrufe**; in Summen unter **Nutzung**; die Person (Projekt, Agent) |
 | `device_id`, `session_id`, `conversation_id`, `turn_id` | Verbinden die Anfrage eines Agenten mit seiner Anmeldung auf einem Gerät und mit seiner Unterhaltung | Administratoren unter **LLM-Aufrufe**. Nie in den Zahlen oder im Download |
 | `request_id`, `trace_id`, `tenant_id`, `endpoint`, `stream` | Eine Anfrage finden und wie sie gestellt wurde | Administratoren |
@@ -176,8 +177,6 @@ sieht Datum und Grund der Einsichten in ihre eigenen Zahlen.
     Sie dienen dem Betrieb und der Sicherheit des Dienstes; sie gehören nicht zu den Nutzungszahlen, und die
     Einstellungen auf dieser Seite ändern sie nicht. Nennen Sie sie in Ihrer Vereinbarung ebenfalls.
 
-    - **LLM-Aufrufe** zeigt bei jedem Aufruf die Konto-ID und findet Aufrufe danach (siehe
-      [LLM-Aufrufe](llm-calls.md)).
     - Der Reiter **Aktivität** eines Agenten nennt, wer sich auf welchem Gerät beim Agenten angemeldet hat, und
       listet, was die Anwendungen gemeldet haben, etwa ausgeführte Tools und erteilte Freigaben. Seine Zahlen zu
       Anfragen und Tokens gelten pro Agent, auch für einen Agenten, den nur eine Person nutzt (siehe

@@ -19,6 +19,8 @@ As installed, and until you change a setting:
 - **Nobody sees another person's usage figures.** Person-level reporting is off. The **Usage** page shows teams,
   agents, models and providers only where at least five people are behind a figure (see
   [The minimum group size](usage.md#the-minimum-group-size)).
+- **No page lists requests by person.** **Cost Observability** and **LLM Calls** never show who sent a request,
+  and do not find requests by person.
 - **Everyone sees their own**, under **My usage**, and can download it.
 - **Nothing ranks or compares people**: no top users, no leaderboards, no scores.
 - **Person-level figures are kept per day at most, for 90 days.** The request log they come from is kept for 90
@@ -34,7 +36,7 @@ when. A change applies within minutes; nothing restarts.
 
 | Setting | Default | Range | What changing it means |
 |---|---|---|---|
-| **Person-level reporting** (`usage.person_reporting`) | Off | Off, on | On: people with the role `usage_auditor` can look at one person's or one team's figures per person, giving a reason each time (see [Looking at one person's figures](#looking-at-one-persons-figures)), and see who sent each request on the cost pages. Everyone's **My usage** then says so. This is an evaluation of employee data per person: in Germany it is co-determined by the works council (§ 87(1) no. 6 BetrVG), so agree it before switching it on; assume a data protection impact assessment is needed; and tell employees (the person-level notice on [Documents](usage-documents.md#employee-notice)). |
+| **Person-level reporting** (`usage.person_reporting`) | Off | Off, on | On: people with the role `usage_auditor` can look at one person's or one team's figures per person, giving a reason each time (see [Looking at one person's figures](#looking-at-one-persons-figures)). Everyone's **My usage** then says so. This is an evaluation of employee data per person: in Germany it is co-determined by the works council (§ 87(1) no. 6 BetrVG), so agree it before switching it on; assume a data protection impact assessment is needed; and tell employees (the person-level notice on [Documents](usage-documents.md#employee-notice)). |
 | **Minimum group size** (`usage.min_group_size`) | 5 | 5 to 50 | Every figure on **Usage** covers at least this many people. Raise it if your works agreement asks for more; it cannot go below 5. The higher it is, the more teams, agents and days are shown only in the "fewer than" row. |
 | **Person-level granularity** (`usage.person_granularity`) | Day | Day, month | How finely the person-level view shows a person's figures. Month shows less of how someone works. There is no finer setting: no person's figures exist by the hour. |
 | **Request log** (`usage.request_log_retention_days`) | 90 days | 7 to 365 days | How long each request's record is kept: the person, the time to the second, the model, the tokens and, for agents, the device. Keep it longer only for a reason you can name, such as investigating security incidents, and write that reason down. |
@@ -51,7 +53,8 @@ when. A change applies within minutes; nothing restarts.
 ## Looking at one person's figures
 
 Only someone with the role `usage_auditor`, and only while **Person-level reporting** is on, sees one person's
-figures. The role is built in, nobody holds it at installation, and being a superuser does not give it: an
+figures, and only in the person-level view on **Usage**: no other page in the console shows them. The role is
+built in, nobody holds it at installation, and being a superuser does not give it: an
 administrator who is to look at person-level figures needs the role too.
 
 1. Agree who may look, and for which reasons, with your DPO and works council. Typical reasons: a dispute about
@@ -68,9 +71,7 @@ A usage auditor then finds the person-level view on **Observability → Usage**:
 
 Every look is recorded in the audit log (`usage.people.view`): who looked, at whose figures, which range, and the
 reason. The person sees, in their download, the date and the reason of each look at their figures, but not who
-looked; **My usage** shows how many there were. While person-level reporting is on, usage auditors also see who
-sent each request under **Cost Observability → Requests** and in its CSV export, and that is recorded the same
-way.
+looked; **My usage** shows how many there were.
 
 ??? info "Who checks the record"
     The built-in role `auditor` reads the audit log and the **Usage** page, and changes nothing: a fitting role for
@@ -121,7 +122,7 @@ days (**Request log**, `usage.request_log_retention_days`); erased with the acco
 
 | Fields | What for | Who sees them |
 |---|---|---|
-| `user_id` | The person who sent the request: their account id, not their name or e-mail | The person, in their download. Administrators, with each call on **LLM Calls**, to trace a failure. On the cost pages only usage auditors while person-level reporting is on |
+| `user_id` | The person who sent the request: their account id, not their name or e-mail | The person, in their download. Usage auditors, in the person-level view while person-level reporting is on. No other page shows it, **Cost Observability** and **LLM Calls** included |
 | `group_id`, `project_id`, `agent_id` | The person's usage group (team), the chat project, the agent | Administrators on **LLM Calls**; in sums on **Usage**; the person (project, agent) |
 | `device_id`, `session_id`, `conversation_id`, `turn_id` | Tie an agent's request to its sign-in on a device and to its conversation | Administrators on **LLM Calls**. Never in the figures or the download |
 | `request_id`, `trace_id`, `tenant_id`, `endpoint`, `stream` | Find a request and how it was asked | Administrators |
@@ -158,7 +159,6 @@ administrators and auditors; the person sees the date and reason of the looks at
     These serve running and securing the service; they are not part of the usage figures, and the settings on this
     page do not change them. Name them in your agreement too.
 
-    - **LLM Calls** shows the account id with each call, and finds calls by it (see [LLM calls](llm-calls.md)).
     - An agent's **Activity** tab names who signed in to the agent on which device, and lists what the
       applications reported, such as tools that ran and approvals given. Its request and token counts are per
       agent, also for an agent only one person uses (see [Agents and add-ins](agents.md)).

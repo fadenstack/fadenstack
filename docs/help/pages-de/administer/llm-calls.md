@@ -40,7 +40,7 @@ Wählen Sie den Pfeil vor einer Anfrage, um ihre Runden zu sehen.
 1. Wählen Sie oben einen Zeitraum: **15 Min** bis **30 Tage**.
 2. Grenzen Sie die Liste ein: **Alle Modelle** für ein Modell, **Fehler** oder **Erfolgreich** für das
    Ergebnis, oder tippen Sie ins Suchfeld. Die Suche findet einen Aufruf an seiner Anfrage-, Trace-, Sitzungs-,
-   Unterhaltungs-, Benutzer- oder Agenten-ID und an einem Teil des Modellnamens oder Fehlercodes.
+   Unterhaltungs- oder Agenten-ID und an einem Teil des Modellnamens oder Fehlercodes.
 3. Sortieren Sie mit den Spaltenköpfen nach **Zeit**, **Dauer** oder **Tokens**.
 
 **Live** holt alle paar Sekunden neue Aufrufe, solange Sie die erste Seite ansehen; wählen Sie es erneut, um
@@ -69,7 +69,7 @@ unten). Dann:
 
 ![Der Zeitverlauf einer Anfrage eines Agenten: neun Runden, nach jeder die Freigabe und die Tool-Ausführung, um die das Modell bat](../images/administer/llm-calls-request-timeline.png)
 
-**Details** listet jedes erfasste Feld, mit einer Schaltfläche, um die Liste nach Modell, Benutzer oder
+**Details** listet jedes erfasste Feld außer der Person, mit einer Schaltfläche, um die Liste nach Modell oder
 Unterhaltung des Aufrufs zu filtern. **JSON** zeigt den Datensatz, wie er ist, zum Kopieren in eine
 Fehlermeldung.
 
@@ -117,6 +117,10 @@ Zu jedem Aufruf hält das Gateway fest, wer ihn schickte, welches Modell wo antw
 das Ergebnis und die geschätzten Kosten; bei einem Agenten auch seine Unterhaltung und Anfrage. Der Text der
 Anfrage und der Antwort wird nicht gespeichert, ebenso wenig, was ein Tool las oder schrieb. Die Zahlen hier
 sind dieselben wie unter [Nutzung und Limits](usage.md).
+
+Diese Seite zeigt nie, wer einen Aufruf geschickt hat, und findet Aufrufe nicht nach Person. Die Nutzung einer
+einzelnen Person zeigt nur die personenbezogene Auswertung unter **Nutzung**, einem Nutzungsprüfer, mit
+Begründung und aufgezeichnet (siehe [Nutzung und Datenschutz](usage-privacy.md#looking-at-one-persons-figures)).
 
 ## Wenn es nicht funktioniert {#when-it-does-not-work}
 

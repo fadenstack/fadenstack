@@ -30,7 +30,7 @@ Fadenstack keeps your chats until they are deleted. See [Deleting](#deleting).
 |---|---|
 | You | Your chats, projects, files and skills |
 | Colleagues | None of your chats or files. Skills you share with them. The organisation's knowledge base is shared by everyone |
-| Administrators, in the console | That a chat, a project or a file exists (who, when), not its title, name or content. The sizes and types of your files. Usage in totals for groups, not yours alone, and the record of a single request when they trace a failure (see [Your usage](#your-usage)). Which tools ran and the kind of a failure, not what the tool answered. How often personal data was found, not the data itself. Every skill, including private ones. What they look at in the console is recorded in the audit log |
+| Administrators, in the console | That a chat, a project or a file exists (who, when), not its title, name or content. The sizes and types of your files. Usage in totals for groups, never yours alone; the requests they look at do not name who sent them (see [Your usage](#your-usage)). Which tools ran and the kind of a failure, not what the tool answered. How often personal data was found, not the data itself. Every skill, including private ones. What they look at in the console is recorded in the audit log |
 
 The console does not show administrators your conversations. The people who run the server do hold the key the chats are encrypted with, so use the chat as you would your organisation's e-mail: private from colleagues, but within your organisation's IT.
 
@@ -85,7 +85,7 @@ The model list does not always show where a model runs. If it matters for what y
 **My usage**, in the menu behind your account button, shows how much you used: your tokens and estimated cost by day or month, by model, agent and project, and the limits that apply to everyone. **Download** gives you your data as JSON or CSV: your daily figures, your request records (time, model, tokens, cost, outcome; never what you wrote) and when someone looked at your figures, and why.
 
 - **You** see your own figures.
-- **Administrators** see totals for groups of at least five people, never your figures alone. To find out why a request failed, they can look up its record, which names your account.
+- **Administrators** see totals for groups of at least five people, never your figures alone. When they look into a failed request, its record does not show who sent it.
 - **If your organisation has switched on person-level reporting**, **My usage** says so. A few named people may then look at your figures, by day or by month, each time giving a reason. **My usage** shows how often that happened; your download shows the date and the reason of each look, not who looked.
 
 Your figures are kept for the time **My usage** names (90 days unless your organisation chose otherwise), and are erased when your account is deleted. Your organisation uses them for costs and capacity, not to judge your work. See [Usage and privacy](../administer/usage-privacy.md).

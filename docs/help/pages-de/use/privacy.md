@@ -30,7 +30,7 @@ Fadenstack bewahrt Ihre Chats auf, bis sie gelöscht werden. Siehe [Löschen](#d
 |---|---|
 | Sie | Ihre Chats, Projekte, Dateien und Skills |
 | Kolleginnen und Kollegen | Keinen Ihrer Chats und keine Ihrer Dateien. Skills, die Sie mit ihnen teilen. Die Wissensdatenbank der Organisation teilen sich alle |
-| Administratoren, in der Konsole | Dass ein Chat, ein Projekt oder eine Datei existiert (wer, wann), nicht Titel, Namen oder Inhalt. Größen und Typen Ihrer Dateien. Die Nutzung in Summen für Gruppen, nicht Ihre allein, und den Eintrag einer einzelnen Anfrage, wenn sie einen Fehler nachverfolgen (siehe [Ihre Nutzung](#your-usage)). Welche Tools liefen und die Art eines Fehlers, nicht die Antwort des Tools. Wie oft personenbezogene Daten gefunden wurden, nicht die Daten selbst. Jeden Skill, auch private. Was sie sich in der Konsole ansehen, wird im Audit-Protokoll festgehalten |
+| Administratoren, in der Konsole | Dass ein Chat, ein Projekt oder eine Datei existiert (wer, wann), nicht Titel, Namen oder Inhalt. Größen und Typen Ihrer Dateien. Die Nutzung in Summen für Gruppen, nie Ihre allein; die Anfragen, die sie ansehen, nennen nicht, wer sie gesendet hat (siehe [Ihre Nutzung](#your-usage)). Welche Tools liefen und die Art eines Fehlers, nicht die Antwort des Tools. Wie oft personenbezogene Daten gefunden wurden, nicht die Daten selbst. Jeden Skill, auch private. Was sie sich in der Konsole ansehen, wird im Audit-Protokoll festgehalten |
 
 Die Konsole zeigt Administratoren Ihre Unterhaltungen nicht. Die Personen, die den Server betreiben, haben jedoch den Schlüssel, mit dem die Chats verschlüsselt sind. Nutzen Sie den Chat deshalb wie die E-Mail Ihrer Organisation: privat gegenüber Kolleginnen und Kollegen, aber innerhalb der IT Ihrer Organisation.
 
@@ -85,7 +85,7 @@ Die Modellliste zeigt nicht immer, wo ein Modell läuft. Wenn das für das, was 
 **Meine Nutzung**, im Menü hinter Ihrer Konto-Schaltfläche, zeigt, wie viel Sie genutzt haben: Ihre Tokens und geschätzten Kosten nach Tag oder Monat, nach Modell, Agent und Projekt, und die Limits, die für alle gelten. **Download** liefert Ihnen Ihre Daten als JSON oder CSV: Ihre täglichen Zahlen, Ihre Einträge zu Anfragen (Zeit, Modell, Tokens, Kosten, Ergebnis; nie, was Sie geschrieben haben) und wann jemand Ihre Zahlen angesehen hat und warum.
 
 - **Sie** sehen Ihre eigenen Zahlen.
-- **Administratoren** sehen Summen für Gruppen von mindestens fünf Personen, nie Ihre Zahlen allein. Um herauszufinden, warum eine Anfrage fehlgeschlagen ist, können sie deren Eintrag aufrufen, der Ihr Konto nennt.
+- **Administratoren** sehen Summen für Gruppen von mindestens fünf Personen, nie Ihre Zahlen allein. Gehen sie einer fehlgeschlagenen Anfrage nach, zeigt deren Eintrag nicht, wer sie gesendet hat.
 - **Hat Ihre Organisation die personenbezogene Auswertung eingeschaltet**, steht das unter **Meine Nutzung**. Dann dürfen einige benannte Personen Ihre Zahlen ansehen, nach Tag oder nach Monat, jedes Mal mit Begründung. **Meine Nutzung** zeigt, wie oft das geschah; Ihr Download zeigt Datum und Grund jeder Einsicht, nicht, wer hineingesehen hat.
 
 Ihre Zahlen werden so lange aufbewahrt, wie **Meine Nutzung** angibt (90 Tage, wenn Ihre Organisation nichts anderes gewählt hat), und mit Ihrem Konto gelöscht. Ihre Organisation verwendet sie für Kosten und Kapazität, nicht, um Ihre Arbeit zu beurteilen. Siehe [Nutzung und Datenschutz](../administer/usage-privacy.md).

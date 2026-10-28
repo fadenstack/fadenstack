@@ -117,10 +117,9 @@ Open **Observability → Cost Dashboard** (the page is titled **Cost Observabili
 
 **Export CSV** downloads the requests of the range (up to 5,000 rows) for a spreadsheet.
 
-The requests show who sent them only to a usage auditor (the role `usage_auditor`), and only while person-level
-reporting is on; each
-such look is recorded in the audit log (see [Usage and privacy](usage-privacy.md#looking-at-one-persons-figures)).
-Everyone else sees the requests without the person, in the list, the details and the export.
+The requests never show who sent them: not in the list, the details or the export, and not on **LLM Calls**
+either. One person's usage is shown only in the person-level view on **Usage** (see
+[Usage and privacy](usage-privacy.md#looking-at-one-persons-figures)).
 
 ## Limits for the whole instance
 
