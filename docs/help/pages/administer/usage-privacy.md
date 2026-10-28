@@ -133,6 +133,7 @@ days (**Request log**, `usage.request_log_retention_days`); erased with the acco
 |---|---|---|
 | `user_id` | The person who sent the request: their account id, not their name or e-mail | The person, in their download. Usage auditors, in the person-level view while person-level reporting is on, and in a download they take for one person. No other page shows it, **Cost Observability** and **LLM Calls** included |
 | `group_id`, `project_id`, `agent_id` | The person's usage group (team), the chat project, the agent | Administrators on **LLM Calls**; in sums on **Usage**; the person (project, agent) |
+| `group_path` | The usage team's position in the team tree at the time of use | Administrators; in sums on **Usage** |
 | `device_id`, `session_id`, `conversation_id`, `turn_id` | Tie an agent's request to its sign-in on a device and to its conversation | Administrators on **LLM Calls**. Never in the figures or the download |
 | `request_id`, `trace_id`, `tenant_id`, `endpoint`, `stream` | Find a request and how it was asked | Administrators |
 | `model_alias`, `provider_instance_id` | Which model answered and where it ran | Administrators; in sums; the person (model) |
@@ -151,9 +152,9 @@ days (**Request log**, `usage.request_log_retention_days`); erased with the acco
 
 | Table | One row per | Also holds | Kept (setting) | Who sees it |
 |---|---|---|---|---|
-| `usage_hourly` | Hour (UTC), team, agent, model, provider and currency | `people`: how many people are behind the row. No person, no project, no device | 90 days (`usage.hourly_retention_days`) | Administrators and auditors (`usage:read`) on **Usage**, only hours of at least five people |
-| `usage_daily` | Day (usage time zone), team, agent, model, provider and currency | `people`. No person, no project, no device | 25 months (`usage.daily_retention_months`) | Administrators and auditors on **Usage**, under the minimum group size |
-| `usage_daily_person` | Day, person, team, project, agent, model and currency | No device, no time of day | 90 days (`usage.person_retention_days`); erased with the account | The person, on **My usage** and in the download. Usage auditors while person-level reporting is on, by day or month (`usage.person_granularity`), and in a download they take for one person |
+| `usage_hourly` | Hour (UTC), team, agent, model, provider and currency | `people`: how many people are behind the row. `group_path`: the usage team's position in the team tree at the time of use. No person, no project, no device | 90 days (`usage.hourly_retention_days`) | Administrators and auditors (`usage:read`) on **Usage**, only hours of at least five people |
+| `usage_daily` | Day (usage time zone), team, agent, model, provider and currency | `people`, `group_path`. No person, no project, no device | 25 months (`usage.daily_retention_months`) | Administrators and auditors on **Usage**, under the minimum group size |
+| `usage_daily_person` | Day, person, team, project, agent, model and currency | `group_path`. No device, no time of day | 90 days (`usage.person_retention_days`); erased with the account | The person, on **My usage** and in the download. Usage auditors while person-level reporting is on, by day or month (`usage.person_granularity`), and in a download they take for one person |
 | `usage_rollup_state` | One row in all | How far the figures are added up, and when they were last added up and deleted. No personal data | Kept | Nobody |
 
 **The limits**: the values set (`rpm_limit`, `tpm_limit`, `tokens_per_day` of the instance's policy), and their

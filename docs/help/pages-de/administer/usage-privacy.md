@@ -149,6 +149,7 @@ Aufbewahrt 90 Tage (**Anfrageprotokoll**, `usage.request_log_retention_days`); g
 |---|---|---|
 | `user_id` | Die Person, die die Anfrage gesendet hat: ihre Konto-ID, nicht ihr Name oder ihre E-Mail-Adresse | Die Person, in ihrem Download. Nutzungsprüfer, in der personenbezogenen Auswertung, solange sie eingeschaltet ist, und in einem Download, den sie für eine Person erstellen. Keine andere Seite zeigt sie, auch nicht **Kosten-Observability** und **LLM-Aufrufe** |
 | `group_id`, `project_id`, `agent_id` | Die Nutzungsgruppe (das Team) der Person, das Chat-Projekt, der Agent | Administratoren unter **LLM-Aufrufe**; in Summen unter **Nutzung**; die Person (Projekt, Agent) |
+| `group_path` | Die Stellung des Nutzungsteams im Teambaum zum Zeitpunkt der Nutzung | Administratoren; in Summen unter **Nutzung** |
 | `device_id`, `session_id`, `conversation_id`, `turn_id` | Verbinden die Anfrage eines Agenten mit seiner Anmeldung auf einem Gerät und mit seiner Unterhaltung | Administratoren unter **LLM-Aufrufe**. Nie in den Zahlen oder im Download |
 | `request_id`, `trace_id`, `tenant_id`, `endpoint`, `stream` | Eine Anfrage finden und wie sie gestellt wurde | Administratoren |
 | `model_alias`, `provider_instance_id` | Welches Modell geantwortet hat und wo es lief | Administratoren; in Summen; die Person (Modell) |
@@ -167,9 +168,9 @@ Aufbewahrt 90 Tage (**Anfrageprotokoll**, `usage.request_log_retention_days`); g
 
 | Tabelle | Eine Zeile pro | Enthält außerdem | Aufbewahrt (Einstellung) | Wer sie sieht |
 |---|---|---|---|---|
-| `usage_hourly` | Stunde (UTC), Team, Agent, Modell, Provider und Währung | `people`: wie viele Personen hinter der Zeile stehen. Keine Person, kein Projekt, kein Gerät | 90 Tage (`usage.hourly_retention_days`) | Administratoren und Prüfer (`usage:read`) unter **Nutzung**, nur Stunden mit mindestens fünf Personen |
-| `usage_daily` | Tag (Zeitzone der Nutzungsmessung), Team, Agent, Modell, Provider und Währung | `people`. Keine Person, kein Projekt, kein Gerät | 25 Monate (`usage.daily_retention_months`) | Administratoren und Prüfer unter **Nutzung**, nach der Mindestgruppengröße |
-| `usage_daily_person` | Tag, Person, Team, Projekt, Agent, Modell und Währung | Kein Gerät, keine Uhrzeit | 90 Tage (`usage.person_retention_days`); gelöscht mit dem Konto | Die Person, unter **Meine Nutzung** und im Download. Nutzungsprüfer, solange die personenbezogene Auswertung eingeschaltet ist, nach Tag oder Monat (`usage.person_granularity`), und in einem Download, den sie für eine Person erstellen |
+| `usage_hourly` | Stunde (UTC), Team, Agent, Modell, Provider und Währung | `people`: wie viele Personen hinter der Zeile stehen. `group_path`: die Stellung des Nutzungsteams im Teambaum zum Zeitpunkt der Nutzung. Keine Person, kein Projekt, kein Gerät | 90 Tage (`usage.hourly_retention_days`) | Administratoren und Prüfer (`usage:read`) unter **Nutzung**, nur Stunden mit mindestens fünf Personen |
+| `usage_daily` | Tag (Zeitzone der Nutzungsmessung), Team, Agent, Modell, Provider und Währung | `people`, `group_path`. Keine Person, kein Projekt, kein Gerät | 25 Monate (`usage.daily_retention_months`) | Administratoren und Prüfer unter **Nutzung**, nach der Mindestgruppengröße |
+| `usage_daily_person` | Tag, Person, Team, Projekt, Agent, Modell und Währung | `group_path`. Kein Gerät, keine Uhrzeit | 90 Tage (`usage.person_retention_days`); gelöscht mit dem Konto | Die Person, unter **Meine Nutzung** und im Download. Nutzungsprüfer, solange die personenbezogene Auswertung eingeschaltet ist, nach Tag oder Monat (`usage.person_granularity`), und in einem Download, den sie für eine Person erstellen |
 | `usage_rollup_state` | Eine Zeile insgesamt | Wie weit die Zahlen zusammengefasst sind und wann zuletzt zusammengefasst und gelöscht wurde. Keine personenbezogenen Daten | Aufbewahrt | Niemand |
 
 **Die Limits**: die eingestellten Werte (`rpm_limit`, `tpm_limit`, `tokens_per_day` der Richtlinie der Instanz)
