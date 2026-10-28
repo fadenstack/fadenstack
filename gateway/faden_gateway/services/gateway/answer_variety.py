@@ -30,6 +30,7 @@ import secrets
 from typing import Any
 
 from faden_gateway.services.gateway import text_receipts
+from faden_gateway.services.gateway.usage import add_usage
 
 #: Word joiner and zero-width space: invisible, never in what the model said back (measured), and not the
 #: Unicode marker's own characters (U+FEFF and the variation selectors).
@@ -136,11 +137,10 @@ def merged(payloads: list[dict[str, Any]]) -> dict[str, Any]:
     for index, payload in enumerate(payloads):
         choice = (payload.get("choices") or [{}])[0]
         choices.append({**choice, "index": index})
-    usage: dict[str, int] = {}
+    usage: dict[str, Any] = {}
     for payload in payloads:
-        for key, value in (payload.get("usage") or {}).items():
-            if isinstance(value, int) and not isinstance(value, bool):
-                usage[key] = usage.get(key, 0) + value
+        # The cached and reasoning tokens in the ``*_details`` objects too.
+        add_usage(usage, payload.get("usage"))
     out = {**first, "choices": choices}
     if usage:
         out["usage"] = {**(first.get("usage") or {}), **usage}
