@@ -1027,7 +1027,9 @@
       "attempts": "Versuche",
       "outcome": "Weiter",
       "gave_up": "Aufgegeben: Diese Mail wird nicht verschickt.",
+      "refused_for_good": "Wird nicht erneut versucht: Der Mailserver hat sie endgültig abgelehnt.",
       "next_attempt": "Nächster Versuch {{when}}",
+      "sending_now": "Wird gerade gesendet.",
       "sent_since": "Seitdem ist Mail hinausgegangen."
     },
     "kinds": {
@@ -1124,7 +1126,8 @@
       "auth": "Angemeldet: {{auth}}",
       "elapsed": "{{ms}} ms",
       "failed": "Die Testmail ist nicht hinausgegangen",
-      "too_many": "Zu viele Testmails in zehn Minuten: Warten Sie einige Minuten und versuchen Sie es dann erneut."
+      "too_many": "Zu viele Testmails in zehn Minuten: Warten Sie einige Minuten und versuchen Sie es dann erneut.",
+      "running": "Eine andere Testmail von Ihnen ist noch unterwegs: Warten Sie ihr Ergebnis ab und versuchen Sie es dann erneut."
     },
     "save": {
       "saved": "Mail-Einstellungen gespeichert. Die nächste Mail geht damit hinaus.",
@@ -1175,6 +1178,7 @@
       "relay_refused": "Der Mailserver leitet für diesen Server keine Mail weiter: Erlauben Sie diesem Server das Relaying oder melden Sie sich an.",
       "recipient_refused": "Der Mailserver hat den Empfänger abgelehnt: Prüfen Sie die Adresse.",
       "message_refused": "Der Mailserver hat die Nachricht selbst abgelehnt, etwa als zu groß oder als Spam.",
+      "temporarily_refused": "Der Mailserver hat vorerst abgelehnt: Mail wird später von selbst erneut versucht. Geschieht das immer wieder, sagt seine Antwort darunter, warum (etwa zu viele Verbindungen, Greylisting).",
       "server_error": "Der Mailserver hat mit einem Fehler geantwortet.",
       "mailer_unreachable": "Der Mail-Dienst ist nicht erreichbar: Prüfen Sie unter Einstellungen → Module, ob das Mail-Modul läuft."
     }
@@ -4820,7 +4824,7 @@
     "licence_missing": "Enterprise ist installiert, hat aber keine Lizenz: Die Enterprise-Funktionen sind aus.",
     "licence_seats_over": "{{used}} aktive Konten bei {{seats}} Plätzen in der Lizenz. Gesperrt wird nichts; erweitern Sie die Lizenz oder schalten Sie nicht benötigte Konten ab.",
     "mail_link_base_missing": "Mail ist eingeschaltet, hat aber keine Konsolenadresse für ihre Links, daher geht keine Mail hinaus: Tragen Sie sie unter Einstellungen → Mail → Links ein.",
-    "mail_failing": "Mail scheitert ({{code}}): Unter Einstellungen → Mail steht, was der Mailserver gesagt hat und was zu tun ist.",
+    "mail_failing": "Mail scheitert ({{code}}): Unter Einstellungen → Mail steht, warum und was zu tun ist.",
     "unknown": "Ein Hinweis für die Administration: {{code}}",
     "hide": "Ausblenden, bis der Browser geschlossen wird",
     "restriction_tool_mode_ceilings": "Grenzen für den Tool-Modus benötigen Fadenstack Enterprise: Bis es zurück ist, sind Tools in jedem Chat nur lesend.",

@@ -57,9 +57,13 @@ export interface MailFailure {
   code: string;
   reason: string;
   attempts: number;
+  /** Not tried again: failed for good, or too often. */
   gave_up: boolean;
+  /** Being sent again right now. */
+  sending: boolean;
   created_at: string;
-  next_attempt_at: string;
+  /** When it is tried again; `null` while it is being sent and once it was given up. */
+  next_attempt_at: string | null;
   /** It failed after the last mail that went out: mail is failing now. */
   after_last_sent: boolean;
 }
@@ -67,6 +71,7 @@ export interface MailFailure {
 export interface MailState {
   goes_out: boolean;
   reasons: MailStopReason[];
+  /** Not sent yet nor given up, those being sent now included. */
   waiting: number;
   last_sent_at: string | null;
   last_failure: MailFailure | null;
@@ -132,9 +137,18 @@ export const MAIL_FAILURES = [
   "relay_refused",
   "recipient_refused",
   "message_refused",
+  "temporarily_refused",
   "server_error",
   "mailer_unreachable",
 ] as const;
+
+/** The failures that are final: the mail server refused for good, and the mail is not tried again. */
+export const FINAL_MAIL_FAILURES: readonly string[] = [
+  "login_refused",
+  "sender_refused",
+  "recipient_refused",
+  "message_refused",
+];
 
 /** What is wrong with one field of the form. */
 export interface MailProblem {
@@ -158,9 +172,14 @@ export function mailProblems(err: unknown): MailProblem[] {
   );
 }
 
-/** Too many test mails in ten minutes (429). */
+/** Another test mail by the same administrator is still on its way (429 `test_running`). */
+export function testRunning(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 429 && err.code === "test_running";
+}
+
+/** Too many test mails in ten minutes (429, any other code). */
 export function tooManyTests(err: unknown): boolean {
-  return err instanceof ApiError && err.status === 429;
+  return err instanceof ApiError && err.status === 429 && !testRunning(err);
 }
 
 /** The settings keys the Mail page sets; the Modules tab's mailer card leaves them to it. */

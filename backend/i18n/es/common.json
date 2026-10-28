@@ -1027,7 +1027,9 @@
       "attempts": "Intentos",
       "outcome": "Siguiente",
       "gave_up": "Abandonado: este correo no se envía.",
+      "refused_for_good": "No se vuelve a intentar: el servidor de correo lo rechazó definitivamente.",
       "next_attempt": "Nuevo intento {{when}}",
+      "sending_now": "Se está enviando ahora.",
       "sent_since": "Desde entonces ha salido correo."
     },
     "kinds": {
@@ -1124,7 +1126,8 @@
       "auth": "Sesión iniciada: {{auth}}",
       "elapsed": "{{ms}} ms",
       "failed": "El correo de prueba no salió",
-      "too_many": "Demasiados correos de prueba en diez minutos: espere unos minutos y vuelva a intentarlo."
+      "too_many": "Demasiados correos de prueba en diez minutos: espere unos minutos y vuelva a intentarlo.",
+      "running": "Otro correo de prueba suyo sigue en camino: espere su resultado y vuelva a intentarlo."
     },
     "save": {
       "saved": "Ajustes de correo guardados. El próximo correo sale con ellos.",
@@ -1175,6 +1178,7 @@
       "relay_refused": "El servidor de correo no reenvía correo para este servidor: permita que este servidor haga relé, o inicie sesión.",
       "recipient_refused": "El servidor de correo rechazó al destinatario: compruebe la dirección.",
       "message_refused": "El servidor de correo rechazó el propio mensaje, por ejemplo por demasiado grande o como spam.",
+      "temporarily_refused": "El servidor de correo lo rechazó por ahora: el correo se vuelve a intentar más tarde por sí solo. Si sigue ocurriendo, su respuesta de abajo dice por qué (p. ej. demasiadas conexiones, greylisting).",
       "server_error": "El servidor de correo respondió con un error.",
       "mailer_unreachable": "No se puede contactar con el servicio de correo: compruebe en Configuración → Módulos que el módulo de correo está en marcha."
     }
@@ -4820,7 +4824,7 @@
     "licence_missing": "Enterprise está instalado pero no tiene licencia: las funciones Enterprise están desactivadas.",
     "licence_seats_over": "{{used}} cuentas activas y la licencia tiene {{seats}} puestos. No se bloquea nada; conviene ampliar la licencia o desactivar las cuentas que no hagan falta.",
     "mail_link_base_missing": "El correo está activado pero no tiene la dirección de la consola para sus enlaces, así que no sale ningún correo: indíquela en Configuración → Correo → Enlaces.",
-    "mail_failing": "El correo está fallando ({{code}}): en Configuración → Correo verá lo que dijo el servidor de correo y qué hacer.",
+    "mail_failing": "El correo está fallando ({{code}}): en Configuración → Correo verá por qué y qué hacer.",
     "unknown": "Un aviso para administradores: {{code}}",
     "hide": "Ocultar hasta cerrar el navegador",
     "restriction_tool_mode_ceilings": "Los límites del modo de herramientas necesitan Fadenstack Enterprise: hasta que vuelva, las herramientas de todos los chats son de solo lectura.",

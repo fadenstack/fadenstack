@@ -31,6 +31,7 @@ import { errorText } from "~/api/http";
 import {
   mailApi,
   mailProblems,
+  testRunning,
   tooManyTests,
   type MailAuth,
   type MailSecurity,
@@ -69,6 +70,7 @@ type TestOutcome =
   | { kind: "result"; result: MailTestResult; to: string }
   | { kind: "problems" }
   | { kind: "too_many" }
+  | { kind: "running" }
   | { kind: "error"; message: string };
 
 function Section({ title, intro, children }: { title: string; intro?: string; children: ReactNode }) {
@@ -90,10 +92,10 @@ function Section({ title, intro, children }: { title: string; intro?: string; ch
 
 function TestOutcomeView({ outcome }: { outcome: TestOutcome }) {
   const { t } = useTranslation();
-  if (outcome.kind === "too_many") {
+  if (outcome.kind === "too_many" || outcome.kind === "running") {
     return (
       <Alert severity="warning" data-testid="mail-test-result">
-        {t("mail.test.too_many")}
+        {outcome.kind === "running" ? t("mail.test.running") : t("mail.test.too_many")}
       </Alert>
     );
   }
@@ -286,6 +288,8 @@ export default function MailSettingsTab() {
       if (found.length) {
         setProblems(byField(found));
         setTestOutcome({ kind: "problems" });
+      } else if (testRunning(err)) {
+        setTestOutcome({ kind: "running" });
       } else if (tooManyTests(err)) {
         setTestOutcome({ kind: "too_many" });
       } else {

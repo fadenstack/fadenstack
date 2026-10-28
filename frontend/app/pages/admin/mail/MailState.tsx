@@ -2,6 +2,7 @@
  * Whether mail goes out, and if not why; how many mails wait; the last one sent; the last failure. And a
  * failure in words: the mail service's code as a sentence with what to do, and the mail server's own reply.
  */
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 
 import Alert from "@mui/material/Alert";
@@ -15,7 +16,7 @@ import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import RefreshIcon from "@mui/icons-material/Refresh";
 
-import { MAIL_FAILURES, type MailState } from "~/api/mailSettings";
+import { FINAL_MAIL_FAILURES, MAIL_FAILURES, type MailFailure, type MailState } from "~/api/mailSettings";
 import { formatDateTime } from "~/lib/dates";
 
 /** Whether *reason* is a mail server's reply (it starts with an SMTP reply code), not the mail service's words. */
@@ -78,6 +79,18 @@ function Fact({ label, value, testId }: { label: string; value: string; testId?:
   );
 }
 
+/**
+ * What happens to the failed mail next: being sent now, given up (for good when the mail server refused it so),
+ * or tried again at a time. Never a retry time for a mail that is not tried again.
+ */
+function outcomeOf(failure: MailFailure, t: TFunction): string | null {
+  if (failure.sending) return t("mail.state.sending_now");
+  if (failure.gave_up) {
+    return FINAL_MAIL_FAILURES.includes(failure.code) ? t("mail.state.refused_for_good") : t("mail.state.gave_up");
+  }
+  return failure.next_attempt_at ? t("mail.state.next_attempt", { when: formatDateTime(failure.next_attempt_at) }) : null;
+}
+
 export function MailStatePanel({
   state,
   refreshing,
@@ -90,6 +103,7 @@ export function MailStatePanel({
   const { t } = useTranslation();
   const failure = state.last_failure;
   const failing = state.goes_out && !!failure?.after_last_sent;
+  const outcome = failure ? outcomeOf(failure, t) : null;
 
   return (
     <Paper sx={{ p: 2 }} data-testid="mail-state">
@@ -148,14 +162,7 @@ export function MailStatePanel({
                 <Fact label={t("mail.state.kind")} value={t(`mail.kinds.${failure.kind}`, { defaultValue: failure.kind })} />
                 <Fact label={t("mail.state.when")} value={formatDateTime(failure.created_at)} />
                 <Fact label={t("mail.state.attempts")} value={String(failure.attempts)} />
-                <Fact
-                  label={t("mail.state.outcome")}
-                  value={
-                    failure.gave_up
-                      ? t("mail.state.gave_up")
-                      : t("mail.state.next_attempt", { when: formatDateTime(failure.next_attempt_at) })
-                  }
-                />
+                {outcome && <Fact label={t("mail.state.outcome")} value={outcome} testId="mail-failure-outcome" />}
               </Stack>
               {!failure.after_last_sent && (
                 <Typography variant="caption" color="text.secondary">

@@ -134,9 +134,12 @@ eingerichtet haben.
 **Mail-Status** oben sagt, ob Mail hinausgeht, und wenn nicht, warum: Das Mail-Modul ist aus, kein Server ist
 eingetragen oder die Konsolenadresse fehlt. Er zeigt, wie viele Mails warten, wann die letzte verschickt wurde, und
 den letzten Fehler: welche Mail, den Grund in Worten, die Antwort des Mailservers oder andere Einzelheiten, wie oft
-es versucht wurde und ob es weiter versucht wird. Mails werden eine Weile erneut versucht und ungesendet gelöscht,
-sobald sie nicht mehr nützen (ein abgelaufener Link). Eine Mail, die der Mailserver endgültig abgelehnt hat (die
-Anmeldung, den Absender, den Empfänger oder die Nachricht), wird nicht erneut versucht.
+es versucht wurde und ob es weiter versucht wird oder gerade gesendet wird. Mails werden eine Weile erneut versucht
+und ungesendet gelöscht, sobald sie nicht mehr nützen (ein abgelaufener Link). Eine Mail, die der Mailserver
+endgültig abgelehnt hat (die Anmeldung, den Absender, den Empfänger oder die Nachricht), wird nicht erneut
+versucht.
+
+Eine Testmail nach der anderen: Solange Ihre unterwegs ist, bittet die Seite, ihr Ergebnis abzuwarten.
 
 Scheitert Mail, zeigt jede Seite der Konsole einen Hinweis, bis wieder eine Mail hinausgeht.
 
@@ -147,7 +150,7 @@ seine Worte bezeichnet, oder andere Einzelheiten, etwa den Fehler des Netzes.
 
 | Sie sehen | Was zu tun ist |
 |---|---|
-| Die Mail-Einstellungen sind unvollständig | Die Einzelheiten darunter nennen, was fehlt oder sich nicht verwenden lässt: kein Server, ein Feld für Microsoft 365, ein Zertifikatstext, der kein PEM ist, oder Zeichen in Benutzername oder Passwort, die eine SMTP-Anmeldung nicht senden kann (nur ASCII). |
+| Die Mail-Einstellungen sind unvollständig | Die Einzelheiten darunter nennen, was fehlt oder sich nicht verwenden lässt: kein Server; ein Feld für Microsoft 365 oder ein anderer Server als `smtp.office365.com` für Microsoft 365; vertrauenswürdige Zertifikate, die kein PEM sind oder einen anderen Block enthalten, etwa einen privaten Schlüssel; eine Absenderadresse ohne Domain oder mit anderen Zeichen vor dem @ als Buchstaben, Ziffern und `. _ - +`; ein Absendername über mehr als eine Zeile; Zeichen in Benutzername oder Passwort, die eine SMTP-Anmeldung nicht senden kann (nur ASCII). |
 | Dem Zertifikat des Mailservers wird nicht vertraut | Fügen Sie die CA Ihrer Organisation unter **Vertrauenswürdige Zertifikate** ein. |
 | Der Mail-Dienst lehnt diese CA ab | Fügen Sie stattdessen das eigene Zertifikat des Mailservers ein oder lassen Sie die CA mit Schlüsselverwendung neu ausstellen. |
 | Das Zertifikat des Mailservers ist abgelaufen | Es muss auf dem Mailserver erneuert werden. An einen Server mit abgelaufenem Zertifikat sendet Fadenstack keine Mail. |
@@ -165,9 +168,10 @@ seine Worte bezeichnet, oder andere Einzelheiten, etwa den Fehler des Netzes.
 | Der Mailserver verlangt eine Anmeldung | Wählen Sie eine Anmeldung und tragen Sie das Konto ein. |
 | Der Mailserver hat den Empfänger abgelehnt | Prüfen Sie die Adresse. Die Antwort des Mailservers darunter sagt, warum er ihn abgelehnt hat. |
 | Der Mailserver hat die Nachricht selbst abgelehnt, etwa als zu groß oder als Spam | Die Antwort des Mailservers darunter sagt, warum. Als Spam abgelehnte Mail: Prüfen Sie die Einträge Ihrer Domain für diesen Mailserver (oben). |
-| Der Mailserver hat mit einem Fehler geantwortet | Die Antwort des Mailservers darunter sagt, warum. Ein vorübergehender Fehler (eine Antwort, die mit 4 beginnt) wird von selbst erneut versucht. |
+| Der Mailserver hat vorerst abgelehnt | Eine Antwort, die mit 4 beginnt (etwa `421`, `451`): Der Mailserver ist ausgelastet, begrenzt Verbindungen oder nutzt Greylisting. Wartende Mail wird von selbst erneut versucht; senden Sie eine Testmail in ein paar Minuten erneut. Geschieht das immer wieder, sagt die Antwort des Mailservers darunter, warum. |
+| Der Mailserver hat mit einem Fehler geantwortet | Die Antwort des Mailservers darunter sagt, warum. |
 | Der Mailserver hat die Begrüßung dieses Servers abgelehnt | Tragen Sie als **Begrüßungsname** einen vollständigen DNS-Namen ein, z. B. `ai.example.internal`. |
-| Das gespeicherte Passwort oder der geheime Schlüssel gilt für einen anderen Server | Geben Sie ihn für diesen Server erneut ein und speichern Sie. |
+| Das gespeicherte Passwort oder der geheime Schlüssel gilt für einen anderen Server | Ein gespeichertes Passwort oder Geheimnis gilt nur für die Einstellungen, für die es gespeichert wurde: denselben Server und Port, dieselben vertrauenswürdigen Zertifikate und dieselbe Anmeldung (bei Microsoft 365 denselben Mandanten und dieselbe App). Geben Sie es erneut ein, um andere Einstellungen zu testen oder zu speichern. |
 | Der Mail-Dienst ist nicht erreichbar | Starten Sie das Mail-Modul unter **Einstellungen → Module**. |
 
 Unter einem Feld kann die Seite sagen:

@@ -1027,7 +1027,9 @@
       "attempts": "尝试次数",
       "outcome": "接下来",
       "gave_up": "已放弃：这封邮件不会发送。",
+      "refused_for_good": "不再重试：邮件服务器已永久拒绝。",
       "next_attempt": "将于 {{when}} 重试",
+      "sending_now": "正在发送。",
       "sent_since": "此后已有邮件发出。"
     },
     "kinds": {
@@ -1124,7 +1126,8 @@
       "auth": "登录方式：{{auth}}",
       "elapsed": "{{ms}} 毫秒",
       "failed": "测试邮件未能发出",
-      "too_many": "十分钟内测试邮件过多：请等几分钟后再试。"
+      "too_many": "十分钟内测试邮件过多：请等几分钟后再试。",
+      "running": "您的另一封测试邮件仍在发送中：请等待其结果，然后重试。"
     },
     "save": {
       "saved": "邮件设置已保存。下一封邮件将按此发送。",
@@ -1175,6 +1178,7 @@
       "relay_refused": "邮件服务器不为本服务器转发邮件：请允许本服务器中继，或改为登录。",
       "recipient_refused": "邮件服务器拒绝了收件人：请检查地址。",
       "message_refused": "邮件服务器拒绝了邮件本身，例如因为过大或被视为垃圾邮件。",
+      "temporarily_refused": "邮件服务器暂时拒绝：邮件稍后会自动重试。如果反复出现，下方它的回复会说明原因（例如连接过多、灰名单）。",
       "server_error": "邮件服务器返回了错误。",
       "mailer_unreachable": "无法连接邮件服务：请在 设置 → 模块 中检查邮件模块是否在运行。"
     }
@@ -4820,7 +4824,7 @@
     "licence_missing": "已安装 Enterprise，但没有许可证：Enterprise 功能已关闭。",
     "licence_seats_over": "有 {{used}} 个活跃账户，而许可证只有 {{seats}} 个席位。不会阻止任何操作；请扩展许可证或停用不需要的账户。",
     "mail_link_base_missing": "邮件已开启，但没有用于链接的控制台地址，因此不会发出任何邮件：请在 设置 → 邮件 → 链接 中填写。",
-    "mail_failing": "邮件发送失败（{{code}}）：请在 设置 → 邮件 中查看邮件服务器的回复以及处理方法。",
+    "mail_failing": "邮件发送失败（{{code}}）：请在 设置 → 邮件 中查看原因以及处理方法。",
     "unknown": "给管理员的提示：{{code}}",
     "hide": "隐藏，直到关闭浏览器",
     "restriction_tool_mode_ceilings": "工具模式限制需要 Fadenstack Enterprise：在其恢复之前，所有聊天中的工具都是只读的。",

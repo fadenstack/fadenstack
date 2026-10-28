@@ -124,9 +124,11 @@ Fadenstack. If mail lands in spam folders, check those records for the mail serv
 **Mail state** at the top says whether mail goes out, and if not, why: the mail module is off, no server is set,
 or the console address is missing. It shows how many mails wait, when the last one went out, and the last
 failure: which mail, the reason in words, the mail server's reply or other details, how often it was tried, and
-whether it is tried again. Mails are tried again for a while and are deleted, unsent, once they are of no use any
-more (a reset link that expired). A mail the mail server refused for good (the sign-in, the sender, the recipient
-or the message) is not tried again.
+whether it is tried again, or being sent right now. Mails are tried again for a while and are deleted, unsent, once
+they are of no use any more (a reset link that expired). A mail the mail server refused for good (the sign-in, the
+sender, the recipient or the message) is not tried again.
+
+One test mail at a time: while yours is on its way, the page asks you to wait for its result.
 
 When mail fails, every console page shows a notice until a mail goes out again.
 
@@ -137,7 +139,7 @@ as its words, or other details, such as the network's error.
 
 | You see | What to do |
 |---|---|
-| The mail settings are incomplete | The details below name what is missing or cannot be used: no server, a Microsoft 365 field, a trusted certificate text that is not PEM, or characters in the user name or password that an SMTP sign-in cannot send (only ASCII). |
+| The mail settings are incomplete | The details below name what is missing or cannot be used: no server; a Microsoft 365 field, or another server than `smtp.office365.com` for Microsoft 365; trusted certificates that are not PEM or hold another block, such as a private key; a sender address without a domain, or with other characters before the @ than letters, digits and `. _ - +`; a sender name of more than one line; characters in the user name or password that an SMTP sign-in cannot send (only ASCII). |
 | The mail server's certificate is not trusted | Paste your organisation's CA under **Trusted certificates**. |
 | The mail service refuses this CA | Paste the mail server's own certificate instead, or have the CA reissued with key usage. |
 | The mail server's certificate has expired | It must be renewed on the mail server. Fadenstack sends no mail to a server whose certificate has expired. |
@@ -155,9 +157,10 @@ as its words, or other details, such as the network's error.
 | The mail server requires a sign-in | Choose a sign-in and enter the account. |
 | The mail server refused the recipient | Check the address. The mail server's reply below says why it refused it. |
 | The mail server refused the message itself, e.g. as too large or as spam | The mail server's reply below says why. Mail taken for spam: check your domain's records for this mail server (above). |
-| The mail server answered with an error | The mail server's reply below says why. A temporary error (a reply that starts with 4) is tried again by itself. |
+| The mail server refused for now | A reply that starts with 4 (e.g. `421`, `451`): the mail server is busy, limits connections, or greylists. Mail that waits is tried again by itself; send a test mail again in a few minutes. If it keeps happening, the mail server's reply below says why. |
+| The mail server answered with an error | The mail server's reply below says why. |
 | The mail server refused this server's greeting | Enter a **Greeting name** that is a full DNS name, e.g. `ai.example.internal`. |
-| The stored password or secret was saved for another server | Enter it again for this server and save. |
+| The stored password or secret was saved for another server | A stored password or secret goes only with the settings it was saved for: the same server and port, trusted certificates and sign-in (for Microsoft 365, the same tenant and app). Enter it again to test or save other settings. |
 | The mail service cannot be reached | Start the mail module under **Settings → Modules**. |
 
 Under a field, the page may say:

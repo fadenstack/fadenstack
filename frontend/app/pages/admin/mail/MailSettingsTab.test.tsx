@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi, type MockInstance } from "vitest"
 import { hasFeature } from "~/api/about";
 import { ApiError } from "~/api/http";
 import { llmSettings } from "~/api/llm";
-import { MAIL_SETTINGS, mailApi, type MailView } from "~/api/mailSettings";
+import { MAIL_SETTINGS, mailApi, type MailFailure, type MailView } from "~/api/mailSettings";
 import { systemSettingsApi } from "~/api/systemSettings";
 import { renderPage } from "~/test/renderPage";
 
@@ -291,6 +291,38 @@ describe("the mail form", () => {
     expect(await screen.findByTestId("mail-test-result")).toHaveTextContent("Too many test mails in ten minutes");
   });
 
+  it("asks to wait while another test mail is still on its way", async () => {
+    test.mockRejectedValue(new ApiError("running", 429, "test_running", { code: "test_running" }));
+    renderTab();
+    await screen.findByDisplayValue("mail.example.com");
+    fireEvent.click(screen.getByRole("button", { name: "Send a test mail" }));
+    const result = await screen.findByTestId("mail-test-result");
+    expect(result).toHaveTextContent("Another test mail of yours is still on its way: wait for its result");
+    expect(result).not.toHaveTextContent("Too many");
+  });
+
+  it("shows a server without a saved sign-in as one without, and saves it so", async () => {
+    get.mockResolvedValue({
+      ...VIEW,
+      settings: { ...VIEW.settings, host: "relay.example.internal", auth: "none", username: "", password_set: false,
+        secrets_server: "" },
+      root_mode: false,
+    });
+    renderTab(false);
+    await screen.findByDisplayValue("relay.example.internal");
+    expect(screen.getByRole("combobox", { name: "Sign in with" })).toHaveTextContent("No sign-in");
+    expect(screen.getByRole("combobox", { name: "Sign in with" })).toHaveAccessibleDescription(
+      /^For a relay in your network/,
+    );
+    expect(screen.queryByRole("textbox", { name: /^User name/ })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("mail-password")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("mail-root-mode-hint")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    expect(save.mock.calls[0][0]).toMatchObject({ auth: "none", username: "", password: null, m365_client_secret: null });
+  });
+
   it("lists the saved certificates, warning of a CA the mail service refuses", async () => {
     get.mockResolvedValue({
       ...VIEW,
@@ -423,8 +455,9 @@ describe("the mail state", () => {
           reason: "certificate verify failed: unable to get local issuer certificate",
           attempts: 5,
           gave_up: true,
+          sending: false,
           created_at: "2026-10-27T08:00:00Z",
-          next_attempt_at: "2026-10-27T09:00:00Z",
+          next_attempt_at: null,
           after_last_sent: true,
         },
       },
@@ -441,5 +474,65 @@ describe("the mail state", () => {
     expect(within(failure).getByTestId("mail-failure-reason")).toHaveTextContent("unable to get local issuer certificate");
     expect(failure).toHaveTextContent("Given up: this mail is not sent.");
     expect(screen.getByTestId("mail-certificates-unreadable")).toBeInTheDocument();
+  });
+
+  const FAILURE: MailFailure = {
+    kind: "password_reset",
+    code: "connect_failed",
+    reason: "mail.example.com:587: Connection refused",
+    attempts: 2,
+    gave_up: false,
+    sending: false,
+    created_at: "2026-10-27T08:00:00Z",
+    next_attempt_at: "2026-10-27T09:00:00Z",
+    after_last_sent: true,
+  };
+
+  async function lastFailure(failure: Partial<MailFailure>) {
+    get.mockResolvedValue({ ...VIEW, state: { ...VIEW.state, waiting: 1, last_failure: { ...FAILURE, ...failure } } });
+    renderTab();
+    return within(await screen.findByTestId("mail-state")).findByTestId("mail-last-failure");
+  }
+
+  it("says when a failed mail is tried again", async () => {
+    const failure = await lastFailure({});
+    expect(within(failure).getByTestId("mail-failure-outcome")).toHaveTextContent(/^Tries again /);
+  });
+
+  it("says a failed mail is being sent right now, not when it is tried again", async () => {
+    const failure = await lastFailure({ sending: true, next_attempt_at: null });
+    expect(within(failure).getByTestId("mail-failure-outcome")).toHaveTextContent("Being sent now.");
+  });
+
+  it("claims no retry for a mail the mail server refused for good", async () => {
+    const failure = await lastFailure({
+      code: "login_refused", reason: "535 5.7.8 Authentication credentials invalid", attempts: 1, gave_up: true,
+      next_attempt_at: null,
+    });
+    expect(within(failure).getByTestId("mail-failure-outcome")).toHaveTextContent(
+      "Not tried again: the mail server refused it for good.",
+    );
+    expect(failure).not.toHaveTextContent("Tries again");
+  });
+
+  it("names nothing next for a mail that is neither waiting nor being sent", async () => {
+    const failure = await lastFailure({ next_attempt_at: null });
+    expect(within(failure).queryByTestId("mail-failure-outcome")).not.toBeInTheDocument();
+    expect(failure).not.toHaveTextContent("Tries again");
+  });
+
+  it("words a mail service that cannot be reached, without calling its reason the mail server's", async () => {
+    const failure = await lastFailure({ code: "mailer_unreachable", reason: "the mail service answered 403" });
+    expect(within(failure).getByTestId("mail-failure-text")).toHaveTextContent("The mail service cannot be reached");
+    expect(within(failure).getByTestId("mail-failure-reason-label")).toHaveTextContent(/^Details:$/);
+    expect(within(failure).getByTestId("mail-failure-reason")).toHaveTextContent("the mail service answered 403");
+  });
+
+  it("words a refusal for now, with the mail server's reply", async () => {
+    const failure = await lastFailure({ code: "temporarily_refused", reason: "421 4.7.0 Too many connections" });
+    expect(within(failure).getByTestId("mail-failure-text")).toHaveTextContent(
+      "The mail server refused for now: mail is tried again later by itself.",
+    );
+    expect(within(failure).getByTestId("mail-failure-reason-label")).toHaveTextContent("The mail server's own words:");
   });
 });

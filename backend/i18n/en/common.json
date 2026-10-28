@@ -1022,7 +1022,9 @@
       "attempts": "Attempts",
       "outcome": "Next",
       "gave_up": "Given up: this mail is not sent.",
+      "refused_for_good": "Not tried again: the mail server refused it for good.",
       "next_attempt": "Tries again {{when}}",
+      "sending_now": "Being sent now.",
       "sent_since": "Mail has gone out since then."
     },
     "kinds": {
@@ -1119,7 +1121,8 @@
       "auth": "Signed in: {{auth}}",
       "elapsed": "{{ms}} ms",
       "failed": "The test mail did not go out",
-      "too_many": "Too many test mails in ten minutes: wait a few minutes, then try again."
+      "too_many": "Too many test mails in ten minutes: wait a few minutes, then try again.",
+      "running": "Another test mail of yours is still on its way: wait for its result, then try again."
     },
     "save": {
       "saved": "Mail settings saved. The next mail goes out with them.",
@@ -1170,6 +1173,7 @@
       "relay_refused": "The mail server does not pass on mail for this server: allow this server to relay, or sign in.",
       "recipient_refused": "The mail server refused the recipient: check the address.",
       "message_refused": "The mail server refused the message itself, e.g. as too large or as spam.",
+      "temporarily_refused": "The mail server refused for now: mail is tried again later by itself. If this keeps happening, its reply below says why (e.g. too many connections, greylisting).",
       "server_error": "The mail server answered with an error.",
       "mailer_unreachable": "The mail service cannot be reached: check under Settings → Modules that the mail module is running."
     }
@@ -4818,7 +4822,7 @@
     "licence_missing": "Enterprise is installed but has no licence: Enterprise features are off.",
     "licence_seats_over": "{{used}} active accounts, and the licence has {{seats}} seats. Nothing is blocked; extend the licence or switch off accounts that are not needed.",
     "mail_link_base_missing": "Mail is switched on but has no console address for its links, so no mail goes out: set it under Settings → Mail → Links.",
-    "mail_failing": "Mail is failing ({{code}}): Settings → Mail shows what the mail server said and what to do.",
+    "mail_failing": "Mail is failing ({{code}}): Settings → Mail shows why and what to do.",
     "unknown": "A notice for administrators: {{code}}",
     "hide": "Hide until the browser is closed",
     "restriction_tool_mode_ceilings": "Tool mode limits need Fadenstack Enterprise: until it is back, tools in every chat are read-only.",

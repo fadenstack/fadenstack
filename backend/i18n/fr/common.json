@@ -1022,7 +1022,9 @@
       "attempts": "Tentatives",
       "outcome": "Suite",
       "gave_up": "Abandonné : cet e-mail ne sera pas envoyé.",
+      "refused_for_good": "Pas de nouvel essai : le serveur de messagerie l'a refusé définitivement.",
       "next_attempt": "Nouvelle tentative {{when}}",
+      "sending_now": "En cours d'envoi.",
       "sent_since": "Des e-mails sont partis depuis."
     },
     "kinds": {
@@ -1119,7 +1121,8 @@
       "auth": "Connecté : {{auth}}",
       "elapsed": "{{ms}} ms",
       "failed": "L'e-mail de test n'est pas parti",
-      "too_many": "Trop d'e-mails de test en dix minutes : attendez quelques minutes, puis réessayez."
+      "too_many": "Trop d'e-mails de test en dix minutes : attendez quelques minutes, puis réessayez.",
+      "running": "Un autre e-mail de test de votre part est encore en route : attendez son résultat, puis réessayez."
     },
     "save": {
       "saved": "Paramètres de messagerie enregistrés. Le prochain e-mail part avec eux.",
@@ -1170,6 +1173,7 @@
       "relay_refused": "Le serveur de messagerie ne relaie pas les e-mails de ce serveur : autorisez ce serveur à relayer, ou connectez-vous.",
       "recipient_refused": "Le serveur de messagerie a refusé le destinataire : vérifiez l'adresse.",
       "message_refused": "Le serveur de messagerie a refusé le message lui-même, p. ex. comme trop volumineux ou comme spam.",
+      "temporarily_refused": "Le serveur de messagerie a refusé pour le moment : l'e-mail est réessayé plus tard automatiquement. Si cela se répète, sa réponse ci-dessous dit pourquoi (par exemple trop de connexions, greylisting).",
       "server_error": "Le serveur de messagerie a répondu par une erreur.",
       "mailer_unreachable": "Le service de messagerie est injoignable : vérifiez sous Paramètres → Modules que le module de messagerie fonctionne."
     }
@@ -4820,7 +4824,7 @@
     "licence_missing": "Enterprise est installé mais n'a pas de licence : les fonctions Enterprise sont désactivées.",
     "licence_seats_over": "{{used}} comptes actifs pour {{seats}} places dans la licence. Rien n'est bloqué ; étendez la licence ou désactivez les comptes inutiles.",
     "mail_link_base_missing": "La messagerie est activée mais n'a pas d'adresse de la console pour ses liens, aucun e-mail ne part donc : indiquez-la dans Paramètres → Messagerie → Liens.",
-    "mail_failing": "Les e-mails échouent ({{code}}) : sous Paramètres → Messagerie, voyez ce qu'a répondu le serveur de messagerie et que faire.",
+    "mail_failing": "Les e-mails échouent ({{code}}) : sous Paramètres → Messagerie, voyez pourquoi et que faire.",
     "unknown": "Un avis pour les administrateurs : {{code}}",
     "hide": "Masquer jusqu'à la fermeture du navigateur",
     "restriction_tool_mode_ceilings": "Les limites du mode des outils nécessitent Fadenstack Enterprise : jusqu'à son retour, les outils de chaque chat sont en lecture seule.",
