@@ -1,0 +1,71 @@
+/**
+ * Formatting for the usage pages: periods, money per currency, the date range
+ * a period choice stands for. In the UI language; nothing here is text of its
+ * own (labels come from the `usage.*` keys).
+ */
+import { fmtMoney } from "~/components/dashboard/format";
+import { ApiError, errorText } from "~/api/http";
+import { isUsageErrorCode, type AdminBucket } from "~/api/usage";
+
+/** A refusal the console words itself (`usage.errors.<code>`), else the server's message. */
+export function usageErrorText(err: unknown, t: (key: string) => string): string {
+  if (err instanceof ApiError && isUsageErrorCode(err.code)) return t(`usage.errors.${err.code}`);
+  return errorText(err);
+}
+
+/** `YYYY-MM-DD` of a date in the browser's time zone. */
+export function isoDay(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/** The last `days` days, today included, as the API's `from`/`to`. */
+export function lastDays(days: number, today = new Date()): { from: string; to: string } {
+  const start = new Date(today);
+  start.setDate(start.getDate() - (days - 1));
+  return { from: isoDay(start), to: isoDay(today) };
+}
+
+/**
+ * A period of a series as a Date: an hour is ISO-8601 UTC; a day
+ * (`2026-10-01`) or a month (`2026-10`, `2026-10-01`) is a calendar date,
+ * read as local midnight so it is written as the same day.
+ */
+export function periodDate(period: string): Date {
+  if (/^\d{4}-\d{2}$/.test(period)) return new Date(`${period}-01T00:00:00`);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(period)) return new Date(`${period}T00:00:00`);
+  return new Date(period);
+}
+
+/** How a period is written on an axis or in a table. */
+export function periodLabel(period: string, bucket: AdminBucket, lang?: string): string {
+  const date = periodDate(period);
+  if (Number.isNaN(date.getTime())) return period;
+  const options: Intl.DateTimeFormatOptions =
+    bucket === "hour"
+      ? { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }
+      : bucket === "month"
+        ? { month: "short", year: "numeric" }
+        : { day: "numeric", month: "short", year: "numeric" };
+  return new Intl.DateTimeFormat(lang, options).format(date);
+}
+
+/**
+ * Estimated cost, each currency on its own ("€1.20 · $0.40"); null when no
+ * price applies -- a missing price is not a zero.
+ */
+export function fmtCost(cost: Record<string, number> | null | undefined, lang?: string): string | null {
+  const entries = Object.entries(cost ?? {});
+  if (entries.length === 0) return null;
+  return entries.map(([currency, amount]) => fmtMoney(amount, currency, lang)).join(" · ");
+}
+
+/** A moment as date and time in the UI language. */
+export function fmtWhen(iso: string | null | undefined, lang?: string): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat(lang, { dateStyle: "medium", timeStyle: "short" }).format(date);
+}

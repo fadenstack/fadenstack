@@ -315,6 +315,7 @@ export default function ChatPage() {
       onSkills: chatSkills.value.enabled ? () => navigate("/skills") : undefined,
       onAgents: agentsAllowed ? () => navigate("/agents") : undefined,
       onCheckContent: checkAllowed ? () => navigate("/check-content") : undefined,
+      onUsage: () => navigate("/usage"),
       phoneNav: isPhone
         ? { hand: navHand, open: sidebarOpen, onOpen: () => setSidebarOpen(true) }
         : null,
