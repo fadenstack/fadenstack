@@ -33,6 +33,7 @@ NAMES = (
     "hourly_retention_days",
     "daily_retention_months",
     "time_zone",
+    "privacy_notice_url",
 )
 #: The smallest k there is, whatever is stored (M04: raisable, never lower).
 K_FLOOR = 5
@@ -50,6 +51,7 @@ class UsageSettings:
     hourly_retention_days: int
     daily_retention_months: int
     time_zone: str
+    privacy_notice_url: str
 
     @property
     def k(self) -> int:

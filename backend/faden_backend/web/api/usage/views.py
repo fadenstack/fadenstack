@@ -106,6 +106,8 @@ async def my_usage(
             "granularity": config.person_granularity,
             "retention_days": config.person_retention_days,
             "views_of_my_data": len(await people.views_of(session, user.id)),
+            # The organisation's privacy notice on usage metering, to link to (M14); null without one.
+            "notice_url": config.privacy_notice_url or None,
         },
     }
 

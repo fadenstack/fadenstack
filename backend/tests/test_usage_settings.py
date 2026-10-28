@@ -38,6 +38,7 @@ DEFAULTS = {
     "hourly_retention_days": 90,
     "daily_retention_months": 25,
     "time_zone": "UTC",
+    "privacy_notice_url": "",
 }
 
 
@@ -121,6 +122,8 @@ async def test_the_defaults(client: AsyncClient, admin: Any) -> None:
          [{"field": "min_group_size", "code": "out_of_range"}, {"field": "time_zone", "code": "invalid"}]),
         ({"person_retention_days": 30}, [{"field": "person_retention_days", "code": "out_of_range"}]),
         ({"person_granularity": "hour"}, [{"field": "person_granularity", "code": "invalid"}]),
+        ({"privacy_notice_url": "http://intranet/privacy"}, [{"field": "privacy_notice_url", "code": "invalid"}]),
+        ({"privacy_notice_url": "https://"}, [{"field": "privacy_notice_url", "code": "invalid"}]),
         ({"min_group_size": "5"}, [{"field": "min_group_size", "code": "invalid"}]),
         ({"device_tracking": True}, [{"field": "device_tracking", "code": "invalid"}]),
     ],
@@ -314,3 +317,22 @@ def test_the_bundles_have_every_statement_text_and_no_key_twice(language: str) -
     bundle = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=_pairs_without_duplicates)
     english = json.loads((settings.i18n_path / "en" / "common.json").read_text(encoding="utf-8"))
     assert set(bundle["usage"]["statement"]) == set(english["usage"]["statement"])
+
+
+# ── The CLI (``faden deploy`` writes the host's time zone) ──────────
+
+
+def test_the_cli_writes_the_usage_settings_but_the_switch() -> None:
+    from faden_backend.tools.admin import _CLI_SETTINGS as CLI_SETTINGS
+    from faden_backend.tools.admin import _cli_value as cli_value
+
+    assert "usage.time_zone" in CLI_SETTINGS and "usage.min_group_size" in CLI_SETTINGS
+    assert "usage.person_reporting" not in CLI_SETTINGS, "only in the console, in Root Mode"
+    assert cli_value("usage.time_zone", "Europe/Berlin") == ("Europe/Berlin", None)
+    assert cli_value("usage.min_group_size", "10") == (10, None)
+    assert cli_value("usage.person_granularity", "month") == ("month", None)
+    for key, raw in (("usage.time_zone", "Mars/Olympus"), ("usage.min_group_size", "3"),
+                     ("usage.min_group_size", "ten"), ("chat.deleted_retention_days", "-1")):
+        value, problem = cli_value(key, raw)
+        assert value is None and problem, (key, raw)
+    assert cli_value("chat.deleted_retention_days", "45") == (45, None)
