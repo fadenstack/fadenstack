@@ -93,7 +93,7 @@ const PAGES: PageHelpDef[] = [
   {
     prefix: "/admin/usage",
     id: "usage",
-    actions: ["totals", "groups", "small", "people", "settings"],
+    actions: ["totals", "groups", "tree", "small", "people", "settings"],
     doc: "administer/usage#the-usage-page",
   },
   {

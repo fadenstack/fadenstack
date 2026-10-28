@@ -19,16 +19,33 @@ import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { useTheme } from "@mui/material/styles";
 
-import { StatGrid, StatTile, TimeSeriesChart } from "~/components/dashboard/kit";
+import Box from "@mui/material/Box";
+
+import { StatGrid, StatTile, TimeSeriesChart, WidgetCard, WidgetEmpty } from "~/components/dashboard/kit";
 import { fmtInt } from "~/components/dashboard/format";
-import type { AdminBucket, Measures, UsagePeriod } from "~/api/usage";
+import { isHidden, type AdminBucket, type Measures, type UsagePeriod, type UsageSection } from "~/api/usage";
 
 import { fmtCost, periodLabel } from "./usageFormat";
 
-/** Requests, tokens in and out, the estimated cost, failures: the totals of a period. */
-export function UsageTotals({ totals, before }: { totals: Measures; before?: ReactNode }) {
+/**
+ * Requests, tokens in and out, the estimated cost, failures: the totals of a period. Totals the server
+ * hides (fewer than k people in the range) show as gaps, with `hiddenHint` saying why.
+ */
+export function UsageTotals({ totals, before, hiddenHint }: { totals: Measures; before?: ReactNode; hiddenHint?: string }) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
+  if (isHidden(totals)) {
+    const gap = (label: string) => <StatTile label={label} value={null} emptyHint={hiddenHint} />;
+    return (
+      <StatGrid>
+        {before}
+        {gap(t("usage.measures.requests"))}
+        {gap(t("usage.measures.input_tokens"))}
+        {gap(t("usage.measures.output_tokens"))}
+        {gap(t("usage.measures.cost"))}
+      </StatGrid>
+    );
+  }
   const cost = fmtCost(totals.cost, lang);
   return (
     <StatGrid>
@@ -71,7 +88,7 @@ export function UsageSeriesChart({
 }) {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
-  const value = (p: UsagePeriod & { suppressed?: boolean }, n: number) => (p.suppressed ? null : n);
+  const value = (p: UsagePeriod & { suppressed?: boolean }, n: number | null) => (p.suppressed ? null : n);
   return (
     <TimeSeriesChart
       x={series.map((p) => p.period)}
@@ -150,7 +167,8 @@ export function MeasuresTable({
         </TableHead>
         <TableBody>
           {rows.map((row) => {
-            const m = row.measures;
+            // Measures the server hid (fewer than k people) are no figures either.
+            const m = row.measures && !isHidden(row.measures) ? row.measures : null;
             const cost = m ? fmtCost(m.cost, lang) : null;
             return (
               <TableRow key={row.key}>
@@ -178,6 +196,40 @@ export function MeasuresTable({
         </TableBody>
       </Table>
     </TableContainer>
+  );
+}
+
+/** A block from an extension (budgets, later): its heading by kind, then its fields as they come. */
+export function UsageSectionCard({ section }: { section: UsageSection }) {
+  const { t, i18n } = useTranslation();
+  const number = new Intl.NumberFormat(i18n.language);
+  const show = (value: unknown): string => {
+    if (value === null || value === undefined) return "–";
+    if (typeof value === "number") return number.format(value);
+    if (typeof value === "boolean") return value ? t("common.yes") : t("common.no");
+    if (typeof value === "string") return value;
+    return JSON.stringify(value);
+  };
+  const fields = Object.entries(section.data ?? {});
+  return (
+    <WidgetCard title={t(`usage.sections.${section.kind}`, { defaultValue: section.kind })}>
+      {fields.length === 0 ? (
+        <WidgetEmpty message={t("usage.no_data")} />
+      ) : (
+        <Box component="dl" sx={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 0.75, m: 0 }}>
+          {fields.map(([key, value]) => (
+            <Box key={key} sx={{ display: "contents" }}>
+              <Typography component="dt" variant="body2" color="text.secondary">
+                {t(`usage.section_fields.${key}`, { defaultValue: key })}
+              </Typography>
+              <Typography component="dd" variant="body2" sx={{ m: 0, textAlign: "right", overflowWrap: "anywhere" }}>
+                {show(value)}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+      )}
+    </WidgetCard>
   );
 }
 

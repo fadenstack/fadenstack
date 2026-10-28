@@ -4837,7 +4837,6 @@
         "provider": "按提供商"
       },
       "order_note": "按名称排列；此处不做任何排名。",
-      "no_label": "未设置",
       "reporting_off": "按人员统计已关闭：没有人能看到单个人员的数据。",
       "reporting_on_no_right": "按人员统计已开启。只有拥有用量审计员角色的人员才能看到单个人员的数据。",
       "people": {
@@ -4861,7 +4860,34 @@
         "col_period": "时间段",
         "export_title": "下载某个人的数据",
         "export_note": "每次下载都会连同您为此次查看说明的理由一起记录。"
-      }
+      },
+      "smaller_teams": "较小的组及其他",
+      "smaller_teams_hint": "因人数太少而未单独显示的下级组，以及直接属于 {{name}} 的人员",
+      "unassigned": "未分配",
+      "unassigned_hint": "没有用量归属组的人员",
+      "no_agent": "无智能体",
+      "unknown_model": "未知模型",
+      "unknown_provider": "未知提供商",
+      "expand": "显示 {{name}} 下的组",
+      "collapse": "隐藏 {{name}} 下的组",
+      "expand_all": "全部展开",
+      "collapse_all": "全部收起",
+      "structure_label": "组结构",
+      "structure": {
+        "recorded": "按记录",
+        "current": "当前结构"
+      },
+      "structure_hint": {
+        "recorded": "用量计在使用时该组所处的位置。",
+        "current": "过去的用量按当前的树归类。"
+      },
+      "totals_hidden": "在此时间段内使用本实例的人数少于 {{k}}：不显示合计。",
+      "smaller_teams_top_hint": "人数各少于 {{k}} 的组，合并在一起",
+      "deleted_team": "已删除的组",
+      "unhide": "仍然显示",
+      "unhide_title": "显示涵盖少于 {{k}} 人的数据",
+      "unhide_intro": "作为用量审计员，您可以在说明理由后查看这些数据。此次查看会连同您的理由一起记录，与查看单个人员的数据相同。",
+      "unhidden_note": "这些数据涵盖的人数少于 {{k}}。它们是以用量审计员身份向您显示的，每次查看都会连同您的理由一起记录。"
     },
     "errors": {
       "load_failed": "无法加载用量数据。",

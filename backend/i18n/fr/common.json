@@ -4837,7 +4837,6 @@
         "provider": "Par fournisseur"
       },
       "order_note": "Trié par nom ; rien n'est classé ici.",
-      "no_label": "Non défini",
       "reporting_off": "Le suivi par personne est désactivé : personne ne voit les chiffres d'une seule personne.",
       "reporting_on_no_right": "Le suivi par personne est activé. Seules les personnes ayant le rôle d'auditeur d'utilisation voient les chiffres de personnes individuelles.",
       "people": {
@@ -4861,7 +4860,34 @@
         "col_period": "Période",
         "export_title": "Télécharger les données d'une personne",
         "export_note": "Chaque téléchargement est enregistré avec le motif indiqué pour cette consultation."
-      }
+      },
+      "smaller_teams": "Petites équipes et autres",
+      "smaller_teams_hint": "Sous-équipes trop petites pour apparaître seules, et les personnes directement dans {{name}}",
+      "unassigned": "Non affecté",
+      "unassigned_hint": "Personnes sans groupe d'usage",
+      "no_agent": "Sans agent",
+      "unknown_model": "Modèle inconnu",
+      "unknown_provider": "Fournisseur inconnu",
+      "expand": "Afficher les équipes sous {{name}}",
+      "collapse": "Masquer les équipes sous {{name}}",
+      "expand_all": "Tout ouvrir",
+      "collapse_all": "Tout fermer",
+      "structure_label": "Structure des équipes",
+      "structure": {
+        "recorded": "Tel qu'enregistré",
+        "current": "Structure actuelle"
+      },
+      "structure_hint": {
+        "recorded": "L'utilisation compte là où se trouvait l'équipe au moment de l'utilisation.",
+        "current": "L'utilisation passée suit l'arbre actuel."
+      },
+      "totals_hidden": "Moins de {{k}} personnes ont utilisé l'instance sur cette période : les totaux ne sont pas affichés.",
+      "smaller_teams_top_hint": "Équipes de moins de {{k}} personnes chacune, réunies",
+      "deleted_team": "Une équipe supprimée depuis",
+      "unhide": "Afficher quand même",
+      "unhide_title": "Afficher des chiffres sur moins de {{k}} personnes",
+      "unhide_intro": "En tant qu'auditeur d'utilisation, vous pouvez voir ces chiffres en indiquant un motif. La consultation est enregistrée avec votre motif, comme la consultation des chiffres d'une personne.",
+      "unhidden_note": "Ces chiffres couvrent moins de {{k}} personnes. Ils vous sont montrés en tant qu'auditeur d'utilisation, et chaque consultation est enregistrée avec votre motif."
     },
     "errors": {
       "load_failed": "Les chiffres d'utilisation n'ont pas pu être chargés.",

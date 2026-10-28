@@ -4837,7 +4837,6 @@
         "provider": "Nach Anbieter"
       },
       "order_note": "Nach Namen sortiert; hier wird nichts in eine Rangfolge gebracht.",
-      "no_label": "Nicht gesetzt",
       "reporting_off": "Die personenbezogene Auswertung ist ausgeschaltet: Niemand sieht die Zahlen einer einzelnen Person.",
       "reporting_on_no_right": "Die personenbezogene Auswertung ist eingeschaltet. Nur Personen mit der Rolle Nutzungsprüfer sehen die Zahlen einzelner Personen.",
       "people": {
@@ -4861,7 +4860,34 @@
         "col_period": "Zeitraum",
         "export_title": "Daten einer Person herunterladen",
         "export_note": "Jeder Download wird mit der Begründung protokolliert, die Sie für diese Einsicht angegeben haben."
-      }
+      },
+      "smaller_teams": "Kleinere Teams und weitere",
+      "smaller_teams_hint": "Unterteams, die zu klein sind, um einzeln zu erscheinen, und die Personen direkt in {{name}}",
+      "unassigned": "Nicht zugeordnet",
+      "unassigned_hint": "Personen ohne Nutzungsgruppe",
+      "no_agent": "Ohne Agent",
+      "unknown_model": "Unbekanntes Modell",
+      "unknown_provider": "Unbekannter Anbieter",
+      "expand": "Teams unter {{name}} zeigen",
+      "collapse": "Teams unter {{name}} ausblenden",
+      "expand_all": "Alle öffnen",
+      "collapse_all": "Alle schließen",
+      "structure_label": "Teamstruktur",
+      "structure": {
+        "recorded": "Wie erfasst",
+        "current": "Heutige Struktur"
+      },
+      "structure_hint": {
+        "recorded": "Die Nutzung zählt dort, wo das Team zur Zeit der Nutzung stand.",
+        "current": "Frühere Nutzung folgt dem heutigen Baum."
+      },
+      "totals_hidden": "Weniger als {{k}} Personen haben die Instanz in diesem Zeitraum genutzt: Die Summen werden nicht gezeigt.",
+      "smaller_teams_top_hint": "Teams mit jeweils weniger als {{k}} Personen, zusammen",
+      "deleted_team": "Ein inzwischen gelöschtes Team",
+      "unhide": "Trotzdem zeigen",
+      "unhide_title": "Zahlen über weniger als {{k}} Personen zeigen",
+      "unhide_intro": "Als Nutzungsprüfer dürfen Sie diese Zahlen mit Begründung sehen. Die Einsicht wird mit Ihrer Begründung protokolliert, wie die Einsicht in die Zahlen einer Person.",
+      "unhidden_note": "Diese Zahlen umfassen weniger als {{k}} Personen. Sie werden Ihnen als Nutzungsprüfer gezeigt, und jede Einsicht wird mit Ihrer Begründung protokolliert."
     },
     "errors": {
       "load_failed": "Die Nutzungszahlen konnten nicht geladen werden.",

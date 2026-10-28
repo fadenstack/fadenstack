@@ -352,7 +352,8 @@
       "action_groups": "Nach Nutzungsgruppe, Agent, Modell oder Anbieter gruppieren; Gruppen unter der Mindestgruppengröße zählen in einer Zeile „Weniger als … Personen“",
       "action_small": "Ein Hinweis warnt, wenn weniger Personen als die Mindestgruppengröße die Instanz nutzen: Ihre Summen gelten dann als personenbezogene Daten",
       "action_people": "Nutzungsprüfer sehen bei eingeschalteter personenbezogener Auswertung die Zahlen pro Person nach Angabe einer Begründung; jede Einsicht wird protokolliert",
-      "action_settings": "Einstellungen → Nutzung und Datenschutz legt die Mindestgruppengröße, die Aufbewahrungsfristen, die Limits und die personenbezogene Auswertung fest"
+      "action_settings": "Einstellungen → Nutzung und Datenschutz legt die Mindestgruppengröße, die Aufbewahrungsfristen, die Limits und die personenbezogene Auswertung fest",
+      "action_tree": "Teams als Baum: ein Team zu seinen Unterteams öffnen, wie erfasst oder in der heutigen Struktur"
     },
     "logs": {
       "title": "Logs & Audit",

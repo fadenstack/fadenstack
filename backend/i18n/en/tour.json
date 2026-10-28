@@ -352,7 +352,8 @@
       "action_groups": "Group by usage group, agent, model or provider; groups below the minimum group size are counted in one row, \"Fewer than ... people\"",
       "action_small": "A banner warns when fewer people than the minimum group size use the instance: its totals then count as person-level data",
       "action_people": "Usage auditors, with person-level reporting on, see figures per person after giving a reason; each view is recorded",
-      "action_settings": "Settings → Usage and privacy sets the minimum group size, the retention periods, the limits and person-level reporting"
+      "action_settings": "Settings → Usage and privacy sets the minimum group size, the retention periods, the limits and person-level reporting",
+      "action_tree": "Teams as a tree: open a team to its sub-teams, as recorded or in today's structure"
     },
     "logs": {
       "title": "Logs & Audit",

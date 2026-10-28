@@ -22,20 +22,28 @@ const ADMIN = "/api/admin/usage";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-/** What every figure carries. `cost` per currency; `{}` when no price applies. */
+/**
+ * What every figure carries. `cost` per currency; `{}` when no price applies. A figure about fewer than
+ * k people is hidden: every measure null, `cost` too (M04) -- see `isHidden`.
+ */
 export interface Measures {
-  requests: number;
+  requests: number | null;
   /** Status 400 or above, refusals not counted. */
-  failed: number;
+  failed: number | null;
   /** Refused by a limit or an admission check. */
-  refused: number;
+  refused: number | null;
   /** All input, cached included. */
-  input_tokens: number;
-  cached_input_tokens: number;
+  input_tokens: number | null;
+  cached_input_tokens: number | null;
   /** All output, reasoning included. */
-  output_tokens: number;
-  reasoning_tokens: number;
-  cost: Record<string, number>;
+  output_tokens: number | null;
+  reasoning_tokens: number | null;
+  cost: Record<string, number> | null;
+}
+
+/** A figure the server hides (fewer than k people): its measures are null. */
+export function isHidden(measures: Pick<Measures, "requests">): boolean {
+  return measures.requests === null;
 }
 
 export type MyBucket = "day" | "month";
@@ -100,16 +108,26 @@ export interface AdminUsagePeriod extends UsagePeriod {
 }
 
 /**
- * A group of the admin view. `other`: the one row the groups with fewer than
- * k people were merged into (it holds at least k itself); its `people` is null.
+ * A group of the admin view. `other`: the row the groups with fewer than k people were merged into (it
+ * holds at least k itself, else its measures are null); its `people` is null. `key` null and `other`
+ * false: no team ("Unassigned": people without a usage group), no agent, an unknown model or provider.
+ *
+ * By team the rows form a tree: `parent_key` (null at the top) and `path` (keys, top first); a team's
+ * measures include its sub-teams; the sub-teams of a parent too small to show alone come as one `other`
+ * row with that `parent_key` ("smaller teams").
  */
 export interface AdminUsageGroup extends Measures {
   key: string | null;
   label: string | null;
-  other?: boolean;
+  other: boolean;
   people: number | null;
   suppressed: boolean;
+  parent_key?: string | null;
+  path?: string[];
 }
+
+/** By team: the tree as it was when the usage happened (`recorded`), or as it is today (`current`). */
+export type TeamStructure = "recorded" | "current";
 
 export interface AdminUsage {
   time_zone: string;
@@ -128,6 +146,15 @@ export interface AdminUsage {
   person_reporting: boolean;
   /** Person-level reporting is on and the caller holds `usage.people:audit`. */
   can_view_people: boolean;
+  /** Blocks an extension adds (budgets, later). */
+  sections?: UsageSection[];
+  /** By team: the structure the rows follow. */
+  structure?: TeamStructure;
+  /**
+   * Totals and series about fewer than k people shown anyway: to a usage auditor with person-level
+   * reporting on, for the reason sent (recorded like a per-person view).
+   */
+  unhidden?: boolean;
 }
 
 /** Whose per-person figures: one team or one person, and why. */
@@ -265,8 +292,14 @@ export const usageApi = {
     return `${ME}/export${query({ format })}`;
   },
 
-  /** Totals and groups, k-suppressed. */
-  admin(params: RangeParams & { bucket?: AdminBucket; group_by?: GroupBy } = {}) {
+  /**
+   * Totals and groups, k-suppressed; by team, as recorded (default) or in today's structure. `reason`
+   * (a usage auditor's, 10-500 characters) shows totals and series about fewer than k people anyway;
+   * refused like `people`.
+   */
+  admin(
+    params: RangeParams & { bucket?: AdminBucket; group_by?: GroupBy; structure?: TeamStructure; reason?: string } = {},
+  ) {
     return request<AdminUsage>(`${ADMIN}${query({ ...params })}`);
   },
 

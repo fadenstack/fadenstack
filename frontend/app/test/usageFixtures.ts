@@ -15,6 +15,20 @@ export function measures(overrides: Partial<Measures> = {}): Measures {
   };
 }
 
+/** The figures of a cell the server hides (fewer than k people): every measure null, cost too. */
+export function hiddenMeasures(): Measures {
+  return {
+    requests: null,
+    failed: null,
+    refused: null,
+    input_tokens: null,
+    cached_input_tokens: null,
+    output_tokens: null,
+    reasoning_tokens: null,
+    cost: null,
+  };
+}
+
 export function myUsage(overrides: Partial<MyUsage> = {}): MyUsage {
   return {
     time_zone: "Europe/Berlin",
@@ -48,8 +62,8 @@ export function adminUsage(overrides: Partial<AdminUsage> = {}): AdminUsage {
     totals: { ...measures(), people: 21 },
     series: [{ period: "2026-10-28", suppressed: false, ...measures() }],
     groups: [
-      { key: "g-sales", label: "Sales", people: 7, suppressed: false, ...measures({ requests: 70 }) },
-      { key: "g-eng", label: "Engineering", people: 9, suppressed: false, ...measures({ requests: 900 }) },
+      { key: "g-sales", label: "Sales", other: false, people: 7, suppressed: false, ...measures({ requests: 70 }) },
+      { key: "g-eng", label: "Engineering", other: false, people: 9, suppressed: false, ...measures({ requests: 900 }) },
       { key: null, label: null, other: true, people: null, suppressed: true, ...measures({ requests: 30 }) },
     ],
     person_reporting: false,
