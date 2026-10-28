@@ -25,7 +25,8 @@ someone's access.
     | `default_user` | The chat: chats, projects and attachments, in the chat and through the API, their own skills (create and share), and reading the knowledge base's collections that are open to them. Every new account gets it unless you pick other roles. |
     | `viewer` | Reading the state of models, clusters, machines, containers and logs, through the API. |
     | `operator` | What `viewer` gives, and running models through the API: creating, changing, scaling, stopping and starting clusters and deployments. Not deleting. |
-    | `admin` | Every permission, including deleting, making a skill visible to the whole organisation (`skills:publish`), administering every skill (`skills:manage`), and creating and deleting agents (`agents:create`, `agents:delete`). |
+    | `admin` | Every permission but one, including deleting, making a skill visible to the whole organisation (`skills:publish`), administering every skill (`skills:manage`), creating and deleting agents (`agents:create`, `agents:delete`), and the usage figures for groups (`usage:read`). Not the one that `usage_auditor` gives. |
+    | `usage_auditor` | Looking at one person's usage figures while person-level reporting is on, with a reason each time (`usage.people:audit`). Nobody holds it at installation, and being a superuser does not give it. See [Usage and privacy](usage-privacy.md#looking-at-one-persons-figures). |
     | `rag_manager`, `rag_editor`, `rag_viewer` | Managing or editing the knowledge base (`rag_manager`, `rag_editor`: they see every collection and set who reads each), or reading it (`rag_viewer`). |
 
 !!! note
@@ -211,8 +212,9 @@ server; `faden chats orphans` lists it and `faden chats orphans --erase` erases 
 Two rights are about trust rather than work, and each can be given, taken back and handed over:
 
 - An **administrator** (superuser) may do everything in the console.
-- An **auditor** (the built-in role `auditor`) reads the audit log and changes nothing. Administrators read it
-  too; viewers and operators do not, because it holds e-mail and IP addresses.
+- An **auditor** (the built-in role `auditor`) reads the audit log and the usage figures for groups
+  (**Observability → Usage**), and changes nothing. Administrators read them too; viewers and operators do not,
+  because the audit log holds e-mail and IP addresses.
 
 To change them, start **Root Mode** first, then open **Access Control → Users** and select **Rights** (the
 shield icon) in the person's row:

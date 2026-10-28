@@ -61,6 +61,8 @@
 "Werden meine personenbezogenen Daten geschützt oder maskiert?" = "personal-data-protection"
 "Was wird an externe Provider wie OpenAI gesendet?" = "models-at-outside-providers"
 "Wie lösche ich meine Chats oder Dateien?" = "deleting"
+"Kann mein Administrator sehen, wie viel ich nutze?" = "your-usage"
+"Wo sehe ich meine eigene Nutzung, und kann ich sie herunterladen?" = "your-usage"
 "Warum steht in einer Antwort <PERSON> statt eines Namens?" = "when-it-does-not-work"
 
 ["use/account.md"]

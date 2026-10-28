@@ -63,6 +63,8 @@
 "Is my personal data protected or masked?" = "personal-data-protection"
 "What is sent to outside providers such as OpenAI?" = "models-at-outside-providers"
 "How do I delete my chats or files?" = "deleting"
+"Can my administrator see how much I use?" = "your-usage"
+"Where do I see my own usage, and can I download it?" = "your-usage"
 "Why does an answer show <PERSON> instead of a name?" = "when-it-does-not-work"
 
 ["use/account.md"]
