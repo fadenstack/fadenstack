@@ -91,6 +91,12 @@ const PAGES: PageHelpDef[] = [
     doc: "administer/usage",
   },
   {
+    prefix: "/admin/usage",
+    id: "usage",
+    actions: ["totals", "groups", "small", "people", "settings"],
+    doc: "administer/usage",
+  },
+  {
     prefix: "/admin/logs",
     id: "logs",
     actions: ["filter", "audit"],
