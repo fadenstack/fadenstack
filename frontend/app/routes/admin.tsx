@@ -32,6 +32,8 @@ import {
   readCachedAccessAnyAge,
   writeCachedAccess,
   clearCachedAccess,
+  consolePages,
+  mayOpen,
   type NavEntry,
 } from "~/lib/adminConstants";
 import { AdminTopbar } from "~/components/AdminTopbar";
@@ -143,7 +145,8 @@ function AdminLayoutInner() {
   async function ensureAuthenticated() {
     try {
       const access = await fetchMeAccessDedup();
-      if (!access.is_superuser) {
+      // Superusers, and those a permission lets onto some console pages (consolePages).
+      if (!access.is_superuser && consolePages(false, accessKeys(access))?.length === 0) {
         writeCachedAccess({
           email: access.email,
           isSuperuser: access.is_superuser,
@@ -188,7 +191,7 @@ function AdminLayoutInner() {
     const freshCachedAccess = readCachedAccess();
     const cachedAccess = freshCachedAccess ?? readCachedAccessAnyAge();
     if (cachedAccess !== null) {
-      if (!cachedAccess.isSuperuser) {
+      if (!cachedAccess.isSuperuser && consolePages(false, cachedAccess.permissions)?.length === 0) {
         navigate("/chat", { replace: true });
         return;
       }
@@ -280,6 +283,14 @@ function AdminLayoutInner() {
     await loadRootStatus();
   }
 
+  // The pages someone who is not a superuser may open; any other console address leads to the first.
+  const pages = consolePages(isSuperuser, permissionKeys);
+  useEffect(() => {
+    if (!authReady || pages === null || mayOpen(pages, location.pathname)) return;
+    navigate(pages[0] ?? "/chat", { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authReady, isSuperuser, permissionKeys, location.pathname]);
+
   const isRootActive = rootStatus?.active ?? false;
   /** No permission needed, or this one, or (a list) any of them. */
   const hasPermission = (permission?: string | string[]): boolean => {
@@ -294,16 +305,20 @@ function AdminLayoutInner() {
   // Determine RAG mode for nav filtering
   const { mode: ragMode } = useRagMode();
 
-  // Filter entries by permissions / modules / superuser, then split by saved order
+  // Filter entries by permissions / modules / superuser (and, for anyone else, the pages they may
+  // open), then split by saved order
+  const opens = (to: string) => mayOpen(pages, to.split("?")[0]);
   const visibleEntries = NAV.map((entry) => {
     if (entry.module && !isModuleEnabled(entry.module)) return null;
     if (entry.kind === "leaf") {
       if (entry.superuserOnly && !isSuperuser) return null;
+      if (!opens(entry.to)) return null;
       return hasPermission(entry.permission) ? entry : null;
     }
     const children = entry.children.filter((child) => {
       if (child.module && !isModuleEnabled(child.module)) return false;
       if (child.superuserOnly && !isSuperuser) return false;
+      if (!opens(child.to)) return false;
       if (!hasPermission(child.permission)) return false;
       if (child.ragMode && ragMode && child.ragMode !== ragMode) return false;
       return true;

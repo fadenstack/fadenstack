@@ -168,6 +168,37 @@ export function clearCachedAccess() {
   }
 }
 
+// ── Who opens the console ────────────────────────────────────────
+//
+// The console is the superusers'. Someone else enters it only for the pages a permission of theirs opens
+// (the platform auditor, and anyone else with `usage:read`, for the Usage page), plus their own profile;
+// the navigation shows those pages only, and any other console address leads back to them. The server
+// checks every call anyway; this only keeps the console from showing pages that would answer 403.
+
+/** Console pages someone who is not a superuser may open, by the permission that opens them. */
+export const CONSOLE_PAGES_BY_PERMISSION: Readonly<Record<string, readonly string[]>> = {
+  "usage:read": ["/admin/usage"],
+};
+
+/** Pages everyone let into the console has. */
+const CONSOLE_PAGES_FOR_ALL = ["/admin/profile"];
+
+/** The console pages someone may open: null for a superuser (every page); empty: the console stays shut. */
+export function consolePages(isSuperuser: boolean, permissions: Iterable<string>): string[] | null {
+  if (isSuperuser) return null;
+  const keys = new Set(permissions);
+  const opened = Object.entries(CONSOLE_PAGES_BY_PERMISSION)
+    .filter(([permission]) => keys.has(permission))
+    .flatMap(([, pages]) => pages);
+  return opened.length ? [...opened, ...CONSOLE_PAGES_FOR_ALL] : [];
+}
+
+/** Whether `pathname` (no query) is one of `pages`, or below one; every page for null. */
+export function mayOpen(pages: string[] | null, pathname: string): boolean {
+  if (pages === null) return true;
+  return pages.some((page) => pathname === page || pathname.startsWith(`${page}/`));
+}
+
 // ── Navigation structure ─────────────────────────────────────────
 
 export interface NavChild {

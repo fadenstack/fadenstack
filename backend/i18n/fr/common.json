@@ -4892,7 +4892,8 @@
       "unhide": "Afficher quand même",
       "unhide_title": "Afficher des chiffres sur moins de {{k}} personnes",
       "unhide_intro": "En tant qu'auditeur d'utilisation, vous pouvez voir ces chiffres en indiquant un motif. La consultation est enregistrée avec votre motif, comme la consultation des chiffres d'une personne.",
-      "unhidden_note": "Ces chiffres couvrent moins de {{k}} personnes. Ils vous sont montrés en tant qu'auditeur d'utilisation, et chaque consultation est enregistrée avec votre motif."
+      "unhidden_note": "Ces chiffres couvrent moins de {{k}} personnes. Ils vous sont montrés en tant qu'auditeur d'utilisation, et chaque consultation est enregistrée avec votre motif.",
+      "menu": "Utilisation de toutes les équipes"
     },
     "errors": {
       "load_failed": "Les chiffres d'utilisation n'ont pas pu être chargés.",

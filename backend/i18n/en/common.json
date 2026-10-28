@@ -4890,7 +4890,8 @@
       "unhide": "Show anyway",
       "unhide_title": "Show figures about fewer than {{k}} people",
       "unhide_intro": "As a usage auditor you may see these figures for a stated reason. The view is recorded with your reason, as a look at one person's figures is.",
-      "unhidden_note": "These figures cover fewer than {{k}} people. They are shown to you as a usage auditor, and each view is recorded with your reason."
+      "unhidden_note": "These figures cover fewer than {{k}} people. They are shown to you as a usage auditor, and each view is recorded with your reason.",
+      "menu": "Usage of all teams"
     },
     "errors": {
       "load_failed": "The usage figures could not be loaded.",
