@@ -30,7 +30,7 @@ Fadenstack keeps your chats until they are deleted. See [Deleting](#deleting).
 |---|---|
 | You | Your chats, projects, files and skills |
 | Colleagues | None of your chats or files. Skills you share with them. The organisation's knowledge base is shared by everyone |
-| Administrators, in the console | That a chat, a project or a file exists (who, when), not its title, name or content. The sizes and types of your files. Your usage. Which tools ran and the kind of a failure, not what the tool answered. How often personal data was found, not the data itself. Every skill, including private ones. What they look at in the console is recorded in the audit log |
+| Administrators, in the console | That a chat, a project or a file exists (who, when), not its title, name or content. The sizes and types of your files. Usage in totals for groups, never yours alone; the requests they look at do not name who sent them (see [Your usage](#your-usage)). Which tools ran and the kind of a failure, not what the tool answered. How often personal data was found, not the data itself. Every skill, including private ones. What they look at in the console is recorded in the audit log |
 
 The console does not show administrators your conversations. The people who run the server do hold the key the chats are encrypted with, so use the chat as you would your organisation's e-mail: private from colleagues, but within your organisation's IT.
 
@@ -79,6 +79,18 @@ You can only make the protection stricter than your organisation's policy, never
 Your administrator can offer models that run at an outside provider, such as OpenAI or Azure, next to your organisation's own. When you pick one of those, everything the model needs to answer goes to that provider: your message, the earlier messages of the chat, the text of your attached files, project and skill instructions, tool results and knowledge passages. Personal data is masked first if the policy says so. The provider's own terms then apply.
 
 The model list does not always show where a model runs. If it matters for what you write, ask your administrator, or pick a model you know runs inside your organisation. See [Remote providers](../administer/providers.md).
+
+## Your usage
+
+**My usage**, in the menu behind your account button, shows how much you used: your tokens and estimated cost by day or month, by model, agent and project, and the limits that apply to everyone. **Download** gives you your data as JSON or CSV: your daily figures, your request records (time, model, tokens, cost, outcome; never what you wrote) and when someone looked at your figures, and why.
+
+- **You** see your own figures.
+- **Administrators** see totals for groups of at least five people, never your figures alone. When they look into a failed request, its record does not show who sent it.
+- **If your organisation has switched on person-level reporting**, **My usage** says so. A few named people may then look at your figures, by day or by month, each time giving a reason. **My usage** shows how often that happened; your download shows the date and the reason of each look, not who looked.
+
+Your figures are kept for the time **My usage** names (90 days unless your organisation chose otherwise), and are erased when your account is deleted. Your organisation uses them for costs and capacity, not to judge your work. See [Usage and privacy](../administer/usage-privacy.md).
+
+When a limit stops a request, the message names the limit, for example the instance's daily token limit. Ask your administrator if you need more.
 
 ## Tools and the knowledge base
 

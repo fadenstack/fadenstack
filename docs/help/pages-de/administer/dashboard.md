@@ -26,7 +26,7 @@ es um den Server steht, auf dem Fadenstack läuft. Diese Seite erklärt, was jed
 | **KI-Datenverkehr** | Wo Anfragen bedient wurden, mit dem internen Anteil in der Mitte des Rings, die meistgenutzten Ziele, die Zahl der Anfragen, ihre Geschwindigkeit (P50, P95) und Fehler, für **Heute**, **24 Std.**, **7 T.** oder **30 T.** | **Datenverkehr ansehen** öffnet die Kosten- und Nutzungsseiten. |
 | **Handlungsbedarf** | Aktuelle Probleme, die schwersten zuerst (siehe unten). | Beheben Sie sie, oder schalten Sie stumm, was Ihnen schon bekannt ist. |
 | **Lokale KI-Kapazität** | Cluster in Ordnung, Maschinen online, GPUs und freie GPUs sowie CPU, GPU und VRAM jeder Maschine. **Einfärben nach**: **Zustand**, **GPU** oder **VRAM**. | Wählen Sie eine Maschine oder Gruppe für Details; **Maschinen** öffnet die Maschinen. |
-| **Nutzung** | Anfragen pro Tag für die letzten **7 Tage** oder **30 Tage**, nach Ort der Bearbeitung. | Siehe [Nutzung und Kosten](usage.md). |
+| **Nutzung** | Anfragen pro Tag für die letzten **7 Tage** oder **30 Tage**, nach Ort der Bearbeitung. | Siehe [Nutzung und Limits](usage.md). |
 | **Integrationen** | **LLM-Provider** nach Standort und wie viele davon antworten, funktionsfähige **MCP-Server**, aktive **Skills**. | Jeder Eintrag öffnet seine Seite. |
 | **Plattformzustand** | Der Gesamtzustand, die Dienste, von denen Fadenstack abhängt (Datenbank, Message Queue, Grafana), die Module, Gateway-Fehler in der letzten Stunde und belegte Datenbankverbindungen. | Eine ausgefallene Abhängigkeit erscheint auch unter **Handlungsbedarf**. |
 | **Serverressourcen** | CPU, Arbeitsspeicher, Swap, Festplatte und GPU des Servers, auf dem Fadenstack läuft. | Wenig Speicherplatz erscheint unter **Handlungsbedarf**. |

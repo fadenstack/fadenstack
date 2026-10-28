@@ -63,6 +63,8 @@
 "Is my personal data protected or masked?" = "personal-data-protection"
 "What is sent to outside providers such as OpenAI?" = "models-at-outside-providers"
 "How do I delete my chats or files?" = "deleting"
+"Can my administrator see how much I use?" = "your-usage"
+"Where do I see my own usage, and can I download it?" = "your-usage"
 "Why does an answer show <PERSON> instead of a name?" = "when-it-does-not-work"
 
 ["use/account.md"]
@@ -175,9 +177,32 @@
 
 ["administer/usage.md"]
 "How do I see usage and costs?" = "where-to-see-it"
+"Where do I see my own usage?" = "your-own-usage"
 "How do I set prices for models?" = "set-prices"
-"How do I see usage per person or per group?" = "usage-per-person-and-per-group"
-"Can I set limits or budgets?" = "limits-and-budgets"
+"How do I see usage per team, agent or model?" = "the-usage-page"
+"Why does a row say fewer than five people?" = "the-minimum-group-size"
+"How do I limit requests or tokens per minute or per day?" = "limits-for-the-whole-instance"
+"Can I set limits or budgets?" = "limits-for-the-whole-instance"
+"What does a 429 or quota_tokens_per_day error mean?" = "what-people-see-when-a-limit-refuses"
+"Are the costs what the provider bills?" = "where-the-numbers-come-from"
+
+["administer/usage-privacy.md"]
+"Can administrators see how much each person uses?" = "private-by-default"
+"How do I switch on person-level usage reporting?" = "the-settings"
+"How long is usage data kept?" = "retention-and-erasure"
+"Who may look at one person's usage, and is it recorded?" = "looking-at-one-persons-figures"
+"What is the usage auditor role?" = "looking-at-one-persons-figures"
+"How does someone get a copy of their usage data (GDPR access request)?" = "your-own-view-and-the-download"
+"Is usage data deleted when an account is deleted?" = "retention-and-erasure"
+"Which usage data fields are stored?" = "the-data-fields"
+"May we use usage data to evaluate employees?" = "what-usage-data-is-for"
+
+["administer/usage-documents.md"]
+"What do we need for the works council and the DPO?" = ""
+"Is there an employee privacy notice for usage measurement?" = "employee-notice"
+"Is there a records-of-processing entry or a DPIA template?" = "records-of-processing-entry"
+"Is there a works-agreement annex for usage measurement?" = "works-agreement-annex"
+"How do we answer an access or erasure request about usage?" = "access-request-and-erasure-procedure"
 
 ["administer/llm-calls.md"]
 "Why did a request to a model fail?" = "why-a-call-failed"

@@ -61,6 +61,8 @@
 "Werden meine personenbezogenen Daten geschützt oder maskiert?" = "personal-data-protection"
 "Was wird an externe Provider wie OpenAI gesendet?" = "models-at-outside-providers"
 "Wie lösche ich meine Chats oder Dateien?" = "deleting"
+"Kann mein Administrator sehen, wie viel ich nutze?" = "your-usage"
+"Wo sehe ich meine eigene Nutzung, und kann ich sie herunterladen?" = "your-usage"
 "Warum steht in einer Antwort <PERSON> statt eines Namens?" = "when-it-does-not-work"
 
 ["use/account.md"]
@@ -173,9 +175,32 @@
 
 ["administer/usage.md"]
 "Wo sehe ich Nutzung und Kosten?" = "where-to-see-it"
+"Wo sehe ich meine eigene Nutzung?" = "your-own-usage"
 "Wie lege ich Preise für Modelle fest?" = "set-prices"
-"Wie sehe ich die Nutzung pro Person oder Gruppe?" = "usage-per-person-and-per-group"
-"Kann ich Limits oder Budgets festlegen?" = "limits-and-budgets"
+"Wie sehe ich die Nutzung pro Team, Agent oder Modell?" = "the-usage-page"
+"Warum steht in einer Zeile „weniger als fünf Personen“?" = "the-minimum-group-size"
+"Wie begrenze ich Anfragen oder Tokens pro Minute oder pro Tag?" = "limits-for-the-whole-instance"
+"Kann ich Limits oder Budgets festlegen?" = "limits-for-the-whole-instance"
+"Was bedeutet ein Fehler 429 oder quota_tokens_per_day?" = "what-people-see-when-a-limit-refuses"
+"Sind die Kosten das, was der Provider berechnet?" = "where-the-numbers-come-from"
+
+["administer/usage-privacy.md"]
+"Können Administratoren sehen, wie viel jede Person nutzt?" = "private-by-default"
+"Wie schalte ich die personenbezogene Auswertung der Nutzung ein?" = "the-settings"
+"Wie lange werden Nutzungsdaten aufbewahrt?" = "retention-and-erasure"
+"Wer darf die Nutzung einer einzelnen Person ansehen, und wird das festgehalten?" = "looking-at-one-persons-figures"
+"Was ist die Rolle usage_auditor?" = "looking-at-one-persons-figures"
+"Wie bekommt jemand eine Kopie seiner Nutzungsdaten (Auskunft nach DSGVO)?" = "your-own-view-and-the-download"
+"Werden Nutzungsdaten gelöscht, wenn ein Konto gelöscht wird?" = "retention-and-erasure"
+"Welche Datenfelder zur Nutzung werden gespeichert?" = "the-data-fields"
+"Dürfen wir Nutzungsdaten zur Bewertung von Beschäftigten verwenden?" = "what-usage-data-is-for"
+
+["administer/usage-documents.md"]
+"Was brauchen wir für Betriebsrat und Datenschutzbeauftragten?" = ""
+"Gibt es Datenschutzhinweise für Beschäftigte zur Nutzungsmessung?" = "employee-notice"
+"Gibt es eine Vorlage für das Verarbeitungsverzeichnis oder die DSFA?" = "records-of-processing-entry"
+"Gibt es eine Anlage zur Betriebsvereinbarung für die Nutzungsmessung?" = "works-agreement-annex"
+"Wie beantworten wir ein Auskunfts- oder Löschersuchen zur Nutzung?" = "access-request-and-erasure-procedure"
 
 ["administer/llm-calls.md"]
 "Warum ist eine Anfrage an ein Modell fehlgeschlagen?" = "why-a-call-failed"

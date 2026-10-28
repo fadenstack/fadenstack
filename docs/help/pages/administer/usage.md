@@ -1,53 +1,186 @@
-# Usage and costs
+# Usage and limits
 
-Fadenstack counts every request that goes through its gateway: who sent it, which model answered and where it
-ran, how many tokens it took, how long it took, and what it would cost at the prices you set. This page shows
-where to see those figures, and how to make the cost estimates meaningful.
-
-![Cost Observability on the Overview tab: Estimated Spend, Total Requests, Total Tokens, Avg Latency and Error Rate, with Cost Over Time, Request Throughput, Latency Percentiles and Spend by Model below](../images/administer/observability.png)
-
-## What is counted
-
-For each request, the request log keeps:
-
-- the person, their **Usage group**, and the chat project or the agent it came from;
-- the model, and where it ran: on your machines, in your network or at an external provider;
-- the tokens: prompt, completion and total;
-- the time to the first token and the whole time;
-- the outcome: success or the error;
-- the estimated cost, when the model has a price.
-
-The text of the request and its answer is not part of it. Everything that goes through the gateway is
-counted: the chat, the agents, and applications using API tokens.
+Fadenstack counts every request that goes through its gateway: how many tokens it took, which model answered,
+and what it would cost at the prices you set. This page shows what is counted, where each person and the
+administrators see it, and how to limit what the whole instance uses. What the figures mean for people's data,
+and who may see whose, is on [Usage and privacy](usage-privacy.md).
 
 ## Where to see it
 
-| Where | What it shows |
+| Where | Who | What it shows |
+|---|---|---|
+| **My usage**, in the menu behind the account button | Everyone, for themselves | Their own tokens and estimated cost, the limits that apply, and a download of their data (see [Your own usage](#your-own-usage)). |
+| **Observability → Usage** | Administrators and auditors | Totals and a series over time, by team, agent, model or provider, only for groups of at least five people (see [The Usage page](#the-usage-page)). |
+| [Dashboard](dashboard.md) | Administrators | Today at a glance: **Requests today**, **Active users today**, **Kept in-house**, **Spend this month**, **Error rate (1 h)**; **AI traffic** (where requests were served) and **Usage** (requests per day, by where they were served). |
+| **Observability → Cost Dashboard** | Administrators | Spend, requests, tokens, speed and errors of the whole instance, and the prices (see [The cost and usage pages](#the-cost-and-usage-pages)). |
+| **Observability → LLM Calls** | Administrators | Each request and call: why one failed, what an agent did for one question, where calls went (see [LLM calls](llm-calls.md)). |
+| An agent's **Activity** tab | Administrators; the owner of a personal agent | Requests, errors, tokens, users and conversations of that agent, counts only, when at least five people used it in the range; its owner sees a personal agent's figures (see [Agents and add-ins](agents.md)). |
+| A deployment's page | Administrators | Requests, speed and failures of that model over the last minutes (see [Deployments](deployments.md)). |
+| **Observability → Data Residency** | Administrators | How much data went to your machines, your network and outside (see [Data residency](providers.md#data-residency)). |
+
+## What is counted
+
+Everything that goes through the gateway is counted: the chat, the agents, and applications using API tokens.
+For each request, the request log keeps:
+
+- the person, their **Usage group** (their team), and the chat project or the agent it came from;
+- the model, and where it ran: on your machines, in your network or at an external provider;
+- the tokens, and the time to the first token and the whole time;
+- the outcome: success, the error, or the limit that refused it;
+- the estimated cost, when the model has a price.
+
+The text of the request and its answer is not part of it. Every few minutes, Fadenstack adds the request log up
+into hourly and daily figures; the usage pages read those. The full list of what is stored, and for how long, is
+on [Usage and privacy](usage-privacy.md#the-data-fields).
+
+Each figure on the usage pages counts:
+
+| Figure | What it counts |
 |---|---|
-| [Dashboard](dashboard.md) | Today at a glance: **Requests today**, **Active users today**, **Kept in-house**, **Spend this month**, **Error rate (1 h)**; **AI traffic** (where requests were served) and **Usage** (requests per day, by where they were served). |
-| **Observability → Cost Dashboard** | The cost and usage pages (below). |
-| **Observability → LLM Calls** | Each request and call: why one failed, what an agent did for one question, where calls went (see [LLM calls](llm-calls.md)). |
-| An agent's **Activity** tab | Requests, errors, tokens, users and conversations of that agent, counts only (see [Agents and add-ins](agents.md)). |
-| A deployment's page | Requests, speed and failures of that model over the last minutes (see [Deployments](deployments.md)). |
-| **Observability → Data Residency** | How much data went to your machines, your network and outside (see [Data residency](providers.md#data-residency)). |
+| **Requests** | Every request that reached the gateway, failed and refused ones included. |
+| **Failed** | Requests that ended in an error (HTTP status 400 or higher). Refusals by a limit are not counted here. |
+| **Refused** | Requests a limit refused before they ran (see [Limits for the whole instance](#limits-for-the-whole-instance)). They used no tokens. |
+| **Input tokens** | What was sent to the model, cached tokens included. |
+| **Cached input tokens** | The part of the input the model or its provider took from a cache. Already part of the input tokens. |
+| **Output tokens** | What the model wrote, its reasoning included. |
+| **Reasoning tokens** | The part of the output a reasoning model spent thinking before it answered. Already part of the output tokens. |
+| **Estimated cost** | The tokens at the model's price (see [Where the numbers come from](#where-the-numbers-come-from)), per currency. |
+| **People** | How many different people the figure covers. |
+
+??? info "Days, months and the time zone"
+    Days and months begin at midnight in the usage time zone: **Settings → Usage and privacy**, **Time zone**
+    (`usage.time_zone`). Unless you change it, it is the server's time zone, or UTC when that is not known. The
+    daily limit starts again at the same midnight.
+
+## Your own usage
+
+Everyone who signs in sees their own usage under **My usage**, in the menu behind their account button:
+
+- their tokens and estimated cost by day or month, by model, by agent and by chat project;
+- the limits that apply to the instance, and how much of each is used at the moment;
+- whether person-level reporting is on, how finely and for how long their figures are kept, and how often a
+  usage auditor looked at them;
+- a download of their data, as JSON or CSV.
+
+The download holds their daily figures, their request records still in the request log (time, model, agent,
+tokens, cost and outcome; never what was written, never the device), and the date and the stated reason of
+each time a usage auditor looked at their figures, without the name of who looked. It answers what a person
+may ask under Art. 15 GDPR about their usage (see [Usage and privacy](usage-privacy.md#your-own-view-and-the-download)).
+
+## The Usage page
+
+The **Usage** page shows how much the instance uses, and where, without showing anyone's own figures.
+Administrators and people with the `auditor` role can open it.
+
+1. Open **Observability → Usage**.
+2. Pick a time range, and whether to show it by hour, day or month.
+3. Choose what each row is: a team (the **Usage group**), an agent, a model or a provider.
+
+The page shows the totals, the figures over time, and one row per team, agent, model or provider, with the
+figures of [What is counted](#what-is-counted). It never shows a person, a name or a ranking of people. Who may
+look at one person's figures, and how, is on
+[Usage and privacy](usage-privacy.md#looking-at-one-persons-figures).
+
+### The minimum group size
+
+Every figure on the page covers at least five different people: the **minimum group size**, which you can raise
+under **Settings → Usage and privacy** but not set below five.
+
+- A team, agent, model or provider used by fewer people in the range gets no row of its own. It is counted in a
+  row of its own kind, "fewer than five people", that holds all of them.
+- That row covers at least five people as well. Where the small groups together are fewer, the smallest groups
+  shown are moved into it until it does, so no group's figures follow from the total minus the other rows.
+- An hour, a day or a month in which fewer people used the instance shows no figures. Hours show only where at
+  least five people used it.
+- The same holds over time: where hiding a period would let it be worked out from the total minus the periods
+  shown, another period is hidden with it.
+- The number of people in the total shows only from five upwards.
+
+A team of three, or an agent one person uses, is therefore never shown on its own: its figures would be one
+person's under another name.
+
+!!! note "Small instances"
+    When fewer than five people used the instance in the range, the page says so. Every figure is then close to
+    one person's own, so handle the page as person-level data (see [Usage and privacy](usage-privacy.md)).
 
 ## The cost and usage pages
 
-![Cost Observability, opened from Observability → Cost Dashboard: the tabs Overview, Requests and Pricing, and the time ranges 7d to 90d with refresh and download at the top right](../images/administer/cost-dashboard-top.png)
+![Cost Observability on the Overview tab: Estimated Spend, Total Requests, Total Tokens, Avg Latency and Error Rate, with Cost Over Time, Request Throughput, Latency Percentiles and Spend by Model below](../images/administer/observability.png)
 
 Open **Observability → Cost Dashboard** (the page is titled **Cost Observability**) and pick a time range.
 
+![Cost Observability, opened from Observability → Cost Dashboard: the tabs Overview, Requests and Pricing, and the time ranges 7d to 90d with refresh and download at the top right](../images/administer/cost-dashboard-top.png)
+
 | Tab | What it shows |
 |---|---|
-| **Overview** | **Estimated Spend**, **Total Requests**, **Total Tokens**, **Avg Latency** and **Error Rate**, with **Cost Over Time**, **Request Throughput**, **Latency Percentiles**, **Spend by Model** and **Top Users**. |
-| **Requests** | Every request, newest first. Filter by **Model** or **User ID**, and open one for its details: tokens, cost, timing, the tools and skills it used, and the steps it went through. |
-| **Pricing** | The prices the estimates use (below). |
+| **Overview** | **Estimated Spend**, **Total Requests**, **Total Tokens**, **Avg Latency** and **Error Rate**, with **Cost Over Time**, **Request Throughput**, **Latency Percentiles** and **Spend by Model**. |
+| **Requests** | Every request, newest first. Filter by **Model**, and open one for its details: tokens, cost, timing, the tools and skills it used, and the steps it went through. |
+| **Pricing** | The prices the estimates use (see [Set prices](#set-prices)). |
 
 **Export CSV** downloads the requests of the range (up to 5,000 rows) for a spreadsheet.
 
-## Set prices
+The requests never show who sent them: not in the list, the details or the export, and not on **LLM Calls**
+either. One person's usage is shown only in the person-level view on **Usage** (see
+[Usage and privacy](usage-privacy.md#looking-at-one-persons-figures)).
 
-Costs are estimates from prices you set per model. They do not change what a provider bills you.
+## Limits for the whole instance
+
+Three limits keep the instance from being used up, by a runaway script or an agent going in circles. Each counts
+everyone's requests together, through the chat, the agents and the API, and keeps nothing about any person.
+
+| Limit | What it caps | Starts again |
+|---|---|---|
+| **Requests per minute** | The requests of everyone together | Every minute |
+| **Tokens per minute** | Input and output tokens of everyone together | Every minute |
+| **Tokens per day** | Input and output tokens of everyone together | At midnight in the usage time zone |
+
+1. Open **Settings** and select the **Usage and privacy** tab.
+2. Under the limits, enter a number for each limit you want. Leave a field empty for no limit.
+3. Select **Save**.
+
+The change is recorded in the audit log with your name (`usage.limits.update`). **My usage** shows everyone the
+limits and how much of each is used.
+
+??? info "How a limit counts a request"
+    - A request counts when it starts: its prompt and the most it may write (its `max_tokens`, or a default when
+      it sets none). When the answer is done, its real tokens replace that.
+    - A request a limit refuses does not count towards it.
+    - An answer that is already being written is never cut off: its tokens count once it is done, so the
+      instance can end up a little over a limit.
+
+Limits per team, per person or per agent, and budgets, are <span class="fs-planned">Planned</span>.
+
+### What people see when a limit refuses
+
+In the chat and in the agents, people get a message that names the limit, for example "this instance's daily
+token limit", and asks them to turn to an administrator. It says nothing about anyone's usage, and nobody else is
+told.
+
+Applications get the answer OpenAI's API gives, so their client libraries handle it as they would there: HTTP
+status `429` with an OpenAI error body (`error.message`, `error.type`, `error.code`).
+
+| Limit | `error.type` | `error.code` | `Retry-After` |
+|---|---|---|---|
+| Requests per minute | `rate_limit_error` | `rate_limit_rpm` | Seconds to the end of the minute |
+| Tokens per minute | `rate_limit_error` | `rate_limit_tpm` | Seconds to the end of the minute |
+| Tokens per day | `insufficient_quota` | `quota_tokens_per_day` | Seconds to the next day, with `x-should-retry: false` |
+
+OpenAI's client libraries wait and try again after a per-minute refusal by themselves; after a per-day refusal
+(`x-should-retry: false`) they do not. While a limit is set, every answer carries how much is left:
+`x-ratelimit-limit-requests`, `x-ratelimit-remaining-requests` and `x-ratelimit-reset-requests`, and the same
+three for `-tokens` (the reset as OpenAI writes it, for example `12s`).
+
+## Where the numbers come from
+
+- **Tokens** are what the model's provider reported for the request. Where it reports none, Fadenstack counts
+  them itself or estimates them; the request log says which (`provider`, `counted` or `estimated`).
+- **Costs** are estimates: the tokens at the price set for the model when the request ran. They do not change
+  what a provider bills you. A model without a price adds no cost; figures in more than one currency are shown
+  per currency, never converted.
+- **The usage pages** add the request log up every few minutes, so a request shows there a few minutes after it
+  ended.
+
+### Set prices
 
 ![LLM Providers: a provider's row with its model, Set price in the Price $/1M column, its status and endpoint](../images/administer/providers-list-top.png)
 
@@ -71,25 +204,14 @@ model's price history is kept.
 Requests to an external model without a price are still counted. **Spend this month** on the dashboard says
 how many there were ("Requests without a price"), so you know the estimate is short.
 
-## Usage per person and per group
-
-![Assign Roles for one person: the roles to tick and the Usage group their usage is attributed to](../images/administer/users-edit-roles.png)
-
-- **Per person**: **Top Users** on the cost pages, and the **User ID** filter under **Requests**.
-- **Per group**: each request is recorded with the person's **Usage group**, the group set on their row under
-  **Access Control → Users** (see [Users, groups and roles](users.md#groups)). A person with no usage group
-  counts towards none. Reports of usage per group in the console are
-  <span class="fs-planned">Planned</span>.
-
-## Limits and budgets
-
-Budgets and limits per person, group or agent are <span class="fs-planned">Planned</span>: they will cap how
-much a person, a team or an agent may use.
-
 ## When it does not work
 
 | You see | What to do |
 |---|---|
-| The figures are empty | No requests in the range, or the gateway cannot write its log. Send a message in the chat, then refresh. |
+| The figures are empty | No requests in the range, or the gateway cannot write its log. Send a message in the chat, wait a few minutes, then refresh. |
+| A request from a moment ago is missing on **Usage** or **My usage** | The usage pages add up the request log every few minutes. Refresh a little later. |
+| A row says "fewer than five people", or a day shows no figures | Fewer than five people used that team, agent, model or day: their figures are kept together on purpose (see [The minimum group size](#the-minimum-group-size)). |
 | Spend shows "None" or looks too low | The models used have no price. Set them as above. |
+| People get a message about the instance's limit | A limit for the whole instance was reached. Raise it under **Settings → Usage and privacy**, or wait until it starts again: the next minute, or midnight for the daily limit. |
+| An application stops with `429` and `quota_tokens_per_day` | The daily token limit was reached; the client does not retry by itself. It works again after midnight in the usage time zone, or as soon as you raise the limit. |
 | A request is missing from the cost pages | Only requests that reach the gateway are counted: a model someone calls directly at its endpoint, bypassing Fadenstack, is not. |
