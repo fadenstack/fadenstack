@@ -955,22 +955,11 @@ async def lifespan_setup(
         except Exception:
             log.debug("EE runtime key registration skipped.", exc_info=True)
 
-    # Connect to RabbitMQ with retries — RMQ may still be starting.
+    # Connect to RabbitMQ, for as long as it takes to come up (after a reboot: minutes).
     if not broker.is_worker_process:
-        import asyncio
+        from faden_backend.services.rabbit.lifespan import wait_for_broker  # noqa: PLC0415
 
-        for attempt in range(1, 13):
-            try:
-                await broker.startup()
-                break
-            except Exception:
-                if attempt == 12:
-                    raise
-                log.warning(
-                    "RabbitMQ not ready (attempt %d/12). Retrying in 5 s…",
-                    attempt,
-                )
-                await asyncio.sleep(5)
+        await wait_for_broker(broker.startup)
 
     _setup_db(app)
     if not broker.is_worker_process:

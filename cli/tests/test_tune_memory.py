@@ -16,7 +16,7 @@ import yaml
 
 from faden_cli.core import tune
 from faden_cli.core.env_gen import read_env_file, write_env_file
-from faden_cli.core.rmq import CONSUMER_TIMEOUT_MS, write_definitions
+from faden_cli.core.rmq import CONSUMER_TIMEOUT_MS, MEMORY_BYTES, write_definitions
 from faden_cli.core.sysinfo import (
     MAX_DOWNLOAD_RANGES,
     MIN_DOWNLOAD_RANGES,
@@ -110,3 +110,14 @@ def test_rabbitmq_lets_a_task_hold_its_message_for_as_long_as_a_download(tmp_pat
     conf = (tmp_path / "rabbitmq" / "10-faden.conf").read_text(encoding="utf-8")
     assert f"consumer_timeout = {CONSUMER_TIMEOUT_MS}" in conf
     assert CONSUMER_TIMEOUT_MS >= 24 * 3600 * 1000
+
+
+def test_rabbitmq_is_told_the_memory_its_container_has(tmp_path: Path) -> None:
+    """It read the host's (40 GB of a 64 GB machine) and was killed at 512M before its own alarm came."""
+    write_definitions(tmp_path, admin_pass="a", backend_pass="b", api_pass="c")
+    conf = (tmp_path / "rabbitmq" / "10-faden.conf").read_text(encoding="utf-8")
+    assert f"total_memory_available_override_value = {MEMORY_BYTES}" in conf
+    rmq = yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))["services"]["faden-rmq"]
+    limit = rmq["deploy"]["resources"]["limits"]["memory"]
+    assert limit.endswith("G") and int(limit[:-1]) * 1024**3 == MEMORY_BYTES, "Docker's G is GiB"
+    assert MEMORY_BYTES >= 1024**3

@@ -1,4 +1,7 @@
+import asyncio
+import logging
 import ssl
+from collections.abc import Awaitable, Callable
 
 import aio_pika
 from aio_pika.abc import AbstractChannel, AbstractRobustConnection
@@ -7,6 +10,36 @@ from fastapi import FastAPI
 
 from faden_backend.services.tls import rewrite_amqp_url_for_tls
 from faden_backend.settings import settings
+
+log = logging.getLogger(__name__)
+
+#: The longest pause between two tries to reach RabbitMQ at start-up.
+BROKER_RETRY_CAP_S = 30.0
+
+
+async def wait_for_broker(
+    start: Callable[[], Awaitable[object]],
+    *,
+    sleep: Callable[[float], Awaitable[object]] = asyncio.sleep,
+) -> None:
+    """Start the task broker, waiting for RabbitMQ for as long as it takes.
+
+    After a reboot Docker starts every container at once: compose's ``depends_on`` (RabbitMQ healthy
+    first) applies only to ``docker compose up``, and RabbitMQ may take minutes to recover its data. Giving
+    up after a minute, as the backend did, left it running without workers, unhealthy, never restarted: the
+    install stayed down until someone restarted it. Each pause is longer, up to :data:`BROKER_RETRY_CAP_S`.
+    """
+    attempt = 0
+    while True:
+        attempt += 1
+        try:
+            await start()
+        except Exception as exc:  # any failure means RabbitMQ is not there yet
+            delay = min(5.0 * attempt, BROKER_RETRY_CAP_S)
+            log.warning("RabbitMQ not ready (attempt %d: %s). Retrying in %.0f s", attempt, exc, delay)
+            await sleep(delay)
+        else:
+            return
 
 
 def _build_rabbit_kwargs() -> dict:

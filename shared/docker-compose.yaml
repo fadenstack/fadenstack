@@ -340,7 +340,10 @@ services:
       resources:
         limits:
           cpus: "1"
-          memory: 512M
+          # RabbitMQ is told this same amount (rabbitmq/10-faden.conf, written by the CLI's core/rmq.py): it reads
+          # the host's memory otherwise and slows publishers only at 60 % of that, long after the kernel has killed
+          # it here. 512M was too little at start-up after a reboot (recovering its data, every service starting).
+          memory: 1G
     healthcheck:
       test: rabbitmq-diagnostics check_running -q
       interval: 3s
