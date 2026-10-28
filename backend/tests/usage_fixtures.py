@@ -124,16 +124,21 @@ async def usage(
     cost_each: str | None = None,
     person_rows: bool = True,
     tenant: str = "default",
+    path: list[str] | None = None,
     **each: int,
 ) -> None:
     """What the rollup job writes for *users* on *day* in one cell: a daily row, and a row per person.
 
-    *each* holds each person's measures (default one request, 10 tokens in, 5 out).
+    *each* holds each person's measures (default one request, 10 tokens in, 5 out). *path* is the recorded
+    team path (root first; its last team the home team); default ``[group]``.
     """
     people = list(users)
     each = {"requests": 1, "input_tokens": 10, "output_tokens": 5, **each}
     cost = Decimal(cost_each) if cost_each else None
-    path = [group] if group else None
+    if path is not None:
+        group = path[-1]
+    else:
+        path = [group] if group else None
     await db.execute(
         text("""
             INSERT INTO usage_daily (day, tenant_id, group_id, group_path, agent_id, model_alias,

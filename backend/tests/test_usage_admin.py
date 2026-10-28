@@ -74,7 +74,8 @@ async def test_teams_under_k_are_merged_into_one_other_row(
     assert shown[sales]["label"].startswith("Sales-")
     [other] = [row for row in body["groups"] if row["other"]]
     assert other == {
-        "key": None, "label": None, "other": True, "people": None, "suppressed": True,
+        "key": None, "label": None, "parent_key": None, "path": [], "other": True, "people": None,
+        "suppressed": True,
         "requests": 3 + 8, "failed": 0, "refused": 0, "input_tokens": 50, "cached_input_tokens": 0,
         "output_tokens": 25, "reasoning_tokens": 0, "cost": {},
     }
@@ -122,7 +123,7 @@ async def test_fewer_than_k_people_in_all_hide_every_group_and_flag_a_small_inst
     body = await _get(client, group_by="model")
 
     assert body["small_instance"] is True
-    assert body["totals"]["people"] is None and body["totals"]["requests"] == 4
+    assert body["totals"]["people"] is None and body["totals"]["requests"] is None, "M04: totals too"
     [other] = body["groups"]
     assert other["other"] is True and other["requests"] is None and other["cost"] is None
     assert all(row["suppressed"] for row in body["series"] if row["period"] in ("2026-10-01", "2026-10-02"))
