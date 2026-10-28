@@ -631,6 +631,13 @@
       "action_modules": "模块：开启或关闭可选模块及其设置",
       "action_appearance": "外观：强调色"
     },
+    "settings_mail": {
+      "title": "邮件",
+      "description": "本服务器如何通过贵组织的邮件服务器发送邮件（密码重置、验证码、管理员告警）。",
+      "action_server": "邮件服务器和登录方式：密码、Microsoft 365，或无需登录的中继",
+      "action_test": "按表单当前内容发送测试邮件，然后保存",
+      "action_state": "邮件状态：邮件是否发出、有多少在等待，以及用文字说明的最近一次失败"
+    },
     "profile": {
       "title": "我的资料",
       "description": "您的账户、密码和 API 令牌。",
