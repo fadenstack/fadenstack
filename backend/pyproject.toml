@@ -24,7 +24,7 @@ dependencies = [
   "SQLAlchemy[asyncio] >=2.0.44,<3",
   "alembic >=1.17.2,<2",
   "asyncpg >=0.31.0,<1",
-  "aio-pika >=9.5.8,<10",
+  "aio-pika>=9.5.8,<11",
   "prometheus-client >=0.23.1,<1",
   "prometheus-fastapi-instrumentator >=8.1.0,<9",  # 7.x capped starlette<1.0; 8.x allows starlette 1.x (clears starlette CVEs)
   "sentry-sdk >=2.46.0,<3",
@@ -40,19 +40,19 @@ dependencies = [
   "taskiq-fastapi >=0.5.0,<1",  # >=0.5.0: removes app.router.startup/shutdown calls, which crash-loop workers on starlette 1.x
   "taskiq-aio-pika >=0.5.0,<1",
   "aiodocker >=0.23.0,<1",
-  "huggingface-hub >=0.27.0,<1",
+  "huggingface-hub>=0.27.0,<3",
   "hf-xet >=1.1.0,<2",
   "httpx >=0.28.1,<1",
-  "psutil >=6.0.0,<7",
+  "psutil>=6.0.0,<8",
   "tzdata >=2025.2",  # zoneinfo data: Windows has no system tz database, and dashboard windows follow the viewer's zone
   "cryptography >=50.0.0",  # >=50.0.0: clears PYSEC-2026-35/36/3552/3553/3554
-  "pynvml>=12.0.0,<13",
+  "pynvml>=12.0.0,<14",
   "pdfplumber >=0.11.0,<1",
   "python-docx >=1.1.0,<2",
   "python-pptx >=1.0.0,<2",
   "openpyxl >=3.1.0,<4",
   "pgvector >=0.3.6,<1",
-  "aiofiles >=24.1.0,<25",
+  "aiofiles>=24.1.0,<26",
   "python-multipart >=0.0.31",  # >=0.0.31: clears PYSEC-2026-3036/3037/3038/3039/3040
   # Transitive floors — uv lock is conservative (keeps previously locked versions), so each
   # floor is spelled out to force the vulnerable transitive versions up to the fix:
@@ -75,7 +75,7 @@ dependencies = [
 dev = [
   "pytest >=9.0.3,<10",  # >=9.0.3: clears PYSEC-2026-1845
   "ruff >=0.14.6,<1",
-  "mypy >=1.19.0,<2",
+  "mypy>=1.19.0,<3",
   "pre-commit >=4.5.0,<5",
   "pytest-cov >=7.0.0,<8",
   "anyio >=4.14.2,<5",  # >=4.14.2: clears PYSEC-2026-4024/4025
