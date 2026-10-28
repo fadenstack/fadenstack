@@ -186,6 +186,36 @@ async def dbsession(
 
 
 @pytest.fixture
+async def follow_settings(dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch) -> AsyncGenerator[Any]:
+    """This process follows the system settings in the database, as after its startup, through the test's
+    connection (services/system_settings/runtime_sync.py).
+
+    Yields the follower; every registered setting gets its value back afterwards.
+    """
+    from faden_backend.services.system_settings import runtime_sync
+    from faden_backend.services.system_settings.runtime_mapping import (
+        get_runtime_secret_key_map,
+        get_runtime_value_key_map,
+        runtime_target,
+    )
+
+    follower = runtime_sync._Follower()  # noqa: SLF001 - a fresh one per test
+    monkeypatch.setattr(runtime_sync, "_follower", follower)
+    keys = {**get_runtime_value_key_map(), **get_runtime_secret_key_map()}
+    before = {key: (runtime_target(key), attr, getattr(runtime_target(key), attr)) for key, attr in keys.items()}
+
+    async def startup_load() -> None:
+        """Nothing stored yet: the values are the environment's."""
+
+    await runtime_sync.start(await dbsession.connection(), startup_load)
+    try:
+        yield follower
+    finally:
+        for target, attr, value in before.values():
+            object.__setattr__(target, attr, value)
+
+
+@pytest.fixture
 async def test_rmq_pool() -> AsyncGenerator[Channel]:
     """
     Create rabbitMQ pool.

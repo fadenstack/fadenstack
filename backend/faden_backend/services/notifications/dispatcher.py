@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from faden_backend.db.models.notifications import NotificationOutbox
 from faden_backend.services.extensions import mail_available, registry
 from faden_backend.services.notifications.retention import prune_expired_notifications
+from faden_backend.services.system_settings import runtime_sync
 
 log = logging.getLogger(__name__)
 
@@ -60,6 +61,8 @@ class NotificationDispatcher:
             await asyncio.sleep(_POLL_INTERVAL_SECONDS)
 
     async def _poll_once(self) -> None:
+        # Whether and how mail goes out are settings: as they are now, also in a worker no request reached.
+        await runtime_sync.current()
         now = datetime.now(tz=UTC)
         async with self._session_factory() as session:
             dropped = await prune_expired_notifications(session, now)
