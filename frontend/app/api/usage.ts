@@ -64,11 +64,15 @@ export interface UsageBreakdown extends Measures {
 
 export type CapKind = "rpm" | "tpm" | "tokens_per_day";
 
-/** A limit of the instance and where it stands now. */
+/**
+ * A limit of the instance and where it stands now. `used` is null for the per-minute limits (counted in
+ * the gateway's memory) and for today's tokens while fewer than k other people used the instance today
+ * (it would give away what they used, M02).
+ */
 export interface UsageCap {
   kind: CapKind;
   limit: number;
-  used: number;
+  used: number | null;
   resets_at: string | null;
 }
 
@@ -85,6 +89,8 @@ export interface MyPrivacy {
   retention_days: number;
   /** Audited views of the caller's figures by others. */
   views_of_my_data: number;
+  /** The organisation's privacy notice (an https address), when one is set: the own view links to it (M14). */
+  notice_url?: string | null;
 }
 
 export interface MyUsage {
@@ -188,6 +194,19 @@ export interface UsageSettings {
   hourly_retention_days: number;
   daily_retention_months: number;
   time_zone: string;
+  /** The organisation's privacy notice: an https address, or empty for none. */
+  privacy_notice_url?: string;
+}
+
+/** A privacy notice address the backend takes: empty, or an https URL. */
+export function noticeUrlOk(value: string): boolean {
+  const text = value.trim();
+  if (!text) return true;
+  try {
+    return new URL(text).protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 /** The instance's caps; null: no limit. */

@@ -4739,7 +4739,6 @@
       "menu": "My usage",
       "title": "My usage",
       "subtitle": "What you used of the AI models, and what it would cost at this instance's prices.",
-      "back_to_chat": "Back to the chat",
       "by_model": "By model",
       "by_agent": "By agent",
       "by_project": "By project",
@@ -4762,7 +4761,13 @@
       "privacy_on_retention": "Your per-person figures are kept for {{days}} days, then deleted.",
       "privacy_views_none": "Nobody has viewed your figures so far.",
       "privacy_views_one": "Your figures were viewed {{count}} time; the download lists when and why.",
-      "privacy_views_other": "Your figures were viewed {{count}} times; the download lists when and why."
+      "privacy_views_other": "Your figures were viewed {{count}} times; the download lists when and why.",
+      "back": "Back",
+      "notice_link": "Read the privacy notice",
+      "unknown_project": "A chat project",
+      "cap_limit": "Limit: {{limit}}",
+      "cap_minute_note": "Counted per minute; how much is used right now is not shown here.",
+      "cap_day_hidden": "How much is used today shows once enough other people have used the instance today."
     },
     "range_label": "Period",
     "range": {
@@ -4937,7 +4942,10 @@
       "statement_title": "Configuration statement",
       "statement_intro": "A document of the current privacy settings, to attach to the works agreement or the data protection impact assessment.",
       "statement_language": "Language",
-      "statement_download": "Download"
+      "statement_download": "Download",
+      "privacy_notice_url": "Privacy notice",
+      "privacy_notice_url_help": "The address of your privacy notice for employees (https). My usage links to it; empty: no link.",
+      "privacy_notice_url_error": "An https address, or empty."
     },
     "statement": {
       "title": "Usage metering: configuration statement",

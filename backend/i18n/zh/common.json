@@ -4741,7 +4741,6 @@
       "menu": "我的用量",
       "title": "我的用量",
       "subtitle": "您使用了多少 AI 模型，以及按本实例的价格大约花费多少。",
-      "back_to_chat": "返回聊天",
       "by_model": "按模型",
       "by_agent": "按智能体",
       "by_project": "按项目",
@@ -4764,7 +4763,13 @@
       "privacy_on_retention": "您的个人数据保留 {{days}} 天，之后删除。",
       "privacy_views_none": "到目前为止，没有人查看过您的数据。",
       "privacy_views_one": "您的数据已被查看 {{count}} 次；下载文件列出了时间和理由。",
-      "privacy_views_other": "您的数据已被查看 {{count}} 次；下载文件列出了时间和理由。"
+      "privacy_views_other": "您的数据已被查看 {{count}} 次；下载文件列出了时间和理由。",
+      "back": "返回",
+      "notice_link": "阅读隐私声明",
+      "unknown_project": "某个聊天项目",
+      "cap_limit": "限额：{{limit}}",
+      "cap_minute_note": "按分钟计数；此处不显示当前已用多少。",
+      "cap_day_hidden": "当今天有足够多的其他人使用本实例后，才会显示今天已用多少。"
     },
     "range_label": "时间段",
     "range": {
@@ -4939,7 +4944,10 @@
       "statement_title": "配置声明",
       "statement_intro": "一份记录当前隐私设置的文档，可附在企业协议或数据保护影响评估中。",
       "statement_language": "语言",
-      "statement_download": "下载"
+      "statement_download": "下载",
+      "privacy_notice_url": "隐私声明",
+      "privacy_notice_url_help": "面向员工的隐私声明的地址（https）。“我的用量”会链接到它；留空：不显示链接。",
+      "privacy_notice_url_error": "https 地址，或留空。"
     },
     "statement": {
       "title": "使用量计量：配置说明",

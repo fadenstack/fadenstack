@@ -4741,7 +4741,6 @@
       "menu": "Meine Nutzung",
       "title": "Meine Nutzung",
       "subtitle": "Was Sie von den KI-Modellen genutzt haben und was es zu den Preisen dieser Instanz kosten würde.",
-      "back_to_chat": "Zurück zum Chat",
       "by_model": "Nach Modell",
       "by_agent": "Nach Agent",
       "by_project": "Nach Projekt",
@@ -4764,7 +4763,13 @@
       "privacy_on_retention": "Ihre Zahlen pro Person werden {{days}} Tage aufbewahrt und dann gelöscht.",
       "privacy_views_none": "Bisher hat niemand Ihre Zahlen eingesehen.",
       "privacy_views_one": "Ihre Zahlen wurden {{count}}-mal eingesehen; der Download nennt, wann und warum.",
-      "privacy_views_other": "Ihre Zahlen wurden {{count}}-mal eingesehen; der Download nennt, wann und warum."
+      "privacy_views_other": "Ihre Zahlen wurden {{count}}-mal eingesehen; der Download nennt, wann und warum.",
+      "back": "Zurück",
+      "notice_link": "Datenschutzhinweise lesen",
+      "unknown_project": "Ein Chat-Projekt",
+      "cap_limit": "Limit: {{limit}}",
+      "cap_minute_note": "Pro Minute gezählt; wie viel gerade genutzt ist, zeigt diese Seite nicht.",
+      "cap_day_hidden": "Wie viel heute genutzt ist, erscheint, sobald genug andere Personen die Instanz heute genutzt haben."
     },
     "range_label": "Zeitraum",
     "range": {
@@ -4939,7 +4944,10 @@
       "statement_title": "Konfigurationsbeschreibung",
       "statement_intro": "Ein Dokument der aktuellen Datenschutzeinstellungen, als Anlage zur Betriebsvereinbarung oder zur Datenschutz-Folgenabschätzung.",
       "statement_language": "Sprache",
-      "statement_download": "Download"
+      "statement_download": "Download",
+      "privacy_notice_url": "Datenschutzhinweise",
+      "privacy_notice_url_help": "Die Adresse Ihrer Datenschutzhinweise für Beschäftigte (https). Meine Nutzung verlinkt sie; leer: kein Link.",
+      "privacy_notice_url_error": "Eine https-Adresse oder leer."
     },
     "statement": {
       "title": "Nutzungsmessung: Konfigurationsnachweis",

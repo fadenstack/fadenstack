@@ -31,6 +31,9 @@ export default [
     route("/agents/:slug", "pages/agents/MyAgentPage.tsx"),
     // Checking content for marks of AI generation (provenance:check).
     route("/check-content", "pages/check/CheckContentPage.tsx"),
+  ]),
+  // The signed-in person's own pages, whichever modules are on.
+  layout("routes/account.tsx", [
     // Everyone's own usage of the models, its limits and who may see it.
     route("/usage", "pages/usage/MyUsagePage.tsx"),
   ]),

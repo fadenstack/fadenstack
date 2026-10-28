@@ -4741,7 +4741,6 @@
       "menu": "Mi uso",
       "title": "Mi uso",
       "subtitle": "Lo que ha usado de los modelos de IA y lo que costaría a los precios de esta instancia.",
-      "back_to_chat": "Volver al chat",
       "by_model": "Por modelo",
       "by_agent": "Por agente",
       "by_project": "Por proyecto",
@@ -4764,7 +4763,13 @@
       "privacy_on_retention": "Sus cifras por persona se conservan {{days}} días y después se eliminan.",
       "privacy_views_none": "Hasta ahora nadie ha consultado sus cifras.",
       "privacy_views_one": "Sus cifras se consultaron {{count}} vez; la descarga indica cuándo y por qué.",
-      "privacy_views_other": "Sus cifras se consultaron {{count}} veces; la descarga indica cuándo y por qué."
+      "privacy_views_other": "Sus cifras se consultaron {{count}} veces; la descarga indica cuándo y por qué.",
+      "back": "Volver",
+      "notice_link": "Leer el aviso de privacidad",
+      "unknown_project": "Un proyecto de chat",
+      "cap_limit": "Límite: {{limit}}",
+      "cap_minute_note": "Se cuenta por minuto; aquí no se muestra cuánto se usa en este momento.",
+      "cap_day_hidden": "Lo usado hoy se muestra cuando suficientes otras personas hayan usado la instancia hoy."
     },
     "range_label": "Periodo",
     "range": {
@@ -4939,7 +4944,10 @@
       "statement_title": "Declaración de configuración",
       "statement_intro": "Un documento con los ajustes de privacidad actuales, para adjuntar al acuerdo con el comité de empresa o a la evaluación de impacto relativa a la protección de datos.",
       "statement_language": "Idioma",
-      "statement_download": "Descargar"
+      "statement_download": "Descargar",
+      "privacy_notice_url": "Aviso de privacidad",
+      "privacy_notice_url_help": "La dirección de su aviso de privacidad para empleados (https). Mi uso enlaza a él; vacío: sin enlace.",
+      "privacy_notice_url_error": "Una dirección https, o vacío."
     },
     "statement": {
       "title": "Medición del uso: declaración de configuración",

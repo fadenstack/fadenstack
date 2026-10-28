@@ -34,6 +34,7 @@ import Typography from "@mui/material/Typography";
 import DownloadIcon from "@mui/icons-material/Download";
 
 import {
+  noticeUrlOk,
   PERSON_RETENTION_WARN_DAYS,
   USAGE_SETTING_RANGES,
   UsageProblemsError,
@@ -65,6 +66,7 @@ interface Draft {
   person_reporting: boolean;
   person_granularity: Granularity;
   time_zone: string;
+  notice_url: string;
   ranged: Record<RangedSetting, string>;
 }
 
@@ -73,6 +75,7 @@ function toDraft(s: UsageSettings): Draft {
     person_reporting: s.person_reporting,
     person_granularity: s.person_granularity,
     time_zone: s.time_zone,
+    notice_url: s.privacy_notice_url ?? "",
     ranged: Object.fromEntries(RANGED.map((k) => [k, String(s[k])])) as Record<RangedSetting, string>,
   };
 }
@@ -160,6 +163,7 @@ function PrivacySection() {
     if (draft.person_reporting !== saved.person_reporting) out.person_reporting = draft.person_reporting;
     if (draft.person_granularity !== saved.person_granularity) out.person_granularity = draft.person_granularity;
     if (draft.time_zone.trim() !== saved.time_zone) out.time_zone = draft.time_zone.trim();
+    if (draft.notice_url.trim() !== (saved.privacy_notice_url ?? "")) out.privacy_notice_url = draft.notice_url.trim();
     for (const key of RANGED) {
       const value = rangedValue(key, draft.ranged[key]);
       if (value !== null && value !== saved[key]) out[key] = value;
@@ -174,7 +178,8 @@ function PrivacySection() {
 
   // A zone is checked once it is changed: one the server holds stays savable.
   const zoneBad = draft.time_zone.trim() !== saved.time_zone && !validTimeZone(draft.time_zone);
-  const invalid = RANGED.some((k) => rangedValue(k, draft.ranged[k]) === null) || zoneBad;
+  const noticeBad = !noticeUrlOk(draft.notice_url);
+  const invalid = RANGED.some((k) => rangedValue(k, draft.ranged[k]) === null) || zoneBad || noticeBad;
   const dirty = Boolean(changes && Object.keys(changes).length > 0);
   const personDays = rangedValue("person_retention_days", draft.ranged.person_retention_days);
 
@@ -308,6 +313,25 @@ function PrivacySection() {
             helperText={
               problems.time_zone || (zoneBad ? t("usage.settings.time_zone_error") : t("usage.settings.time_zone_help"))
             }
+            fullWidth
+          />
+          {/* The organisation's own notice to employees: My usage links to it (M14). */}
+          <TextField
+            size="small"
+            type="url"
+            label={t("usage.settings.privacy_notice_url")}
+            value={draft.notice_url}
+            placeholder="https://"
+            onChange={(e) => {
+              setDraft({ ...draft, notice_url: e.target.value });
+              setProblems((p) => ({ ...p, privacy_notice_url: "" }));
+            }}
+            error={noticeBad || Boolean(problems.privacy_notice_url)}
+            helperText={
+              problems.privacy_notice_url ||
+              (noticeBad ? t("usage.settings.privacy_notice_url_error") : t("usage.settings.privacy_notice_url_help"))
+            }
+            sx={{ gridColumn: "1 / -1" }}
             fullWidth
           />
         </Box>

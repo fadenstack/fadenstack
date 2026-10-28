@@ -4741,7 +4741,6 @@
       "menu": "Mon utilisation",
       "title": "Mon utilisation",
       "subtitle": "Ce que vous avez utilisé des modèles d'IA, et ce que cela coûterait aux prix de cette instance.",
-      "back_to_chat": "Retour au chat",
       "by_model": "Par modèle",
       "by_agent": "Par agent",
       "by_project": "Par projet",
@@ -4764,7 +4763,13 @@
       "privacy_on_retention": "Vos chiffres par personne sont conservés {{days}} jours, puis supprimés.",
       "privacy_views_none": "Personne n'a consulté vos chiffres jusqu'ici.",
       "privacy_views_one": "Vos chiffres ont été consultés {{count}} fois ; le téléchargement indique quand et pourquoi.",
-      "privacy_views_other": "Vos chiffres ont été consultés {{count}} fois ; le téléchargement indique quand et pourquoi."
+      "privacy_views_other": "Vos chiffres ont été consultés {{count}} fois ; le téléchargement indique quand et pourquoi.",
+      "back": "Retour",
+      "notice_link": "Lire la politique de confidentialité",
+      "unknown_project": "Un projet de chat",
+      "cap_limit": "Limite : {{limit}}",
+      "cap_minute_note": "Compté par minute ; l'utilisation en cours n'est pas affichée ici.",
+      "cap_day_hidden": "L'utilisation du jour s'affiche dès qu'assez d'autres personnes ont utilisé l'instance aujourd'hui."
     },
     "range_label": "Période",
     "range": {
@@ -4939,7 +4944,10 @@
       "statement_title": "Déclaration de configuration",
       "statement_intro": "Un document des paramètres de confidentialité actuels, à joindre à l'accord d'entreprise ou à l'analyse d'impact relative à la protection des données.",
       "statement_language": "Langue",
-      "statement_download": "Télécharger"
+      "statement_download": "Télécharger",
+      "privacy_notice_url": "Politique de confidentialité",
+      "privacy_notice_url_help": "L'adresse de votre politique de confidentialité pour les salariés (https). Mon utilisation y renvoie ; vide : aucun lien.",
+      "privacy_notice_url_error": "Une adresse https, ou vide."
     },
     "statement": {
       "title": "Mesure de l'utilisation : déclaration de configuration",
