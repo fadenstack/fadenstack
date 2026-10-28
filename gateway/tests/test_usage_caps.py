@@ -383,6 +383,28 @@ async def test_a_whole_answer_after_tool_rounds_counts_every_round(
 
 
 @pytest.mark.anyio
+async def test_a_refused_request_counts_for_its_persons_team(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await _seed_basic_graph(db_session)
+    await _caps(db_session, rpm_limit=1, tpm_limit=None)
+    fastapi_app.state.gateway_observability = _FakeObservability()
+    _answers(monkeypatch, USAGE)
+
+    async def fetch(user_id: str) -> object:  # noqa: ARG001
+        return UsageTeam("sales-north", ("company", "sales", "sales-north"))
+
+    fastapi_app.state.usage_group_resolver = UsageGroupResolver(fetch)
+    assert (await client.post("/v1/chat/completions", headers=_headers(), json=ASK)).status_code == 200
+    assert (await client.post("/v1/chat/completions", headers=_headers(), json=ASK)).status_code == 429
+    rows = {row.status_code: row for row in await _rows(db_session)}
+    refused = rows[429]
+    assert (refused.group_id, refused.group_path) == ("sales-north", ["company", "sales", "sales-north"]), (
+        "a refusal before the lookups still counts for the person's team"
+    )
+
+
+@pytest.mark.anyio
 async def test_the_log_keeps_the_teams_path_at_the_time_of_use(
     fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
 ) -> None:

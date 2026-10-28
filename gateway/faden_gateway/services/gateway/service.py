@@ -1086,6 +1086,8 @@ class _Prepared:
     group_id: str | None = None  # the user's usage group, for attribution
     #: The usage group's path at the time of use, root first (``usage_group.py``); empty without one.
     group_path: tuple[str, ...] = ()
+    #: The usage group was looked up (it may be none): its row counts for the person's team.
+    team_booked: bool = False
     project_id: str | None = None  # the session's chat project, for attribution
     #: What admission reserved against the tenant's token caps (``usage.reserved_tokens``).
     estimated_tokens: int = 0
@@ -1531,6 +1533,7 @@ class GatewayService:
                 answer=_answer_text(result.payload) if result is not None and images is None else None,
             )
             await self._settle(req, metered)
+            await self._book_team(req, auth)
             await self.audit.log(
                 request_id=request_id,
                 trace_id=req.trace_id,
@@ -1969,6 +1972,7 @@ class GatewayService:
                         logger.warning("Failed to keep the failed reply", exc_info=True)
                 # It never reached the model: it used nothing of what it reserved.
                 await self._settle(req, NO_USAGE)
+                await self._book_team(req, auth)
                 await self.audit.log(
                     request_id=request_id,
                     trace_id=req.trace_id,
@@ -2091,6 +2095,20 @@ class GatewayService:
         team = usage_team(value)
         req.group_id = team.group_id if team is not None else None
         req.group_path = team.path if team is not None else ()
+        req.team_booked = True
+
+    async def _book_team(self, req: _Prepared, auth: AuthContext) -> None:
+        """Look the person's usage group up for a request whose row is about to be written without it.
+
+        A request refused before the lookups (a cap, an unmarked route, a missing model) counted as
+        unassigned, so its team never saw its refusals. The resolver is cached: mostly no round trip.
+        """
+        if req.team_booked or self.usage_groups is None:
+            return
+        try:
+            self._book_on(req, await self.usage_groups.resolve(auth.user_id))
+        except Exception:  # the row is written either way
+            logger.warning("Could not look up the usage group of a refused request", exc_info=True)
 
     async def _settle(self, req: _Prepared, usage: Usage) -> None:
         """Replace the request's reservation on the caps by its real input and output, once.
@@ -4021,6 +4039,7 @@ class GatewayService:
             stats.usage if stats is not None else NO_USAGE, reached=req.decision is not None,
             status_code=status_code, input_obj=_input_of(req.egress_payload or req.payload), answer=content,
         )
+        await self._book_team(req, auth)
         try:
             await self._audit_on_own_session(
                 request_id=request_id,
