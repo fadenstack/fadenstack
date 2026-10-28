@@ -82,9 +82,14 @@ Ein Nutzungsprüfer findet die personenbezogene Auswertung dann unter **Observab
 3. Die Zahlen erscheinen pro Person und pro Tag (oder Monat), nach Namen sortiert, nie danach, wie viel jemand
    genutzt hat.
 
-Jede Einsicht wird im Audit-Protokoll festgehalten (`usage.people.view`): wer hineingesehen hat, in wessen
-Zahlen, für welchen Zeitraum und mit welchem Grund. Die Person sieht in ihrem Download Datum und Grund jeder
-Einsicht in ihre Zahlen, aber nicht, wer hineingesehen hat; **Meine Nutzung** zeigt, wie viele es waren.
+Ein Nutzungsprüfer kann außerdem die Daten einer einzelnen Person herunterladen, als JSON oder CSV: dasselbe, was
+die Person unter **Meine Nutzung** erhält (siehe [Die eigene Ansicht und der Download](#your-own-view-and-the-download)),
+etwa um ein Auskunftsersuchen von jemandem zu beantworten, der sich nicht anmelden kann. Auch das braucht eine
+Begründung.
+
+Jede Einsicht und jeder Download wird im Audit-Protokoll festgehalten: wer, in wessen Zahlen, für welchen
+Zeitraum und mit welchem Grund. Die Person sieht in ihrem eigenen Download Datum und angegebenen Grund jeder
+Einsicht und jedes Downloads, nie, wer hineingesehen hat; **Meine Nutzung** zeigt, wie viele es waren.
 
 ??? info "Wer die Aufzeichnung prüft"
     Die eingebaute Rolle `auditor` liest das Audit-Protokoll und die Seite **Nutzung** und ändert nichts: eine
@@ -104,12 +109,13 @@ kann (die Nutzungsprüfer), wie fein und wie lange.
 - ihre täglichen Zahlen;
 - ihre Einträge, die noch im Anfrageprotokoll stehen: Zeit, Modell, Agent, Tokens, Kosten und Ergebnis, nie,
   was geschrieben wurde, und nie das Gerät;
-- Datum und angegebenen Grund jeder Einsicht eines Nutzungsprüfers in ihre Zahlen.
+- Datum und angegebenen Grund jeder Einsicht eines Nutzungsprüfers in ihre Zahlen und jedes Downloads ihrer
+  Daten durch ihn; nie, wer hineingesehen hat.
 
 Fragt jemand, was über seine Nutzung gespeichert ist (Art. 15 DSGVO), verweisen Sie ihn dorthin: Der Download
 beantwortet das, zusammen mit Ihren Datenschutzhinweisen für Beschäftigte (Zwecke, Rechtsgrundlage, Empfänger,
-Speicherdauer, Rechte). Der Download gehört der Person selbst: Ein Administrator kann ihn nicht für jemand
-anderen herunterladen.
+Speicherdauer, Rechte). Für jemanden, der sich nicht anmelden kann, lädt ein Nutzungsprüfer dasselbe herunter
+und gibt das Ersuchen als Grund an (siehe [Die Zahlen einer Person ansehen](#looking-at-one-persons-figures)).
 
 ## Aufbewahrung und Löschung {#retention-and-erasure}
 
@@ -141,7 +147,7 @@ Aufbewahrt 90 Tage (**Anfrageprotokoll**, `usage.request_log_retention_days`); g
 
 | Felder | Wozu | Wer sie sieht |
 |---|---|---|
-| `user_id` | Die Person, die die Anfrage gesendet hat: ihre Konto-ID, nicht ihr Name oder ihre E-Mail-Adresse | Die Person, in ihrem Download. Nutzungsprüfer, in der personenbezogenen Auswertung, solange sie eingeschaltet ist. Keine andere Seite zeigt sie, auch nicht **Kosten-Observability** und **LLM-Aufrufe** |
+| `user_id` | Die Person, die die Anfrage gesendet hat: ihre Konto-ID, nicht ihr Name oder ihre E-Mail-Adresse | Die Person, in ihrem Download. Nutzungsprüfer, in der personenbezogenen Auswertung, solange sie eingeschaltet ist, und in einem Download, den sie für eine Person erstellen. Keine andere Seite zeigt sie, auch nicht **Kosten-Observability** und **LLM-Aufrufe** |
 | `group_id`, `project_id`, `agent_id` | Die Nutzungsgruppe (das Team) der Person, das Chat-Projekt, der Agent | Administratoren unter **LLM-Aufrufe**; in Summen unter **Nutzung**; die Person (Projekt, Agent) |
 | `device_id`, `session_id`, `conversation_id`, `turn_id` | Verbinden die Anfrage eines Agenten mit seiner Anmeldung auf einem Gerät und mit seiner Unterhaltung | Administratoren unter **LLM-Aufrufe**. Nie in den Zahlen oder im Download |
 | `request_id`, `trace_id`, `tenant_id`, `endpoint`, `stream` | Eine Anfrage finden und wie sie gestellt wurde | Administratoren |
@@ -163,7 +169,7 @@ Aufbewahrt 90 Tage (**Anfrageprotokoll**, `usage.request_log_retention_days`); g
 |---|---|---|---|---|
 | `usage_hourly` | Stunde (UTC), Team, Agent, Modell, Provider und Währung | `people`: wie viele Personen hinter der Zeile stehen. Keine Person, kein Projekt, kein Gerät | 90 Tage (`usage.hourly_retention_days`) | Administratoren und Prüfer (`usage:read`) unter **Nutzung**, nur Stunden mit mindestens fünf Personen |
 | `usage_daily` | Tag (Zeitzone der Nutzungsmessung), Team, Agent, Modell, Provider und Währung | `people`. Keine Person, kein Projekt, kein Gerät | 25 Monate (`usage.daily_retention_months`) | Administratoren und Prüfer unter **Nutzung**, nach der Mindestgruppengröße |
-| `usage_daily_person` | Tag, Person, Team, Projekt, Agent, Modell und Währung | Kein Gerät, keine Uhrzeit | 90 Tage (`usage.person_retention_days`); gelöscht mit dem Konto | Die Person, unter **Meine Nutzung** und im Download. Nutzungsprüfer, solange die personenbezogene Auswertung eingeschaltet ist, nach Tag oder Monat (`usage.person_granularity`) |
+| `usage_daily_person` | Tag, Person, Team, Projekt, Agent, Modell und Währung | Kein Gerät, keine Uhrzeit | 90 Tage (`usage.person_retention_days`); gelöscht mit dem Konto | Die Person, unter **Meine Nutzung** und im Download. Nutzungsprüfer, solange die personenbezogene Auswertung eingeschaltet ist, nach Tag oder Monat (`usage.person_granularity`), und in einem Download, den sie für eine Person erstellen |
 | `usage_rollup_state` | Eine Zeile insgesamt | Wie weit die Zahlen zusammengefasst sind und wann zuletzt zusammengefasst und gelöscht wurde. Keine personenbezogenen Daten | Aufbewahrt | Niemand |
 
 **Die Limits**: die eingestellten Werte (`rpm_limit`, `tpm_limit`, `tokens_per_day` der Richtlinie der Instanz)
@@ -171,7 +177,8 @@ und ihre Zählungen, eine pro Instanz, die nur für ihre Minute oder ihren Tag b
 personenbezogenen Daten.
 
 **Die Aufzeichnung, wer hineingesehen und was sich geändert hat**, im Audit-Protokoll: jede Einsicht in
-personenbezogene Zahlen (`usage.people.view`: wer, in wessen Zahlen, welcher Zeitraum, der Grund), jede Änderung
+personenbezogene Zahlen (`usage.people.view`: wer, in wessen Zahlen, welcher Zeitraum, der Grund) und jeder
+Download der Daten einer Person durch einen Nutzungsprüfer (ebenso), jede Änderung
 an den Limits (`usage.limits.update`) und an den Einstellungen zur Nutzung sowie das Lesen der Kostenseiten.
 Aufbewahrt so lange wie das Audit-Protokoll (siehe oben). Sichtbar für Administratoren und Prüfer; die Person
 sieht Datum und Grund der Einsichten in ihre eigenen Zahlen.
@@ -225,7 +232,8 @@ Nutzungszahlen handeln von Ihren Kolleginnen und Kollegen. Bevor Sie damit arbei
   Sie den Grund so, wie Sie ihn der Person selbst schreiben würden: Sie sieht ihn in ihrem Download.
 - Kopieren Sie personenbezogene Zahlen nicht aus Fadenstack heraus, in Screenshots oder Tabellen: Dort entgehen
   sie der Aufbewahrungsdauer und der Aufzeichnung, wer hineingesehen hat.
-- Fragt jemand, was über seine Nutzung gespeichert ist, verweisen Sie ihn auf **Meine Nutzung** und den Download.
+- Fragt jemand, was über seine Nutzung gespeichert ist, verweisen Sie ihn auf **Meine Nutzung** und den Download;
+  für jemanden, der sich nicht anmelden kann, lädt ein Nutzungsprüfer ihn herunter.
 - Sind Sie unsicher, ob eine Verwendung erlaubt ist, fragen Sie vorher Ihren Datenschutzbeauftragten.
 
 ## Wenn es nicht funktioniert {#when-it-does-not-work}

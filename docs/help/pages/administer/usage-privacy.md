@@ -72,9 +72,13 @@ A usage auditor then finds the person-level view on **Observability → Usage**:
 2. Give the reason for looking: 10 to 500 characters.
 3. The figures appear per person and per day (or month), sorted by name, never by how much someone used.
 
-Every look is recorded in the audit log (`usage.people.view`): who looked, at whose figures, which range, and the
-reason. The person sees, in their download, the date and the reason of each look at their figures, but not who
-looked; **My usage** shows how many there were.
+A usage auditor can also download one person's data, as JSON or CSV: the same the person gets under **My usage**
+(see [Your own view and the download](#your-own-view-and-the-download)), for example to answer an access request
+from someone who cannot sign in. It needs a reason too.
+
+Every look and every download is recorded in the audit log: who, at whose figures, which range, and the reason.
+The person sees, in their own download, the date and the stated reason of each, never who looked; **My usage**
+shows how many there were.
 
 ??? info "Who checks the record"
     The built-in role `auditor` reads the audit log and the **Usage** page, and changes nothing: a fitting role for
@@ -92,11 +96,13 @@ reporting is on, it says so, with who can see their figures (the usage auditors)
 - their daily figures;
 - their request records still in the request log: time, model, agent, tokens, cost and outcome, never what was
   written and never the device;
-- the date and the stated reason of each look at their figures by a usage auditor.
+- the date and the stated reason of each look at their figures, or download of them, by a usage auditor; never
+  who looked.
 
 When someone asks what is stored about their usage (Art. 15 GDPR), point them there: the download, together with
-your employee notice (purposes, legal basis, recipients, retention, rights), answers it. The download is the
-person's own: an administrator cannot download it for someone else.
+your employee notice (purposes, legal basis, recipients, retention, rights), answers it. For someone who cannot
+sign in, a usage auditor downloads the same for them, giving the request as the reason (see
+[Looking at one person's figures](#looking-at-one-persons-figures)).
 
 ## Retention and erasure
 
@@ -125,7 +131,7 @@ days (**Request log**, `usage.request_log_retention_days`); erased with the acco
 
 | Fields | What for | Who sees them |
 |---|---|---|
-| `user_id` | The person who sent the request: their account id, not their name or e-mail | The person, in their download. Usage auditors, in the person-level view while person-level reporting is on. No other page shows it, **Cost Observability** and **LLM Calls** included |
+| `user_id` | The person who sent the request: their account id, not their name or e-mail | The person, in their download. Usage auditors, in the person-level view while person-level reporting is on, and in a download they take for one person. No other page shows it, **Cost Observability** and **LLM Calls** included |
 | `group_id`, `project_id`, `agent_id` | The person's usage group (team), the chat project, the agent | Administrators on **LLM Calls**; in sums on **Usage**; the person (project, agent) |
 | `device_id`, `session_id`, `conversation_id`, `turn_id` | Tie an agent's request to its sign-in on a device and to its conversation | Administrators on **LLM Calls**. Never in the figures or the download |
 | `request_id`, `trace_id`, `tenant_id`, `endpoint`, `stream` | Find a request and how it was asked | Administrators |
@@ -147,14 +153,15 @@ days (**Request log**, `usage.request_log_retention_days`); erased with the acco
 |---|---|---|---|---|
 | `usage_hourly` | Hour (UTC), team, agent, model, provider and currency | `people`: how many people are behind the row. No person, no project, no device | 90 days (`usage.hourly_retention_days`) | Administrators and auditors (`usage:read`) on **Usage**, only hours of at least five people |
 | `usage_daily` | Day (usage time zone), team, agent, model, provider and currency | `people`. No person, no project, no device | 25 months (`usage.daily_retention_months`) | Administrators and auditors on **Usage**, under the minimum group size |
-| `usage_daily_person` | Day, person, team, project, agent, model and currency | No device, no time of day | 90 days (`usage.person_retention_days`); erased with the account | The person, on **My usage** and in the download. Usage auditors while person-level reporting is on, by day or month (`usage.person_granularity`) |
+| `usage_daily_person` | Day, person, team, project, agent, model and currency | No device, no time of day | 90 days (`usage.person_retention_days`); erased with the account | The person, on **My usage** and in the download. Usage auditors while person-level reporting is on, by day or month (`usage.person_granularity`), and in a download they take for one person |
 | `usage_rollup_state` | One row in all | How far the figures are added up, and when they were last added up and deleted. No personal data | Kept | Nobody |
 
 **The limits**: the values set (`rpm_limit`, `tpm_limit`, `tokens_per_day` of the instance's policy), and their
 counts, one per instance, which last only for their minute or day. No personal data.
 
 **The record of who looked and what changed**, in the audit log: each look at person-level figures
-(`usage.people.view`: who, whose, which range, the reason), each change to the limits (`usage.limits.update`) and
+(`usage.people.view`: who, whose, which range, the reason) and each download of one person's data by a usage
+auditor (the same), each change to the limits (`usage.limits.update`) and
 to the usage settings, and the reads of the cost pages. Kept as long as the audit log (see above). Seen by
 administrators and auditors; the person sees the date and reason of the looks at their own figures.
 
@@ -202,7 +209,8 @@ Usage figures are about your colleagues. Before you work with them:
   would for that person to read: they see it in their download.
 - Do not copy person-level figures out of Fadenstack, into screenshots or spreadsheets: there they escape the
   retention and the record of who looked.
-- When someone asks what is stored about their usage, point them to **My usage** and its download.
+- When someone asks what is stored about their usage, point them to **My usage** and its download; for someone
+  who cannot sign in, a usage auditor downloads it for them.
 - If you are unsure whether a use is allowed, ask your DPO first.
 
 ## When it does not work

@@ -96,7 +96,7 @@ An entry for your records of processing activities (Art. 30(1) GDPR).
 | Purposes | Running the AI platform and planning its capacity; knowing costs and allocating them to teams, projects and agents; protection against runaway use (limits for the whole platform); showing each user their own use [; settling disputes about costs by looking at individual figures, see the works agreement] |
 | Legal basis | Art. 6(1)(f) GDPR [; works agreement [title] of [date], Art. 88 GDPR, § 26(4) BDSG] |
 | Data subjects | Employees and other users of the AI platform [trainees, contractors] |
-| Personal data | Per request: account id, team, chat project, agent, model, time, tokens, estimated cost, outcome; for agents the device and conversation ids. Per person and day: the same figures added up. Records of looks at individual figures: who looked, whose figures, period, reason. No content of requests or answers; no special categories (Art. 9 GDPR) |
+| Personal data | Per request: account id, team, chat project, agent, model, time, tokens, estimated cost, outcome; for agents the device and conversation ids. Per person and day: the same figures added up. Records of looks at individual figures and of downloads of one person's data: who, whose figures, period, reason. No content of requests or answers; no special categories (Art. 9 GDPR) |
 | Recipients | Administrators [positions]; [usage auditors [positions], if person-level reporting is on]; [IT service provider under Art. 28 GDPR] |
 | Transfers to third countries | None for the usage data |
 | Erasure periods | Request records [90] days; daily figures per person [90] days; figures without persons [90] days hourly, [25] months daily; erased with the account; audit log [period] |
@@ -160,6 +160,7 @@ request (chat, agent, application)
             -> Usage page: totals of at least [5] people (administrators, auditors)
             -> My usage: each person's own figures and download
             -> person-level view: usage auditors, if switched on, reason, recorded
+            -> one person's download by a usage auditor (access requests): reason, recorded
 limits for the whole platform: one count per minute and per day, no person, not kept
 ```
 
@@ -234,7 +235,8 @@ configuration they choose, not in what the annex must settle.
 >
 > **6. Individual figures** (only if person-level reporting is on). The role `usage_auditor` is held only by
 > [names or positions]. They may look at individual figures only for [reasons], each time with a stated reason
-> [and after approval by [works council member / DPO]]. The person concerned [is informed within [period] / can see
+> [and after approval by [works council member / DPO]]. To answer an access request, they may download one
+> person's data, with the request as the reason. The person concerned [is informed within [period] / can see
 > the date and reason in their download].
 >
 > **7. Roles.** Administrators: [positions]. Reading the audit log and aggregate figures (role `auditor`):
@@ -302,7 +304,8 @@ How to answer requests about usage data. The legal deadline is one month (Art. 1
    and reason of every look at their figures.
 3. Add the information of Art. 15(1)(a) to (h) GDPR: purposes, categories, recipients, periods, rights, source.
    The employee notice has it.
-4. Fadenstack has no download of another person's usage. For someone who cannot sign in: [your procedure].
+4. For someone who cannot sign in, a usage auditor downloads the same data for them from the person-level view on
+   **Usage**, giving the request as the reason. The download is recorded.
 
 **Erasure (Art. 17 GDPR)**
 

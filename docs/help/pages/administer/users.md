@@ -26,7 +26,7 @@ someone's access.
     | `viewer` | Reading the state of models, clusters, machines, containers and logs, through the API. |
     | `operator` | What `viewer` gives, and running models through the API: creating, changing, scaling, stopping and starting clusters and deployments. Not deleting. |
     | `admin` | Every permission but one, including deleting, making a skill visible to the whole organisation (`skills:publish`), administering every skill (`skills:manage`), creating and deleting agents (`agents:create`, `agents:delete`), and the usage figures for groups (`usage:read`). Not the one that `usage_auditor` gives. |
-    | `usage_auditor` | Looking at one person's usage figures while person-level reporting is on, with a reason each time (`usage.people:audit`). Nobody holds it at installation, and being a superuser does not give it. See [Usage and privacy](usage-privacy.md#looking-at-one-persons-figures). |
+    | `usage_auditor` | Looking at one person's usage figures while person-level reporting is on, and downloading one person's usage data for an access request, with a reason each time (`usage.people:audit`). Nobody holds it at installation, and being a superuser does not give it. See [Usage and privacy](usage-privacy.md#looking-at-one-persons-figures). |
     | `rag_manager`, `rag_editor`, `rag_viewer` | Managing or editing the knowledge base (`rag_manager`, `rag_editor`: they see every collection and set who reads each), or reading it (`rag_viewer`). |
 
 !!! note

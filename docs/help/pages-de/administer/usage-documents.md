@@ -104,7 +104,7 @@ Ein Eintrag für Ihr Verzeichnis von Verarbeitungstätigkeiten (Art. 30 Abs. 1 D
 | Zwecke | Betrieb der KI-Plattform und Planung ihrer Kapazität; Kenntnis der Kosten und deren Zuordnung zu Teams, Projekten und Agenten; Schutz vor ausuferndem Verbrauch (Limits für die gesamte Plattform); Anzeige der eigenen Nutzung für jede Person [; Klärung von Streitfragen über Kosten durch Einsicht in persönliche Zahlen, siehe Betriebsvereinbarung] |
 | Rechtsgrundlage | Art. 6 Abs. 1 lit. f DSGVO [; Betriebsvereinbarung [Titel] vom [Datum], Art. 88 DSGVO, § 26 Abs. 4 BDSG] |
 | Kategorien betroffener Personen | Beschäftigte und andere Nutzer der KI-Plattform [Auszubildende, Fremdpersonal] |
-| Kategorien personenbezogener Daten | Pro Anfrage: Konto-ID, Team, Chat-Projekt, Agent, Modell, Zeitpunkt, Tokens, geschätzte Kosten, Ergebnis; bei Agenten die Kennungen von Gerät und Unterhaltung. Pro Person und Tag: dieselben Zahlen zusammengefasst. Aufzeichnung der Einsichten in persönliche Zahlen: wer, in wessen Zahlen, Zeitraum, Grund. Keine Inhalte von Anfragen oder Antworten; keine besonderen Kategorien (Art. 9 DSGVO) |
+| Kategorien personenbezogener Daten | Pro Anfrage: Konto-ID, Team, Chat-Projekt, Agent, Modell, Zeitpunkt, Tokens, geschätzte Kosten, Ergebnis; bei Agenten die Kennungen von Gerät und Unterhaltung. Pro Person und Tag: dieselben Zahlen zusammengefasst. Aufzeichnung der Einsichten in persönliche Zahlen und der Downloads der Daten einer Person: wer, in wessen Zahlen, Zeitraum, Grund. Keine Inhalte von Anfragen oder Antworten; keine besonderen Kategorien (Art. 9 DSGVO) |
 | Kategorien von Empfängern | Administratoren [Funktionen]; [Nutzungsprüfer [Funktionen], wenn die personenbezogene Auswertung eingeschaltet ist]; [IT-Dienstleister als Auftragsverarbeiter nach Art. 28 DSGVO] |
 | Übermittlung in Drittländer | Keine für die Nutzungsdaten |
 | Löschfristen | Einträge zu Anfragen [90] Tage; tägliche Zahlen pro Person [90] Tage; Zahlen ohne Personenbezug [90] Tage stündlich, [25] Monate täglich; Löschung mit dem Konto; Audit-Protokoll [Dauer] |
@@ -173,6 +173,7 @@ Anfrage (Chat, Agent, Anwendung)
             -> Seite „Nutzung“: Summen ab [5] Personen (Administratoren, Prüfer)
             -> Meine Nutzung: die eigenen Zahlen jeder Person und der Download
             -> personenbezogene Auswertung: Nutzungsprüfer, wenn eingeschaltet, mit Grund, aufgezeichnet
+            -> Download der Daten einer Person durch einen Nutzungsprüfer (Auskunft): mit Grund, aufgezeichnet
 Limits für die gesamte Plattform: eine Zählung pro Minute und pro Tag, keine Person, nicht aufbewahrt
 ```
 
@@ -251,7 +252,9 @@ gewählten Konfiguration, nicht in dem, was die Anlage regeln muss.
 >
 > **6. Persönliche Zahlen** (nur bei eingeschalteter personenbezogener Auswertung). Die Rolle `usage_auditor`
 > haben nur [Namen oder Funktionen]. Sie dürfen persönliche Zahlen nur aus [Gründe] ansehen, jedes Mal mit
-> Begründung [und nach Zustimmung von [Mitglied des Betriebsrats / Datenschutzbeauftragter]]. Die betroffene
+> Begründung [und nach Zustimmung von [Mitglied des Betriebsrats / Datenschutzbeauftragter]]. Zur Beantwortung
+> eines Auskunftsersuchens dürfen sie die Daten einer Person herunterladen, mit dem Ersuchen als Grund. Die
+> betroffene
 > Person [wird binnen [Frist] informiert / sieht Datum und Grund in ihrem Download].
 >
 > **7. Rollen.** Administratoren: [Funktionen]. Lesen des Audit-Protokolls und der zusammengefassten Zahlen (Rolle
@@ -326,8 +329,9 @@ So beantworten Sie Anfragen zu Nutzungsdaten. Die gesetzliche Frist beträgt ein
    Modell, Agent, Tokens, Kosten, Ergebnis) sowie Datum und Grund jeder Einsicht in ihre Zahlen.
 3. Ergänzen Sie die Informationen nach Art. 15 Abs. 1 lit. a bis h DSGVO: Zwecke, Kategorien, Empfänger,
    Speicherdauer, Rechte, Herkunft. Die Datenschutzhinweise enthalten sie.
-4. Fadenstack bietet keinen Download der Nutzung einer anderen Person. Für jemanden, der sich nicht anmelden
-   kann: [Ihr Verfahren].
+4. Für jemanden, der sich nicht anmelden kann, lädt ein Nutzungsprüfer dieselben Daten in der
+   personenbezogenen Auswertung unter **Nutzung** herunter und gibt das Ersuchen als Grund an. Der Download wird
+   aufgezeichnet.
 
 **Löschung (Art. 17 DSGVO)**
 
