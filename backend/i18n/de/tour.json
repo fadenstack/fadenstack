@@ -341,7 +341,7 @@
       "title": "Kosten-Dashboard",
       "description": "Kosten, Nutzung und Geschwindigkeit der Anfragen, die das Gateway bedient hat. Die Kosten sind Schätzungen aus den von Ihnen gesetzten Preisen; sie wirken sich nicht auf Abrechnungen aus.",
       "action_overview": "Ausgaben, Anfragen, Tokens, Latenz und Fehler über 7 bis 90 Tage",
-      "action_requests": "Anfragen durchsehen, nach Modell oder Person filtern und eine öffnen, um ihre Pipeline zu sehen",
+      "action_requests": "Anfragen durchsehen, nach Modell filtern und eine öffnen, um ihre Pipeline zu sehen",
       "action_pricing": "Die Preise pro Million Tokens festlegen",
       "action_export": "Die Daten als CSV exportieren"
     },

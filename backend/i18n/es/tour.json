@@ -341,7 +341,7 @@
       "title": "Panel de Costos",
       "description": "Costo, uso y velocidad de las solicitudes que atendió el gateway. Los costos son estimaciones a partir de los precios que usted define; no afectan a la facturación.",
       "action_overview": "Gasto, solicitudes, tokens, latencia y errores de 7 a 90 días",
-      "action_requests": "Explorar las solicitudes, filtrar por modelo o usuario, y abrir una para ver su pipeline",
+      "action_requests": "Explorar las solicitudes, filtrar por modelo y abrir una para ver su pipeline",
       "action_pricing": "Definir los precios por millón de tokens",
       "action_export": "Exportar los datos en CSV"
     },

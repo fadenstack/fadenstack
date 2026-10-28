@@ -1158,7 +1158,6 @@
     "col_status": "状态",
     "col_latency": "延迟",
     "filter_model": "模型",
-    "filter_user_id": "用户ID",
     "search": "搜索",
     "no_requests": "该时间范围内未找到请求。",
     "total_requests_count": "共 {{count}} 个请求",
@@ -1248,7 +1247,7 @@
     "col_input_price_1m": "输入 $/百万",
     "col_output_price_1m": "输出 $/百万",
     "user_hidden": "已隐藏",
-    "user_hidden_hint": "仅在按人员统计开启时向用量审计员显示。"
+    "user_hidden_hint": "这些页面不显示请求的发送者。"
   },
   "llm_providers": {
     "title": "LLM 提供商",
@@ -1461,7 +1460,6 @@
     "refresh": "刷新",
     "updated_at": "更新于 {{time}}",
     "chip_session": "对话 {{id}}",
-    "chip_user": "用户 {{id}}",
     "clear_filters": "清除筛选",
     "stat_calls": "调用",
     "stat_errors": "错误",
@@ -1489,7 +1487,6 @@
     "col_tokens": "Token",
     "col_cost": "费用",
     "col_flags": "信号",
-    "col_user": "用户",
     "col_provider": "提供方",
     "col_last_call": "最近调用",
     "agent": "智能体",

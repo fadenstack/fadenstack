@@ -46,7 +46,7 @@ interface Props {
   onSelect: (callId: string) => void;
   onPrev?: () => void;
   onNext?: () => void;
-  onFilter: (key: "session" | "user_id" | "model_alias", value: string) => void;
+  onFilter: (key: "session" | "model_alias", value: string) => void;
 }
 
 function copy(text: string) {
@@ -530,7 +530,8 @@ function Details({ call, onFilter }: { call: LlmCall; onFilter: Props["onFilter"
       </Section>
       <Section title={t("llm_calls.section_who")}>
         <FieldGrid>
-          <Field label={t("llm_calls.f_user")} value={call.user_id} mono onFilter={() => onFilter("user_id", call.user_id)} />
+          {/* The server names nobody here: a call's person is hidden, and calls are not found by person. */}
+          <Field label={t("llm_calls.f_user")} value={call.user_id ?? t("observability.user_hidden")} />
           <Field label={t("llm_calls.f_tenant")} value={call.tenant_id} />
           <Field label={t("llm_calls.f_group")} value={call.group_id} mono />
           <Field label={t("llm_calls.f_project")} value={call.project_id} mono />

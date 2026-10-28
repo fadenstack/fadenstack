@@ -128,27 +128,25 @@ describe("Observability overview", () => {
 });
 
 describe("Observability requests", () => {
-  it("shows a request's person as hidden, and offers no filter by person", async () => {
+  it("has no person column and no search by person; a request's details say its person is hidden", async () => {
     obs.requests.mockResolvedValue({ items: [request()], total: 1, page: 1, limit: 50 });
     const { container } = view();
     await userEvent.click(await screen.findByRole("tab", { name: "Requests" }));
 
     const table = await screen.findByRole("table");
-    expect(within(table).getByText("Hidden")).toBeInTheDocument();
+    const headers = within(table).getAllByRole("columnheader").map((h) => h.textContent);
+    expect(headers).not.toContain("User");
+    expect(screen.getAllByRole("textbox").map((box) => box.getAttribute("id"))).toHaveLength(1); // the model filter only
+    expect(screen.getByRole("textbox", { name: "Model" })).toBeInTheDocument();
+    expect(container.querySelector("[data-user-hidden]")).toBeNull();
+
+    await userEvent.click(within(table).getByText("qwen3.8-27b-fp8"));
+    expect(await screen.findByText("Hidden")).toBeInTheDocument();
     expect(container.querySelector("[data-user-hidden]")).not.toBeNull();
-    expect(screen.queryByRole("textbox", { name: "User ID" })).toBeNull();
-
-    await userEvent.click(within(table).getByText("Hidden"));
-    expect(await screen.findAllByText("Hidden")).toHaveLength(2); // the row and its details
-  });
-
-  it("names the person and offers the filter when the server names people", async () => {
-    obs.requests.mockResolvedValue({ items: [request({ user_id: "u-1" })], total: 1, page: 1, limit: 50 });
-    view();
-    await userEvent.click(await screen.findByRole("tab", { name: "Requests" }));
-
-    const table = await screen.findByRole("table");
-    expect(within(table).getByText("u-1")).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "User ID" })).toBeInTheDocument();
+    expect(obs.requests).toHaveBeenCalledWith(expect.any(String), expect.any(String), {
+      page: 1,
+      limit: 50,
+      model_alias: undefined,
+    });
   });
 });

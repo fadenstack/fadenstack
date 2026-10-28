@@ -1153,7 +1153,6 @@
     "col_status": "Statut",
     "col_latency": "Latence",
     "filter_model": "Modèle",
-    "filter_user_id": "ID Utilisateur",
     "search": "Rechercher",
     "no_requests": "Aucune requête trouvée pour cette période.",
     "total_requests_count": "{{count}} requêtes au total",
@@ -1243,7 +1242,7 @@
     "col_input_price_1m": "Entrée $/1 M",
     "col_output_price_1m": "Sortie $/1 M",
     "user_hidden": "Masqué",
-    "user_hidden_hint": "Visible uniquement par les auditeurs d'utilisation, tant que le suivi par personne est activé."
+    "user_hidden_hint": "Ces pages n'indiquent pas qui a envoyé une requête."
   },
   "llm_providers": {
     "title": "Fournisseurs LLM",
@@ -1468,7 +1467,6 @@
     "refresh": "Actualiser",
     "updated_at": "Mis à jour {{time}}",
     "chip_session": "Conversation {{id}}",
-    "chip_user": "Utilisateur {{id}}",
     "clear_filters": "Effacer les filtres",
     "stat_calls": "Appels",
     "stat_errors": "Erreurs",
@@ -1496,7 +1494,6 @@
     "col_tokens": "Tokens",
     "col_cost": "Coût",
     "col_flags": "Signaux",
-    "col_user": "Utilisateur",
     "col_provider": "Fournisseur",
     "col_last_call": "Dernier appel",
     "agent": "Agent",

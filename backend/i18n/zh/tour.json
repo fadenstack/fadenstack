@@ -341,7 +341,7 @@
       "title": "成本仪表板",
       "description": "网关所处理请求的成本、用量和速度。成本是根据您设置的价格估算的，不影响计费。",
       "action_overview": "7 到 90 天内的支出、请求、Token、延迟和错误",
-      "action_requests": "浏览请求，按模型或用户筛选，并打开某个请求查看其处理流程",
+      "action_requests": "浏览请求，按模型筛选，并打开某个请求查看其处理流程",
       "action_pricing": "设置每百万 Token 的价格",
       "action_export": "将数据导出为 CSV"
     },

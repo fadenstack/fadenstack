@@ -15,7 +15,8 @@ export interface LlmCall {
   request_id: string;
   trace_id: string | null;
   tenant_id: string;
-  user_id: string;
+  /** Null: calls name nobody (who sent one is not shown on these pages). */
+  user_id: string | null;
   model_alias: string | null;
   provider_instance_id: string | null;
   provider_id: string | null;
@@ -123,7 +124,8 @@ export interface LlmTurn {
   agent_id: string | null;
   device_id: string | null;
   tenant_id: string;
-  user_id: string;
+  /** Null: turns name nobody. */
+  user_id: string | null;
   started_at: string;
   ended_at: string;
   duration_ms: number;
@@ -182,7 +184,6 @@ export interface CallQuery {
   q?: string;
   model_alias?: string;
   outcome?: CallOutcome;
-  user_id?: string;
   agent_id?: string;
   session?: string;
   min_latency_ms?: number;

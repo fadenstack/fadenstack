@@ -1158,7 +1158,6 @@
     "col_status": "Status",
     "col_latency": "Latenz",
     "filter_model": "Modell",
-    "filter_user_id": "Benutzer-ID",
     "search": "Suchen",
     "no_requests": "Keine Anfragen in diesem Zeitraum gefunden.",
     "total_requests_count": "{{count}} Anfragen gesamt",
@@ -1248,7 +1247,7 @@
     "col_input_price_1m": "Eingabe $/1 Mio.",
     "col_output_price_1m": "Ausgabe $/1 Mio.",
     "user_hidden": "Verborgen",
-    "user_hidden_hint": "Nur für Nutzungsprüfer sichtbar, solange die Auswertung pro Person eingeschaltet ist."
+    "user_hidden_hint": "Wer eine Anfrage gesendet hat, zeigen diese Seiten nicht."
   },
   "llm_providers": {
     "title": "LLM-Provider",
@@ -1461,7 +1460,6 @@
     "refresh": "Aktualisieren",
     "updated_at": "Aktualisiert {{time}}",
     "chip_session": "Unterhaltung {{id}}",
-    "chip_user": "Benutzer {{id}}",
     "clear_filters": "Filter zurücksetzen",
     "stat_calls": "Aufrufe",
     "stat_errors": "Fehler",
@@ -1489,7 +1487,6 @@
     "col_tokens": "Tokens",
     "col_cost": "Kosten",
     "col_flags": "Hinweise",
-    "col_user": "Benutzer",
     "col_provider": "Provider",
     "col_last_call": "Letzter Aufruf",
     "agent": "Agent",

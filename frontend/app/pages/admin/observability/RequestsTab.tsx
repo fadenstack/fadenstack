@@ -1,7 +1,7 @@
 /**
  * Requests tab — paginated log of gateway requests with cost detail.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -64,7 +64,6 @@ export default function RequestsTab({ start, end }: Props) {
   const [page, setPage] = useState(1);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [modelFilter, setModelFilter] = useState("");
-  const [userFilter, setUserFilter] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -74,7 +73,6 @@ export default function RequestsTab({ start, end }: Props) {
         page,
         limit: 50,
         model_alias: modelFilter || undefined,
-        user_id: userFilter || undefined,
       });
       setData(result);
     } catch (err: unknown) {
@@ -82,17 +80,16 @@ export default function RequestsTab({ start, end }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [start, end, page, modelFilter, userFilter]);
+  }, [start, end, page, modelFilter]);
 
   useEffect(() => {
     load();
   }, [load]);
 
   const totalPages = data ? Math.ceil(data.total / data.limit) : 0;
-  // Filtering by person only where the server names people to this caller
-  // (a usage auditor, person-level reporting on); a filter already typed stays.
-  const peopleNamed = Boolean(userFilter) || Boolean(data?.items.some((r) => r.user_id));
 
+  // No person column and no search by person: requests name nobody here (M02, M11); a request's
+  // details say its person is hidden. Figures of single people are on the Usage page, for usage auditors.
   return (
     <Box>
       {/* Filters */}
@@ -107,18 +104,6 @@ export default function RequestsTab({ start, end }: Props) {
           }}
           sx={{ width: 200 }}
         />
-        {peopleNamed && (
-          <TextField
-            size="small"
-            label={t("observability.filter_user_id")}
-            value={userFilter}
-            onChange={(e) => {
-              setUserFilter(e.target.value);
-              setPage(1);
-            }}
-            sx={{ width: 200 }}
-          />
-        )}
         <Button variant="outlined" size="small" onClick={load}>
           {t("observability.search")}
         </Button>
@@ -157,7 +142,6 @@ export default function RequestsTab({ start, end }: Props) {
                   <TableCell align="right">
                     {t("observability.col_est_cost")}
                   </TableCell>
-                  <TableCell>{t("observability.col_user")}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -254,15 +238,10 @@ function RequestRow({
         <TableCell align="right">{row.latency_ms} ms</TableCell>
         <TableCell align="right">{row.total_tokens ?? "—"}</TableCell>
         <TableCell align="right">{fmtCost(row.estimated_total_cost)}</TableCell>
-        <TableCell
-          sx={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis" }}
-        >
-          <UserCell userId={row.user_id} />
-        </TableCell>
       </TableRow>
       <TableRow>
         <TableCell
-          colSpan={8}
+          colSpan={7}
           sx={{ p: 0, borderBottom: expanded ? undefined : "none" }}
         >
           <Collapse in={expanded} unmountOnExit>
@@ -293,7 +272,7 @@ function RequestRow({
                     />
                     <Detail
                       label={t("observability.col_user")}
-                      value={row.user_id ?? t("observability.user_hidden")}
+                      value={<UserCell userId={row.user_id} />}
                     />
                     <Detail
                       label={t("observability.trace_id")}
@@ -419,8 +398,8 @@ function RequestRow({
 }
 
 /**
- * Who sent a request: the server names the person only to a usage auditor
- * while person-level reporting is on (M02, M06); otherwise "hidden".
+ * Who sent a request: the server names nobody here (M02, M11), so the
+ * details say "hidden" rather than leaving a gap that reads as missing data.
  */
 function UserCell({ userId }: { userId: string | null }) {
   const { t } = useTranslation();
@@ -434,7 +413,7 @@ function UserCell({ userId }: { userId: string | null }) {
   );
 }
 
-function Detail({ label, value }: { label: string; value: string }) {
+function Detail({ label, value }: { label: string; value: ReactNode }) {
   return (
     <Box sx={{ minWidth: 120 }}>
       <Typography variant="caption" color="text.secondary">

@@ -94,7 +94,6 @@ export default function LlmCallsPage() {
   const model = params.get("model") ?? "";
   const outcome = (params.get("outcome") as CallOutcome | null) ?? undefined;
   const session = params.get("session") ?? "";
-  const userId = params.get("user") ?? "";
   const sort = (params.get("sort") as CallSort | null) ?? "newest";
   const page = Math.max(1, Number(params.get("page") ?? 1) || 1);
   const limit = PAGE_SIZES.includes(Number(params.get("limit"))) ? Number(params.get("limit")) : 50;
@@ -140,7 +139,7 @@ export default function LlmCallsPage() {
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [fresh, setFresh] = useState<Set<string>>(new Set());
   const knownIds = useRef<Set<string>>(new Set());
-  const queryKey = JSON.stringify([rangeMs, q, model, outcome, session, userId, sort, page, limit, view, grouped]);
+  const queryKey = JSON.stringify([rangeMs, q, model, outcome, session, sort, page, limit, view, grouped]);
   const lastKey = useRef<string>("");
   /** Bumped by every load: only the latest one may write, whatever its trigger (filter, poll, button). */
   const loadSeq = useRef(0);
@@ -155,7 +154,6 @@ export default function LlmCallsPage() {
         model_alias: model || undefined,
         outcome,
         session: session || undefined,
-        user_id: userId || undefined,
       };
       const seq = ++loadSeq.current;
       const stale = () => signal.aborted || seq !== loadSeq.current;
@@ -264,7 +262,6 @@ export default function LlmCallsPage() {
 
   const filterChips = [
     session && { key: "session", label: t("llm_calls.chip_session", { id: shortId(session) }) },
-    userId && { key: "user", label: t("llm_calls.chip_user", { id: shortId(userId) }) },
   ].filter(Boolean) as Array<{ key: string; label: string }>;
 
   const detail = selectedId ? (
@@ -277,7 +274,7 @@ export default function LlmCallsPage() {
       onPrev={onPrev}
       onNext={onNext}
       onFilter={(key, value) =>
-        update({ [key === "model_alias" ? "model" : key === "user_id" ? "user" : "session"]: value, view: null }, { resetPage: true, push: true })
+        update({ [key === "model_alias" ? "model" : "session"]: value, view: null }, { resetPage: true, push: true })
       }
     />
   ) : null;

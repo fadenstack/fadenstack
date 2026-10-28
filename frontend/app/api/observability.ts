@@ -62,10 +62,7 @@ export interface RequestLog {
   request_id: string;
   trace_id: string | null;
   tenant_id: string;
-  /**
-   * Null unless person-level reporting is on and the caller is a usage
-   * auditor (then the server records the view); shown as "hidden".
-   */
+  /** Null: requests name nobody here (figures of single people are on the Usage page); shown as "hidden". */
   user_id: string | null;
   model_alias: string | null;
   provider_instance_id: string | null;
@@ -219,7 +216,6 @@ export const observability = {
       page?: number;
       limit?: number;
       model_alias?: string;
-      user_id?: string;
       status_code?: number;
     },
   ) {

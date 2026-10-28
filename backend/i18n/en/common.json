@@ -1153,7 +1153,6 @@
     "col_status": "Status",
     "col_latency": "Latency",
     "filter_model": "Model",
-    "filter_user_id": "User ID",
     "search": "Search",
     "no_requests": "No requests found in this time range.",
     "total_requests_count": "{{count}} total requests",
@@ -1243,7 +1242,7 @@
     "col_input_price_1m": "Input $/1M",
     "col_output_price_1m": "Output $/1M",
     "user_hidden": "Hidden",
-    "user_hidden_hint": "Shown only to usage auditors while person-level reporting is on."
+    "user_hidden_hint": "Who sent a request is not shown on these pages."
   },
   "llm_providers": {
     "title": "LLM Providers",
@@ -1466,7 +1465,6 @@
     "refresh": "Refresh",
     "updated_at": "Updated {{time}}",
     "chip_session": "Conversation {{id}}",
-    "chip_user": "User {{id}}",
     "clear_filters": "Clear filters",
     "stat_calls": "Calls",
     "stat_errors": "Errors",
@@ -1494,7 +1492,6 @@
     "col_tokens": "Tokens",
     "col_cost": "Cost",
     "col_flags": "Signals",
-    "col_user": "User",
     "col_provider": "Provider",
     "col_last_call": "Last call",
     "agent": "Agent",

@@ -172,7 +172,7 @@ export default function TurnsTable({ turns, selectedId, onSelect, p95LatencyMs, 
           <TableCell>{sortable(t("llm_calls.col_duration"), "slowest")}</TableCell>
           <TableCell>{sortable(t("llm_calls.col_tokens"), "tokens")}</TableCell>
           <TableCell>{t("llm_calls.col_tools")}</TableCell>
-          {!compact && <TableCell>{t("llm_calls.col_user")}</TableCell>}
+          {/* No person column: turns name nobody (usage of single people is not shown here). */}
         </TableRow>
       </TableHead>
       <TableBody ref={bodyRef}>
@@ -281,19 +281,10 @@ export default function TurnsTable({ turns, selectedId, onSelect, p95LatencyMs, 
                 <TableCell sx={{ width: 130 }}>
                   <ToolSignals turn={turn} />
                 </TableCell>
-                {!compact && (
-                  <TableCell sx={{ width: 96 }}>
-                    <Tooltip title={turn.user_id}>
-                      <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>
-                        {shortId(turn.user_id)}
-                      </Typography>
-                    </Tooltip>
-                  </TableCell>
-                )}
               </TableRow>
               {isOpen && kids === "loading" && (
                 <TableRow>
-                  <TableCell colSpan={compact ? 8 : 9} sx={{ py: 1, pl: 6 }}>
+                  <TableCell colSpan={8} sx={{ py: 1, pl: 6 }}>
                     <CircularProgress size={16} />
                   </TableCell>
                 </TableRow>

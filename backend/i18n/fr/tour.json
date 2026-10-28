@@ -341,7 +341,7 @@
       "title": "Tableau de bord des coûts",
       "description": "Coût, utilisation et rapidité des requêtes servies par la passerelle. Les coûts sont des estimations calculées à partir des prix que vous définissez ; ils n'ont aucun effet sur la facturation.",
       "action_overview": "Dépenses, requêtes, tokens, latence et erreurs sur 7 à 90 jours",
-      "action_requests": "Parcourir les requêtes, filtrer par modèle ou par utilisateur, et en ouvrir une pour voir son pipeline",
+      "action_requests": "Parcourir les requêtes, filtrer par modèle, et en ouvrir une pour voir son pipeline",
       "action_pricing": "Définir les prix par million de tokens",
       "action_export": "Exporter les données en CSV"
     },

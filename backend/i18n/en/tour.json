@@ -341,7 +341,7 @@
       "title": "Cost Observability",
       "description": "Cost, usage and speed of the requests the gateway served. Costs are estimates from the prices you set; they do not affect billing.",
       "action_overview": "Spend, requests, tokens, latency and errors over 7 to 90 days",
-      "action_requests": "Browse requests, filter by model or user, and open one to see its pipeline",
+      "action_requests": "Browse requests, filter by model, and open one to see its pipeline",
       "action_pricing": "Set the prices per million tokens",
       "action_export": "Export the data as CSV"
     },
