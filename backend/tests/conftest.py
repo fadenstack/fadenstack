@@ -132,12 +132,13 @@ async def _engine(anyio_backend: Any) -> AsyncGenerator[AsyncEngine]:
     engine = create_async_engine(str(settings.db_url))
     async with engine.begin() as conn:
         await conn.run_sync(meta.create_all)
-        # What the migration adds beside the models: the count of changes to access, and its triggers.
+        # What the migrations add beside the models: the counts of changes to access and to the system
+        # settings, and their triggers.
         from sqlalchemy import text
 
-        from faden_backend.db import access_epoch
+        from faden_backend.db import access_epoch, settings_epoch
 
-        for statement in access_epoch.create_all():
+        for statement in [*access_epoch.create_all(), *settings_epoch.create_all()]:
             await conn.execute(text(statement))
 
     try:
