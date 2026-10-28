@@ -195,6 +195,13 @@
 "Which usage data fields are stored?" = "the-data-fields"
 "May we use usage data to evaluate employees?" = "what-usage-data-is-for"
 
+["administer/usage-documents.md"]
+"What do we need for the works council and the DPO?" = ""
+"Is there an employee privacy notice for usage measurement?" = "employee-notice"
+"Is there a records-of-processing entry or a DPIA template?" = "records-of-processing-entry"
+"Is there a works-agreement annex for usage measurement?" = "works-agreement-annex"
+"How do we answer an access or erasure request about usage?" = "access-request-and-erasure-procedure"
+
 ["administer/llm-calls.md"]
 "Why did a request to a model fail?" = "why-a-call-failed"
 "How do I find a call or a request?" = "find-a-call"

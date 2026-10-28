@@ -38,6 +38,7 @@ nav = [
     { "What happens to a request" = "administer/requests.md" },
     { "Usage and limits" = "administer/usage.md" },
     { "Usage and privacy" = "administer/usage-privacy.md" },
+    { "Documents for your DPO and works council" = "administer/usage-documents.md" },
     { "LLM calls" = "administer/llm-calls.md" },
     { "The dashboard" = "administer/dashboard.md" },
   ] },

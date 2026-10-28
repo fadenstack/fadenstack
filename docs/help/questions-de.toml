@@ -193,6 +193,13 @@
 "Welche Datenfelder zur Nutzung werden gespeichert?" = "the-data-fields"
 "Dürfen wir Nutzungsdaten zur Bewertung von Beschäftigten verwenden?" = "what-usage-data-is-for"
 
+["administer/usage-documents.md"]
+"Was brauchen wir für Betriebsrat und Datenschutzbeauftragten?" = ""
+"Gibt es Datenschutzhinweise für Beschäftigte zur Nutzungsmessung?" = "employee-notice"
+"Gibt es eine Vorlage für das Verarbeitungsverzeichnis oder die DSFA?" = "records-of-processing-entry"
+"Gibt es eine Anlage zur Betriebsvereinbarung für die Nutzungsmessung?" = "works-agreement-annex"
+"Wie beantworten wir ein Auskunfts- oder Löschersuchen zur Nutzung?" = "access-request-and-erasure-procedure"
+
 ["administer/llm-calls.md"]
 "Warum ist eine Anfrage an ein Modell fehlgeschlagen?" = "why-a-call-failed"
 "Wie finde ich einen Aufruf oder eine Anfrage?" = "find-a-call"
