@@ -59,7 +59,8 @@ Konto-Schaltfläche:
 - ihre Tokens und geschätzten Kosten nach Tag oder Monat, nach Modell, nach Agent und nach Chat-Projekt;
 - die Limits, die für die Instanz gelten, und wie viel davon gerade verbraucht ist;
 - ob die personenbezogene Auswertung eingeschaltet ist, wie fein und wie lange ihre Zahlen aufbewahrt werden
-  und wie oft ein Nutzungsprüfer sie angesehen hat;
+  und wie oft ein Nutzungsprüfer sie angesehen hat, mit einem Link zu Ihren Datenschutzhinweisen, wenn Sie
+  einen gesetzt haben (siehe [Nutzung und Datenschutz](usage-privacy.md#the-settings));
 - unter **Ihre Daten** **Als JSON herunterladen** und **Als CSV herunterladen**.
 
 Der Download enthält ihre täglichen Zahlen, ihre Einträge, die noch im Anfrageprotokoll stehen (Zeit, Modell,
@@ -71,7 +72,8 @@ eine Person nach Art. 15 DSGVO über ihre Nutzung erfragen kann (siehe
 ## Die Seite „Nutzung“ {#the-usage-page}
 
 Die Seite **Nutzung** zeigt, wie viel die Instanz verbraucht und wo, ohne die Zahlen einzelner Personen zu
-zeigen. Administratoren und Personen mit der Rolle `auditor` können sie öffnen.
+zeigen. Administratoren können sie öffnen, ebenso Personen mit der Rolle `auditor`, die dafür keine
+Administratorrechte brauchen (siehe [Administratoren und Prüfer](users.md#administrators-and-auditors)).
 
 1. Öffnen Sie **Observability → Nutzung**.
 2. Wählen Sie den **Zeitraum** (**7 Tage** bis **12 Monate**) und **Zahlen pro** **Stunde**, **Tag** oder
@@ -114,15 +116,18 @@ sie unter **Einstellungen → Nutzung und Datenschutz** erhöhen, aber nicht unt
   Stunden erscheinen nur, wenn mindestens fünf Personen die Instanz in dieser Stunde genutzt haben.
 - Dasselbe gilt über die Zeit: Ließe sich ein ausgeblendeter Zeitraum aus der Summe minus den angezeigten
   errechnen, wird ein weiterer mit ihm ausgeblendet.
-- Die Zahl der Personen in der Summe erscheint erst ab fünf.
+- **Summen** und **Tokens im Zeitverlauf** zeigen nur Zahlen, wenn mindestens fünf Personen die Instanz im
+  Zeitraum genutzt haben. Ein Nutzungsprüfer sieht sie trotzdem, solange die personenbezogene Auswertung
+  eingeschaltet ist.
 
 Ein Team aus drei Personen oder ein Agent, den eine Person nutzt, erscheint daher nie allein: Seine Zahlen wären
 die einer Person unter anderem Namen.
 
 !!! note "Kleine Instanzen"
-    Haben im Zeitraum weniger als fünf Personen die Instanz genutzt, sagt die Seite das (**Eine kleine Instanz**). Jede Zahl liegt dann
-    nahe an den Zahlen einer einzelnen Person; behandeln Sie die Seite deshalb wie personenbezogene Daten (siehe
-    [Nutzung und Datenschutz](usage-privacy.md)).
+    Haben im Zeitraum weniger als fünf Personen die Instanz genutzt, sagt die Seite das (**Eine kleine
+    Instanz**), und die Summen zeigen keine Zahlen: Sie lägen nahe an den Zahlen einer einzelnen Person. Ein
+    Nutzungsprüfer, der sie bei eingeschalteter personenbezogener Auswertung trotzdem sieht, behandelt sie wie
+    personenbezogene Daten (siehe [Nutzung und Datenschutz](usage-privacy.md)).
 
 ## Die Kosten- und Nutzungsseiten {#the-cost-and-usage-pages}
 

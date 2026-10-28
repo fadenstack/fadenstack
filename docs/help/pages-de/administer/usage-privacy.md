@@ -20,7 +20,8 @@ Nach der Installation, und solange Sie keine Einstellung ändern:
 
 - **Niemand sieht die Nutzungszahlen einer anderen Person.** Die personenbezogene Auswertung ist aus. Die Seite
   **Nutzung** zeigt Teams, Agenten, Modelle und Provider nur dort, wo mindestens fünf Personen hinter einer Zahl
-  stehen (siehe [Die Mindestgruppengröße](usage.md#the-minimum-group-size)).
+  stehen, und ihre Summen nur, wenn mindestens fünf Personen die Instanz genutzt haben (siehe
+  [Die Mindestgruppengröße](usage.md#the-minimum-group-size)).
 - **Keine Seite listet Anfragen nach Person.** **Kosten-Observability** und **LLM-Aufrufe** zeigen nie, wer eine
   Anfrage gesendet hat, und finden Anfragen nicht nach Person.
 - **Auch die Zahlen eines Agenten brauchen fünf Personen.** Sein Reiter **Aktivität** zeigt sie nur, wenn
@@ -53,6 +54,7 @@ Minuten; nichts wird neu gestartet.
 | **Stündliche Zahlen** (`usage.hourly_retention_days`) | 90 Tage | 31 bis 180 Tage | Zahlen pro Stunde nach Team, Agent, Modell und Provider, für die Kapazitätsplanung. Sie enthalten keine Person. |
 | **Tägliche Zahlen** (`usage.daily_retention_months`) | 25 Monate | 13 bis 60 Monate | Zahlen pro Tag nach Team, Agent, Modell und Provider, für den Vergleich mit dem Vorjahr und die Kosten. Sie enthalten keine Person. |
 | **Zeitzone** (`usage.time_zone`) | Die Zeitzone des Servers oder UTC | Ein Zeitzonenname wie `Europe/Berlin` | Wo Tage und Monate beginnen und wann das Tageslimit neu beginnt. Ohne Einfluss auf den Datenschutz. |
+| **Datenschutzhinweise** (`usage.privacy_notice_url`) | Leer | Leer oder eine `https://`-Adresse | **Meine Nutzung** verlinkt darauf, sodass die Beschäftigten Ihre Datenschutzhinweise (siehe [Unterlagen](usage-documents.md#employee-notice)) dort finden, wo sie ihre eigenen Zahlen sehen. Leer: kein Link. |
 
 ??? info "Die Konfigurationsbeschreibung"
     Wählen Sie auf demselben Reiter unter **Konfigurationsbeschreibung** die **Sprache** (Deutsch, Englisch,
@@ -98,7 +100,8 @@ Zeitraum und mit welchem Grund. Die Person sieht in ihrem eigenen Download Datum
 Einsicht und jedes Downloads, nie, wer hineingesehen hat; **Meine Nutzung** zeigt, wie viele es waren.
 
 ??? info "Wer die Aufzeichnung prüft"
-    Die eingebaute Rolle `auditor` liest das Audit-Protokoll und die Seite **Nutzung** und ändert nichts: eine
+    Die eingebaute Rolle `auditor` liest das Audit-Protokoll, öffnet die Seite **Nutzung** ohne
+    Administratorrechte und ändert nichts: eine
     passende Rolle für Ihren Datenschutzbeauftragten oder ein Mitglied des Betriebsrats. Unter **Logs → Audit**
     zeigt der Aktionsfilter `usage.` die Einsichten in personenbezogene Zahlen und die Änderungen an den Limits;
     die Änderungen an den Einstellungen stehen dort ebenfalls.
@@ -108,7 +111,8 @@ Einsicht und jedes Downloads, nie, wer hineingesehen hat; **Meine Nutzung** zeig
 Jede Person, die sich anmeldet, hat **Meine Nutzung**, im Menü hinter ihrer Konto-Schaltfläche: ihre eigenen
 Tokens und geschätzten Kosten nach Tag oder Monat, nach Modell, Agent und Chat-Projekt, und die Limits, die
 gelten. Ist die personenbezogene Auswertung eingeschaltet, steht das dort, mit der Angabe, wer ihre Zahlen sehen
-kann (die Nutzungsprüfer), wie fein und wie lange.
+kann (die Nutzungsprüfer), wie fein und wie lange. Haben Sie eine Adresse unter **Datenschutzhinweise**
+gesetzt (siehe [Die Einstellungen](#the-settings)), verlinkt die Seite darauf.
 
 Unter **Ihre Daten** liefern **Als JSON herunterladen** und **Als CSV herunterladen**:
 

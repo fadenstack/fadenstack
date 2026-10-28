@@ -21,6 +21,8 @@ Anfragen von Betroffenen und die Zweckbestimmung. Diese Seite enthält für jede
 2. Stellen Sie sie unter **Einstellungen → Nutzung und Datenschutz** ein.
 3. Wählen Sie auf demselben Reiter unter **Konfigurationsbeschreibung** **Download**. Sie hält die Einstellungen fest,
    wie sie sind; fügen Sie sie der Anlage und der Datenschutz-Folgenabschätzung bei.
+4. Sind die Datenschutzhinweise für Beschäftigte veröffentlicht, tragen Sie ihre Adresse auf demselben Reiter
+   unter **Datenschutzhinweise** ein: **Meine Nutzung** verlinkt dann darauf.
 
 Die Liste aller gespeicherten Felder und was jede Einstellung bedeutet, steht unter
 [Nutzung und Datenschutz](usage-privacy.md). Sie ist das Verzeichnis der Datenfelder, auf das sich die Unterlagen

@@ -57,7 +57,8 @@ Everyone who signs in sees their own usage under **My usage**, in the menu behin
 - their tokens and estimated cost by day or month, by model, by agent and by chat project;
 - the limits that apply to the instance, and how much of each is used at the moment;
 - whether person-level reporting is on, how finely and for how long their figures are kept, and how often a
-  usage auditor looked at them;
+  usage auditor looked at them, with a link to your privacy notice when you have set one (see
+  [Usage and privacy](usage-privacy.md#the-settings));
 - under **Your data**, **Download as JSON** and **Download as CSV**.
 
 The download holds their daily figures, their request records still in the request log (time, model, agent,
@@ -68,7 +69,8 @@ may ask under Art. 15 GDPR about their usage (see [Usage and privacy](usage-priv
 ## The Usage page
 
 The **Usage** page shows how much the instance uses, and where, without showing anyone's own figures.
-Administrators and people with the `auditor` role can open it.
+Administrators can open it, and so can people with the role `auditor`, who need no administrator rights for it
+(see [Administrators and auditors](users.md#administrators-and-auditors)).
 
 1. Open **Observability → Usage**.
 2. Pick the **Period** (**7 days** to **12 months**), and **Figures per** **Hour**, **Day** or **Month**.
@@ -108,15 +110,16 @@ under **Settings → Usage and privacy** but not set below five.
   least five people used it.
 - The same holds over time: where hiding a period would let it be worked out from the total minus the periods
   shown, another period is hidden with it.
-- The number of people in the total shows only from five upwards.
+- **Totals** and **Tokens over time** show figures only when at least five people used the instance in the
+  range. A usage auditor sees them anyway while person-level reporting is on.
 
 A team of three, or an agent one person uses, is therefore never shown on its own: its figures would be one
 person's under another name.
 
 !!! note "Small instances"
-    When fewer than five people used the instance in the range, the page says so (**A small instance**). Every
-    figure is then close to one person's own, so handle the page as person-level data (see
-    [Usage and privacy](usage-privacy.md)).
+    When fewer than five people used the instance in the range, the page says so (**A small instance**) and the
+    totals show no figures: they would be close to one person's own. A usage auditor who still sees them while
+    person-level reporting is on handles them as person-level data (see [Usage and privacy](usage-privacy.md)).
 
 ## The cost and usage pages
 

@@ -19,6 +19,8 @@ information sheet, a procedure for requests, and the intended purpose. This page
 2. Set it under **Settings → Usage and privacy**.
 3. Under **Configuration statement** on the same tab, select **Download**. The statement records the settings as
    they are; attach it to the annex and to the DPIA.
+4. Once the employee notice is published, enter its address under **Privacy notice** on the same tab: **My usage**
+   then links to it.
 
 The list of every stored field, and what each setting means, is on [Usage and privacy](usage-privacy.md). It is
 the data-field inventory the documents below refer to.

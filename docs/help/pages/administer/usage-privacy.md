@@ -17,8 +17,8 @@ is one, your works council. Templates for them are on [Documents for your DPO an
 As installed, and until you change a setting:
 
 - **Nobody sees another person's usage figures.** Person-level reporting is off. The **Usage** page shows teams,
-  agents, models and providers only where at least five people are behind a figure (see
-  [The minimum group size](usage.md#the-minimum-group-size)).
+  agents, models and providers only where at least five people are behind a figure, and its totals only when at
+  least five people used the instance (see [The minimum group size](usage.md#the-minimum-group-size)).
 - **No page lists requests by person.** **Cost Observability** and **LLM Calls** never show who sent a request,
   and do not find requests by person.
 - **An agent's figures need five people too.** Its **Activity** tab shows them only when at least five people
@@ -47,6 +47,7 @@ when. A change applies within minutes; nothing restarts.
 | **Hourly figures** (`usage.hourly_retention_days`) | 90 days | 31 to 180 days | Figures per hour by team, agent, model and provider, for capacity planning. They hold no person. |
 | **Daily figures** (`usage.daily_retention_months`) | 25 months | 13 to 60 months | Figures per day by team, agent, model and provider, for year-on-year planning and costs. They hold no person. |
 | **Time zone** (`usage.time_zone`) | The server's time zone, or UTC | A time zone name such as `Europe/Berlin` | Where days and months begin, and when the daily limit starts again. No effect on privacy. |
+| **Privacy notice** (`usage.privacy_notice_url`) | Empty | Empty, or an `https://` address | **My usage** links to it, so people find your notice to employees (see [Documents](usage-documents.md#employee-notice)) where they see their own figures. Empty: no link. |
 
 ??? info "The configuration statement"
     Under **Configuration statement** on the same tab, pick the **Language** (English, German, Spanish, French or
@@ -85,8 +86,8 @@ The person sees, in their own download, the date and the stated reason of each, 
 shows how many there were.
 
 ??? info "Who checks the record"
-    The built-in role `auditor` reads the audit log and the **Usage** page, and changes nothing: a fitting role for
-    your DPO or a member of the works council. In **Logs → Audit**, the action filter `usage.` shows the looks
+    The built-in role `auditor` reads the audit log and opens the **Usage** page without administrator rights, and
+    changes nothing: a fitting role for your DPO or a member of the works council. In **Logs → Audit**, the action filter `usage.` shows the looks
     at person-level figures and the changes to the limits; the settings changes are there as well.
 
 ## Your own view and the download
@@ -94,6 +95,7 @@ shows how many there were.
 Everyone who signs in has **My usage**, in the menu behind their account button: their own tokens and
 estimated cost by day or month, by model, agent and chat project, and the limits that apply. When person-level
 reporting is on, it says so, with who can see their figures (the usage auditors), how finely and for how long.
+When you have set a **Privacy notice** address (see [The settings](#the-settings)), it links there.
 
 Under **Your data**, **Download as JSON** and **Download as CSV** give them:
 

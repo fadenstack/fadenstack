@@ -88,7 +88,7 @@ Die Modellliste zeigt nicht immer, wo ein Modell läuft. Wenn das für das, was 
 - **Administratoren** sehen Summen für Gruppen von mindestens fünf Personen, nie Ihre Zahlen allein. Gehen sie einer fehlgeschlagenen Anfrage nach, zeigt deren Eintrag nicht, wer sie gesendet hat.
 - **Hat Ihre Organisation die personenbezogene Auswertung eingeschaltet**, steht das unter **Meine Nutzung**. Dann dürfen einige benannte Personen Ihre Zahlen ansehen, nach Tag oder nach Monat, jedes Mal mit Begründung. **Meine Nutzung** zeigt, wie oft das geschah; Ihr Download zeigt Datum und Grund jeder Einsicht, nicht, wer hineingesehen hat.
 
-Ihre Zahlen werden so lange aufbewahrt, wie **Meine Nutzung** angibt (90 Tage, wenn Ihre Organisation nichts anderes gewählt hat), und mit Ihrem Konto gelöscht. Ihre Organisation verwendet sie für Kosten und Kapazität, nicht, um Ihre Arbeit zu beurteilen. Siehe [Nutzung und Datenschutz](../administer/usage-privacy.md).
+Ihre Zahlen werden so lange aufbewahrt, wie **Meine Nutzung** angibt (90 Tage, wenn Ihre Organisation nichts anderes gewählt hat), und mit Ihrem Konto gelöscht. Ihre Organisation verwendet sie für Kosten und Kapazität, nicht, um Ihre Arbeit zu beurteilen; hat sie Datenschutzhinweise für Beschäftigte, verlinkt **Meine Nutzung** darauf. Siehe [Nutzung und Datenschutz](../administer/usage-privacy.md).
 
 Hält ein Limit eine Anfrage an, nennt die Meldung das Limit, etwa das Tageslimit der Instanz für Tokens. Fragen Sie Ihren Administrator, wenn Sie mehr brauchen.
 

@@ -200,6 +200,7 @@
 "How does someone get a copy of their usage data (GDPR access request)?" = "your-own-view-and-the-download"
 "Is usage data deleted when an account is deleted?" = "retention-and-erasure"
 "Which usage data fields are stored?" = "the-data-fields"
+"How do I link our privacy notice from My usage?" = "the-settings"
 "May we use usage data to evaluate employees?" = "what-usage-data-is-for"
 
 ["administer/usage-documents.md"]
