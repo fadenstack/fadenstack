@@ -13,6 +13,7 @@ Was die Zahlen für die Daten der Beschäftigten bedeuten und wer wessen Zahlen 
 | **Meine Nutzung**, im Menü hinter der Konto-Schaltfläche | Jede Person, für sich selbst | Die eigenen Tokens und geschätzten Kosten, die geltenden Limits und einen Download der eigenen Daten (siehe [Ihre eigene Nutzung](#your-own-usage)). |
 | **Observability → Nutzung** | Administratoren und Prüfer | Summen und Verlauf nach Team, Agent, Modell oder Provider, nur für Gruppen von mindestens fünf Personen (siehe [Die Seite „Nutzung“](#the-usage-page)). |
 | [Dashboard](dashboard.md) | Administratoren | Den heutigen Tag auf einen Blick: **Anfragen heute**, **Aktive Benutzer heute**, **Intern bearbeitet**, **Kosten diesen Monat**, **Fehlerquote (1 Std.)**; **KI-Datenverkehr** (wo Anfragen bedient wurden) und **Nutzung** (Anfragen pro Tag, nach Ort der Bearbeitung). |
+| **Observability → Budgets** | Administratoren, mit Fadenstack Enterprise | Was jedes Budget in diesem Zeitraum verbraucht hat, seine Benachrichtigungen und die Verrechnung je Team oder Kostenstelle (siehe [Budgets](budgets.md)). |
 | **Observability → Kosten-Dashboard** | Administratoren | Ausgaben, Anfragen, Tokens, Geschwindigkeit und Fehler der ganzen Instanz sowie die Preise (siehe [Die Kosten- und Nutzungsseiten](#the-cost-and-usage-pages)). |
 | **Observability → LLM-Aufrufe** | Administratoren | Jede Anfrage und jeder Aufruf: warum einer fehlschlug, was ein Agent für eine Frage tat, wohin Aufrufe gingen (siehe [LLM-Aufrufe](llm-calls.md)). |
 | Der Reiter **Aktivität** eines Agenten | Administratoren; der Eigentümer eines persönlichen Agenten | Anfragen, Fehler, Tokens, Benutzer und Unterhaltungen dieses Agenten, nur als Zahlen, wenn mindestens fünf Personen ihn im Zeitraum genutzt haben; die Zahlen eines persönlichen Agenten sieht sein Eigentümer (siehe [Agenten und Add-ins](agents.md)). |
@@ -58,6 +59,7 @@ Konto-Schaltfläche:
 
 - ihre Tokens und geschätzten Kosten nach Tag oder Monat, nach Modell, nach Agent und nach Chat-Projekt;
 - die Limits, die für die Instanz gelten, und wie viel davon gerade verbraucht ist;
+- mit Fadenstack Enterprise die Budgets, die für sie gelten (siehe [Budgets](budgets.md#your-own-budgets));
 - ob die personenbezogene Auswertung eingeschaltet ist, wie fein und wie lange ihre Zahlen aufbewahrt werden
   und wie oft ein Nutzungsprüfer sie angesehen hat, mit einem Link zu Ihren Datenschutzhinweisen, wenn Sie
   einen gesetzt haben (siehe [Nutzung und Datenschutz](usage-privacy.md#the-settings));
@@ -178,7 +180,8 @@ zeigt allen die Limits und wie viel davon verbraucht ist.
     - Eine Antwort, die bereits geschrieben wird, wird nie abgebrochen: Ihre Tokens zählen, sobald sie fertig
       ist. Die Instanz kann ein Limit daher leicht überschreiten.
 
-Limits pro Team, pro Person oder pro Agent sowie Budgets sind <span class="fs-planned">Geplant</span>.
+Budgets pro Team, pro Agent, pro Person oder für die ganze Organisation, pro Tag, Woche oder Monat, gibt es mit
+Fadenstack Enterprise: siehe [Budgets](budgets.md).
 
 ### Was Benutzer sehen, wenn ein Limit ablehnt {#what-people-see-when-a-limit-refuses}
 

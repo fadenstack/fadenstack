@@ -12,6 +12,7 @@ and who may see whose, is on [Usage and privacy](usage-privacy.md).
 | **My usage**, in the menu behind the account button | Everyone, for themselves | Their own tokens and estimated cost, the limits that apply, and a download of their data (see [Your own usage](#your-own-usage)). |
 | **Observability → Usage** | Administrators and auditors | Totals and a series over time, by team, agent, model or provider, only for groups of at least five people (see [The Usage page](#the-usage-page)). |
 | [Dashboard](dashboard.md) | Administrators | Today at a glance: **Requests today**, **Active users today**, **Kept in-house**, **Spend this month**, **Error rate (1 h)**; **AI traffic** (where requests were served) and **Usage** (requests per day, by where they were served). |
+| **Observability → Budgets** | Administrators, with Fadenstack Enterprise | What each budget has used this period, its alerts, and the chargeback per team or cost centre (see [Budgets](budgets.md)). |
 | **Observability → Cost Dashboard** | Administrators | Spend, requests, tokens, speed and errors of the whole instance, and the prices (see [The cost and usage pages](#the-cost-and-usage-pages)). |
 | **Observability → LLM Calls** | Administrators | Each request and call: why one failed, what an agent did for one question, where calls went (see [LLM calls](llm-calls.md)). |
 | An agent's **Activity** tab | Administrators; the owner of a personal agent | Requests, errors, tokens, users and conversations of that agent, counts only, when at least five people used it in the range; its owner sees a personal agent's figures (see [Agents and add-ins](agents.md)). |
@@ -56,6 +57,7 @@ Everyone who signs in sees their own usage under **My usage**, in the menu behin
 
 - their tokens and estimated cost by day or month, by model, by agent and by chat project;
 - the limits that apply to the instance, and how much of each is used at the moment;
+- with Fadenstack Enterprise, the budgets that apply to them (see [Budgets](budgets.md#your-own-budgets));
 - whether person-level reporting is on, how finely and for how long their figures are kept, and how often a
   usage auditor looked at them, with a link to your privacy notice when you have set one (see
   [Usage and privacy](usage-privacy.md#the-settings));
@@ -166,7 +168,8 @@ limits and how much of each is used.
     - An answer that is already being written is never cut off: its tokens count once it is done, so the
       instance can end up a little over a limit.
 
-Limits per team, per person or per agent, and budgets, are <span class="fs-planned">Planned</span>.
+Budgets per team, per agent, per person or for the whole organisation, per day, week or month, come with
+Fadenstack Enterprise: see [Budgets](budgets.md).
 
 ### What people see when a limit refuses
 
