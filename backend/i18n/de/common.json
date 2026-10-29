@@ -5195,6 +5195,13 @@
     },
     "refused": {
       "label": "Budget aufgebraucht",
+      "reason": {
+        "personal": "Das würde Ihr persönliches Budget für diesen Zeitraum überschreiten. Wenden Sie sich für mehr an die Administration oder an die verantwortliche Person des Budgets.",
+        "team": "Das würde das Budget Ihres Teams für diesen Zeitraum überschreiten. Wenden Sie sich für mehr an die Administration oder an die verantwortliche Person des Budgets.",
+        "agent": "Das würde das Budget dieses Agenten für diesen Zeitraum überschreiten. Wenden Sie sich für mehr an die Administration oder an die verantwortliche Person des Budgets.",
+        "organisation": "Das würde das Budget der Organisation für diesen Zeitraum überschreiten. Wenden Sie sich für mehr an die Administration oder an die verantwortliche Person des Budgets.",
+        "other": "Das würde ein Budget für diesen Zeitraum überschreiten. Wenden Sie sich für mehr an die Administration oder an die verantwortliche Person des Budgets."
+      },
       "until": "Es beginnt am {{when}} neu."
     }
   }

@@ -54,6 +54,18 @@ export function budgetErrorText(err: unknown, t: T): string {
   return errorText(err);
 }
 
+/** The kinds of budget a refusal names (`error.param` of `budget_exceeded`). */
+export const REFUSAL_KINDS = ["personal", "team", "agent", "organisation"] as const;
+
+/**
+ * The words for a refusal by a budget, from the kind the gateway names (never its English message, and
+ * never a figure): `budgets.refused.reason.<kind>`, or the general wording for a kind not known here.
+ */
+export function budgetRefusalKey(param: string | null | undefined): string {
+  const kind = (REFUSAL_KINDS as readonly string[]).includes(param ?? "") ? param : "other";
+  return `budgets.refused.reason.${kind}`;
+}
+
 /** The months a report can be asked for, newest first: this month and the twelve before (`YYYY-MM`). */
 export function recentMonths(count = 13, now = new Date()): string[] {
   const months: string[] = [];

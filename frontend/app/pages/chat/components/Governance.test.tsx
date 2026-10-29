@@ -50,33 +50,32 @@ describe("the chat's errors, by kind", () => {
     expect(errorDetail(failed)).toMatchObject({ kind: "rate_limit", retryAfter: 17 });
   });
 
-  it("tells a used-up budget from a rate limit, with the gateway's words and when it starts again", async () => {
-    const message =
-      "Your team's budget for this month is used up. Ask an administrator or the budget's owner for more.";
+  it("tells a used-up budget from a rate limit, with the kind of budget and when it starts again", async () => {
+    const message = "This would go over your team's budget for this period.";
     vi.stubGlobal(
       "fetch",
       vi.fn(
         async () =>
-          new Response(JSON.stringify({ error: { message, type: "insufficient_quota", code: "budget_exceeded" } }), {
-            status: 429,
-            headers: { "Retry-After": "86400", "x-should-retry": "false" },
-          }),
+          new Response(
+            JSON.stringify({ error: { message, type: "insufficient_quota", code: "budget_exceeded", param: "team" } }),
+            { status: 429, headers: { "Retry-After": "86400", "x-should-retry": "false" } },
+          ),
       ),
     );
     const { reader } = streamChat({ model: "m", messages: [] });
     const failed = await reader.next().catch((e: unknown) => e);
-    // No "Rate limit reached (429)" in front: the chat labels it as a budget.
-    expect(errorDetail(failed)).toEqual({ kind: "budget", message, retryAfter: 86400 });
+    // No "Rate limit reached (429)" in front: the chat words it as a budget, from the code and the kind.
+    expect(errorDetail(failed)).toEqual({ kind: "budget", message, retryAfter: 86400, param: "team" });
   });
 
   it("reads a used-up budget from the stream's error event too", async () => {
     const body =
-      'data: {"error": {"message": "This agent\'s budget is used up.", "type": "insufficient_quota", ' +
-      '"code": "budget_exceeded", "status": 429}}\n\ndata: [DONE]\n\n';
+      'data: {"error": {"message": "This would go over this agent\'s budget.", "type": "insufficient_quota", ' +
+      '"code": "budget_exceeded", "param": "agent", "status": 429}}\n\ndata: [DONE]\n\n';
     vi.stubGlobal("fetch", vi.fn(async () => new Response(body, { status: 200 })));
     const { reader } = streamChat({ model: "m", messages: [] });
     const failed = await reader.next().catch((e: unknown) => e);
-    expect(errorDetail(failed)).toMatchObject({ kind: "budget", message: "This agent's budget is used up." });
+    expect(errorDetail(failed)).toMatchObject({ kind: "budget", param: "agent" });
   });
 
   it("keeps anything else an error", () => {

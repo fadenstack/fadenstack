@@ -111,15 +111,16 @@ Budgets folgen dem Teambaum (siehe [Teams als Baum](users.md#teams-in-a-tree)):
 
 ### Was Benutzer sehen, wenn ein Budget ablehnt {#what-people-see-when-a-budget-refuses}
 
-Im Chat und in den Agenten sehen Benutzer **Budget aufgebraucht** mit einer Meldung, die die Art des Budgets nennt,
-etwa „your team's budget for this month“, „this agent's budget“ oder „your personal budget“, sie bittet, sich an
-einen Administrator oder die verantwortliche Person des Budgets zu wenden, und sagt, wann es neu beginnt. Sie zeigt
-nie die Nutzung anderer, und niemand sonst wird benachrichtigt.
+Im Chat sehen Benutzer **Budget aufgebraucht** mit einer Meldung in ihrer Sprache, die die Art des Budgets nennt,
+etwa „Das würde das Budget Ihres Teams für diesen Zeitraum überschreiten. Wenden Sie sich für mehr an die
+Administration oder an die verantwortliche Person des Budgets.“, und sagt, wann es neu beginnt. Ebenso für „Ihr
+persönliches Budget“, „das Budget dieses Agenten“ und „das Budget der Organisation“. Sie zeigt nie eine Zahl oder
+die Nutzung anderer, und niemand sonst wird benachrichtigt.
 
-Anwendungen erhalten die Antwort, die die API von OpenAI für ein Kontingent gibt: HTTP-Status `429` mit
-`error.type` `insufficient_quota` und `error.code` `budget_exceeded`, `Retry-After` mit den Sekunden bis zum Ende
-des Zeitraums und `x-should-retry: false`, sodass die Client-Bibliotheken von OpenAI es nicht von selbst erneut
-versuchen.
+Anwendungen und Agenten erhalten die Antwort, die die API von OpenAI für ein Kontingent gibt: HTTP-Status `429`
+mit `error.type` `insufficient_quota`, `error.code` `budget_exceeded` und der Art des Budgets in `error.param`
+(`personal`, `team`, `agent` oder `organisation`), `Retry-After` mit den Sekunden bis zum Ende des Zeitraums und
+`x-should-retry: false`, sodass die Client-Bibliotheken von OpenAI es nicht von selbst erneut versuchen.
 
 ## Benachrichtigungen und wer sie erhält {#alerts-and-who-gets-them}
 

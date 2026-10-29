@@ -5195,6 +5195,13 @@
     },
     "refused": {
       "label": "Presupuesto agotado",
+      "reason": {
+        "personal": "Esto superaría su presupuesto personal para este periodo. Para obtener más, pídalo a un administrador o al responsable del presupuesto.",
+        "team": "Esto superaría el presupuesto de su equipo para este periodo. Para obtener más, pídalo a un administrador o al responsable del presupuesto.",
+        "agent": "Esto superaría el presupuesto de este agente para este periodo. Para obtener más, pídalo a un administrador o al responsable del presupuesto.",
+        "organisation": "Esto superaría el presupuesto de la organización para este periodo. Para obtener más, pídalo a un administrador o al responsable del presupuesto.",
+        "other": "Esto superaría un presupuesto para este periodo. Para obtener más, pídalo a un administrador o al responsable del presupuesto."
+      },
       "until": "Vuelve a empezar el {{when}}."
     }
   }

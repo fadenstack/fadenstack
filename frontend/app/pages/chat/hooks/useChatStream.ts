@@ -71,6 +71,8 @@ export interface ChatErrorDetail {
   /** The text that was refused, for "edit and resend". */
   text?: string;
   retryAfter?: number | null;
+  /** ``budget``: the kind of budget (``personal``, ``team``, ``agent``, ``organisation``). */
+  param?: string | null;
 }
 
 export function errorDetail(err: unknown, text?: string): ChatErrorDetail {
@@ -80,7 +82,7 @@ export function errorDetail(err: unknown, text?: string): ChatErrorDetail {
       return { kind: "blocked", message: err.governance?.message ?? message, text };
     }
     if (err.code === BUDGET_EXCEEDED) {
-      return { kind: "budget", message, retryAfter: err.retryAfter };
+      return { kind: "budget", message, retryAfter: err.retryAfter, param: err.param };
     }
     if (err.status === 429 || err.type === "rate_limit_error" || err.code?.startsWith("rate_limit")) {
       return { kind: "rate_limit", message, retryAfter: err.retryAfter };

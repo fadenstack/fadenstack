@@ -5195,6 +5195,13 @@
     },
     "refused": {
       "label": "Budget épuisé",
+      "reason": {
+        "personal": "Cela dépasserait votre budget personnel pour cette période. Pour en obtenir davantage, demandez à un administrateur ou au responsable du budget.",
+        "team": "Cela dépasserait le budget de votre équipe pour cette période. Pour en obtenir davantage, demandez à un administrateur ou au responsable du budget.",
+        "agent": "Cela dépasserait le budget de cet agent pour cette période. Pour en obtenir davantage, demandez à un administrateur ou au responsable du budget.",
+        "organisation": "Cela dépasserait le budget de l'organisation pour cette période. Pour en obtenir davantage, demandez à un administrateur ou au responsable du budget.",
+        "other": "Cela dépasserait un budget pour cette période. Pour en obtenir davantage, demandez à un administrateur ou au responsable du budget."
+      },
       "until": "Il recommence le {{when}}."
     }
   }

@@ -53,8 +53,10 @@ export interface GovernanceNotice {
 }
 
 /**
- * The gateway's refusal when a budget that applies is used up (429, `insufficient_quota`): it starts again
- * with the budget's next period, not in a moment, so the chat words it apart from a rate limit.
+ * The gateway's refusal when a request would go over a budget that applies (429, `insufficient_quota`,
+ * `error.param` the kind of budget: `personal`, `team`, `agent`, `organisation`). It starts again with the
+ * budget's next period, not in a moment, so the chat words it apart from a rate limit, in the reader's
+ * language from the code and the kind (the gateway's own message is English).
  */
 export const BUDGET_EXCEEDED = "budget_exceeded";
 
@@ -63,6 +65,8 @@ export class ChatApiError extends Error {
   code: string | null;
   type: string | null;
   status: number | null;
+  /** What the code is about (`error.param`), e.g. the kind of budget that refused. */
+  param: string | null;
   /** Set when a governance check refused the prompt. */
   governance: GovernanceNotice | null;
   /** Seconds to wait, for a rate limit. */
@@ -74,6 +78,7 @@ export class ChatApiError extends Error {
       code?: string | null;
       type?: string | null;
       status?: number | null;
+      param?: string | null;
       governance?: GovernanceNotice | null;
       retryAfter?: number | null;
     } = {},
@@ -83,6 +88,7 @@ export class ChatApiError extends Error {
     this.code = init.code ?? null;
     this.type = init.type ?? null;
     this.status = init.status ?? null;
+    this.param = init.param ?? null;
     this.governance = init.governance ?? null;
     this.retryAfter = init.retryAfter ?? null;
   }
@@ -92,6 +98,7 @@ function errorFields(payload: unknown): {
   code: string | null;
   type: string | null;
   status: number | null;
+  param: string | null;
   governance: GovernanceNotice | null;
 } {
   const record = (payload && typeof payload === "object" ? payload : {}) as Record<string, unknown>;
@@ -111,6 +118,7 @@ function errorFields(payload: unknown): {
     code: typeof error.code === "string" ? error.code : null,
     type: typeof error.type === "string" ? error.type : null,
     status: typeof error.status === "number" ? error.status : null,
+    param: typeof error.param === "string" ? error.param : null,
     governance,
   };
 }
@@ -151,7 +159,7 @@ function parseApiErrorMessage(payload: unknown, status: number): string | null {
           ? record.message
           : null;
 
-  // A used-up budget is no rate limit: its message names the budget and whom to ask (the chat labels it).
+  // A used-up budget is no rate limit: the chat words it from the code and the kind of budget.
   if (code === BUDGET_EXCEEDED) return message ?? code;
 
   if (

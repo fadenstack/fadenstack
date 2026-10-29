@@ -106,14 +106,15 @@ Budgets follow the team tree (see [Teams in a tree](users.md#teams-in-a-tree)):
 
 ### What people see when a budget refuses
 
-In the chat and in the agents, people see **Budget used up** with a message that names the kind of budget, for
-example "your team's budget for this month", "this agent's budget" or "your personal budget", asks them to turn
-to an administrator or the budget's owner, and says when it starts again. It never shows anyone's use, and
-nobody else is told.
+In the chat, people see **Budget used up** with a message in their language that names the kind of budget, for
+example "This would go over your team's budget for this period. Ask an administrator or the budget's owner for
+more.", and when it starts again. The same goes for "your personal budget", "this agent's budget" and "the
+organisation's budget". It never shows a figure or anyone's use, and nobody else is told.
 
-Applications get the answer OpenAI's API gives for a quota: HTTP status `429` with `error.type`
-`insufficient_quota` and `error.code` `budget_exceeded`, `Retry-After` with the seconds until the period ends,
-and `x-should-retry: false`, so OpenAI's client libraries do not try again by themselves.
+Applications and agents get the answer OpenAI's API gives for a quota: HTTP status `429` with `error.type`
+`insufficient_quota`, `error.code` `budget_exceeded` and the kind of budget in `error.param` (`personal`,
+`team`, `agent` or `organisation`), `Retry-After` with the seconds until the period ends, and
+`x-should-retry: false`, so OpenAI's client libraries do not try again by themselves.
 
 ## Alerts and who gets them
 

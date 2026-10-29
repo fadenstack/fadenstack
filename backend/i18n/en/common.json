@@ -5193,6 +5193,13 @@
     },
     "refused": {
       "label": "Budget used up",
+      "reason": {
+        "personal": "This would go over your personal budget for this period. Ask an administrator or the budget's owner for more.",
+        "team": "This would go over your team's budget for this period. Ask an administrator or the budget's owner for more.",
+        "agent": "This would go over this agent's budget for this period. Ask an administrator or the budget's owner for more.",
+        "organisation": "This would go over the organisation's budget for this period. Ask an administrator or the budget's owner for more.",
+        "other": "This would go over a budget for this period. Ask an administrator or the budget's owner for more."
+      },
       "until": "It starts again on {{when}}."
     }
   }
