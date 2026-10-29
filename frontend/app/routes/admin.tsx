@@ -33,9 +33,12 @@ import {
   writeCachedAccess,
   clearCachedAccess,
   consolePages,
+  featureShown,
   mayOpen,
   type NavEntry,
 } from "~/lib/adminConstants";
+import { aboutInfo } from "~/api/about";
+import { useAsyncData } from "~/lib/useAsyncData";
 import { AdminTopbar } from "~/components/AdminTopbar";
 import { ADMIN_NAV_ID, AdminSidebar } from "~/components/AdminSidebar";
 import { MobileNavButton } from "~/components/MobileNavButton";
@@ -305,6 +308,16 @@ function AdminLayoutInner() {
   // Determine RAG mode for nav filtering
   const { mode: ragMode } = useRagMode();
 
+  // What the server adds beyond core: a page for a feature shows only while it is offered.
+  const features = useAsyncData(
+    () =>
+      aboutInfo()
+        .then((about) => new Set(about.features ?? []) as ReadonlySet<string>)
+        .catch(() => new Set<string>() as ReadonlySet<string>),
+    [],
+    { initialValue: new Set<string>() as ReadonlySet<string> },
+  );
+
   // Filter entries by permissions / modules / superuser (and, for anyone else, the pages they may
   // open), then split by saved order
   const opens = (to: string) => mayOpen(pages, to.split("?")[0]);
@@ -317,6 +330,7 @@ function AdminLayoutInner() {
     }
     const children = entry.children.filter((child) => {
       if (child.module && !isModuleEnabled(child.module)) return false;
+      if (!featureShown(child, features.data)) return false;
       if (child.superuserOnly && !isSuperuser) return false;
       if (!opens(child.to)) return false;
       if (!hasPermission(child.permission)) return false;

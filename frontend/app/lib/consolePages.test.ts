@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { consolePages, mayOpen, NAV } from "./adminConstants";
+import { consolePages, featureShown, mayOpen, NAV } from "./adminConstants";
 
 describe("console pages", () => {
   it("opens every page to a superuser", () => {
@@ -28,5 +28,25 @@ describe("console pages", () => {
   it("has a navigation entry for every page a permission opens", () => {
     const targets = NAV.flatMap((e) => (e.kind === "leaf" ? [e.to] : e.children.map((c) => c.to)));
     expect(targets).toContain("/admin/usage");
+  });
+});
+
+describe("pages for a feature the server offers", () => {
+  const budgets = NAV.flatMap((e) => (e.kind === "group" ? e.children : [])).find((c) => c.to === "/admin/budgets");
+
+  it("lists Budgets under Observability, beside Usage, for superusers", () => {
+    const observability = NAV.find((e) => e.id === "observability");
+    expect(observability?.kind === "group" && observability.children.map((c) => c.to)).toEqual(
+      expect.arrayContaining(["/admin/usage", "/admin/budgets"]),
+    );
+    expect(budgets).toMatchObject({ feature: "budgets", superuserOnly: true });
+  });
+
+  it("shows it only while the server offers the feature", () => {
+    expect(featureShown(budgets!, new Set())).toBe(false);
+    expect(featureShown(budgets!, new Set(["mail_settings"]))).toBe(false);
+    expect(featureShown(budgets!, new Set(["budgets"]))).toBe(true);
+    // An entry that needs no feature always shows.
+    expect(featureShown({}, new Set())).toBe(true);
   });
 });
