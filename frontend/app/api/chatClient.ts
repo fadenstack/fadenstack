@@ -52,6 +52,12 @@ export interface GovernanceNotice {
   message_id?: string | null;
 }
 
+/**
+ * The gateway's refusal when a budget that applies is used up (429, `insufficient_quota`): it starts again
+ * with the budget's next period, not in a moment, so the chat words it apart from a rate limit.
+ */
+export const BUDGET_EXCEEDED = "budget_exceeded";
+
 /** An error from the chat API, with what the page needs to show it on its turn. */
 export class ChatApiError extends Error {
   code: string | null;
@@ -144,6 +150,9 @@ function parseApiErrorMessage(payload: unknown, status: number): string | null {
         : typeof record.message === "string"
           ? record.message
           : null;
+
+  // A used-up budget is no rate limit: its message names the budget and whom to ask (the chat labels it).
+  if (code === BUDGET_EXCEEDED) return message ?? code;
 
   if (
     status === 429 ||
