@@ -95,14 +95,91 @@ describe("My usage", () => {
     expect(within(notice).getByText(/viewed 2 times/)).toBeInTheDocument();
   });
 
-  it("draws an extension's blocks as a heading and their fields", async () => {
-    me.mockResolvedValue(myUsage({ sections: [{ kind: "budgets", data: { monthly_tokens: 1000000, spent: 250000 } }] }));
+  it("draws an extension's other blocks as a heading and their fields", async () => {
+    me.mockResolvedValue(myUsage({ sections: [{ kind: "quota_notes", data: { monthly_tokens: 1000000, spent: 250000 } }] }));
     view();
 
-    const block = await screen.findByRole("region", { name: "Budgets" });
+    const block = await screen.findByRole("region", { name: "quota_notes" });
     expect(within(block).getByText("monthly_tokens")).toBeInTheDocument();
     expect(within(block).getByText("1,000,000")).toBeInTheDocument();
     expect(within(block).getByText("250,000")).toBeInTheDocument();
+  });
+
+  describe("the budgets that apply to the person", () => {
+    const budgets = {
+      kind: "budgets",
+      data: {
+        budgets: [
+          {
+            name: "My month",
+            kind: "personal",
+            unit: "tokens",
+            currency: null,
+            amount: 1000000,
+            spent: 250000,
+            percent: 25,
+            period_end: "2026-10-31",
+            mode: "hard",
+          },
+          {
+            name: "Sales",
+            kind: "team",
+            unit: "money",
+            currency: "EUR",
+            amount: "500.0000",
+            spent: null,
+            percent: null,
+            period_end: "2026-10-31",
+            mode: "soft",
+          },
+        ],
+        alerts: [{ name: "My month", threshold: 80, at: "2026-10-20T09:00:00Z" }],
+      },
+    };
+
+    it("shows each budget with a bar, its period end and what happens when it is used up", async () => {
+      me.mockResolvedValue(myUsage({ sections: [budgets] }));
+      const { container } = view();
+
+      const block = await screen.findByRole("region", { name: "Budgets" });
+      const mine = container.querySelector("[data-my-budget='personal']") as HTMLElement;
+      expect(within(mine).getByText("My month")).toBeInTheDocument();
+      expect(within(mine).getByText("Your personal budget")).toBeInTheDocument();
+      expect(within(mine).getByText("250,000 of 1,000,000 tokens · 25 %")).toBeInTheDocument();
+      expect(within(mine).getByRole("progressbar", { name: "Used of My month" })).toHaveAttribute("aria-valuenow", "25");
+      expect(within(mine).getByText(/This period ends on Oct 31, 2026\./)).toBeInTheDocument();
+      expect(within(mine).getByText(/requests are refused until the period ends/)).toBeInTheDocument();
+      expect(within(block).getByText(/Only you see what you use of your personal budget/)).toBeInTheDocument();
+      expect(within(block).getByText(/ask an administrator or the budget's owner/)).toBeInTheDocument();
+    });
+
+    it("shows a team's budget without its use where the team's use is not shown", async () => {
+      me.mockResolvedValue(myUsage({ sections: [budgets] }));
+      const { container } = view();
+      await screen.findByRole("region", { name: "Budgets" });
+
+      const team = container.querySelector("[data-my-budget='team']") as HTMLElement;
+      expect(within(team).getByText(/Your team's budget · €500\.00/)).toBeInTheDocument();
+      expect(within(team).getByText(/shows only where enough people share the budget/)).toBeInTheDocument();
+      expect(within(team).queryByRole("progressbar")).toBeNull();
+      expect(within(team).getByText(/requests go on and the administrators are told/)).toBeInTheDocument();
+    });
+
+    it("lists the alerts of this period", async () => {
+      me.mockResolvedValue(myUsage({ sections: [budgets] }));
+      view();
+
+      const alerts = await screen.findByRole("heading", { name: "Alerts this period" });
+      expect(alerts.parentElement).toHaveTextContent("My month reached 80 % on Oct 20, 2026.");
+    });
+
+    it("says when no budget applies", async () => {
+      me.mockResolvedValue(myUsage({ sections: [{ kind: "budgets", data: { budgets: [], alerts: [] } }] }));
+      view();
+
+      const block = await screen.findByRole("region", { name: "Budgets" });
+      expect(within(block).getByText("No budget applies to you.")).toBeInTheDocument();
+    });
   });
 
   it("shows no cost where no price applies, rather than a zero", async () => {
