@@ -29,6 +29,8 @@ As installed, and until you change a setting:
 - **Person-level figures are kept per day at most, for 90 days.** The request log they come from is kept for 90
   days too. No figure holds the time of day of a person's use, or their device.
 - **The limits for the instance know no person**: they count everyone's requests together.
+- **Budgets for single people are off** (with Fadenstack Enterprise), and once on, a person's use of their
+  budget is shown to them alone (see [Budgets](budgets.md#privacy)).
 - **Who may look at one person's figures** is a role that nobody holds at installation, not even superusers.
 
 ## The settings
@@ -166,10 +168,25 @@ days (**Request log**, `usage.request_log_retention_days`); erased with the acco
 **The limits**: the values set (`rpm_limit`, `tpm_limit`, `tokens_per_day` of the instance's policy), and their
 counts, one per instance, which last only for their minute or day. No personal data.
 
+**Budgets**, with Fadenstack Enterprise (see [Budgets](budgets.md)). What a budget used comes from the figures
+above; these tables hold the budgets themselves:
+
+| Table | One row per | Holds | Kept | Who sees it |
+|---|---|---|---|---|
+| `ee.budgets` | Budget | `name`; whom it applies to (`scope`, `target_id`: a team, an agent or, for a person's budget, the person's account id); `unit`, `currency`, `amount`, `period`, `mode`, `thresholds`; the owner who gets its alerts (`owner_id`); who created it and when. No usage figures | Until it is deleted | Administrators. A person's budget: its limit only; what the person used shows only to them on **My usage**, and to usage auditors while person-level reporting is on |
+| `ee.budget_alerts` | Budget, period, threshold and kind (`threshold` or `forecast`) | When the alert went out, so it goes out once. No figures, no person | With its budget | Nobody: the alerts themselves name the budget and the threshold, never a person's use |
+| `ee.scim_person_attributes` | Person created by provisioning (SCIM) | `cost_center` and `department`, as the sign-in provider sends them | Erased with the account | Administrators, through the cost-centre rule |
+| `ee.cost_center_rules` | Cost centre | The team it makes a person's usage group | Until removed; deleted with the team | Administrators |
+
+Each budget's count for the current period lasts only while the period runs; for a person's budget it is that
+person's use, shown to nobody else. Chargeback reports have no table of their own: they are made from the
+figures above when they are asked for, per team or cost centre, with at least five people per row.
+
 **The record of who looked and what changed**, in the audit log: each look at person-level figures
 (`usage.people.view`: who, whose, which range, the reason) and each download of one person's data by a usage
 auditor (the same), each change to the limits (`usage.limits.update`) and
-to the usage settings, and the reads of the cost pages. Kept as long as the audit log (see above). Seen by
+to the usage settings, each change to a budget (`budget.create`, `budget.update`, `budget.delete`) and to the
+budget settings, and the reads of the cost pages. Kept as long as the audit log (see above). Seen by
 administrators and auditors; the person sees the date and reason of the looks at their own figures.
 
 ??? info "Other places in the console that name people"

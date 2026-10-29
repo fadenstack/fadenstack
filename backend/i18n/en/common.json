@@ -1629,7 +1629,9 @@
       "approval_wait": "Waited {{wait}} for approvals",
       "approval_wait_hint": "Much of this request's time was a person deciding, not the model or the tools.",
       "many_rounds": "The model took {{count}} rounds",
-      "many_rounds_hint": "Many rounds of tool requests for one question: the model may be looping, or a tool keeps failing. Compare the rounds below."
+      "many_rounds_hint": "Many rounds of tool requests for one question: the model may be looping, or a tool keeps failing. Compare the rounds below.",
+      "budget_exceeded": "A budget was used up",
+      "budget_exceeded_hint": "A budget that applies to this request (the organisation's, a team's, the agent's or the person's) had no room left this period. Budgets are under Observability → Budgets."
     },
     "group_by": "Show",
     "group_turns": "Requests",
@@ -4678,7 +4680,8 @@
     "lift": "Lift",
     "lift_title": "Lift this restriction?",
     "lift_body": "The restriction no longer applies. It is recorded in the audit log.",
-    "lift_tool_mode_ceilings": "Tools in every chat go back to the mode each person picks. The limits are kept and apply again when Enterprise is back. Recorded in the audit log."
+    "lift_tool_mode_ceilings": "Tools in every chat go back to the mode each person picks. The limits are kept and apply again when Enterprise is back. Recorded in the audit log.",
+    "budget_threshold": "The budget {{name}} has used {{threshold}} % of its amount this {{period}}."
   },
   "sign_ins": {
     "title": "Linked sign-ins",
@@ -4989,6 +4992,215 @@
       "auditors_none": "Holders of the usage auditor role: none",
       "views": "Recorded views and downloads of named people's usage in the last 12 months: {{count}}",
       "footer": "This statement describes the configuration; it is not legal advice."
+    }
+  },
+  "budgets": {
+    "nav": "Budgets",
+    "title": "Budgets",
+    "subtitle": "How many tokens, or how much money, the organisation, a team, an agent or one person may use per day, week or month, and how much is used so far.",
+    "new": "New budget",
+    "tabs": {
+      "budgets": "Budgets",
+      "chargeback": "Chargeback",
+      "settings": "Settings"
+    },
+    "rule": "A request needs room in every budget that applies to it: the organisation's, its usage group's and every team's above it, its agent's and, where there is one, its person's.",
+    "none": "No budgets yet. A budget limits what the organisation, a team, an agent or a person uses per period.",
+    "load_failed": "The budgets could not be loaded.",
+    "created": "{{name}} is set up.",
+    "saved": "{{name}} is saved.",
+    "deleted": "{{name}} is deleted.",
+    "delete_title": "Delete this budget?",
+    "delete_body": "{{name}} no longer limits anything, and its alerts end. The deletion is recorded in the audit log.",
+    "amount_tokens": "{{amount}} tokens",
+    "used_tokens": "{{spent}} of {{amount}} tokens",
+    "used_money": "{{spent}} of {{amount}}",
+    "scope": {
+      "tenant": "Organisation",
+      "team": "Team",
+      "agent": "Agent",
+      "person": "Person"
+    },
+    "unit": {
+      "tokens": "Tokens",
+      "money": "Money"
+    },
+    "period": {
+      "day": "Per day",
+      "week": "Per week",
+      "month": "Per month"
+    },
+    "period_noun": {
+      "day": "day",
+      "week": "week",
+      "month": "month"
+    },
+    "mode": {
+      "hard": "Hard",
+      "soft": "Soft",
+      "shadow": "Shadow"
+    },
+    "mode_help": {
+      "hard": "Refuses requests once the budget is used up, until the period ends.",
+      "soft": "Never refuses. Alerts when the thresholds are reached.",
+      "shadow": "Never refuses. Counts the requests it would have refused, to try a budget out before it applies."
+    },
+    "list": {
+      "whole_org": "The whole organisation",
+      "a_person": "A person",
+      "removed_target": "No longer there",
+      "edit": "Edit {{name}}",
+      "delete": "Delete {{name}}",
+      "limit": "Limit {{amount}}",
+      "period_range": "This period: {{start}} to {{end}}",
+      "used_label": "Used of {{name}}",
+      "suppressed": "What a person uses of their budget is shown only to them. Administrators see the limit.",
+      "spent_unknown": "How much is used is not known yet.",
+      "forecast": "At this rate it runs out on {{date}}, before the period ends.",
+      "would_refuse_one": "Would have refused {{n}} request this period.",
+      "would_refuse_other": "Would have refused {{n}} requests this period.",
+      "would_refuse_none": "Would have refused no request this period so far.",
+      "thresholds": "Alerts at {{list}}",
+      "no_thresholds": "No alerts",
+      "owner": "also to {{owner}}",
+      "children_exceed": "The budgets of the teams below add up to more than this one. That is allowed: each request still needs room in this budget too.",
+      "currency_none": "No model has a price in {{currency}}: nothing counts toward this budget until one has.",
+      "currency_others": "Only costs in {{currency}} count. Usage of models priced in {{others}} does not count toward this budget."
+    },
+    "dialog": {
+      "create_title": "New budget",
+      "edit_title": "Edit budget",
+      "tree_rule": "Every budget that applies to a request must have room: the organisation's, each team's from the person's usage group up, the agent's and the person's. A team's budget may not be larger than the budget of the team above it for the same unit and period.",
+      "name": "Name",
+      "name_help": "For you and the alerts, e.g. Sales per month.",
+      "scope": "Applies to",
+      "scope_help": {
+        "tenant": "Every request of the organisation counts.",
+        "team": "Requests of the team's people, and of every team below it, count. A team without a budget is held by the budgets of the teams above it.",
+        "agent": "Requests through this agent count, whoever uses it.",
+        "person": "Only this person's requests count. Only they see what they used of it."
+      },
+      "person_off": "Budgets for single people are off. Switch them on under Settings on this page.",
+      "team": "Team",
+      "team_help": "A team needs at least {{k}} people, counting its sub-teams, unless person-level reporting is on.",
+      "team_help_reporting": "Person-level reporting is on: a team of any size can have a budget.",
+      "no_teams": "No teams yet: set them up under Access Control → Groups.",
+      "agent": "Agent",
+      "agent_help": "An agent only one person uses counts as that person's: its budget needs budgets for single people switched on.",
+      "no_agents": "No agents yet.",
+      "person": "Person",
+      "person_help": "Only this person sees what they use of it, and only they get its alerts.",
+      "unit": "Counts",
+      "amount": "Amount",
+      "amount_help_tokens": "Input and output tokens together, cached ones included.",
+      "amount_help_money": "The estimated cost at the prices set on this instance.",
+      "currency": "Currency",
+      "currency_help": "Three letters, e.g. EUR. Only costs priced in this currency count.",
+      "period": "Period",
+      "period_help": "Calendar days, weeks (Monday to Sunday) or months, in the usage time zone.",
+      "mode": "Mode",
+      "thresholds": "Alerts at (%)",
+      "thresholds_help": "Percentages of the amount, e.g. 80, 100. Each alerts once per period.",
+      "owner": "Owner",
+      "owner_help": "Gets the alerts too, besides the administrators. Optional.",
+      "problems": "Some fields need a look."
+    },
+    "problems": {
+      "required": "Required.",
+      "invalid": "Not a valid value.",
+      "team_too_small": "This team has fewer than {{k}} people, counting its sub-teams. A budget for it needs person-level reporting on (Settings → Usage and privacy).",
+      "exceeds_parent": "Larger than the budget of the team above it for the same unit, currency and period. Lower it, or raise that budget first.",
+      "person_budgets_off": "Budgets for single people are off. Switch them on under Settings on this page, in root mode.",
+      "duplicate": "A budget for this with the same unit and period exists already. Change that one instead.",
+      "name_invalid": "At most 128 characters.",
+      "target_id_required": "Choose whom it applies to.",
+      "amount_invalid": "A number above 0: whole tokens, or money with up to four decimals.",
+      "currency_invalid": "Three letters, such as EUR.",
+      "thresholds_invalid": "Whole percentages from 1 to 1000, separated by commas, such as 80, 100.",
+      "target_id_agent_person_budgets_off": "Only one person uses this agent, so its budget is a budget for that person. Switch on budgets for single people first."
+    },
+    "errors": {
+      "root_mode": "Switching budgets for single people on or off needs root mode. Turn on root mode and save again.",
+      "forbidden": "Budgets are for administrators."
+    },
+    "settings": {
+      "saved": "Saved.",
+      "person_title": "Budgets for single people",
+      "person_intro": "A budget for one person limits how that person may use the models. It is off unless you switch it on.",
+      "person_budgets": "Person budgets",
+      "person_off_text": "Off (the default): budgets apply to the organisation, teams and agents only.",
+      "person_on_text": "On: administrators can give one person a budget. Only that person sees what they used of it, on My usage, and only they get its alerts. Administrators see its limit, not the person's use, unless person-level reporting is on and they hold the usage auditor role. An agent only one person uses counts as that person's.",
+      "works_council": "A budget for one person limits how that person works. Where there is a works council, agree it with them first (co-determination under § 87(1) no. 6 BetrVG), and tell employees in your notice.",
+      "root_mode_hint": "Changing this switch needs root mode.",
+      "root_mode_needed": "Turn on root mode to change this switch.",
+      "cost_center_title": "Usage groups from cost centres",
+      "cost_center_intro": "When your sign-in provider sends a person's cost centre (SCIM), a rule below can make a team their usage group: their usage and their budgets then count there.",
+      "cost_center_rule": "Set the usage group from the cost centre",
+      "cost_center_off_text": "Off (the default): usage groups stay as set in Fadenstack.",
+      "cost_center_on_text": "On: when provisioning creates or changes a person, a rule for their cost centre sets their usage group. People whose cost centre has no rule keep theirs.",
+      "rules_title": "Rules",
+      "rules_none": "No rules yet.",
+      "rule_cost_center": "Cost centre",
+      "rule_team": "Team",
+      "rule_add": "Add rule",
+      "rule_remove": "Remove rule {{n}}",
+      "rules_incomplete": "Every rule needs a cost centre and a team.",
+      "rules_duplicate": "Each cost centre once."
+    },
+    "chargeback": {
+      "title": "Chargeback",
+      "intro": "One month's usage and estimated cost per team or cost centre, to allocate costs within the organisation.",
+      "month": "Month",
+      "by_label": "Per",
+      "by": {
+        "team": "Team",
+        "cost_center": "Cost centre"
+      },
+      "estimate_title": "An internal estimate",
+      "estimate": "The costs are the tokens at the prices set on this instance, not a provider's bill. Every row covers at least {{k}} people; smaller teams are counted together.",
+      "download": "Download CSV",
+      "download_hint": "The CSV uses the FinOps FOCUS column names, for cost tools.",
+      "col_people": "People",
+      "col_cost": "Estimated cost",
+      "people_k": "{{k}} or more",
+      "other_row": "Fewer than {{k}} people",
+      "unassigned": "Unassigned",
+      "no_cost_center": "No cost centre",
+      "no_cost": "No price",
+      "none": "No usage in this month."
+    },
+    "my": {
+      "title": "Budgets",
+      "subtitle": "The budgets that apply to you this period.",
+      "none": "No budget applies to you.",
+      "kind": {
+        "personal": "Your personal budget",
+        "team": "Your team's budget",
+        "agent": "An agent's budget",
+        "organisation": "The organisation's budget"
+      },
+      "spent_hidden": "How much is used shows only where enough people share the budget.",
+      "until": "This period ends on {{date}}.",
+      "mode": {
+        "hard": "Once it is used up, requests are refused until the period ends.",
+        "soft": "Once it is used up, requests go on and the administrators are told.",
+        "shadow": "Only counted: it refuses nothing."
+      },
+      "alerts_title": "Alerts this period",
+      "alert": "{{name}} reached {{threshold}} % on {{date}}.",
+      "private": "Only you see what you use of your personal budget.",
+      "ask": "If you need more, ask an administrator or the budget's owner."
+    },
+    "refused": {
+      "label": "Budget used up",
+      "reason": {
+        "personal": "This would go over your personal budget for this period. Ask an administrator or the budget's owner for more.",
+        "team": "This would go over your team's budget for this period. Ask an administrator or the budget's owner for more.",
+        "agent": "This would go over this agent's budget for this period. Ask an administrator or the budget's owner for more.",
+        "organisation": "This would go over the organisation's budget for this period. Ask an administrator or the budget's owner for more.",
+        "other": "This would go over a budget for this period. Ask an administrator or the budget's owner for more."
+      },
+      "until": "It starts again on {{when}}."
     }
   }
 }

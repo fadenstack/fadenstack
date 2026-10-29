@@ -10,7 +10,8 @@
  *
  * The periods are days of the usage time zone (where the server's days begin), once the server has named
  * it. Chat projects come without names (they are sealed with the chat's content): the page names them from
- * the person's own projects. Blocks an extension adds (`sections`, e.g. budgets) are drawn generically.
+ * the person's own projects. Budgets (`sections` of kind `budgets`) have a card of their own; any other
+ * block an extension adds is drawn generically.
  */
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
@@ -31,6 +32,7 @@ import DownloadIcon from "@mui/icons-material/Download";
 import { chatApi } from "~/api/chatClient";
 import { usageApi, type MyBucket, type MyPrivacy, type UsageBreakdown, type UsageCap } from "~/api/usage";
 import { UserPageFrame } from "~/components/UserPageFrame";
+import MyBudgetsCard from "~/components/budgets/MyBudgetsCard";
 import { FULL_ROW, PanelGrid, RangeToggle, WidgetCard, WidgetEmpty } from "~/components/dashboard/kit";
 import { fmtInt } from "~/components/dashboard/format";
 import { MeasuresTable, UsageSectionCard, UsageSeriesChart, UsageTotals } from "~/components/usage/UsageParts";
@@ -139,9 +141,13 @@ export default function MyUsagePage() {
         <Breakdown title={t("usage.my.by_agent")} rows={data?.by_agent} none={t("usage.my.no_agent")} loading={loadingFirst} />
         <Breakdown title={t("usage.my.by_project")} rows={byProject} none={t("usage.my.no_project")} loading={loadingFirst} />
 
-        {(data?.sections ?? []).map((section, i) => (
-          <UsageSectionCard key={`${section.kind}-${i}`} section={section} />
-        ))}
+        {(data?.sections ?? []).map((section, i) =>
+          section.kind === "budgets" ? (
+            <MyBudgetsCard key={`${section.kind}-${i}`} section={section} />
+          ) : (
+            <UsageSectionCard key={`${section.kind}-${i}`} section={section} />
+          ),
+        )}
 
         <Box sx={FULL_ROW}>
           <WidgetCard title={t("usage.my.export_title")} subtitle={t("usage.my.export_hint")}>

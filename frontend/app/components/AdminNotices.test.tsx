@@ -36,6 +36,16 @@ describe("admin notices", () => {
     );
   });
 
+  it("words a budget's threshold, its period in the reader's words, and names no person", async () => {
+    list.mockResolvedValue([
+      { code: "budget_threshold", severity: "warning", params: { name: "Sales per month", threshold: 80, period: "month" } },
+    ]);
+    render(<AdminNotices isSuperuser />);
+    expect(await screen.findByTestId("admin-notice-budget_threshold")).toHaveTextContent(
+      "The budget Sales per month has used 80 % of its amount this month.",
+    );
+  });
+
   it("counts one day as one", async () => {
     list.mockResolvedValue([{ code: "licence_grace", severity: "error", params: { days: 1, date: "2026-11-20" } }]);
     render(<AdminNotices isSuperuser />);

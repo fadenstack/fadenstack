@@ -1624,7 +1624,9 @@
       "approval_wait": "{{wait}} auf Freigaben gewartet",
       "approval_wait_hint": "Ein Großteil der Zeit dieser Anfrage war eine Person am Entscheiden, nicht das Modell oder die Tools.",
       "many_rounds": "Das Modell brauchte {{count}} Runden",
-      "many_rounds_hint": "Viele Runden mit Tool-Anfragen für eine Frage: Das Modell dreht sich vielleicht im Kreis, oder ein Tool schlägt immer wieder fehl. Die Runden unten vergleichen."
+      "many_rounds_hint": "Viele Runden mit Tool-Anfragen für eine Frage: Das Modell dreht sich vielleicht im Kreis, oder ein Tool schlägt immer wieder fehl. Die Runden unten vergleichen.",
+      "budget_exceeded": "Ein Budget war aufgebraucht",
+      "budget_exceeded_hint": "Ein Budget, das für diese Anfrage gilt (das der Organisation, eines Teams, des Agenten oder der Person), hatte in diesem Zeitraum keinen Platz mehr. Budgets stehen unter Observability → Budgets."
     },
     "group_by": "Anzeigen",
     "group_turns": "Anfragen",
@@ -4680,7 +4682,8 @@
     "lift": "Aufheben",
     "lift_title": "Diese Einschränkung aufheben?",
     "lift_body": "Die Einschränkung gilt nicht mehr. Das wird im Audit-Protokoll festgehalten.",
-    "lift_tool_mode_ceilings": "Tools in jedem Chat folgen wieder dem Modus, den jede Person wählt. Die Grenzen bleiben gespeichert und gelten wieder, sobald Enterprise zurück ist. Wird im Audit-Protokoll festgehalten."
+    "lift_tool_mode_ceilings": "Tools in jedem Chat folgen wieder dem Modus, den jede Person wählt. Die Grenzen bleiben gespeichert und gelten wieder, sobald Enterprise zurück ist. Wird im Audit-Protokoll festgehalten.",
+    "budget_threshold": "Das Budget {{name}} hat in diesem Zeitraum ({{period}}) {{threshold}} % seines Betrags erreicht."
   },
   "sign_ins": {
     "title": "Verknüpfte Anmeldungen",
@@ -4991,6 +4994,215 @@
       "auditors_none": "Inhaber der Rolle Nutzungsprüfer: keine",
       "views": "Protokollierte Ansichten und Downloads der Nutzung namentlich genannter Personen in den letzten 12 Monaten: {{count}}",
       "footer": "Dieser Nachweis beschreibt die Konfiguration; er ist keine Rechtsberatung."
+    }
+  },
+  "budgets": {
+    "nav": "Budgets",
+    "title": "Budgets",
+    "subtitle": "Wie viele Tokens oder wie viel Geld die Organisation, ein Team, ein Agent oder eine einzelne Person pro Tag, Woche oder Monat nutzen darf, und wie viel bisher genutzt ist.",
+    "new": "Neues Budget",
+    "tabs": {
+      "budgets": "Budgets",
+      "chargeback": "Verrechnung",
+      "settings": "Einstellungen"
+    },
+    "rule": "Eine Anfrage braucht Platz in jedem Budget, das für sie gilt: dem der Organisation, dem ihrer Nutzungsgruppe und jedes Teams darüber, dem ihres Agenten und, wo es eines gibt, dem ihrer Person.",
+    "none": "Noch keine Budgets. Ein Budget begrenzt, was die Organisation, ein Team, ein Agent oder eine Person pro Zeitraum nutzt.",
+    "load_failed": "Die Budgets konnten nicht geladen werden.",
+    "created": "{{name}} ist eingerichtet.",
+    "saved": "{{name}} ist gespeichert.",
+    "deleted": "{{name}} ist gelöscht.",
+    "delete_title": "Dieses Budget löschen?",
+    "delete_body": "{{name}} begrenzt dann nichts mehr, und seine Benachrichtigungen enden. Das Löschen wird im Audit-Protokoll festgehalten.",
+    "amount_tokens": "{{amount}} Tokens",
+    "used_tokens": "{{spent}} von {{amount}} Tokens",
+    "used_money": "{{spent}} von {{amount}}",
+    "scope": {
+      "tenant": "Organisation",
+      "team": "Team",
+      "agent": "Agent",
+      "person": "Person"
+    },
+    "unit": {
+      "tokens": "Tokens",
+      "money": "Geld"
+    },
+    "period": {
+      "day": "Pro Tag",
+      "week": "Pro Woche",
+      "month": "Pro Monat"
+    },
+    "period_noun": {
+      "day": "Tag",
+      "week": "Woche",
+      "month": "Monat"
+    },
+    "mode": {
+      "hard": "Hart",
+      "soft": "Weich",
+      "shadow": "Schatten"
+    },
+    "mode_help": {
+      "hard": "Lehnt Anfragen ab, sobald das Budget aufgebraucht ist, bis der Zeitraum endet.",
+      "soft": "Lehnt nie ab. Benachrichtigt, wenn die Schwellen erreicht sind.",
+      "shadow": "Lehnt nie ab. Zählt die Anfragen, die es abgelehnt hätte, um ein Budget zu erproben, bevor es gilt."
+    },
+    "list": {
+      "whole_org": "Die ganze Organisation",
+      "a_person": "Eine Person",
+      "removed_target": "Nicht mehr vorhanden",
+      "edit": "{{name}} bearbeiten",
+      "delete": "{{name}} löschen",
+      "limit": "Limit {{amount}}",
+      "period_range": "Dieser Zeitraum: {{start}} bis {{end}}",
+      "used_label": "Genutzt von {{name}}",
+      "suppressed": "Was eine Person von ihrem Budget nutzt, sieht nur sie selbst. Die Administration sieht das Limit.",
+      "spent_unknown": "Wie viel genutzt ist, ist noch nicht bekannt.",
+      "forecast": "Bei diesem Verbrauch ist es am {{date}} aufgebraucht, vor dem Ende des Zeitraums.",
+      "would_refuse_one": "Hätte in diesem Zeitraum {{n}} Anfrage abgelehnt.",
+      "would_refuse_other": "Hätte in diesem Zeitraum {{n}} Anfragen abgelehnt.",
+      "would_refuse_none": "Hätte in diesem Zeitraum bisher keine Anfrage abgelehnt.",
+      "thresholds": "Benachrichtigung bei {{list}}",
+      "no_thresholds": "Keine Benachrichtigungen",
+      "owner": "auch an {{owner}}",
+      "children_exceed": "Die Budgets der Teams darunter ergeben zusammen mehr als dieses. Das ist erlaubt: Jede Anfrage braucht trotzdem auch in diesem Budget Platz.",
+      "currency_none": "Kein Modell hat einen Preis in {{currency}}: Für dieses Budget zählt nichts, bis eines einen hat.",
+      "currency_others": "Nur Kosten in {{currency}} zählen. Die Nutzung von Modellen mit Preisen in {{others}} zählt für dieses Budget nicht."
+    },
+    "dialog": {
+      "create_title": "Neues Budget",
+      "edit_title": "Budget bearbeiten",
+      "tree_rule": "Jedes Budget, das für eine Anfrage gilt, muss Platz haben: das der Organisation, das jedes Teams von der Nutzungsgruppe der Person aufwärts, das des Agenten und das der Person. Das Budget eines Teams darf nicht größer sein als das Budget des Teams darüber mit derselben Einheit und demselben Zeitraum.",
+      "name": "Name",
+      "name_help": "Für Sie und die Benachrichtigungen, z. B. Vertrieb pro Monat.",
+      "scope": "Gilt für",
+      "scope_help": {
+        "tenant": "Jede Anfrage der Organisation zählt.",
+        "team": "Anfragen der Personen des Teams und jedes Teams darunter zählen. Ein Team ohne Budget wird von den Budgets der Teams darüber begrenzt.",
+        "agent": "Anfragen über diesen Agenten zählen, egal wer ihn nutzt.",
+        "person": "Nur die Anfragen dieser Person zählen. Nur sie sieht, was sie davon genutzt hat."
+      },
+      "person_off": "Budgets für einzelne Personen sind ausgeschaltet. Schalten Sie sie unter Einstellungen auf dieser Seite ein.",
+      "team": "Team",
+      "team_help": "Ein Team braucht mindestens {{k}} Personen, Unterteams eingerechnet, außer die personenbezogene Auswertung ist eingeschaltet.",
+      "team_help_reporting": "Die personenbezogene Auswertung ist eingeschaltet: Ein Team jeder Größe kann ein Budget haben.",
+      "no_teams": "Noch keine Teams: Richten Sie sie unter Zugriffskontrolle → Gruppen ein.",
+      "agent": "Agent",
+      "agent_help": "Ein Agent, den nur eine Person nutzt, zählt als ihrer: Sein Budget erfordert eingeschaltete Budgets für einzelne Personen.",
+      "no_agents": "Noch keine Agenten.",
+      "person": "Person",
+      "person_help": "Nur diese Person sieht, was sie davon nutzt, und nur sie erhält seine Benachrichtigungen.",
+      "unit": "Zählt",
+      "amount": "Betrag",
+      "amount_help_tokens": "Eingabe- und Ausgabe-Tokens zusammen, solche aus dem Cache eingeschlossen.",
+      "amount_help_money": "Die geschätzten Kosten zu den auf dieser Instanz gesetzten Preisen.",
+      "currency": "Währung",
+      "currency_help": "Drei Buchstaben, z. B. EUR. Nur Kosten mit Preisen in dieser Währung zählen.",
+      "period": "Zeitraum",
+      "period_help": "Kalendertage, Wochen (Montag bis Sonntag) oder Monate, in der Zeitzone der Nutzungsmessung.",
+      "mode": "Modus",
+      "thresholds": "Benachrichtigen bei (%)",
+      "thresholds_help": "Prozent des Betrags, z. B. 80, 100. Jede Schwelle benachrichtigt einmal pro Zeitraum.",
+      "owner": "Verantwortlich",
+      "owner_help": "Erhält die Benachrichtigungen ebenfalls, neben der Administration. Optional.",
+      "problems": "Einige Felder brauchen Ihre Aufmerksamkeit."
+    },
+    "problems": {
+      "required": "Erforderlich.",
+      "invalid": "Kein gültiger Wert.",
+      "team_too_small": "Dieses Team hat weniger als {{k}} Personen, Unterteams eingerechnet. Ein Budget dafür erfordert die eingeschaltete personenbezogene Auswertung (Einstellungen → Nutzung und Datenschutz).",
+      "exceeds_parent": "Größer als das Budget des Teams darüber mit derselben Einheit, Währung und demselben Zeitraum. Verringern Sie es oder erhöhen Sie zuerst jenes Budget.",
+      "person_budgets_off": "Budgets für einzelne Personen sind ausgeschaltet. Schalten Sie sie unter Einstellungen auf dieser Seite im Root-Modus ein.",
+      "duplicate": "Ein Budget hierfür mit derselben Einheit und demselben Zeitraum gibt es bereits. Ändern Sie stattdessen jenes.",
+      "name_invalid": "Höchstens 128 Zeichen.",
+      "target_id_required": "Wählen Sie, wofür es gilt.",
+      "amount_invalid": "Eine Zahl über 0: ganze Tokens oder Geld mit bis zu vier Nachkommastellen.",
+      "currency_invalid": "Drei Buchstaben, z. B. EUR.",
+      "thresholds_invalid": "Ganze Prozentwerte von 1 bis 1000, durch Kommas getrennt, z. B. 80, 100.",
+      "target_id_agent_person_budgets_off": "Nur eine Person nutzt diesen Agenten, daher ist sein Budget ein Budget für diese Person. Schalten Sie zuerst Budgets für einzelne Personen ein."
+    },
+    "errors": {
+      "root_mode": "Das Ein- oder Ausschalten von Budgets für einzelne Personen erfordert den Root-Modus. Schalten Sie den Root-Modus ein und speichern Sie erneut.",
+      "forbidden": "Budgets sind der Administration vorbehalten."
+    },
+    "settings": {
+      "saved": "Gespeichert.",
+      "person_title": "Budgets für einzelne Personen",
+      "person_intro": "Ein Budget für eine Person begrenzt, wie diese Person die Modelle nutzen darf. Es ist ausgeschaltet, bis Sie es einschalten.",
+      "person_budgets": "Personenbudgets",
+      "person_off_text": "Aus (Standard): Budgets gelten nur für die Organisation, Teams und Agenten.",
+      "person_on_text": "Ein: Die Administration kann einer Person ein Budget geben. Nur diese Person sieht unter Meine Nutzung, was sie davon genutzt hat, und nur sie erhält seine Benachrichtigungen. Die Administration sieht das Limit, nicht die Nutzung der Person, außer die personenbezogene Auswertung ist eingeschaltet und sie hat die Rolle Nutzungsprüfer. Ein Agent, den nur eine Person nutzt, zählt als ihrer.",
+      "works_council": "Ein Budget für eine Person begrenzt, wie diese Person arbeitet. Wo es einen Betriebsrat gibt, stimmen Sie es vorher mit ihm ab (Mitbestimmung nach § 87 Abs. 1 Nr. 6 BetrVG), und informieren Sie die Beschäftigten in Ihren Hinweisen.",
+      "root_mode_hint": "Das Ändern dieses Schalters erfordert den Root-Modus.",
+      "root_mode_needed": "Schalten Sie den Root-Modus ein, um diesen Schalter zu ändern.",
+      "cost_center_title": "Nutzungsgruppen aus Kostenstellen",
+      "cost_center_intro": "Wenn Ihr Anmeldeanbieter die Kostenstelle einer Person sendet (SCIM), kann eine Regel unten ein Team zu ihrer Nutzungsgruppe machen: Ihre Nutzung und ihre Budgets zählen dann dort.",
+      "cost_center_rule": "Nutzungsgruppe aus der Kostenstelle setzen",
+      "cost_center_off_text": "Aus (Standard): Die Nutzungsgruppen bleiben, wie sie in Fadenstack gesetzt sind.",
+      "cost_center_on_text": "Ein: Legt die Provisionierung eine Person an oder ändert sie, setzt eine Regel für ihre Kostenstelle ihre Nutzungsgruppe. Personen, deren Kostenstelle keine Regel hat, behalten ihre.",
+      "rules_title": "Regeln",
+      "rules_none": "Noch keine Regeln.",
+      "rule_cost_center": "Kostenstelle",
+      "rule_team": "Team",
+      "rule_add": "Regel hinzufügen",
+      "rule_remove": "Regel {{n}} entfernen",
+      "rules_incomplete": "Jede Regel braucht eine Kostenstelle und ein Team.",
+      "rules_duplicate": "Jede Kostenstelle nur einmal."
+    },
+    "chargeback": {
+      "title": "Verrechnung",
+      "intro": "Die Nutzung und die geschätzten Kosten eines Monats je Team oder Kostenstelle, um Kosten innerhalb der Organisation zu verrechnen.",
+      "month": "Monat",
+      "by_label": "Je",
+      "by": {
+        "team": "Team",
+        "cost_center": "Kostenstelle"
+      },
+      "estimate_title": "Eine interne Schätzung",
+      "estimate": "Die Kosten sind die Tokens zu den auf dieser Instanz gesetzten Preisen, keine Rechnung eines Providers. Jede Zeile umfasst mindestens {{k}} Personen; kleinere Teams werden zusammen gezählt.",
+      "download": "CSV herunterladen",
+      "download_hint": "Die CSV-Datei nutzt die Spaltennamen von FinOps FOCUS, für Kostenwerkzeuge.",
+      "col_people": "Personen",
+      "col_cost": "Geschätzte Kosten",
+      "people_k": "{{k}} oder mehr",
+      "other_row": "Weniger als {{k}} Personen",
+      "unassigned": "Nicht zugeordnet",
+      "no_cost_center": "Ohne Kostenstelle",
+      "no_cost": "Kein Preis",
+      "none": "Keine Nutzung in diesem Monat."
+    },
+    "my": {
+      "title": "Budgets",
+      "subtitle": "Die Budgets, die in diesem Zeitraum für Sie gelten.",
+      "none": "Für Sie gilt kein Budget.",
+      "kind": {
+        "personal": "Ihr persönliches Budget",
+        "team": "Das Budget Ihres Teams",
+        "agent": "Das Budget eines Agenten",
+        "organisation": "Das Budget der Organisation"
+      },
+      "spent_hidden": "Wie viel genutzt ist, erscheint nur, wo genug Personen das Budget teilen.",
+      "until": "Dieser Zeitraum endet am {{date}}.",
+      "mode": {
+        "hard": "Ist es aufgebraucht, werden Anfragen bis zum Ende des Zeitraums abgelehnt.",
+        "soft": "Ist es aufgebraucht, laufen Anfragen weiter, und die Administration wird benachrichtigt.",
+        "shadow": "Nur gezählt: Es lehnt nichts ab."
+      },
+      "alerts_title": "Benachrichtigungen in diesem Zeitraum",
+      "alert": "{{name}} hat am {{date}} {{threshold}} % erreicht.",
+      "private": "Nur Sie sehen, was Sie von Ihrem persönlichen Budget nutzen.",
+      "ask": "Wenn Sie mehr brauchen, wenden Sie sich an die Administration oder an die verantwortliche Person des Budgets."
+    },
+    "refused": {
+      "label": "Budget aufgebraucht",
+      "reason": {
+        "personal": "Das würde Ihr persönliches Budget für diesen Zeitraum überschreiten. Wenden Sie sich für mehr an die Administration oder an die verantwortliche Person des Budgets.",
+        "team": "Das würde das Budget Ihres Teams für diesen Zeitraum überschreiten. Wenden Sie sich für mehr an die Administration oder an die verantwortliche Person des Budgets.",
+        "agent": "Das würde das Budget dieses Agenten für diesen Zeitraum überschreiten. Wenden Sie sich für mehr an die Administration oder an die verantwortliche Person des Budgets.",
+        "organisation": "Das würde das Budget der Organisation für diesen Zeitraum überschreiten. Wenden Sie sich für mehr an die Administration oder an die verantwortliche Person des Budgets.",
+        "other": "Das würde ein Budget für diesen Zeitraum überschreiten. Wenden Sie sich für mehr an die Administration oder an die verantwortliche Person des Budgets."
+      },
+      "until": "Es beginnt am {{when}} neu."
     }
   }
 }

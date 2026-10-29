@@ -666,6 +666,16 @@
       "action_verdict": "Das Ergebnis lesen und was jede Ebene gefunden hat: Wasserzeichen, signierte Herkunftsangaben, Metadaten, Belege und Nachweise",
       "action_download": "Das Ergebnis signiert als JSON-Datei herunterladen",
       "action_public": "Bilder und Dateien unter Einstellungen > Module > Herkunftsnachweis auch Personen ohne Konto anbieten"
+    },
+    "budgets": {
+      "title": "Budgets",
+      "description": "Limits für Tokens oder Geld pro Tag, Woche oder Monat für die Organisation, Teams, Agenten und, wenn eingeschaltet, einzelne Personen; mit Benachrichtigungen, einer Prognose und der Verrechnung.",
+      "action_list": "Jedes Budget zeigt, wie viel in diesem Zeitraum genutzt ist, wann es bei diesem Verbrauch aufgebraucht ist, und seine Warnungen",
+      "action_create": "Neues Budget: Wählen Sie, wofür es gilt (ein Team aus dem Baum), Tokens oder Geld, den Betrag, den Zeitraum und den Modus",
+      "action_modes": "Hart lehnt ab, sobald es aufgebraucht ist; Weich benachrichtigt nur; Schatten zählt, was es abgelehnt hätte",
+      "action_tree": "Eine Anfrage braucht Platz in jedem Budget, das gilt; das Budget eines Teams darf nicht größer sein als das darüber",
+      "action_chargeback": "Verrechnung: ein Monat je Team oder Kostenstelle, als interne Schätzung, mit CSV-Download",
+      "action_settings": "Einstellungen: Budgets für einzelne Personen (Root-Modus) und Nutzungsgruppen aus Kostenstellen"
     }
   }
 }

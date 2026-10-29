@@ -34,6 +34,8 @@ Nach der Installation, und solange Sie keine Einstellung ändern:
   Anfrageprotokoll, aus dem sie stammen, ebenfalls 90 Tage. Keine Zahl enthält die Uhrzeit, zu der eine Person
   etwas genutzt hat, oder ihr Gerät.
 - **Die Limits der Instanz kennen keine Person**: Sie zählen die Anfragen aller zusammen.
+- **Budgets für einzelne Personen sind ausgeschaltet** (mit Fadenstack Enterprise), und eingeschaltet sieht nur
+  die Person selbst, was sie von ihrem Budget verbraucht hat (siehe [Budgets](budgets.md#privacy)).
 - **Wer die Zahlen einer einzelnen Person ansehen darf**, regelt eine Rolle, die bei der Installation niemand
   hat, auch kein Superuser.
 
@@ -187,10 +189,27 @@ Aufbewahrt 90 Tage (**Anfrageprotokoll**, `usage.request_log_retention_days`); g
 und ihre Zählungen, eine pro Instanz, die nur für ihre Minute oder ihren Tag bestehen. Keine
 personenbezogenen Daten.
 
+**Budgets**, mit Fadenstack Enterprise (siehe [Budgets](budgets.md)). Was ein Budget verbraucht hat, kommt aus den
+Zahlen oben; diese Tabellen enthalten die Budgets selbst:
+
+| Tabelle | Eine Zeile pro | Enthält | Aufbewahrt | Wer sie sieht |
+|---|---|---|---|---|
+| `ee.budgets` | Budget | `name`; wofür es gilt (`scope`, `target_id`: ein Team, ein Agent oder, beim Budget einer Person, ihre Konto-ID); `unit`, `currency`, `amount`, `period`, `mode`, `thresholds`; die verantwortliche Person, die seine Benachrichtigungen erhält (`owner_id`); wer es wann angelegt hat. Keine Nutzungszahlen | Bis es gelöscht wird | Administratoren. Das Budget einer Person: nur sein Limit; was die Person verbraucht hat, sieht nur sie unter **Meine Nutzung**, und Nutzungsprüfer, solange die personenbezogene Auswertung eingeschaltet ist |
+| `ee.budget_alerts` | Budget, Zeitraum, Schwelle und Art (`threshold` oder `forecast`) | Wann die Benachrichtigung hinausging, damit sie einmal hinausgeht. Keine Zahlen, keine Person | Mit seinem Budget | Niemand: Die Benachrichtigungen selbst nennen das Budget und die Schwelle, nie die Nutzung einer Person |
+| `ee.scim_person_attributes` | Person, die durch Provisionierung (SCIM) angelegt wurde | `cost_center` und `department`, wie der Anmeldeanbieter sie sendet | Gelöscht mit dem Konto | Administratoren, über die Kostenstellen-Regel |
+| `ee.cost_center_rules` | Kostenstelle | Das Team, das sie zur Nutzungsgruppe einer Person macht | Bis sie entfernt wird; gelöscht mit dem Team | Administratoren |
+
+Die Zählung jedes Budgets für den laufenden Zeitraum besteht nur, solange der Zeitraum läuft; beim Budget einer
+Person ist sie deren Nutzung und wird niemandem sonst gezeigt. Verrechnungsberichte haben keine eigene Tabelle:
+Sie entstehen aus den Zahlen oben, wenn sie abgerufen werden, je Team oder Kostenstelle, mit mindestens fünf
+Personen pro Zeile.
+
 **Die Aufzeichnung, wer hineingesehen und was sich geändert hat**, im Audit-Protokoll: jede Einsicht in
 personenbezogene Zahlen (`usage.people.view`: wer, in wessen Zahlen, welcher Zeitraum, der Grund) und jeder
 Download der Daten einer Person durch einen Nutzungsprüfer (ebenso), jede Änderung
-an den Limits (`usage.limits.update`) und an den Einstellungen zur Nutzung sowie das Lesen der Kostenseiten.
+an den Limits (`usage.limits.update`) und an den Einstellungen zur Nutzung, jede Änderung an einem Budget
+(`budget.create`, `budget.update`, `budget.delete`) und an den Budget-Einstellungen sowie das Lesen der
+Kostenseiten.
 Aufbewahrt so lange wie das Audit-Protokoll (siehe oben). Sichtbar für Administratoren und Prüfer; die Person
 sieht Datum und Grund der Einsichten in ihre eigenen Zahlen.
 

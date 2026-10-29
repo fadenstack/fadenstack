@@ -70,6 +70,10 @@ export function AdminNotices({ isSuperuser }: { isSuperuser: boolean }) {
     if (!i18n.exists(key, { count })) return t("notices.unknown", { code: notice.code });
     const params = { ...notice.params };
     if (typeof params.date === "string") params.date = fmtDay(params.date, i18n.language);
+    // A period (`day`, `week`, `month`) in the reader's words.
+    if (typeof params.period === "string" && i18n.exists(`budgets.period_noun.${params.period}`)) {
+      params.period = t(`budgets.period_noun.${params.period}`);
+    }
     return t(key, { ...params, count });
   }
 

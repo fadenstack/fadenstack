@@ -1624,7 +1624,9 @@
       "approval_wait": "等待审批 {{wait}}",
       "approval_wait_hint": "此请求的大部分时间是在等人做决定，而不是模型或工具。",
       "many_rounds": "模型用了 {{count}} 轮",
-      "many_rounds_hint": "一个问题用了很多轮工具请求：模型可能在循环，或某个工具一直失败。请比较下面的各轮。"
+      "many_rounds_hint": "一个问题用了很多轮工具请求：模型可能在循环，或某个工具一直失败。请比较下面的各轮。",
+      "budget_exceeded": "某个预算已用完",
+      "budget_exceeded_hint": "适用于此请求的某个预算（组织、某个组、智能体或个人的预算）在本周期已没有余量。预算位于 可观测性 → 预算。"
     },
     "group_by": "显示",
     "group_turns": "请求",
@@ -4680,7 +4682,8 @@
     "lift": "解除",
     "lift_title": "解除此限制？",
     "lift_body": "该限制不再适用。此操作会记录在审计日志中。",
-    "lift_tool_mode_ceilings": "所有聊天中的工具恢复为每个人选择的模式。这些限制会被保留，并在 Enterprise 恢复后再次生效。此操作会记录在审计日志中。"
+    "lift_tool_mode_ceilings": "所有聊天中的工具恢复为每个人选择的模式。这些限制会被保留，并在 Enterprise 恢复后再次生效。此操作会记录在审计日志中。",
+    "budget_threshold": "预算 {{name}} 在当前周期（{{period}}）已用掉额度的 {{threshold}} %。"
   },
   "sign_ins": {
     "title": "已关联的登录方式",
@@ -4991,6 +4994,215 @@
       "auditors_none": "使用量审计员角色的持有者：无",
       "views": "过去 12 个月中记录的具名人员使用量查看和下载次数：{{count}}",
       "footer": "本说明描述的是配置情况，不构成法律意见。"
+    }
+  },
+  "budgets": {
+    "nav": "预算",
+    "title": "预算",
+    "subtitle": "组织、某个组、某个智能体或某个人每天、每周或每月可以使用多少 Token 或多少金额，以及目前已用多少。",
+    "new": "新建预算",
+    "tabs": {
+      "budgets": "预算",
+      "chargeback": "内部分摊",
+      "settings": "设置"
+    },
+    "rule": "一个请求必须在适用于它的每个预算中都有余量：组织的预算、其用量归属组及其上每个组的预算、其智能体的预算，以及（如有）其所属人员的预算。",
+    "none": "还没有预算。预算用于限制组织、某个组、某个智能体或某个人在每个周期内的用量。",
+    "load_failed": "无法加载预算。",
+    "created": "已设置 {{name}}。",
+    "saved": "已保存 {{name}}。",
+    "deleted": "已删除 {{name}}。",
+    "delete_title": "删除此预算？",
+    "delete_body": "{{name}} 将不再限制任何内容，其提醒也随之停止。删除操作会记录在审计日志中。",
+    "amount_tokens": "{{amount}} Token",
+    "used_tokens": "已用 {{spent}} / {{amount}} Token",
+    "used_money": "已用 {{spent}} / {{amount}}",
+    "scope": {
+      "tenant": "组织",
+      "team": "组",
+      "agent": "智能体",
+      "person": "人员"
+    },
+    "unit": {
+      "tokens": "Token",
+      "money": "金额"
+    },
+    "period": {
+      "day": "每天",
+      "week": "每周",
+      "month": "每月"
+    },
+    "period_noun": {
+      "day": "日",
+      "week": "周",
+      "month": "月"
+    },
+    "mode": {
+      "hard": "硬性",
+      "soft": "软性",
+      "shadow": "影子"
+    },
+    "mode_help": {
+      "hard": "预算用完后拒绝请求，直到本周期结束。",
+      "soft": "从不拒绝。达到阈值时发出提醒。",
+      "shadow": "从不拒绝。统计本会拒绝的请求，以便在预算生效前先试运行。"
+    },
+    "list": {
+      "whole_org": "整个组织",
+      "a_person": "某个人",
+      "removed_target": "已不存在",
+      "edit": "编辑 {{name}}",
+      "delete": "删除 {{name}}",
+      "limit": "限额 {{amount}}",
+      "period_range": "本周期：{{start}} 至 {{end}}",
+      "used_label": "{{name}} 的已用量",
+      "suppressed": "个人对其预算的用量只向本人显示。管理员只能看到限额。",
+      "spent_unknown": "尚不清楚已用多少。",
+      "forecast": "按当前速度，将在 {{date}} 用完，早于本周期结束。",
+      "would_refuse_one": "本周期内本会拒绝 {{n}} 个请求。",
+      "would_refuse_other": "本周期内本会拒绝 {{n}} 个请求。",
+      "would_refuse_none": "本周期内到目前为止不会拒绝任何请求。",
+      "thresholds": "在 {{list}} 时提醒",
+      "no_thresholds": "无提醒",
+      "owner": "同时提醒 {{owner}}",
+      "children_exceed": "下级组的预算加起来超过了此预算。这是允许的：每个请求仍然也需要在此预算中有余量。",
+      "currency_none": "没有模型以 {{currency}} 定价：在有模型以此定价之前，不会有任何用量计入此预算。",
+      "currency_others": "只计入以 {{currency}} 计价的费用。以 {{others}} 定价的模型的用量不计入此预算。"
+    },
+    "dialog": {
+      "create_title": "新建预算",
+      "edit_title": "编辑预算",
+      "tree_rule": "适用于一个请求的每个预算都必须有余量：组织的、从该人员的用量归属组往上每个组的、智能体的以及该人员的。对于相同的单位和周期，一个组的预算不得大于其上级组的预算。",
+      "name": "名称",
+      "name_help": "供您和提醒使用，例如：销售部每月。",
+      "scope": "适用于",
+      "scope_help": {
+        "tenant": "组织的每个请求都计入。",
+        "team": "该组成员以及其下每个组的请求都计入。没有预算的组受其上级组的预算约束。",
+        "agent": "通过此智能体的请求都计入，不论由谁使用。",
+        "person": "只计入此人的请求。只有本人能看到自己的用量。"
+      },
+      "person_off": "针对个人的预算已关闭。请在本页的“设置”中开启。",
+      "team": "组",
+      "team_help": "除非开启了按人员统计，否则一个组（含其下级组）至少需要 {{k}} 人。",
+      "team_help_reporting": "按人员统计已开启：任何规模的组都可以有预算。",
+      "no_teams": "还没有组：请在 访问控制 → 组 中创建。",
+      "agent": "智能体",
+      "agent_help": "只有一个人使用的智能体算作此人的：其预算需要开启针对个人的预算。",
+      "no_agents": "还没有智能体。",
+      "person": "人员",
+      "person_help": "只有此人能看到其用量，也只有此人会收到其提醒。",
+      "unit": "计量",
+      "amount": "额度",
+      "amount_help_tokens": "输入和输出 Token 合计，含缓存 Token。",
+      "amount_help_money": "按本实例设置的价格估算的费用。",
+      "currency": "货币",
+      "currency_help": "三个字母，例如 EUR。只计入以此货币定价的费用。",
+      "period": "周期",
+      "period_help": "按用量时区的自然日、周（周一至周日）或月。",
+      "mode": "模式",
+      "thresholds": "提醒阈值 (%)",
+      "thresholds_help": "额度的百分比，例如 80, 100。每个阈值每个周期提醒一次。",
+      "owner": "负责人",
+      "owner_help": "除管理员外也会收到提醒。可选。",
+      "problems": "有些字段需要检查。"
+    },
+    "problems": {
+      "required": "必填。",
+      "invalid": "不是有效的值。",
+      "team_too_small": "此组（含其下级组）少于 {{k}} 人。为它设置预算需要开启按人员统计（设置 → 用量与隐私）。",
+      "exceeds_parent": "大于上级组在相同单位、货币和周期下的预算。请调低它，或先调高那个预算。",
+      "person_budgets_off": "针对个人的预算已关闭。请在 Root 模式下于本页的“设置”中开启。",
+      "duplicate": "已存在一个针对此对象、单位和周期相同的预算。请改为修改那个预算。",
+      "name_invalid": "最多 128 个字符。",
+      "target_id_required": "请选择适用对象。",
+      "amount_invalid": "大于 0 的数字：整数个 Token，或最多四位小数的金额。",
+      "currency_invalid": "三个字母，例如 EUR。",
+      "thresholds_invalid": "1 到 1000 的整数百分比，用逗号分隔，例如 80, 100。",
+      "target_id_agent_person_budgets_off": "只有一个人使用此智能体，因此它的预算就是针对此人的预算。请先开启针对个人的预算。"
+    },
+    "errors": {
+      "root_mode": "开启或关闭针对个人的预算需要 Root 模式。请启用 Root 模式后重新保存。",
+      "forbidden": "预算仅供管理员使用。"
+    },
+    "settings": {
+      "saved": "已保存。",
+      "person_title": "针对个人的预算",
+      "person_intro": "针对某个人的预算会限制此人使用模型的方式。在您开启之前，它处于关闭状态。",
+      "person_budgets": "个人预算",
+      "person_off_text": "关闭（默认）：预算只适用于组织、组和智能体。",
+      "person_on_text": "开启：管理员可以为某个人设置预算。只有此人能在“我的用量”中看到自己的用量，也只有此人会收到其提醒。管理员只能看到限额，看不到此人的用量，除非开启了按人员统计且其拥有用量审计员角色。只有一个人使用的智能体算作此人的。",
+      "works_council": "针对某个人的预算会限制此人的工作方式。如果有职工委员会，请先与其达成一致（在德国，依据《企业组织法》第 87 条第 1 款第 6 项享有共同决定权），并在告知中通知员工。",
+      "root_mode_hint": "更改此开关需要 Root 模式。",
+      "root_mode_needed": "请启用 Root 模式以更改此开关。",
+      "cost_center_title": "按成本中心确定用量归属组",
+      "cost_center_intro": "当您的登录提供方发送某人的成本中心（SCIM）时，下方的规则可以把某个组设为其用量归属组：其用量和预算随后计入该组。",
+      "cost_center_rule": "根据成本中心设置用量归属组",
+      "cost_center_off_text": "关闭（默认）：用量归属组保持在 Fadenstack 中的设置。",
+      "cost_center_on_text": "开启：当预配创建或更改某人时，针对其成本中心的规则会设置其用量归属组。成本中心没有规则的人员保持原有设置。",
+      "rules_title": "规则",
+      "rules_none": "还没有规则。",
+      "rule_cost_center": "成本中心",
+      "rule_team": "组",
+      "rule_add": "添加规则",
+      "rule_remove": "删除规则 {{n}}",
+      "rules_incomplete": "每条规则都需要成本中心和组。",
+      "rules_duplicate": "每个成本中心只能出现一次。"
+    },
+    "chargeback": {
+      "title": "内部分摊",
+      "intro": "某个月按组或成本中心的用量和预估费用，用于在组织内部分摊成本。",
+      "month": "月份",
+      "by_label": "按",
+      "by": {
+        "team": "组",
+        "cost_center": "成本中心"
+      },
+      "estimate_title": "内部估算",
+      "estimate": "费用是按本实例设置的价格计算的 Token，而不是提供方的账单。每一行至少涵盖 {{k}} 人；较小的组会合并计算。",
+      "download": "下载 CSV",
+      "download_hint": "CSV 使用 FinOps FOCUS 的列名，便于成本工具使用。",
+      "col_people": "人数",
+      "col_cost": "预估费用",
+      "people_k": "{{k}} 人或以上",
+      "other_row": "少于 {{k}} 人",
+      "unassigned": "未分配",
+      "no_cost_center": "无成本中心",
+      "no_cost": "无价格",
+      "none": "本月没有用量。"
+    },
+    "my": {
+      "title": "预算",
+      "subtitle": "本周期适用于您的预算。",
+      "none": "没有适用于您的预算。",
+      "kind": {
+        "personal": "您的个人预算",
+        "team": "您所在组的预算",
+        "agent": "某个智能体的预算",
+        "organisation": "组织的预算"
+      },
+      "spent_hidden": "只有在足够多的人共享该预算时，才会显示已用量。",
+      "until": "本周期于 {{date}} 结束。",
+      "mode": {
+        "hard": "用完后，请求将被拒绝，直到本周期结束。",
+        "soft": "用完后，请求继续进行，并会通知管理员。",
+        "shadow": "仅作统计：不会拒绝任何请求。"
+      },
+      "alerts_title": "本周期的提醒",
+      "alert": "{{name}} 于 {{date}} 达到 {{threshold}} %。",
+      "private": "只有您能看到自己对个人预算的用量。",
+      "ask": "如需更多，请联系管理员或该预算的负责人。"
+    },
+    "refused": {
+      "label": "预算已用完",
+      "reason": {
+        "personal": "这将超出您本周期的个人预算。如需更多，请联系管理员或该预算的负责人。",
+        "team": "这将超出您所在组本周期的预算。如需更多，请联系管理员或该预算的负责人。",
+        "agent": "这将超出此智能体本周期的预算。如需更多，请联系管理员或该预算的负责人。",
+        "organisation": "这将超出组织本周期的预算。如需更多，请联系管理员或该预算的负责人。",
+        "other": "这将超出某个预算本周期的额度。如需更多，请联系管理员或该预算的负责人。"
+      },
+      "until": "将于 {{when}} 重新开始。"
     }
   }
 }

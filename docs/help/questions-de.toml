@@ -185,7 +185,7 @@
 "Warum folgen die Zahlen des Vorjahrs der alten Teamstruktur?" = "teams-on-the-usage-page"
 "Warum steht in einer Zeile „Weniger als 5 Personen“?" = "the-minimum-group-size"
 "Wie begrenze ich Anfragen oder Tokens pro Minute oder pro Tag?" = "limits-for-the-whole-instance"
-"Kann ich Limits oder Budgets festlegen?" = "limits-for-the-whole-instance"
+"Kann ich Limits für die ganze Instanz festlegen?" = "limits-for-the-whole-instance"
 "Was bedeutet ein Fehler 429 oder quota_tokens_per_day?" = "what-people-see-when-a-limit-refuses"
 "Sind die Kosten das, was der Provider berechnet?" = "where-the-numbers-come-from"
 
@@ -200,6 +200,22 @@
 "Welche Datenfelder zur Nutzung werden gespeichert?" = "the-data-fields"
 "Wie verlinke ich unsere Datenschutzhinweise unter Meine Nutzung?" = "the-settings"
 "Dürfen wir Nutzungsdaten zur Bewertung von Beschäftigten verwenden?" = "what-usage-data-is-for"
+
+["administer/budgets.md"]
+"Kann ich Budgets pro Team, Agent oder Person festlegen?" = ""
+"Wie begrenze ich, was ein Team pro Monat nutzen darf?" = "set-up-a-budget"
+"Wofür gilt ein Budget?" = "who-a-budget-applies-to"
+"Warum darf das Budget eines Teams nicht größer sein als das des übergeordneten Teams?" = "the-tree-rule"
+"Warum bekommt ein kleines Team kein Budget?" = "the-tree-rule"
+"Was ist der Unterschied zwischen harten, weichen und Schatten-Budgets?" = "modes"
+"Was bedeutet budget_exceeded?" = "what-people-see-when-a-budget-refuses"
+"Wer erhält Benachrichtigungen zu Budgets?" = "alerts-and-who-gets-them"
+"Wie verrechne ich KI-Kosten an Teams oder Kostenstellen?" = "chargeback"
+"Ist der Export der Verrechnung im Format FinOps FOCUS?" = "chargeback"
+"Wie schalte ich Budgets für einzelne Personen ein?" = "the-settings"
+"Kann eine Kostenstelle aus SCIM die Nutzungsgruppe einer Person setzen?" = "the-settings"
+"Können Administratoren sehen, was eine Person von ihrem Budget verbraucht hat?" = "privacy"
+"Wo sehe ich meine eigenen Budgets?" = "your-own-budgets"
 
 ["administer/usage-documents.md"]
 "Was brauchen wir für Betriebsrat und Datenschutzbeauftragten?" = ""

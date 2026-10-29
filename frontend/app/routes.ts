@@ -96,6 +96,8 @@ export default [
     route("/admin/observability", "pages/admin/observability/ObservabilityPage.tsx"),
     // Usage for teams, agents, models and providers (usage:read)
     route("/admin/usage", "pages/admin/usage/UsagePage.tsx"),
+    // Budgets per team, agent, person or the organisation (while the server offers `budgets`)
+    route("/admin/budgets", "pages/admin/budgets/BudgetsPage.tsx"),
     // User profile
     route("/admin/profile", "pages/admin/ProfilePage.tsx"),
     // Chat routes — guarded by the chat-guard layout that checks module status

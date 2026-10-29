@@ -70,6 +70,7 @@ import BuildIcon from "@mui/icons-material/Build";
 import TuneIcon from "@mui/icons-material/Tune";
 import MonetizationOnIcon from "@mui/icons-material/MonetizationOn";
 import DataUsageIcon from "@mui/icons-material/DataUsage";
+import SavingsIcon from "@mui/icons-material/Savings";
 import GavelIcon from "@mui/icons-material/Gavel";
 import SystemUpdateAltIcon from "@mui/icons-material/SystemUpdateAlt";
 import FactCheckIcon from "@mui/icons-material/FactCheck";
@@ -213,6 +214,8 @@ export interface NavChild {
   ragMode?: "lite" | "pro";
   /** A live count (or, for a yes/no, a dot) to show beside the label, looked up by the sidebar. */
   badge?: "pendingJoins" | "updateAvailable";
+  /** Shown only while the server offers this feature (`GET /api/about`). */
+  feature?: string;
 }
 
 export interface NavGroup {
@@ -265,6 +268,14 @@ export const NAV: NavEntry[] = [
         labelKey: "usage.admin.nav",
         icon: <DataUsageIcon />,
         permission: "usage:read",
+      },
+      {
+        to: "/admin/budgets",
+        labelKey: "budgets.nav",
+        icon: <SavingsIcon />,
+        // Its API (/api/ee/budgets) is for administrators.
+        superuserOnly: true,
+        feature: "budgets",
       },
       {
         to: "/admin/security-map",
@@ -579,6 +590,11 @@ export const NAV: NavEntry[] = [
   },
 ];
 
+/** Whether a navigation entry shows with the features the server offers: one that needs none always does. */
+export function featureShown(entry: { feature?: string }, features: ReadonlySet<string>): boolean {
+  return !entry.feature || features.has(entry.feature);
+}
+
 /** IDs that belong to the bottom "pinned" section by default. */
 export const DEFAULT_PINNED_IDS = ["settings"];
 /** All nav entry IDs in definition order. */
@@ -597,6 +613,7 @@ export function adminPageTitle(
   if (pathname.startsWith("/admin/observability"))
     return t("nav.cost_dashboard");
   if (pathname.startsWith("/admin/usage")) return t("usage.admin.title");
+  if (pathname.startsWith("/admin/budgets")) return t("budgets.title");
   if (pathname.startsWith("/admin/profile")) return t("profile.title");
   if (pathname.startsWith("/admin/containers/new"))
     return t("create_container.title");

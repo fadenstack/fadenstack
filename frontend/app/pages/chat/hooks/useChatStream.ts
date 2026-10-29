@@ -7,7 +7,15 @@
 import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { ChatApiError, chatApi, resumeStream, retryTurn, streamChat, type StreamHandle } from "~/api/chatClient";
+import {
+  BUDGET_EXCEEDED,
+  ChatApiError,
+  chatApi,
+  resumeStream,
+  retryTurn,
+  streamChat,
+  type StreamHandle,
+} from "~/api/chatClient";
 import {
   RETRYABLE_TURNS,
   type ChatMessage,
@@ -56,12 +64,15 @@ function useStreamThrottle(setter: (v: string) => void) {
 /** How the last error shows on its turn. */
 export interface ChatErrorDetail {
   /** ``blocked``: a governance check refused the prompt (not an error: info,
-   * with "edit and resend"); ``rate_limit``: try again later; ``error``: retry. */
-  kind: "blocked" | "rate_limit" | "error";
+   * with "edit and resend"); ``rate_limit``: try again later; ``budget``: a
+   * budget that applies is used up until its period ends; ``error``: retry. */
+  kind: "blocked" | "rate_limit" | "budget" | "error";
   message: string;
   /** The text that was refused, for "edit and resend". */
   text?: string;
   retryAfter?: number | null;
+  /** ``budget``: the kind of budget (``personal``, ``team``, ``agent``, ``organisation``). */
+  param?: string | null;
 }
 
 export function errorDetail(err: unknown, text?: string): ChatErrorDetail {
@@ -69,6 +80,9 @@ export function errorDetail(err: unknown, text?: string): ChatErrorDetail {
   if (err instanceof ChatApiError) {
     if (err.code === "policy_blocked" || err.type === "governance_error") {
       return { kind: "blocked", message: err.governance?.message ?? message, text };
+    }
+    if (err.code === BUDGET_EXCEEDED) {
+      return { kind: "budget", message, retryAfter: err.retryAfter, param: err.param };
     }
     if (err.status === 429 || err.type === "rate_limit_error" || err.code?.startsWith("rate_limit")) {
       return { kind: "rate_limit", message, retryAfter: err.retryAfter };
