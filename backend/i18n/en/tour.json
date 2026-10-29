@@ -666,6 +666,16 @@
       "action_verdict": "Read the verdict and what each layer found: watermark, content credentials, metadata, receipts and records",
       "action_download": "Download the result signed, as a JSON file",
       "action_public": "Offer pictures and files to people without an account under Settings > Modules > Provenance"
+    },
+    "budgets": {
+      "title": "Budgets",
+      "description": "Limits of tokens or money per day, week or month for the organisation, teams, agents and, once switched on, single people; with alerts, a forecast and the chargeback report.",
+      "action_list": "Each budget shows how much is used this period, when it runs out at this rate, and its warnings",
+      "action_create": "New budget: choose whom it applies to (a team from the tree), tokens or money, the amount, the period and the mode",
+      "action_modes": "Hard refuses once used up; soft only alerts; shadow counts what it would have refused",
+      "action_tree": "A request needs room in every budget that applies; a team's budget may not be larger than the one above it",
+      "action_chargeback": "Chargeback: a month per team or cost centre, as an internal estimate, with a CSV download",
+      "action_settings": "Settings: budgets for single people (root mode) and usage groups from cost centres"
     }
   }
 }

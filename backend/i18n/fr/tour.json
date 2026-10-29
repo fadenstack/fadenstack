@@ -666,6 +666,16 @@
       "action_verdict": "Lisez le verdict et ce que chaque couche a trouvé : filigrane, identifiants de contenu, métadonnées, reçus et enregistrements",
       "action_download": "Téléchargez le résultat signé, sous forme de fichier JSON",
       "action_public": "Proposez la vérification d'images et de fichiers aux personnes sans compte dans Paramètres > Modules > Provenance"
+    },
+    "budgets": {
+      "title": "Budgets",
+      "description": "Des limites de tokens ou d'argent par jour, semaine ou mois pour l'organisation, les équipes, les agents et, une fois activés, des personnes individuelles ; avec des alertes, une prévision et la refacturation interne.",
+      "action_list": "Chaque budget montre combien est utilisé sur cette période, quand il sera épuisé à ce rythme, et ses avertissements",
+      "action_create": "Nouveau budget : choisissez à qui il s'applique (une équipe de l'arbre), tokens ou argent, le montant, la période et le mode",
+      "action_modes": "Strict refuse une fois épuisé ; Souple alerte seulement ; Simulation compte ce qu'il aurait refusé",
+      "action_tree": "Une requête a besoin de marge dans chaque budget qui s'applique ; le budget d'une équipe ne peut pas dépasser celui du dessus",
+      "action_chargeback": "Refacturation interne : un mois par équipe ou centre de coûts, comme estimation interne, avec un téléchargement CSV",
+      "action_settings": "Paramètres : budgets pour des personnes individuelles (mode Root) et groupes d'usage à partir des centres de coûts"
     }
   }
 }

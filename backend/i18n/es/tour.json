@@ -666,6 +666,16 @@
       "action_verdict": "Lea el veredicto y lo que encontró cada capa: marca de agua, credenciales de contenido, metadatos, recibos y registros",
       "action_download": "Descargue el resultado firmado, como archivo JSON",
       "action_public": "Ofrezca la comprobación de imágenes y archivos a personas sin cuenta en Configuración > Módulos > Procedencia"
+    },
+    "budgets": {
+      "title": "Presupuestos",
+      "description": "Límites de tokens o de dinero por día, semana o mes para la organización, los equipos, los agentes y, una vez activados, personas individuales; con avisos, una previsión y la imputación de costes.",
+      "action_list": "Cada presupuesto muestra cuánto se ha usado en este periodo, cuándo se agota a este ritmo y sus advertencias",
+      "action_create": "Nuevo presupuesto: elija a qué se aplica (un equipo del árbol), tokens o dinero, el importe, el periodo y el modo",
+      "action_modes": "Estricto rechaza al agotarse; Flexible solo avisa; Simulación cuenta lo que habría rechazado",
+      "action_tree": "Una solicitud necesita margen en cada presupuesto que se aplica; el presupuesto de un equipo no puede superar al de arriba",
+      "action_chargeback": "Imputación de costes: un mes por equipo o centro de coste, como estimación interna, con descarga CSV",
+      "action_settings": "Configuración: presupuestos para personas individuales (modo root) y grupos de uso a partir de centros de coste"
     }
   }
 }
