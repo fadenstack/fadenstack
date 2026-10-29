@@ -97,6 +97,12 @@ const PAGES: PageHelpDef[] = [
     doc: "administer/usage#the-usage-page",
   },
   {
+    prefix: "/admin/budgets",
+    id: "budgets",
+    actions: ["list", "create", "modes", "tree", "chargeback", "settings"],
+    doc: "administer/budgets",
+  },
+  {
     prefix: "/admin/logs",
     id: "logs",
     actions: ["filter", "audit"],
