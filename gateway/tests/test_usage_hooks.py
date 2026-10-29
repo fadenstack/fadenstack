@@ -195,6 +195,13 @@ async def test_a_refusal_with_its_own_status_and_type() -> None:
     assert (error.status_code, error.error_type, error.code) == (429, "rate_limit_error", "team_rpm")
     assert error.headers == {"x-ratelimit-limit-requests": "5", "Retry-After": "20"}
     assert "administrator" in error.message, "a refusal without words still says whom to ask"
+    assert error.param is None
+
+
+@pytest.mark.anyio
+async def test_a_refusal_names_its_limit_in_param() -> None:
+    error = usage_hooks.refused(Refusal(code="budget_exceeded", message="Over the team's budget.", param="team"))
+    assert (error.code, error.param) == ("budget_exceeded", "team"), "a client words it from code and param"
 
 
 @pytest.mark.anyio

@@ -63,6 +63,7 @@ def refused(refusal: Refusal, headers: dict[str, str] | None = None) -> GatewayE
         message=refusal.message or "A usage limit refuses this request. Ask an administrator.",
         error_type=refusal.error_type,
         code=refusal.code,
+        param=refusal.param,
         headers=sent,
     )
 

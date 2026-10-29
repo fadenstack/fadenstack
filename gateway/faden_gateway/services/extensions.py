@@ -97,6 +97,9 @@ class Refusal:
     message: str = ""
     retry_after_sec: int | None = None
     headers: Mapping[str, str] = field(default_factory=dict)
+    #: Which limit, where the code alone does not say (e.g. a budget's kind): the error body's ``param``, so a
+    #: client can word the refusal in its own language.
+    param: str | None = None
 
 
 #: ``AdmissionContext -> Refusal`` to refuse, or ``None`` to let the request in.
