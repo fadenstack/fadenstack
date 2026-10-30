@@ -194,8 +194,8 @@ async def test_list_filters_outcome_model_search_and_sorts(gateway: AsyncSession
     assert [c["request_id"] for c in by_id["items"]] == [slow]
     by_error = await svc.list_calls(CallFilters(**{**_window().__dict__, "q": "SERVER_err"}))
     assert [c["request_id"] for c in by_error["items"]] == [slow]
-    by_conversation = await svc.list_calls(CallFilters(**{**_window().__dict__, "session": "conv-1"}))
-    assert [c["request_id"] for c in by_conversation["items"]] == [other]
+    by_conversation = await svc.list_calls(CallFilters(**{**_window().__dict__, "q": "conv-1"}))
+    assert by_conversation["total"] == 0, "nor by a conversation, which is one person's (M02)"
     wildcard = await svc.list_calls(CallFilters(**{**_window().__dict__, "q": "%"}))
     assert wildcard["total"] == 0, "a % in the search is a character, not a wildcard"
     by_person = await svc.list_calls(CallFilters(**{**_window().__dict__, "q": "u1"}))
@@ -267,7 +267,7 @@ async def test_detail_brings_tools_policies_and_the_conversation(gateway: AsyncS
         {"stage": "input", "outcome": "block", "category": "pii", "check_name": "pii.email",
          "tool_id": None, "created_at": detail["policy_decisions"][0]["created_at"]},
     ], "never the policy's name or the hash of the refused text"
-    assert detail["related_by"] == "conversation_id"
+    assert detail["related_by"] == "conversation_id" and "related_key" not in detail
     assert [c["request_id"] for c in detail["related"]] == [first, second]
 
     alone = await svc.detail(ROW_IDS[await _call(gateway)])
@@ -389,6 +389,46 @@ async def test_turns_group_an_agents_rounds_with_the_tools_its_app_ran(gateway: 
     assert alone is not None
     assert [c["id"] for c in alone["turn_calls"]] == [alone["call"]["id"]]
     assert alone["client_events"] == []
+
+
+async def test_no_answer_carries_an_id_that_stands_for_a_person(gateway: AsyncSession) -> None:
+    """No device, session, conversation or project id in a call, a turn or a call's detail (M02, M04)."""
+    ids = {"device_id": "device-secret", "session_id": "session-secret", "conversation_id": "conv-secret",
+           "project_id": "project-secret"}
+    first = await _call(gateway, **ids, agent_id="a1", turn_id="t9", age_sec=30)
+    await _call(gateway, **ids, agent_id="a1", turn_id="t9", age_sec=20)
+
+    svc = LLMCallsService(_factory(gateway))
+    answers = [
+        await svc.list_calls(_window()), await svc.list_turns(_window()), await svc.detail(ROW_IDS[first]),
+    ]
+
+    assert not any(secret in json.dumps(answers, default=str) for secret in ids.values())
+    detail = answers[2]
+    assert detail is not None
+    rows = [*answers[0]["items"], *answers[1]["items"], detail["call"], *detail["related"], *detail["turn_calls"]]
+    assert all(not set(ids) & set(row) for row in rows), "not even the keys"
+    assert len(detail["related"]) == 2, "the calls of one conversation still link"
+
+
+async def test_the_api_has_no_filter_by_agent_or_session(
+    client: AsyncClient, fastapi_app: FastAPI, gateway: AsyncSession,
+) -> None:
+    from unittest.mock import MagicMock
+
+    from faden_backend.db.models.users import User, current_active_user
+    from faden_backend.web.api.llm.dependencies import get_llm_calls_service
+
+    await _call(gateway, agent_id="a1", session_id="s1")
+    await _call(gateway, agent_id="a2", session_id="s2")
+    fastapi_app.dependency_overrides[get_llm_calls_service] = lambda: LLMCallsService(_factory(gateway))
+    user = MagicMock(spec=User)
+    user.id, user.is_active, user.is_superuser, user.is_verified = uuid.uuid4(), True, True, True
+    fastapi_app.dependency_overrides[current_active_user] = lambda: user
+
+    for params in ({"agent_id": "a1"}, {"session": "s1"}):
+        listed = await client.get(fastapi_app.url_path_for("list_llm_calls"), params=params)
+        assert listed.json()["total"] == 2, params
 
 
 async def test_without_gateway_database_the_explorer_is_empty() -> None:
