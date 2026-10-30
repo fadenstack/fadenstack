@@ -172,13 +172,16 @@ export function clearCachedAccess() {
 // ── Who opens the console ────────────────────────────────────────
 //
 // The console is the superusers'. Someone else enters it only for the pages a permission of theirs opens
-// (the platform auditor, and anyone else with `usage:read`, for the Usage page), plus their own profile;
-// the navigation shows those pages only, and any other console address leads back to them. The server
-// checks every call anyway; this only keeps the console from showing pages that would answer 403.
+// (anyone with `usage:read` -- the platform auditor, a usage auditor -- the Usage page; anyone with
+// `audit:read` -- the platform auditor -- the audit log), plus their own profile; the navigation shows
+// those pages only, and any other console address leads back to them. The server checks every call
+// anyway; this only keeps the console from showing pages that would answer 403.
 
 /** Console pages someone who is not a superuser may open, by the permission that opens them. */
 export const CONSOLE_PAGES_BY_PERMISSION: Readonly<Record<string, readonly string[]>> = {
   "usage:read": ["/admin/usage"],
+  // The Logs page shows only the audit tab without `logs:read`; /admin/audit leads to that tab.
+  "audit:read": ["/admin/logs", "/admin/audit"],
 };
 
 /** Pages everyone let into the console has. */
