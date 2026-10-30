@@ -61,8 +61,8 @@ while person-level reporting is off; add the second before you switch it on.
 >
 > **Who sees what.** You see your own usage under **My usage** on the platform, and can download it. The
 > administrators [positions] see totals for teams, agents and models only where at least [5] people are behind a
-> figure. The request records they use to find the cause of a failure do not show who sent a request. Nobody
-> evaluates your individual usage.
+> figure. The request records they use to find the cause of a failure do not show who sent a request, nor its
+> device, session or conversation, and cannot be searched by person. Nobody evaluates your individual usage.
 >
 > **How long.** Request records [90] days; your daily figures [90] days; figures without persons [90] days by the
 > hour and [25] months by the day. When your account is deleted, your records and daily figures are erased with
@@ -102,7 +102,7 @@ An entry for your records of processing activities (Art. 30(1) GDPR).
 | Recipients | Administrators [positions]; [usage auditors [positions], if person-level reporting is on]; [IT service provider under Art. 28 GDPR] |
 | Transfers to third countries | None for the usage data |
 | Erasure periods | Request records [90] days; daily figures per person [90] days; figures without persons [90] days hourly, [25] months daily; erased with the account; audit log [period] |
-| Technical and organisational measures (Art. 32 GDPR) | Role-based access; a separate role for individual figures, held by nobody unless assigned, not given by administrator rights; minimum group size [5] for every figure shown, with suppression of the remainder; individual figures by day at most, no device and no time of day in figures; a stated reason and a record for every look; automatic deletion; tamper-evident audit log; own view and download for every user; [encryption of the server's storage, backups, access to the server: per your operation]. Configuration statement of [date] attached |
+| Technical and organisational measures (Art. 32 GDPR) | Role-based access; a separate role for individual figures, held by nobody unless assigned, not given by administrator rights; minimum group size [5] for every figure shown, with suppression of the remainder; individual figures by day at most, no device and no time of day in figures; request records for troubleshooting without person, device, session or conversation, and not searchable by them; a stated reason and a record for every look, the reason never in an address; automatic deletion; tamper-evident audit log; own view and download for every user; [encryption of the server's storage, backups, access to the server: per your operation]. Configuration statement of [date] attached |
 
 ## Legitimate-interest assessment
 
@@ -201,6 +201,10 @@ An annex to your works agreement on the AI platform: **Anlage „Nutzungsmessung
 measurement and budgets). It fits a union-side draft as well as an employer-side one: they differ in the
 configuration they choose, not in what the annex must settle.
 
+Section 3 obliges the employer not to take personnel measures based on data processed in breach of the annex.
+It does not declare such measures void or keep the data out of court: a works agreement cannot do that (Federal
+Labour Court, BAG 2 AZR 296/22).
+
 > **Annex [number] to the works agreement [title] of [date]: usage measurement and budgets**
 >
 > **1. Subject.** This annex governs the usage measurement and limits of the AI platform Fadenstack, release
@@ -213,8 +217,8 @@ configuration they choose, not in what the annex must settle.
 >
 > **3. Excluded uses.** Usage data must not be used to monitor or evaluate the performance or behaviour of
 > employees, to compare employees, or as a basis for appraisals, pay, promotion, selection, warnings, dismissals or
-> other personnel measures. Personnel measures based on data processed in breach of this annex [are void / will not
-> be taken]. Usage data must not be analysed by an AI model with regard to individuals.
+> other personnel measures. Personnel measures based on data processed in breach of this annex will not be
+> taken. Usage data must not be analysed by an AI model with regard to individuals.
 >
 > **4. Data.** Only the fields in the attached list are processed. A release that adds fields or reports, or
 > changes a default, is introduced only after the works council has been informed (§ 90 BetrVG) and this annex has
@@ -274,7 +278,8 @@ can still be taken into account (§ 90(2) BetrVG).
 > models, without persons; per day for each person.
 >
 > **Who sees what.** Every employee sees their own figures. Administrators see totals only where at least [5]
-> people are behind a figure; the request records they use to trace failures do not show who sent a request.
+> people are behind a figure; the request records they use to trace failures do not show who sent a request, nor
+> its device, session or conversation, and cannot be searched by person.
 > Nobody sees rankings or comparisons of people. [Planned: [number] named persons may look at individual figures for [reasons], each time
 > with a reason, recorded.]
 >
@@ -307,7 +312,9 @@ How to answer requests about usage data. The legal deadline is one month (Art. 1
 3. Add the information of Art. 15(1)(a) to (h) GDPR: purposes, categories, recipients, periods, rights, source.
    The employee notice has it.
 4. For someone who cannot sign in, a usage auditor downloads the same data for them from the person-level view on
-   **Usage**, giving the request as the reason. The download is recorded.
+   **Usage**, giving the request as the reason. The download is recorded. This needs person-level reporting on;
+   while it is off, the console offers no download of another person's data. [Your procedure, for example: give
+   the person access again so that they download it themselves.]
 
 **Erasure (Art. 17 GDPR)**
 

@@ -10,7 +10,7 @@ and who may see whose, is on [Usage and privacy](usage-privacy.md).
 | Where | Who | What it shows |
 |---|---|---|
 | **My usage**, in the menu behind the account button | Everyone, for themselves | Their own tokens and estimated cost, the limits that apply, and a download of their data (see [Your own usage](#your-own-usage)). |
-| **Observability → Usage** | Administrators and auditors | Totals and a series over time, by team, agent, model or provider, only for groups of at least five people (see [The Usage page](#the-usage-page)). |
+| **Observability → Usage** | Administrators, auditors and usage auditors | Totals and a series over time, by team, agent, model or provider, only for groups of at least five people (see [The Usage page](#the-usage-page)). |
 | [Dashboard](dashboard.md) | Administrators | Today at a glance: **Requests today**, **Active users today**, **Kept in-house**, **Spend this month**, **Error rate (1 h)**; **AI traffic** (where requests were served) and **Usage** (requests per day, by where they were served). |
 | **Observability → Budgets** | Administrators, with Fadenstack Enterprise | What each budget has used this period, its alerts, and the chargeback per team or cost centre (see [Budgets](budgets.md)). |
 | **Observability → Cost Dashboard** | Administrators | Spend, requests, tokens, speed and errors of the whole instance, and the prices (see [The cost and usage pages](#the-cost-and-usage-pages)). |
@@ -56,7 +56,10 @@ Each figure on the usage pages counts:
 Everyone who signs in sees their own usage under **My usage**, in the menu behind their account button:
 
 - their tokens and estimated cost by day or month, by model, by agent and by chat project;
-- the limits that apply to the instance, and how much of each is used at the moment;
+- the limits that apply to the instance. For the daily token limit it also shows how much is used today, but
+  only when at least five other people used the instance today (the
+  [minimum group size](#the-minimum-group-size)): with fewer, the figure would show what they used. The
+  per-minute limits show the limit only, never how much is used;
 - with Fadenstack Enterprise, the budgets that apply to them (see [Budgets](budgets.md#your-own-budgets));
 - whether person-level reporting is on, how finely and for how long their figures are kept, and how often a
   usage auditor looked at them, with a link to your privacy notice when you have set one (see
@@ -71,8 +74,8 @@ may ask under Art. 15 GDPR about their usage (see [Usage and privacy](usage-priv
 ## The Usage page
 
 The **Usage** page shows how much the instance uses, and where, without showing anyone's own figures.
-Administrators can open it, and so can people with the role `auditor`, who need no administrator rights for it
-(see [Administrators and auditors](users.md#administrators-and-auditors)).
+Administrators can open it, and so can people with the role `auditor` or `usage_auditor`, who need no
+administrator rights for it (see [Administrators and auditors](users.md#administrators-and-auditors)).
 
 1. Open **Observability → Usage**.
 2. Pick the **Period** (**7 days** to **12 months**), and **Figures per** **Hour**, **Day** or **Month**.
@@ -113,15 +116,17 @@ under **Settings → Usage and privacy** but not set below five.
 - The same holds over time: where hiding a period would let it be worked out from the total minus the periods
   shown, another period is hidden with it.
 - **Totals** and **Tokens over time** show figures only when at least five people used the instance in the
-  range. A usage auditor sees them anyway while person-level reporting is on.
+  range. On such a small instance, a usage auditor may show them anyway while person-level reporting is on:
+  **Show anyway**, with a reason that is recorded, by day or month but never by hour. The reason covers that one
+  view: changing the **Period**, **Figures per** or **Group by** hides the figures again.
 
 A team of three, or an agent one person uses, is therefore never shown on its own: its figures would be one
 person's under another name.
 
 !!! note "Small instances"
     When fewer than five people used the instance in the range, the page says so (**A small instance**) and the
-    totals show no figures: they would be close to one person's own. A usage auditor who still sees them while
-    person-level reporting is on handles them as person-level data (see [Usage and privacy](usage-privacy.md)).
+    totals show no figures: they would be close to one person's own. A usage auditor who shows them anyway
+    while person-level reporting is on handles them as person-level data (see [Usage and privacy](usage-privacy.md)).
 
 ## The cost and usage pages
 
@@ -159,7 +164,8 @@ everyone's requests together, through the chat, the agents and the API, and keep
 3. Select **Save**.
 
 The change is recorded in the audit log with your name (`usage.limits.update`). **My usage** shows everyone the
-limits and how much of each is used.
+limits, and how much of the daily token limit is used today where that points to nobody (see
+[Your own usage](#your-own-usage)).
 
 ??? info "How a limit counts a request"
     - A request counts when it starts: its prompt and the most it may write (its `max_tokens`, or a default when
