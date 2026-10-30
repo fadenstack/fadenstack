@@ -60,7 +60,7 @@ Konto-Schaltfläche:
 - ihre Tokens und geschätzten Kosten nach Tag oder Monat, nach Modell, nach Agent und nach Chat-Projekt;
 - die Limits, die für die Instanz gelten. Beim Tageslimit für Tokens zeigt sie auch, wie viel heute verbraucht
   ist, aber nur, wenn heute mindestens fünf andere Personen die Instanz genutzt haben (die
-  [Mindestgruppengröße](#the-minimum-group-size)): Bei weniger zeigte die Zahl, was sie verbraucht haben. Die
+  [Mindestgruppengröße](#the-minimum-group-size)): Bei weniger würde die Zahl zeigen, was sie verbraucht haben. Die
   Limits pro Minute zeigen nur das Limit, nie, wie viel verbraucht ist;
 - mit Fadenstack Enterprise die Budgets, die für sie gelten (siehe [Budgets](budgets.md#your-own-budgets));
 - ob die personenbezogene Auswertung eingeschaltet ist, wie fein und wie lange ihre Zahlen aufbewahrt werden

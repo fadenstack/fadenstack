@@ -121,7 +121,7 @@ sind dieselben wie unter [Nutzung und Limits](usage.md).
 
 Diese Seite zeigt nie, wer einen Aufruf geschickt hat, und findet Aufrufe nicht nach Person. Sie zeigt auch keine
 Sitzungs-, Unterhaltungs-, Geräte- oder Projekt-ID und findet keinen Aufruf danach oder nach Agent: Jedes davon
-führte zu einer Person. Die Nutzung einer einzelnen Person zeigt nur die personenbezogene Auswertung unter
+würde zu einer Person führen. Die Nutzung einer einzelnen Person zeigt nur die personenbezogene Auswertung unter
 **Nutzung**, einem Nutzungsprüfer, mit Begründung und aufgezeichnet (siehe
 [Nutzung und Datenschutz](usage-privacy.md#looking-at-one-persons-figures)).
 

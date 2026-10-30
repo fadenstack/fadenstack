@@ -24,8 +24,8 @@ Nach der Installation, und solange Sie keine Einstellung ändern:
   [Die Mindestgruppengröße](usage.md#the-minimum-group-size)).
 - **Keine Seite listet Anfragen nach Person.** **Kosten-Observability** und **LLM-Aufrufe** zeigen nie, wer eine
   Anfrage gesendet hat, und finden Anfragen nicht nach Person. **LLM-Aufrufe** zeigt auch keine Sitzung,
-  Unterhaltung, kein Gerät und kein Projekt einer Anfrage und findet keine danach: Jedes davon führte zu einer
-  Person.
+  Unterhaltung, kein Gerät und kein Projekt einer Anfrage und findet keine danach: Jedes davon würde zu einer
+  Person führen.
 - **Auch die Zahlen eines Agenten brauchen fünf Personen.** Sein Reiter **Aktivität** zeigt sie nur, wenn
   mindestens fünf Personen den Agenten im Zeitraum genutzt haben, und nennt niemanden; der Eigentümer eines
   persönlichen Agenten sieht seine eigenen (siehe [Agenten und Add-ins](agents.md)).
