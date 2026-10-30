@@ -48,6 +48,24 @@ export function lastDays(days: number, timeZone?: string, now = new Date()): { f
 }
 
 /**
+ * `from`/`to` (`YYYY-MM-DD`, both included) cut to the last `maxDays` days of the range; `clamped` says
+ * whether anything was cut.
+ */
+export function clampRange(
+  range: { from: string; to: string },
+  maxDays: number,
+): { from: string; to: string; clamped: boolean } {
+  const first = Date.parse(`${range.from}T00:00:00Z`);
+  const last = Date.parse(`${range.to}T00:00:00Z`);
+  if (Number.isNaN(first) || Number.isNaN(last) || maxDays < 1) return { ...range, clamped: false };
+  const days = Math.round((last - first) / 86_400_000) + 1;
+  if (days <= maxDays) return { ...range, clamped: false };
+  const start = new Date(last);
+  start.setUTCDate(start.getUTCDate() - (maxDays - 1));
+  return { from: start.toISOString().slice(0, 10), to: range.to, clamped: true };
+}
+
+/**
  * A period of a series as a Date: an hour is ISO-8601 UTC; a day
  * (`2026-10-01`) or a month (`2026-10`, `2026-10-01`) is a calendar date,
  * read as local midnight so it is written as the same day.

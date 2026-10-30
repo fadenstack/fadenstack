@@ -31,16 +31,43 @@ import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
 import DownloadIcon from "@mui/icons-material/Download";
 
-import { REASON_MAX, REASON_MIN, reasonOk, usageApi, type PeopleChoices, type PeopleUsage } from "~/api/usage";
+import {
+  REASON_MAX,
+  REASON_MIN,
+  reasonOk,
+  USAGE_SETTING_RANGES,
+  usageApi,
+  UsageProblemsError,
+  type PeopleChoices,
+  type PeopleUsage,
+} from "~/api/usage";
 import { WidgetCard, WidgetEmpty } from "~/components/dashboard/kit";
 import { MeasuresTable } from "~/components/usage/UsageParts";
 import { USAGE_HELP, UsageHelpLink } from "~/components/usage/UsageHelpLink";
-import { periodLabel, usageErrorText } from "~/components/usage/usageFormat";
+import { clampRange, periodLabel, usageErrorText } from "~/components/usage/usageFormat";
 import { saveFile } from "~/lib/saveFile";
 import { pickableTeams } from "~/lib/teamTree";
 
 type Scope = "person" | "team";
 type Choice = PeopleChoices["people"][number];
+
+/**
+ * A refusal of the per-person view in words: the fields a 422 names (the range longer than per-person
+ * figures are kept, or not exactly one person or team), else the refusal's code (`usageErrorText`).
+ */
+function peopleErrorText(
+  err: unknown,
+  t: (key: string, options?: Record<string, unknown>) => string,
+  keptDays: number,
+): string {
+  if (err instanceof UsageProblemsError) {
+    const fields = new Set(err.problems.map((p) => p.field));
+    if (fields.has("from") || fields.has("to")) return t("usage.admin.people.range_refused", { days: keptDays });
+    if (fields.has("team") || fields.has("person")) return t("usage.admin.people.target_refused");
+    return t("usage.admin.people.refused");
+  }
+  return usageErrorText(err, (key) => t(key));
+}
 
 interface Someone {
   id: string;
@@ -261,6 +288,11 @@ function PeopleDialog({
   const trimmed = reason.trim();
   const reasonError = trimmed.length > 0 && !reasonOk(reason);
   const canSubmit = Boolean(target) && reasonOk(reason) && !busy;
+  // Per-person figures are kept for fewer days than the page may show (the server refuses a longer
+  // range): the view covers the last days of the page's range that are kept. Until the server says how
+  // many, the shortest keeping the settings allow.
+  const keptDays = choices.person_retention_days ?? USAGE_SETTING_RANGES.person_retention_days.min;
+  const range = clampRange({ from, to }, keptDays);
 
   async function submit() {
     if (!canSubmit) return;
@@ -268,15 +300,15 @@ function PeopleDialog({
     setError(null);
     try {
       const answer = await usageApi.people({
-        from,
-        to,
+        from: range.from,
+        to: range.to,
         ...(scope === "person" ? { person: target } : { team: target }),
         reason: trimmed,
       });
       setReason("");
       onResult(answer, trimmed, scope === "person" && person ? { id: person.id, label: person.email } : null);
     } catch (err) {
-      setError(usageErrorText(err, (key) => t(key)));
+      setError(peopleErrorText(err, (key, options) => t(key, options), keptDays));
     } finally {
       setBusy(false);
     }
@@ -295,6 +327,13 @@ function PeopleDialog({
         <Stack gap={2} sx={{ pt: 1 }}>
           <Typography variant="body2" color="text.secondary">
             {t("usage.admin.people.dialog_intro")}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" data-usage-people-range>
+            {t(range.clamped ? "usage.admin.people.range_clamped" : "usage.admin.people.range", {
+              from: periodLabel(range.from, "day", i18n.language),
+              to: periodLabel(range.to, "day", i18n.language),
+              days: keptDays,
+            })}
           </Typography>
           {listsError && <Alert severity="error">{listsError}</Alert>}
           <Box>

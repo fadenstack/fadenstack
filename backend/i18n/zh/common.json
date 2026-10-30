@@ -4860,7 +4860,12 @@
         "col_person": "人员",
         "col_period": "时间段",
         "export_title": "下载某个人的数据",
-        "export_note": "每次下载都会连同您为此次查看说明的理由一起记录。"
+        "export_note": "每次下载都会连同您为此次查看说明的理由一起记录。",
+        "range": "时间段：{{from}} 至 {{to}}。",
+        "range_clamped": "时间段：{{from}} 至 {{to}}。按人员的数据保留 {{days}} 天，因此此视图仅涵盖页面时间段中的最后 {{days}} 天。",
+        "range_refused": "按人员的数据保留时间短于此时间段。请在页面上选择更短的时间段（最多 {{days}} 天）后重试。",
+        "target_refused": "请恰好选择一个人或一个用量归属组。",
+        "refused": "服务器未接受此请求。请检查您的选择后重试。"
       },
       "smaller_teams": "较小的组及其他",
       "smaller_teams_hint": "因人数太少而未单独显示的下级组，以及直接属于 {{name}} 的人员",

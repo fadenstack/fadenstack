@@ -4860,7 +4860,12 @@
         "col_person": "Person",
         "col_period": "Zeitraum",
         "export_title": "Daten einer Person herunterladen",
-        "export_note": "Jeder Download wird mit der Begründung protokolliert, die Sie für diese Einsicht angegeben haben."
+        "export_note": "Jeder Download wird mit der Begründung protokolliert, die Sie für diese Einsicht angegeben haben.",
+        "range": "Zeitraum: {{from}} bis {{to}}.",
+        "range_clamped": "Zeitraum: {{from}} bis {{to}}. Zahlen pro Person werden {{days}} Tage aufbewahrt, deshalb umfasst diese Ansicht nur die letzten {{days}} Tage des Zeitraums der Seite.",
+        "range_refused": "Zahlen pro Person werden kürzer aufbewahrt, als dieser Zeitraum lang ist. Wählen Sie auf der Seite einen kürzeren Zeitraum (höchstens {{days}} Tage) und versuchen Sie es erneut.",
+        "target_refused": "Wählen Sie genau eine Person oder eine Nutzungsgruppe.",
+        "refused": "Der Server hat diese Anfrage nicht angenommen. Prüfen Sie Ihre Auswahl und versuchen Sie es erneut."
       },
       "smaller_teams": "Kleinere Teams und weitere",
       "smaller_teams_hint": "Unterteams, die zu klein sind, um einzeln zu erscheinen, und die Personen direkt in {{name}}",

@@ -4860,7 +4860,12 @@
         "col_person": "Persona",
         "col_period": "Periodo",
         "export_title": "Descargar los datos de una persona",
-        "export_note": "Cada descarga se registra con el motivo que indicó para esta consulta."
+        "export_note": "Cada descarga se registra con el motivo que indicó para esta consulta.",
+        "range": "Periodo: del {{from}} al {{to}}.",
+        "range_clamped": "Periodo: del {{from}} al {{to}}. Las cifras por persona se conservan {{days}} días, así que esta vista abarca solo los últimos {{days}} días del periodo de la página.",
+        "range_refused": "Las cifras por persona se conservan menos tiempo del que abarca este periodo. Elija un periodo más corto en la página (como máximo {{days}} días) e inténtelo de nuevo.",
+        "target_refused": "Elija exactamente una persona o un grupo de uso.",
+        "refused": "El servidor no aceptó esta solicitud. Revise su selección e inténtelo de nuevo."
       },
       "smaller_teams": "Equipos más pequeños y otros",
       "smaller_teams_hint": "Subequipos demasiado pequeños para mostrarse solos, y las personas directamente en {{name}}",

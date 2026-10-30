@@ -384,6 +384,47 @@ describe("per-person figures for a usage auditor", () => {
     await waitFor(() => expect(usage.peopleExport).toHaveBeenLastCalledWith("u-2", "csv", "budget dispute in Sales"));
   });
 
+  it("keeps the range inside the days per-person figures are kept", async () => {
+    usage.admin.mockResolvedValue(adminUsage({ from: "2026-07-31", to: "2026-10-28", person_reporting: true, can_view_people: true }));
+    usage.people.mockResolvedValue({ granularity: "day", rows: [] });
+    const dialog = await openDialog();
+    await pickTeam(dialog);
+
+    // The server has not said how long it keeps them: the shortest the settings allow (31 days).
+    expect(dialog.querySelector("[data-usage-people-range]")!.textContent).toMatch(/kept for 31 days/);
+    await userEvent.type(within(dialog).getByRole("textbox", { name: "Reason" }), "Budget dispute in Sales");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Show figures" }));
+
+    await waitFor(() => expect(usage.people).toHaveBeenCalledWith(expect.objectContaining({ from: "2026-09-28", to: "2026-10-28" })));
+  });
+
+  it("uses the server's keeping when it says it", async () => {
+    usage.admin.mockResolvedValue(adminUsage({ from: "2026-07-31", to: "2026-10-28", person_reporting: true, can_view_people: true }));
+    usage.peopleChoices.mockResolvedValue({ people: [], teams: [{ id: "g-sales", name: "Sales" }], person_retention_days: 120 });
+    usage.people.mockResolvedValue({ granularity: "day", rows: [] });
+    const dialog = await openDialog();
+    await pickTeam(dialog);
+    expect(dialog.querySelector("[data-usage-people-range]")!.textContent).not.toMatch(/kept for/);
+
+    await userEvent.type(within(dialog).getByRole("textbox", { name: "Reason" }), "Budget dispute in Sales");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Show figures" }));
+
+    await waitFor(() => expect(usage.people).toHaveBeenCalledWith(expect.objectContaining({ from: "2026-07-31" })));
+  });
+
+  it("words a range the server refuses as too long", async () => {
+    usage.people.mockRejectedValue(new api.UsageProblemsError([{ field: "to", code: "out_of_range" }]));
+    const dialog = await openDialog();
+    await pickTeam(dialog);
+    await userEvent.type(within(dialog).getByRole("textbox", { name: "Reason" }), "Budget dispute in Sales");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Show figures" }));
+
+    await waitFor(() => expect(dialog.querySelector("[data-usage-people-error]")).not.toBeNull());
+    expect(dialog.querySelector("[data-usage-people-error]")!.textContent).toMatch(
+      /Figures per person are kept for a shorter time than this period\. Choose a shorter period on the page \(at most 31 days\)/,
+    );
+  });
+
   it("picks from the usage API's choices, not the administrators' lists", async () => {
     const dialog = await openDialog();
     expect(usage.peopleChoices).toHaveBeenCalled();

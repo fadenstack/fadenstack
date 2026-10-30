@@ -4858,7 +4858,12 @@
         "col_person": "Person",
         "col_period": "Period",
         "export_title": "Download one person's data",
-        "export_note": "Each download is recorded with the reason you gave for this view."
+        "export_note": "Each download is recorded with the reason you gave for this view.",
+        "range": "Period: {{from}} to {{to}}.",
+        "range_clamped": "Period: {{from}} to {{to}}. Figures per person are kept for {{days}} days, so this view covers only the last {{days}} days of the page's period.",
+        "range_refused": "Figures per person are kept for a shorter time than this period. Choose a shorter period on the page (at most {{days}} days) and try again.",
+        "target_refused": "Choose exactly one person or one usage group.",
+        "refused": "The server did not accept this request. Check your choice and try again."
       },
       "smaller_teams": "Smaller teams and others",
       "smaller_teams_hint": "Sub-teams too small to show alone, and the people directly in {{name}}",
