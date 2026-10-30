@@ -387,10 +387,13 @@ export function helpUrl(doc?: string, language?: string): string {
   return doc ? `${root}${doc}/` : root;
 }
 
+/** The Help page of `/pair`, where a person approves an app's sign-in (a page of its own, without the drawer). */
+export const PAIR_HELP_DOC = "use/sign-in-an-app";
+
 /** Every Help page the console links to: a test holds them to pages that exist. */
 export function pageHelpDocs(): string[] {
   return [
-    ...new Set(PAGES.map((p) => p.doc).filter((d): d is string => Boolean(d))),
+    ...new Set([...PAGES.map((p) => p.doc).filter((d): d is string => Boolean(d)), PAIR_HELP_DOC]),
   ];
 }
 

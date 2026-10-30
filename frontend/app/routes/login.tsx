@@ -4,6 +4,7 @@ import { Link as RouterLink, useNavigate, useSearchParams } from "react-router";
 import { auth, LoginRefused } from "~/api/auth";
 import { adminAuthProviders, SignInRefused, type AuthProviderPublic } from "~/api/admin";
 import { clearCachedAccess } from "~/lib/adminConstants";
+import { signInTargetWhenNoneGiven } from "~/lib/pairCode";
 import { refusalText } from "~/lib/signInRefusals";
 import { useTranslation } from "react-i18next";
 
@@ -37,7 +38,9 @@ export default function LoginPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const next = params.get("next") || "/admin/dashboard";
+  // A sign-in with a provider (SSO) comes back here without a target: then an app's sign-in waiting in this tab
+  // (the /pair page kept its code) takes the person back there.
+  const next = params.get("next") || signInTargetWhenNoneGiven("/admin/dashboard");
   // A sign-in with an outside provider met an existing account: it waits for the proof (LinkProof).
   const [linking, setLinking] = useState(() => params.get("error") === "link_needs_confirmation");
   // A forgotten password is reset by mail only while the server can send mail.

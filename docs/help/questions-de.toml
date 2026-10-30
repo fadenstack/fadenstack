@@ -49,6 +49,13 @@
 "Wohin gehen meine Daten aus Office?" = "where-your-data-goes"
 "Wie ändere ich die Sprache des Bereichs in Office?" = "language-and-settings"
 
+["use/sign-in-an-app.md"]
+"Wie melde ich eine Desktop-App an?" = "approve-the-sign-in"
+"Die App zeigt einen Code: Wo gebe ich ihn ein?" = "approve-the-sign-in"
+"Was prüfe ich, bevor ich die Anmeldung einer App genehmige?" = "what-to-check-before-you-approve"
+"Wie lange gilt ein Anmeldecode?" = "limits"
+"Wie beende ich die Anmeldung einer App?" = "see-and-end-the-sign-in"
+
 ["use/checking-content.md"]
 "Wie prüfe ich, ob ein Text oder ein Bild von einer KI stammt?" = "check-a-text-a-picture-or-a-file"
 "Was bedeutet das Ergebnis einer Inhaltsprüfung?" = "read-the-result"

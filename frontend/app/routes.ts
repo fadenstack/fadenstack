@@ -13,6 +13,8 @@ export default [
   // Checking a picture or file without an account, when an administrator
   // offers it; otherwise the page says it is not offered here.
   route("/check", "routes/check.tsx"),
+  // Approving an app's sign-in by its code (pairing): any signed-in person, not only those who chat.
+  route("/pair", "routes/pair.tsx"),
   // Which build this server runs: open pages ask, to notice an upgrade.
   route("/_build", "routes/build.ts"),
   // Standalone chat UI
