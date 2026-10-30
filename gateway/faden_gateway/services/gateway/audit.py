@@ -64,11 +64,14 @@ class AuditService:
         device_id: str | None = None,
         conversation_id: str | None = None,
         turn_id: str | None = None,
+        reservation_id: str | None = None,
+        admitted: bool = False,
     ) -> None:
         """Persist one request log row with optional cost estimation.
 
         Then, in the background, the extensions' usage listeners hear of it (``UsageRecord``, with
-        *estimated_tokens*: what admission reserved for the request).
+        *estimated_tokens*: what admission reserved for the request, *reservation_id*: the gateway's own id
+        its admission checks saw, *admitted*: whether the caps and the checks let it in).
         """
         parsed_provider_id: uuid.UUID | None = None
         if provider_instance_id:
@@ -176,4 +179,6 @@ class AuditService:
                 estimated_tokens=estimated_tokens,
                 created_at=datetime.now(timezone.utc),
                 group_path=tuple(group_path) if group_id else (),
+                reservation_id=reservation_id or uuid.uuid4().hex,
+                admitted=admitted,
             ))

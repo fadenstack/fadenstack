@@ -6,7 +6,9 @@ When they are called, with what, and what a refusal or a failure of theirs does.
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import logging
+import re
 from typing import Any
 
 import pytest
@@ -78,11 +80,14 @@ async def test_a_check_sees_the_request_and_its_refusal_is_answered(
     assert r.headers["retry-after"] == "3600" and r.headers["x-should-retry"] == "false"
     assert r.headers["x-faden-budget"] == "team"
     assert r.headers["x-ratelimit-limit-requests"] == "5", "the caps' headers on an extension's refusal too"
-    assert seen == [AdmissionContext(
+    [context] = seen
+    assert re.fullmatch(r"[0-9a-f]{32}", context.reservation_id), "the gateway's own id, never the client's"
+    assert context == AdmissionContext(
         tenant_id="tenant-a", user_id="user-1", group_id="sales-north", project_id=None, agent_id=None,
         model_alias="qwen3-32b", endpoint="/v1/chat/completions", request_id="req-budget",
         estimated_tokens=RESERVED, group_path=("company", "sales", "sales-north"),
-    )]
+        reservation_id=context.reservation_id,
+    )
     # Core's caps count nothing for it: the request and its reservation were given back.
     assert await _count(fake_redis_pool, "ratelimit:rpm:tenant-a:*") == 0
     assert await _count(fake_redis_pool, "ratelimit:tpm:tenant-a:*") == 0
@@ -90,6 +95,84 @@ async def test_a_check_sees_the_request_and_its_refusal_is_answered(
     assert (row.status_code, row.error_code, row.prompt_tokens) == (429, "budget_exceeded", None)
     await usage_hooks.drain()
     assert [(h.status_code, h.estimated_tokens, h.input_tokens) for h in heard] == [(429, 0, 0)]
+    assert (heard[0].reservation_id, heard[0].admitted) == (context.reservation_id, False), (
+        "the refused request's record names the check's reservation, to be released"
+    )
+
+
+@pytest.mark.anyio
+async def test_requests_sharing_a_client_request_id_get_reservations_of_their_own(
+    gateway: FastAPI, client: AsyncClient, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A client chooses x-request-id: two requests with the same one must not share a budget reservation."""
+    seen: list[AdmissionContext] = []
+    heard: list[UsageRecord] = []
+
+    async def budget(context: AdmissionContext) -> Refusal | None:
+        seen.append(context)
+        return None
+
+    async def listener(record: UsageRecord) -> None:
+        heard.append(record)
+
+    _use(monkeypatch, checks=[budget], listeners=[listener])
+    for _ in range(2):
+        r = await client.post("/v1/chat/completions", headers={**_headers(), "x-request-id": "same"}, json=ASK)
+        assert r.status_code == 200
+    await usage_hooks.drain()
+
+    assert [c.request_id for c in seen] == ["same", "same"]
+    assert len({c.reservation_id for c in seen}) == 2
+    assert sorted((h.reservation_id, h.admitted) for h in heard) == sorted((c.reservation_id, True) for c in seen)
+
+
+@pytest.mark.anyio
+async def test_a_request_the_caps_refuse_is_heard_as_not_admitted(
+    gateway: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    heard: list[UsageRecord] = []
+
+    async def listener(record: UsageRecord) -> None:
+        heard.append(record)
+
+    await _caps(db_session, rpm_limit=1)
+    _use(monkeypatch, listeners=[listener])
+    assert (await client.post("/v1/chat/completions", headers=_headers(), json=ASK)).status_code == 200
+    assert (await client.post("/v1/chat/completions", headers=_headers(), json=ASK)).status_code == 429
+    await usage_hooks.drain()
+    assert [(h.status_code, h.admitted) for h in heard] == [(200, True), (429, False)]
+    assert all(re.fullmatch(r"[0-9a-f]{32}", h.reservation_id) for h in heard)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("sent", ["x" * 129, "has spaces", "slash/es", "naïve", ""])
+async def test_a_client_request_id_the_log_cannot_hold_is_replaced(
+    gateway: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch, sent: str,
+) -> None:
+    """Up to 128 of A-Z a-z 0-9 . _ : - is kept; anything else would fail the log's insert, and is replaced."""
+    _use(monkeypatch)
+    headers = {**_headers(), "x-request-id": sent.encode("utf-8")}
+    r = await client.post("/v1/chat/completions", headers=headers, json=ASK)
+    assert r.status_code == 200
+    assert r.headers["x-request-id"] != sent and len(r.headers["x-request-id"]) <= 128
+    [row] = await _rows(db_session)
+    assert row.request_id == r.headers["x-request-id"]
+
+
+@pytest.mark.anyio
+async def test_a_good_client_request_id_is_kept(
+    gateway: FastAPI, client: AsyncClient, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _use(monkeypatch)
+    sent = "trace-01.a_b:c-" + "x" * 113
+    r = await client.post("/v1/chat/completions", headers={**_headers(), "x-request-id": sent}, json=ASK)
+    assert r.headers["x-request-id"] == sent
+
+
+def test_a_record_built_without_the_new_fields_counts_as_admitted() -> None:
+    fields = {f.name for f in dataclasses.fields(UsageRecord)}
+    assert {"reservation_id", "admitted"} <= fields
+    assert UsageRecord.__dataclass_fields__["admitted"].default is True
 
 
 @pytest.mark.anyio
@@ -181,6 +264,7 @@ async def test_listeners_hear_each_request_after_its_row_is_written(
     )
     assert (record.group_id, record.group_path) == ("sales-north", ("company", "sales", "sales-north"))
     assert record.estimated_tokens == RESERVED and record.model_alias == "qwen3-32b"
+    assert record.admitted is True and re.fullmatch(r"[0-9a-f]{32}", record.reservation_id)
     assert record.provider_instance_id is not None
     assert (record.cost, record.currency) == (None, None), "no price applies here"
     assert "A usage listener failed" in caplog.text
