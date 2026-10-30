@@ -1443,7 +1443,7 @@
   "llm_calls": {
     "title": "Llamadas LLM",
     "search": "Buscar llamadas",
-    "search_placeholder": "Buscar por id de solicitud, traza, sesión, usuario o agente, modelo, error…",
+    "search_placeholder": "Buscar por id de solicitud o de traza, modelo, endpoint, error…",
     "all_models": "Todos los modelos",
     "outcome": "Resultado",
     "outcome_all": "Todas",
@@ -1462,8 +1462,6 @@
     "live_paused_page": "El modo en vivo sigue las llamadas más recientes: vaya a la primera página, ordenada por tiempo",
     "refresh": "Actualizar",
     "updated_at": "Actualizado {{time}}",
-    "chip_session": "Conversación {{id}}",
-    "clear_filters": "Quitar filtros",
     "stat_calls": "Llamadas",
     "stat_errors": "Errores",
     "stat_p50": "Latencia p50",
@@ -1499,7 +1497,6 @@
     "flag_tools": "{{count}} llamadas a herramientas",
     "flag_truncated": "Cortada en el límite de tokens",
     "flag_retried": "Reintentada {{count}} veces",
-    "flag_conversation": "Parte de una conversación",
     "prev": "Llamada anterior (k)",
     "next": "Llamada siguiente (j)",
     "copy_link": "Copiar un enlace a esta llamada",
@@ -1522,7 +1519,6 @@
     "section_request": "Solicitud",
     "section_routing": "Enrutamiento",
     "section_who": "Quién",
-    "section_conversation": "Conversación",
     "section_context": "Contexto",
     "span_first_token": "Esperando el primer token",
     "span_generation": "Generando",
@@ -1533,7 +1529,6 @@
     "related_session_id": "Sesión de chat · {{count}} llamadas",
     "related_trace_id": "Traza · {{count}} llamadas",
     "related_summary": "{{tokens}} tokens en total, {{errors}} fallidas",
-    "related_alone": "La única llamada de su conversación en el registro del gateway.",
     "f_request_id": "Id de solicitud",
     "f_trace_id": "Id de traza",
     "f_endpoint": "Endpoint",
@@ -1548,11 +1543,7 @@
     "f_user": "Usuario",
     "f_tenant": "Inquilino",
     "f_group": "Grupo de uso",
-    "f_project": "Proyecto",
     "f_agent": "Agente",
-    "f_device": "Dispositivo",
-    "f_session": "Sesión de chat",
-    "f_conversation": "Conversación",
     "f_turn": "Turno",
     "f_skills": "Skills",
     "f_rag": "Conocimiento (RAG)",
@@ -1660,7 +1651,6 @@
     "ev_denied": "denegado",
     "ev_error": "fallido",
     "ev_timeout": "tiempo agotado",
-    "chip_user": "Usuario {{id}}",
     "col_user": "Usuario"
   },
   "agents_api_docs": {
@@ -4415,7 +4405,10 @@
       "ends": "Termina",
       "sign_out": "Cerrar sesión",
       "sign_out_title": "¿Cerrar la sesión de este dispositivo?",
-      "sign_out_confirm": "{{device}} ({{user}}) tendrá que volver a iniciar sesión para usar el agente."
+      "sign_out_confirm": "{{device}} ({{user}}) tendrá que volver a iniciar sesión para usar el agente.",
+      "suppressed": "Menos de {{k}} personas usaron este agente en este periodo, así que sus cifras no se muestran: señalarían a personas concretas.",
+      "day_suppressed": "Se omiten los días con menos de {{k}} personas.",
+      "user_hidden": "No se muestra"
     },
     "back_to_chat": "Volver al chat",
     "no_access": "No es responsable de ningún agente. Pida a un administrador que le haga responsable de uno."

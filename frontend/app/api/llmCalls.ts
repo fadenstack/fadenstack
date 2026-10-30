@@ -3,7 +3,10 @@
  *
  * Metadata only: the gateway does not keep prompts or completions, and a
  * failed tool's text is sealed. What a call was, how long it took, what it
- * cost and how it ended is all here.
+ * cost and how it ended is all here -- but not whose it was: no person, and no
+ * session, conversation, device or project id (each points to one person, and
+ * calls are not found by them either). Older servers may still send those ids;
+ * the pages do not show them.
  */
 
 import { clearCachedAccess } from "~/lib/adminConstants";
@@ -33,13 +36,18 @@ export interface LlmCall {
   estimated_total_cost: number | null;
   currency: string | null;
   stream: boolean | null;
-  session_id: string | null;
-  agent_id: string | null;
-  device_id: string | null;
-  conversation_id: string | null;
+  /** Not sent (see the module's note); not shown. */
+  session_id?: string | null;
+  /** Shown when the server sends it. */
+  agent_id?: string | null;
+  /** Not sent; not shown. */
+  device_id?: string | null;
+  /** Not sent; not shown. */
+  conversation_id?: string | null;
   turn_id: string | null;
   group_id: string | null;
-  project_id: string | null;
+  /** Not sent; not shown. */
+  project_id?: string | null;
   finish_reason: string | null;
   retry_count: number | null;
   skills_used: Array<{ name?: string; slug?: string; version?: string }> | null;
@@ -119,10 +127,14 @@ export interface LlmCallDetail {
 export interface LlmTurn {
   key: string;
   turn_id: string | null;
-  conversation_id: string | null;
-  session_id: string | null;
-  agent_id: string | null;
-  device_id: string | null;
+  /** Not sent (see the module's note); not shown. */
+  conversation_id?: string | null;
+  /** Not sent; not shown. */
+  session_id?: string | null;
+  /** Shown (as an agent's call) when the server sends it. */
+  agent_id?: string | null;
+  /** Not sent; not shown. */
+  device_id?: string | null;
   tenant_id: string;
   /** Null: turns name nobody. */
   user_id: string | null;
@@ -178,14 +190,13 @@ export interface LlmRoute {
 export type CallOutcome = "ok" | "error";
 export type CallSort = "newest" | "oldest" | "slowest" | "tokens";
 
+/** What the list narrows to. No agent, session, conversation or device: those would single out a person. */
 export interface CallQuery {
   start: string;
   end: string;
   q?: string;
   model_alias?: string;
   outcome?: CallOutcome;
-  agent_id?: string;
-  session?: string;
   min_latency_ms?: number;
 }
 

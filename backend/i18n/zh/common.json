@@ -1443,7 +1443,7 @@
   "llm_calls": {
     "title": "LLM 调用",
     "search": "搜索调用",
-    "search_placeholder": "按请求、追踪、会话、用户或智能体 ID、模型、错误搜索…",
+    "search_placeholder": "按请求或追踪 ID、模型、端点、错误搜索…",
     "all_models": "全部模型",
     "outcome": "结果",
     "outcome_all": "全部",
@@ -1462,8 +1462,6 @@
     "live_paused_page": "实时模式跟随最新调用：请回到按时间排序的第一页",
     "refresh": "刷新",
     "updated_at": "更新于 {{time}}",
-    "chip_session": "对话 {{id}}",
-    "clear_filters": "清除筛选",
     "stat_calls": "调用",
     "stat_errors": "错误",
     "stat_p50": "延迟 p50",
@@ -1499,7 +1497,6 @@
     "flag_tools": "{{count}} 次工具调用",
     "flag_truncated": "在 token 上限处被截断",
     "flag_retried": "重试 {{count}} 次",
-    "flag_conversation": "属于一个对话",
     "prev": "上一个调用 (k)",
     "next": "下一个调用 (j)",
     "copy_link": "复制此调用的链接",
@@ -1522,7 +1519,6 @@
     "section_request": "请求",
     "section_routing": "路由",
     "section_who": "发起方",
-    "section_conversation": "对话",
     "section_context": "上下文",
     "span_first_token": "等待首个 token",
     "span_generation": "生成中",
@@ -1533,7 +1529,6 @@
     "related_session_id": "聊天会话 · {{count}} 次调用",
     "related_trace_id": "追踪 · {{count}} 次调用",
     "related_summary": "共 {{tokens}} 个 token，{{errors}} 次失败",
-    "related_alone": "网关日志中该对话仅有这一次调用。",
     "f_request_id": "请求 ID",
     "f_trace_id": "追踪 ID",
     "f_endpoint": "端点",
@@ -1548,11 +1543,7 @@
     "f_user": "用户",
     "f_tenant": "租户",
     "f_group": "用量组",
-    "f_project": "项目",
     "f_agent": "智能体",
-    "f_device": "设备",
-    "f_session": "聊天会话",
-    "f_conversation": "对话",
     "f_turn": "轮次",
     "f_skills": "技能",
     "f_rag": "知识库 (RAG)",
@@ -1660,7 +1651,6 @@
     "ev_denied": "已拒绝",
     "ev_error": "失败",
     "ev_timeout": "超时",
-    "chip_user": "用户 {{id}}",
     "col_user": "用户"
   },
   "agents_api_docs": {
@@ -4415,7 +4405,10 @@
       "ends": "到期",
       "sign_out": "注销",
       "sign_out_title": "注销此设备？",
-      "sign_out_confirm": "{{device}}（{{user}}）需要重新登录才能使用该智能体。"
+      "sign_out_confirm": "{{device}}（{{user}}）需要重新登录才能使用该智能体。",
+      "suppressed": "此期间使用该智能体的人数少于 {{k}}，因此不显示其数据：这些数据会指向具体的个人。",
+      "day_suppressed": "人数少于 {{k}} 的日期未显示。",
+      "user_hidden": "不显示"
     },
     "back_to_chat": "返回聊天",
     "no_access": "您没有负责任何智能体。请让管理员将您设为某个智能体的维护者。"

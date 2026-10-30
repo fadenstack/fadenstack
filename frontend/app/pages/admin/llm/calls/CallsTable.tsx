@@ -14,7 +14,6 @@ import Typography from "@mui/material/Typography";
 import { alpha, useTheme } from "@mui/material/styles";
 import BuildOutlinedIcon from "@mui/icons-material/BuildOutlined";
 import ContentCutIcon from "@mui/icons-material/ContentCut";
-import ForumOutlinedIcon from "@mui/icons-material/ForumOutlined";
 import HandymanOutlinedIcon from "@mui/icons-material/HandymanOutlined";
 import ReplayIcon from "@mui/icons-material/Replay";
 import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
@@ -242,11 +241,6 @@ const Row = memo(function Row({
           {(call.retry_count ?? 0) > 0 && (
             <Tooltip title={t("llm_calls.flag_retried", { count: call.retry_count ?? 0 })}>
               <ReplayIcon sx={{ fontSize: 16 }} />
-            </Tooltip>
-          )}
-          {(call.conversation_id || call.session_id) && (
-            <Tooltip title={t("llm_calls.flag_conversation")}>
-              <ForumOutlinedIcon sx={{ fontSize: 16 }} />
             </Tooltip>
           )}
         </Box>

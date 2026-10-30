@@ -7,7 +7,9 @@
  * the page knows is in the URL, so a link to a broken call is a bug report.
  *
  * Metadata only: the gateway keeps no prompts or completions. Enterprise
- * installs with the full Langfuse see content there.
+ * installs with the full Langfuse see content there. And nobody's: calls are
+ * not found, or shown, by person, session, conversation, device or agent --
+ * each of those would single out one person's use (M02, M11).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
@@ -16,7 +18,6 @@ import { useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
-import Chip from "@mui/material/Chip";
 import Drawer from "@mui/material/Drawer";
 import FormControl from "@mui/material/FormControl";
 import IconButton from "@mui/material/IconButton";
@@ -59,7 +60,6 @@ import CallsTable from "./calls/CallsTable";
 import TurnsTable from "./calls/TurnsTable";
 import RoutingMap from "./calls/RoutingMap";
 import StatsStrip from "./calls/StatsStrip";
-import { shortId } from "./calls/format";
 
 const RANGES = { "15m": 15 * 60_000, "1h": 3_600_000, "6h": 6 * 3_600_000, "24h": 86_400_000, "7d": 7 * 86_400_000, "30d": 30 * 86_400_000 } as const;
 type Range = keyof typeof RANGES;
@@ -93,7 +93,6 @@ export default function LlmCallsPage() {
   const q = params.get("q") ?? "";
   const model = params.get("model") ?? "";
   const outcome = (params.get("outcome") as CallOutcome | null) ?? undefined;
-  const session = params.get("session") ?? "";
   const sort = (params.get("sort") as CallSort | null) ?? "newest";
   const page = Math.max(1, Number(params.get("page") ?? 1) || 1);
   const limit = PAGE_SIZES.includes(Number(params.get("limit"))) ? Number(params.get("limit")) : 50;
@@ -139,7 +138,7 @@ export default function LlmCallsPage() {
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [fresh, setFresh] = useState<Set<string>>(new Set());
   const knownIds = useRef<Set<string>>(new Set());
-  const queryKey = JSON.stringify([rangeMs, q, model, outcome, session, sort, page, limit, view, grouped]);
+  const queryKey = JSON.stringify([rangeMs, q, model, outcome, sort, page, limit, view, grouped]);
   const lastKey = useRef<string>("");
   /** Bumped by every load: only the latest one may write, whatever its trigger (filter, poll, button). */
   const loadSeq = useRef(0);
@@ -153,7 +152,6 @@ export default function LlmCallsPage() {
         q: q || undefined,
         model_alias: model || undefined,
         outcome,
-        session: session || undefined,
       };
       const seq = ++loadSeq.current;
       const stale = () => signal.aborted || seq !== loadSeq.current;
@@ -260,10 +258,6 @@ export default function LlmCallsPage() {
     return list;
   }, [stats, model]);
 
-  const filterChips = [
-    session && { key: "session", label: t("llm_calls.chip_session", { id: shortId(session) }) },
-  ].filter(Boolean) as Array<{ key: string; label: string }>;
-
   const detail = selectedId ? (
     <CallDetail
       callId={selectedId}
@@ -273,9 +267,7 @@ export default function LlmCallsPage() {
       onSelect={(id) => select(id)}
       onPrev={onPrev}
       onNext={onNext}
-      onFilter={(key, value) =>
-        update({ [key === "model_alias" ? "model" : "session"]: value, view: null }, { resetPage: true, push: true })
-      }
+      onFilterModel={(value) => update({ model: value, view: null }, { resetPage: true, push: true })}
     />
   ) : null;
 
@@ -381,16 +373,6 @@ export default function LlmCallsPage() {
             <RefreshIcon fontSize="small" />
           </IconButton>
         </Tooltip>
-        {filterChips.length > 0 && (
-          <Stack direction="row" spacing={1} sx={{ flexBasis: "100%" }}>
-            {filterChips.map((c) => (
-              <Chip key={c.key} size="small" label={c.label} onDelete={() => update({ [c.key]: null }, { resetPage: true })} />
-            ))}
-            <Button size="small" onClick={() => update({ session: null, user: null, q: null, model: null, outcome: null }, { resetPage: true })}>
-              {t("llm_calls.clear_filters")}
-            </Button>
-          </Stack>
-        )}
       </Paper>
 
       <StatsStrip

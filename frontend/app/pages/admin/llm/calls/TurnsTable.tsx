@@ -242,7 +242,6 @@ export default function TurnsTable({ turns, selectedId, onSelect, p95LatencyMs, 
                     </Typography>
                   </Box>
                   <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }} noWrap component="div">
-                    {turn.conversation_id ? `${shortId(turn.conversation_id)} · ` : ""}
                     {shortId(turn.turn_id ?? turn.last_call_id)}
                     {failed && turn.error_code ? ` · ${turn.error_code}` : ""}
                   </Typography>

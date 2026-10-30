@@ -1448,7 +1448,7 @@
   "llm_calls": {
     "title": "LLM Calls",
     "search": "Search calls",
-    "search_placeholder": "Search by request, trace, session, user or agent id, model, error…",
+    "search_placeholder": "Search by request or trace id, model, endpoint, error…",
     "all_models": "All models",
     "outcome": "Outcome",
     "outcome_all": "All",
@@ -1467,8 +1467,6 @@
     "live_paused_page": "Live updates follow the newest calls: go to the first page, sorted by time",
     "refresh": "Refresh",
     "updated_at": "Updated {{time}}",
-    "chip_session": "Conversation {{id}}",
-    "clear_filters": "Clear filters",
     "stat_calls": "Calls",
     "stat_errors": "Errors",
     "stat_p50": "Latency p50",
@@ -1504,7 +1502,6 @@
     "flag_tools": "{{count}} tool calls",
     "flag_truncated": "Cut off at the token limit",
     "flag_retried": "Retried {{count}} times",
-    "flag_conversation": "Part of a conversation",
     "prev": "Previous call (k)",
     "next": "Next call (j)",
     "copy_link": "Copy a link to this call",
@@ -1527,7 +1524,6 @@
     "section_request": "Request",
     "section_routing": "Routing",
     "section_who": "Who",
-    "section_conversation": "Conversation",
     "section_context": "Context",
     "span_first_token": "Waiting for the first token",
     "span_generation": "Generating",
@@ -1538,7 +1534,6 @@
     "related_session_id": "Chat session · {{count}} calls",
     "related_trace_id": "Trace · {{count}} calls",
     "related_summary": "{{tokens}} tokens in all, {{errors}} failed",
-    "related_alone": "The only call of its conversation in the gateway's log.",
     "f_request_id": "Request id",
     "f_trace_id": "Trace id",
     "f_endpoint": "Endpoint",
@@ -1553,11 +1548,7 @@
     "f_user": "User",
     "f_tenant": "Tenant",
     "f_group": "Usage group",
-    "f_project": "Project",
     "f_agent": "Agent",
-    "f_device": "Device",
-    "f_session": "Chat session",
-    "f_conversation": "Conversation",
     "f_turn": "Turn",
     "f_skills": "Skills",
     "f_rag": "Knowledge (RAG)",
@@ -1665,7 +1656,6 @@
     "ev_denied": "denied",
     "ev_error": "failed",
     "ev_timeout": "timed out",
-    "chip_user": "User {{id}}",
     "col_user": "User"
   },
   "rag_runtime": {
@@ -4413,7 +4403,10 @@
       "ends": "Ends",
       "sign_out": "Sign out",
       "sign_out_title": "Sign this device out?",
-      "sign_out_confirm": "{{device}} ({{user}}) must sign in again to use the agent."
+      "sign_out_confirm": "{{device}} ({{user}}) must sign in again to use the agent.",
+      "suppressed": "Fewer than {{k}} people used this agent in this period, so its figures are not shown: they would point to single people.",
+      "day_suppressed": "Days with fewer than {{k}} people are left out.",
+      "user_hidden": "Not shown"
     },
     "back_to_chat": "Back to the chat",
     "no_access": "You do not look after any agents. Ask an administrator to make you a maintainer of one."
