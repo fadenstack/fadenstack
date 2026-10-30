@@ -113,6 +113,29 @@ async def test_secrets_are_taken_up_and_a_deleted_one_returns_to_the_start_value
 
 
 @pytest.mark.anyio
+async def test_a_secret_that_cannot_be_opened_keeps_its_value_and_logs_only_a_count(
+    follow_settings: Any, probe: FastAPI, client: AsyncClient, dbsession: AsyncSession,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    await _store_secret(dbsession, "faden_gateway.mcp_service_token", "token-one")
+    await client.get("/api/settings-probe")
+    assert settings.mcp_service_token == "token-one"
+
+    await dbsession.execute(
+        text("UPDATE system_setting_secret SET ciphertext = 'not-a-fernet-token' "
+             "WHERE key = 'faden_gateway.mcp_service_token'"),
+    )
+    with caplog.at_level("ERROR"):
+        await client.get("/api/settings-probe")
+
+    assert settings.mcp_service_token == "token-one", "kept as it was"
+    assert "1 stored secret(s) could not be opened" in caplog.text
+    assert "mcp_service_token" not in caplog.text and "not-a-fernet-token" not in caplog.text, (
+        "neither the setting nor its sealed value reaches the log"
+    )
+
+
+@pytest.mark.anyio
 async def test_the_health_check_reads_nothing(
     follow_settings: Any, client: AsyncClient, dbsession: AsyncSession,
 ) -> None:

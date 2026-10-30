@@ -203,6 +203,7 @@ async def _load(conn: AsyncConnection) -> None:
         {"keys": list(secret_keys)},
     )
     sealed = {str(row["key"]): str(row["ciphertext"]) for row in rows.mappings()}
+    unreadable = 0
     for key, attr in secret_keys.items():
         if key not in sealed:
             _set(key, attr, baseline.get(key, _MISSING))
@@ -210,9 +211,16 @@ async def _load(conn: AsyncConnection) -> None:
         try:
             plain = crypto.decrypt(sealed[key])
         except Exception:  # one unreadable secret does not keep the others from loading
-            log.exception("Could not open the stored secret '%s'; it stays as it was", key)
+            unreadable += 1
             continue
         _set(key, attr, baseline.get(key, _MISSING) if _blank(plain) else plain)
+    if unreadable:
+        # A count only: nothing of a secret, nor of the error that opening it raised, reaches the log
+        # (ASVS 5.0 16.2.5). A changed settings master key makes every stored secret unreadable at once.
+        log.error(
+            "%d stored secret(s) could not be opened with the settings master key; they stay as they were",
+            unreadable,
+        )
 
 
 #: Paths that need no settings: the health check, the API description, static files, metrics.
