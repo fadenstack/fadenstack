@@ -119,7 +119,8 @@ Applications and agents get the answer OpenAI's API gives for a quota: HTTP stat
 ## Alerts and who gets them
 
 A budget alerts once per threshold and period: at 80 % and 100 % unless you set other thresholds. It alerts
-once more per period when, at the rate so far, it would run out before the period ends.
+once more per period when, at the rate so far, it would run out before the period ends. An alert's mail goes out
+once, unless the mail server's answer to it was lost: then it is sent again, and can come twice.
 
 | Budget | Who is told, and how |
 |---|---|
