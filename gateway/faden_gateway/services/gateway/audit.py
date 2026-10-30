@@ -66,12 +66,14 @@ class AuditService:
         turn_id: str | None = None,
         reservation_id: str | None = None,
         admitted: bool = False,
+        refused: bool = False,
     ) -> None:
         """Persist one request log row with optional cost estimation.
 
         Then, in the background, the extensions' usage listeners hear of it (``UsageRecord``, with
         *estimated_tokens*: what admission reserved for the request, *reservation_id*: the gateway's own id
-        its admission checks saw, *admitted*: whether the caps and the checks let it in).
+        its admission checks saw, *admitted*: whether the caps and the checks let it in). *refused*: a cap or
+        an admission check refused it (the row's ``refused``, which the rollups count).
         """
         parsed_provider_id: uuid.UUID | None = None
         if provider_instance_id:
@@ -115,6 +117,7 @@ class AuditService:
             completion_tokens=completion_tokens,
             total_tokens=total_tokens,
             error_code=error_code,
+            refused=refused,
             stream=stream,
             cached_tokens=cached_tokens,
             cache_write_tokens=cache_write_tokens,

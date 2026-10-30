@@ -46,7 +46,8 @@ UTC_SETTINGS = UsageSettings(time_zone="UTC")
 
 def test_the_migrations_follow_the_last_one_and_leave_one_head() -> None:
     scripts = ScriptDirectory.from_config(Config(str(Path(__file__).parents[1] / "alembic.ini")))
-    assert scripts.get_heads() == ["u5ag3l1m"]
+    assert scripts.get_heads() == ["u5ag3rfsd"]
+    assert scripts.get_revision("u5ag3rfsd").down_revision == "u5ag3l1m"
     assert scripts.get_revision("u5ag3l1m").down_revision == "u5ag3r0ll"
     assert scripts.get_revision("u5ag3r0ll").down_revision == "r3c31pt1d"
 
@@ -185,6 +186,24 @@ async def test_hours_and_days_sum_the_log_cell_by_cell(engine: AsyncEngine) -> N
     ]
     assert {r["user_id"] for r in person} == {"u1", "u2", "u3", "u4", "u5", "v1"}
     assert all(r["day"] == date(2026, 11, 10) and r["project_id"] is None for r in person)
+
+
+@needs_postgres
+@pytest.mark.anyio
+async def test_a_refusal_counts_by_the_logs_own_flag_whatever_its_code(engine: AsyncEngine) -> None:
+    """An extension's check chooses its own code: the log's ``refused`` says it was a refusal.
+
+    A row from before the flag (NULL) is known by its code, as before; an explicit false is not a refusal,
+    whatever the code says.
+    """
+    await _log(engine, H11, user_id="a", status_code=429, error_code="team_spend_cap", refused=True)
+    await _log(engine, H11, user_id="e", status_code=402, error_code="tenant_spend_cap", refused=True)
+    await _log(engine, H11, user_id="b", status_code=429, error_code="quota_tokens_per_day", refused=None)
+    await _log(engine, H11, user_id="c", status_code=429, error_code="budget_from_upstream", refused=False)
+    await _log(engine, H11, user_id="d", status_code=200, refused=False)
+    await usage_rollup.run_once(engine, UTC_SETTINGS, now=NOW)
+    [hour] = await _all(engine, UsageHourly)
+    assert (hour["requests"], hour["refused"], hour["failed"]) == (5, 3, 1)
 
 
 @needs_postgres

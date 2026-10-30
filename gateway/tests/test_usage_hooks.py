@@ -169,6 +169,27 @@ async def test_a_good_client_request_id_is_kept(
     assert r.headers["x-request-id"] == sent
 
 
+@pytest.mark.anyio
+async def test_the_log_says_which_requests_a_cap_or_a_check_refused(
+    gateway: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Whatever code a check chooses, its refusal's row says ``refused``; a cap's too; an answer's does not."""
+    asked: list[int] = []
+
+    async def spend_cap(context: AdmissionContext) -> Refusal | None:  # noqa: ARG001
+        asked.append(1)
+        return Refusal(code="team_spend_cap", message="Over the team's spend.") if len(asked) == 2 else None
+
+    await _caps(db_session, rpm_limit=2)  # the refused second gives its count back
+    _use(monkeypatch, checks=[spend_cap])
+    codes = [(await client.post("/v1/chat/completions", headers=_headers(), json=ASK)).status_code for _ in range(4)]
+    assert codes == [200, 429, 200, 429]
+    rows = sorted(await _rows(db_session), key=lambda row: row.created_at)
+    assert [(row.error_code, row.refused) for row in rows] == [
+        (None, False), ("team_spend_cap", True), (None, False), ("rate_limit_rpm", True),
+    ]
+
+
 def test_a_record_built_without_the_new_fields_counts_as_admitted() -> None:
     fields = {f.name for f in dataclasses.fields(UsageRecord)}
     assert {"reservation_id", "admitted"} <= fields

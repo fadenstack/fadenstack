@@ -1096,6 +1096,8 @@ class _Prepared:
     estimated_tokens: int = 0
     #: The caps and the admission checks let the request in.
     admitted: bool = False
+    #: A cap or an admission check refused the request: its row says so (``refused``), whatever its code.
+    refused: bool = False
     #: What the request holds on the tenant's caps until its real usage is known (``ratelimit.py``).
     reservation: Reservation | None = None
     skills: list[ResolvedSkill] = field(default_factory=list)
@@ -1552,6 +1554,7 @@ class GatewayService:
                 estimated_tokens=req.estimated_tokens if req.admitted else 0,
                 reservation_id=req.reservation_id,
                 admitted=req.admitted,
+                refused=req.refused,
                 error_code=error_code or req.fallback_error_code,
                 stream=False,
                 provider_name=(
@@ -1995,6 +1998,7 @@ class GatewayService:
                     estimated_tokens=req.estimated_tokens if req.admitted else 0,
                     reservation_id=req.reservation_id,
                     admitted=req.admitted,
+                    refused=req.refused,
                     error_code=pre_stream_error_code or req.fallback_error_code,
                     stream=True,
                     provider_name=(
@@ -2045,6 +2049,7 @@ class GatewayService:
                 zone=usage_settings.current().zone,
             )
             if isinstance(admitted, CapRefusal):
+                req.refused = True
                 raise admitted.error()
             req.reservation = admitted
         checks = extension_registry.admission_checks
@@ -2055,6 +2060,7 @@ class GatewayService:
             )
             refusal = await usage_hooks.first_refusal(checks, context)
             if refusal is not None:
+                req.refused = True
                 if req.reservation is not None:
                     await self.limiter.release(req.reservation)
                 raise usage_hooks.refused(refusal, req.caps_headers)
@@ -4064,6 +4070,7 @@ class GatewayService:
                 estimated_tokens=req.estimated_tokens if req.admitted else 0,
                 reservation_id=req.reservation_id,
                 admitted=req.admitted,
+                refused=req.refused,
                 error_code=final_error_code,
                 stream=True,
                 provider_name=(

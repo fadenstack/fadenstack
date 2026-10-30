@@ -23,10 +23,12 @@ Postgres advisory lock (``pg_try_advisory_lock``), every five minutes (``usage_r
    they keep their totals when the log is purged or a person is erased.
 
 What is counted (``db/models/usage.py``): ``requests`` is every request that reached the gateway (every row
-of the log), failed and refused ones included; ``refused`` those a cap or an admission check refused
-(``error_code`` ``rate_limit_*``, ``quota_*``, ``budget_*``); ``failed`` the others with a status of 400 or
-more. ``currency`` is the price's currency for a request a price applied to, else NULL, and ``cost`` the sum
-of the requests' estimates. A row logged before teams had paths books on ``[group_id]``.
+of the log), failed and refused ones included; ``refused`` those a cap or an admission check refused -- the
+log's ``refused``, which the gateway sets on every row whatever the refusal's code (an extension's check
+chooses its own), and for a row from before it (NULL) its ``error_code`` (``rate_limit_*``, ``quota_*``,
+``budget_*``); ``failed`` the others with a status of 400 or more. ``currency`` is the price's currency for
+a request a price applied to, else NULL, and ``cost`` the sum of the requests' estimates. A row logged before
+teams had paths books on ``[group_id]``.
 """
 
 from __future__ import annotations
@@ -77,7 +79,8 @@ PURGE_BATCH = 5000
 #: The first purge waits this long after the first backfill: after an upgrade, administrators set the
 #: retention before anything is deleted (the backend shows a notice until ``purge_from``).
 PURGE_GRACE = timedelta(days=7)
-#: An ``error_code`` with one of these marks a request a cap or an admission check refused.
+#: An ``error_code`` with one of these marks a request a cap or an admission check refused, on a row logged
+#: before the log said so itself (``refused`` NULL).
 REFUSED_PREFIXES = ("rate_limit_", "quota_", "budget_")
 
 _HOUR = timedelta(hours=1)
@@ -130,7 +133,9 @@ def _months_before(day: date, months: int) -> date:
 def _log_rows(start: datetime, end: datetime, zone_name: str) -> Subquery:
     """The request log's rows in ``[start, end)``, with what the rollups group and count them by."""
     refused = func.coalesce(
-        or_(*(func.starts_with(_LOG.error_code, prefix) for prefix in REFUSED_PREFIXES)), false(),
+        _LOG.refused,
+        or_(*(func.starts_with(_LOG.error_code, prefix) for prefix in REFUSED_PREFIXES)),
+        false(),
     )
     priced = or_(_LOG.estimated_total_cost.is_not(None), _LOG.price_catalog_id.is_not(None))
     group_path = func.coalesce(

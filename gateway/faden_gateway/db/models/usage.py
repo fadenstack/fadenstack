@@ -47,7 +47,8 @@ class _Measures:
     requests: Mapped[int] = _counter(Integer)
     #: Status 400 or more, refusals by a cap or an admission check not included.
     failed: Mapped[int] = _counter(Integer)
-    #: Refused by a cap or an admission check (``error_code`` ``rate_limit_*``, ``quota_*``, ``budget_*``).
+    #: Refused by a cap or an admission check (the request log's ``refused``; on older rows ``error_code``
+    #: ``rate_limit_*``, ``quota_*``, ``budget_*``).
     refused: Mapped[int] = _counter(Integer)
     #: Including the cached input.
     input_tokens: Mapped[int] = _counter(BigInteger)

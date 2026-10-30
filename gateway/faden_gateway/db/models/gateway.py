@@ -381,6 +381,9 @@ class LLMGatewayRequestLog(Base):
     completion_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     total_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     error_code: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    #: A cap of the tenant's or an extension's admission check refused the request (whatever its error code
+    #: says); NULL on rows written before the gateway recorded it.
+    refused: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     # Cost estimate columns (populated at write time by PricingService)
     estimated_input_cost: Mapped[float | None] = mapped_column(
         Numeric(18, 10), nullable=True,
