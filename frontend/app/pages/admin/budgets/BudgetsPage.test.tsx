@@ -129,6 +129,7 @@ describe("Budgets", () => {
     budgets.list.mockResolvedValue([
       budget({ forecast_end: "2026-10-24", percent: 85, spent: 850000, owner_id: "u-owner" }),
       budget({ id: "b-try", name: "Trial", mode: "shadow", would_refuse: 12, scope: "tenant", target_id: null, target_label: null }),
+      budget({ id: "b-unknown", name: "Pilot", mode: "shadow", would_refuse: null, scope: "tenant", target_id: null, target_label: null }),
     ]);
     view();
 
@@ -139,6 +140,19 @@ describe("Budgets", () => {
     expect(within(trial).getByText("The whole organisation")).toBeInTheDocument();
     expect(within(trial).getByText("Shadow")).toBeInTheDocument();
     expect(within(trial).getByText("Would have refused 12 requests this period.")).toBeInTheDocument();
+    // Not known is not none.
+    const pilot = screen.getByRole("listitem", { name: "Pilot" });
+    expect(within(pilot).getByText("How many requests it would have refused is not known.")).toBeInTheDocument();
+    expect(within(pilot).queryByText(/no request/)).toBeNull();
+  });
+
+  it("shows a team's budget without its use when too few people used it", async () => {
+    budgets.list.mockResolvedValue([budget({ spent: null, percent: null, forecast_end: null, suppressed: true })]);
+    view();
+
+    const sales = await screen.findByRole("listitem", { name: "Sales per month" });
+    expect(within(sales).getByText(/Fewer people than the privacy rule asks for used this budget/)).toBeInTheDocument();
+    expect(within(sales).queryByRole("progressbar")).toBeNull();
   });
 
   it("lists budgets by name, never by how much is used", async () => {

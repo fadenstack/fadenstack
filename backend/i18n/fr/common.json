@@ -5065,7 +5065,9 @@
       "owner": "aussi à {{owner}}",
       "children_exceed": "Les budgets des équipes en dessous dépassent celui-ci au total. C'est permis : chaque requête a quand même besoin de marge dans ce budget aussi.",
       "currency_none": "Aucun modèle n'a de prix en {{currency}} : rien ne compte pour ce budget tant qu'aucun n'en a.",
-      "currency_others": "Seuls les coûts en {{currency}} comptent. L'utilisation des modèles dont le prix est en {{others}} ne compte pas pour ce budget."
+      "currency_others": "Seuls les coûts en {{currency}} comptent. L'utilisation des modèles dont le prix est en {{others}} ne compte pas pour ce budget.",
+      "would_refuse_unknown": "Le nombre de requêtes qu'il aurait refusées n'est pas connu.",
+      "suppressed_few": "Moins de personnes que ne l'exige la règle de confidentialité ont utilisé ce budget sur cette période : la consommation n'est donc pas affichée, elle désignerait des personnes précises."
     },
     "dialog": {
       "create_title": "Nouveau budget",
@@ -5189,7 +5191,8 @@
       "alerts_title": "Alertes de cette période",
       "alert": "{{name}} a atteint {{threshold}} % le {{date}}.",
       "private": "Vous seul voyez ce que vous utilisez de votre budget personnel.",
-      "ask": "S'il vous en faut plus, demandez à un administrateur ou au responsable du budget."
+      "ask": "S'il vous en faut plus, demandez à un administrateur ou au responsable du budget.",
+      "alert_forecast": "{{name}} : le {{date}}, la prévision indiquait qu'il serait épuisé avant la fin de la période."
     },
     "refused": {
       "label": "Budget épuisé",

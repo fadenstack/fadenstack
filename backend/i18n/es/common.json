@@ -5065,7 +5065,9 @@
       "owner": "también a {{owner}}",
       "children_exceed": "Los presupuestos de los equipos inferiores suman más que este. Está permitido: cada solicitud necesita margen también en este presupuesto.",
       "currency_none": "Ningún modelo tiene precio en {{currency}}: nada cuenta para este presupuesto hasta que alguno lo tenga.",
-      "currency_others": "Solo cuentan los costes en {{currency}}. El uso de modelos con precio en {{others}} no cuenta para este presupuesto."
+      "currency_others": "Solo cuentan los costes en {{currency}}. El uso de modelos con precio en {{others}} no cuenta para este presupuesto.",
+      "would_refuse_unknown": "No se sabe cuántas solicitudes habría rechazado.",
+      "suppressed_few": "Menos personas de las que exige la regla de privacidad usaron este presupuesto en este periodo, así que no se muestra cuánto se ha usado: señalaría a personas concretas."
     },
     "dialog": {
       "create_title": "Nuevo presupuesto",
@@ -5189,7 +5191,8 @@
       "alerts_title": "Avisos de este periodo",
       "alert": "{{name}} alcanzó el {{threshold}} % el {{date}}.",
       "private": "Solo usted ve lo que usa de su presupuesto personal.",
-      "ask": "Si necesita más, pídalo a un administrador o al responsable del presupuesto."
+      "ask": "Si necesita más, pídalo a un administrador o al responsable del presupuesto.",
+      "alert_forecast": "{{name}}: el {{date}} la previsión indicó que se agota antes de que termine el periodo."
     },
     "refused": {
       "label": "Presupuesto agotado",

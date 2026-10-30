@@ -5065,7 +5065,9 @@
       "owner": "auch an {{owner}}",
       "children_exceed": "Die Budgets der Teams darunter ergeben zusammen mehr als dieses. Das ist erlaubt: Jede Anfrage braucht trotzdem auch in diesem Budget Platz.",
       "currency_none": "Kein Modell hat einen Preis in {{currency}}: Für dieses Budget zählt nichts, bis eines einen hat.",
-      "currency_others": "Nur Kosten in {{currency}} zählen. Die Nutzung von Modellen mit Preisen in {{others}} zählt für dieses Budget nicht."
+      "currency_others": "Nur Kosten in {{currency}} zählen. Die Nutzung von Modellen mit Preisen in {{others}} zählt für dieses Budget nicht.",
+      "would_refuse_unknown": "Wie viele Anfragen es abgelehnt hätte, ist nicht bekannt.",
+      "suppressed_few": "Weniger Personen, als die Datenschutzregel verlangt, haben dieses Budget in diesem Zeitraum genutzt. Wie viel genutzt ist, wird deshalb nicht angezeigt: Es würde auf einzelne Personen hinweisen."
     },
     "dialog": {
       "create_title": "Neues Budget",
@@ -5189,7 +5191,8 @@
       "alerts_title": "Benachrichtigungen in diesem Zeitraum",
       "alert": "{{name}} hat am {{date}} {{threshold}} % erreicht.",
       "private": "Nur Sie sehen, was Sie von Ihrem persönlichen Budget nutzen.",
-      "ask": "Wenn Sie mehr brauchen, wenden Sie sich an die Administration oder an die verantwortliche Person des Budgets."
+      "ask": "Wenn Sie mehr brauchen, wenden Sie sich an die Administration oder an die verantwortliche Person des Budgets.",
+      "alert_forecast": "{{name}}: Am {{date}} sagte die Prognose, dass es vor dem Ende des Zeitraums aufgebraucht ist."
     },
     "refused": {
       "label": "Budget aufgebraucht",

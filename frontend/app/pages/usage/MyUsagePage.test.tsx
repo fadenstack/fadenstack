@@ -133,7 +133,10 @@ describe("My usage", () => {
             mode: "soft",
           },
         ],
-        alerts: [{ name: "My month", threshold: 80, at: "2026-10-20T09:00:00Z" }],
+        alerts: [
+          { name: "My month", kind: "threshold", threshold: 80, at: "2026-10-20T09:00:00Z" },
+          { name: "My month", kind: "forecast", threshold: null, at: "2026-10-21T09:00:00Z" },
+        ],
       },
     };
 
@@ -171,6 +174,11 @@ describe("My usage", () => {
 
       const alerts = await screen.findByRole("heading", { name: "Alerts this period" });
       expect(alerts.parentElement).toHaveTextContent("My month reached 80 % on Oct 20, 2026.");
+      // A forecast names no threshold.
+      expect(alerts.parentElement).toHaveTextContent(
+        "My month: on Oct 21, 2026 the forecast said it runs out before the period ends.",
+      );
+      expect(alerts.parentElement).not.toHaveTextContent(/reached (0|null) %/);
     });
 
     it("says when no budget applies", async () => {

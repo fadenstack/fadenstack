@@ -5063,7 +5063,9 @@
       "owner": "also to {{owner}}",
       "children_exceed": "The budgets of the teams below add up to more than this one. That is allowed: each request still needs room in this budget too.",
       "currency_none": "No model has a price in {{currency}}: nothing counts toward this budget until one has.",
-      "currency_others": "Only costs in {{currency}} count. Usage of models priced in {{others}} does not count toward this budget."
+      "currency_others": "Only costs in {{currency}} count. Usage of models priced in {{others}} does not count toward this budget.",
+      "would_refuse_unknown": "How many requests it would have refused is not known.",
+      "suppressed_few": "Fewer people than the privacy rule asks for used this budget in this period, so how much is used is not shown: it would point to single people."
     },
     "dialog": {
       "create_title": "New budget",
@@ -5187,7 +5189,8 @@
       "alerts_title": "Alerts this period",
       "alert": "{{name}} reached {{threshold}} % on {{date}}.",
       "private": "Only you see what you use of your personal budget.",
-      "ask": "If you need more, ask an administrator or the budget's owner."
+      "ask": "If you need more, ask an administrator or the budget's owner.",
+      "alert_forecast": "{{name}}: on {{date}} the forecast said it runs out before the period ends."
     },
     "refused": {
       "label": "Budget used up",

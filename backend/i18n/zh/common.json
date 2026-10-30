@@ -5065,7 +5065,9 @@
       "owner": "同时提醒 {{owner}}",
       "children_exceed": "下级组的预算加起来超过了此预算。这是允许的：每个请求仍然也需要在此预算中有余量。",
       "currency_none": "没有模型以 {{currency}} 定价：在有模型以此定价之前，不会有任何用量计入此预算。",
-      "currency_others": "只计入以 {{currency}} 计价的费用。以 {{others}} 定价的模型的用量不计入此预算。"
+      "currency_others": "只计入以 {{currency}} 计价的费用。以 {{others}} 定价的模型的用量不计入此预算。",
+      "would_refuse_unknown": "不清楚它会拒绝多少请求。",
+      "suppressed_few": "本周期内使用此预算的人数少于隐私规则的要求，因此不显示用量：这些数据会指向具体的个人。"
     },
     "dialog": {
       "create_title": "新建预算",
@@ -5189,7 +5191,8 @@
       "alerts_title": "本周期的提醒",
       "alert": "{{name}} 于 {{date}} 达到 {{threshold}} %。",
       "private": "只有您能看到自己对个人预算的用量。",
-      "ask": "如需更多，请联系管理员或该预算的负责人。"
+      "ask": "如需更多，请联系管理员或该预算的负责人。",
+      "alert_forecast": "{{name}}：{{date}} 的预测显示，它将在本周期结束前用完。"
     },
     "refused": {
       "label": "预算已用完",
