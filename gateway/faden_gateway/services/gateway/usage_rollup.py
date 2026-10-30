@@ -14,6 +14,10 @@ Postgres advisory lock (``pg_try_advisory_lock``), every five minutes (``usage_r
 3. **Recompute**: the current and the previous hour (UTC) and day (the usage time zone) are deleted and
    written again from the log, in one transaction each: idempotent, so a run may repeat, and a reader sees
    the old sums or the new.
+Before all that, every run removes the usage of the people erased in the last 30 days (``usage_erased``,
+written by ``erasure.erase_user``) that turned up again -- request-log rows of a request that ended after
+the erasure, person rows a run wrote from a log read just before it -- and writes no person row for them.
+
 4. **Purge**, once the watermark has caught up, only with the settings read, and not before
    ``usage_rollup_state.purge_from`` -- a week after the first backfill was done, so that after an upgrade
    administrators set the retention before anything is deleted (plan decision 9): request-log rows older
@@ -64,7 +68,13 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 from sqlalchemy.sql.selectable import Subquery
 
 from faden_gateway.db.models.gateway import LLMGatewayRequestLog
-from faden_gateway.db.models.usage import UsageDaily, UsageDailyPerson, UsageHourly, UsageRollupState
+from faden_gateway.db.models.usage import (
+    UsageDaily,
+    UsageDailyPerson,
+    UsageErased,
+    UsageHourly,
+    UsageRollupState,
+)
 from faden_gateway.services.gateway import usage_settings
 from faden_gateway.services.gateway.usage_settings import UsageSettings
 
@@ -79,6 +89,8 @@ PURGE_BATCH = 5000
 #: The first purge waits this long after the first backfill: after an upgrade, administrators set the
 #: retention before anything is deleted (the backend shows a notice until ``purge_from``).
 PURGE_GRACE = timedelta(days=7)
+#: How long an erased person's usage is removed again by every run (``usage_erased``).
+ERASED_KEPT = timedelta(days=30)
 #: An ``error_code`` with one of these marks a request a cap or an admission check refused, on a row logged
 #: before the log said so itself (``refused`` NULL).
 REFUSED_PREFIXES = ("rate_limit_", "quota_", "budget_")
@@ -204,8 +216,26 @@ async def _days(conn: AsyncConnection, first: date, last: date, zone: tzinfo, zo
     daily = select(*keys, *_measures(rows), people).where(within).group_by(*keys)
     await conn.execute(insert(UsageDaily).from_select([*_DAILY_KEYS, *_MEASURES, "people"], daily))
     keys = [rows.c[name] for name in _PERSON_KEYS]
-    person = select(*keys, *_measures(rows)).where(within).group_by(*keys)
+    erased = select(UsageErased.user_id).scalar_subquery()
+    person = select(*keys, *_measures(rows)).where(within, rows.c.user_id.not_in(erased)).group_by(*keys)
     await conn.execute(insert(UsageDailyPerson).from_select([*_PERSON_KEYS, *_MEASURES], person))
+
+
+async def forget_erased(conn: AsyncConnection, now: datetime) -> dict[str, int]:
+    """Remove what turned up again of the people erased within ``ERASED_KEPT``; forget older erasures.
+
+    Their request-log rows (with their tool calls, ``ON DELETE CASCADE``) and person-level rows. The caller
+    commits.
+    """
+    recent = select(UsageErased.user_id).where(UsageErased.erased_at >= now - ERASED_KEPT).scalar_subquery()
+    removed = {
+        "request_log": (await conn.execute(delete(_LOG).where(_LOG.user_id.in_(recent)))).rowcount or 0,
+        "usage_daily_person": (await conn.execute(
+            delete(UsageDailyPerson).where(UsageDailyPerson.user_id.in_(recent)),
+        )).rowcount or 0,
+    }
+    await conn.execute(delete(UsageErased).where(UsageErased.erased_at < now - ERASED_KEPT))
+    return removed
 
 
 async def _state(conn: AsyncConnection, **values: Any) -> None:
@@ -220,6 +250,8 @@ async def _roll_up(conn: AsyncConnection, config: UsageSettings, now: datetime |
     current_hour = _floor_hour(now)
     previous_hour = current_hour - _HOUR
     today = now.astimezone(zone).date()
+    await forget_erased(conn, now)
+    await conn.commit()
     await conn.execute(pg_insert(UsageRollupState).values(id=1).on_conflict_do_nothing())
     through = (await conn.execute(
         select(UsageRollupState.backfilled_through).where(UsageRollupState.id == 1),

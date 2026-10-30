@@ -8,6 +8,7 @@ GenAI conventions count: ``input_tokens`` includes the cached ones, ``output_tok
 - ``usage_daily``: day in the usage time zone (``usage.time_zone``), the same keys.
 - ``usage_daily_person``: day, tenant, person, team, project, agent, model -- person-level data at day
   granularity at most (M10), kept for ``usage.person_retention_days``.
+- ``usage_erased``: the people erased in the last 30 days, whose usage each rollup run removes again (M12).
 
 A key may be NULL (no team, no agent); the unique indexes treat NULLs as equal (``NULLS NOT DISTINCT``,
 Postgres 15+), so each cell is one row. ``group_path`` is the team's path at the time of use (its ancestors
@@ -141,6 +142,15 @@ class UsageDailyPerson(_Measures, Base):
         # A person's own view, their export and their erasure look them up by person.
         Index("ix_usage_daily_person_user", "user_id", "day"),
     )
+
+
+class UsageErased(Base):
+    """A person erased (an account deleted): for 30 days every rollup run removes what of theirs turns up."""
+
+    __tablename__ = "usage_erased"
+
+    user_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    erased_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class UsageRollupState(Base):

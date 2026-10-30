@@ -25,7 +25,13 @@ from sqlalchemy import insert, select, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 
 from faden_gateway.db.models.gateway import LLMGatewayRequestLog, LLMToolCallLog, PriceCatalog
-from faden_gateway.db.models.usage import UsageDaily, UsageDailyPerson, UsageHourly, UsageRollupState
+from faden_gateway.db.models.usage import (
+    UsageDaily,
+    UsageDailyPerson,
+    UsageErased,
+    UsageHourly,
+    UsageRollupState,
+)
 from faden_gateway.services.gateway import erasure, usage_group, usage_rollup, usage_settings
 from faden_gateway.services.gateway.usage_group import PATH_LEVELS, BackendUserGroups, UsageTeam
 from faden_gateway.services.gateway.usage_settings import UsageSettings
@@ -46,7 +52,8 @@ UTC_SETTINGS = UsageSettings(time_zone="UTC")
 
 def test_the_migrations_follow_the_last_one_and_leave_one_head() -> None:
     scripts = ScriptDirectory.from_config(Config(str(Path(__file__).parents[1] / "alembic.ini")))
-    assert scripts.get_heads() == ["u5ag3rfsd"]
+    assert scripts.get_heads() == ["u5ag3ers"]
+    assert scripts.get_revision("u5ag3ers").down_revision == "u5ag3rfsd"
     assert scripts.get_revision("u5ag3rfsd").down_revision == "u5ag3l1m"
     assert scripts.get_revision("u5ag3l1m").down_revision == "u5ag3r0ll"
     assert scripts.get_revision("u5ag3r0ll").down_revision == "r3c31pt1d"
@@ -80,7 +87,7 @@ async def engine() -> AsyncIterator[AsyncEngine]:
     async with engine.begin() as conn:
         await conn.execute(text(
             "TRUNCATE llm_gateway_request_log, llm_tool_call_log, usage_hourly, usage_daily, usage_daily_person, "
-            "price_catalog CASCADE",
+            "usage_erased, price_catalog CASCADE",
         ))
         await conn.execute(text(
             "UPDATE usage_rollup_state SET backfilled_through = NULL, last_run_at = NULL, last_purge_at = NULL, "
@@ -352,6 +359,46 @@ async def test_erasing_a_person_takes_their_log_and_person_rows_and_leaves_the_s
     assert [r["user_id"] for r in await _all(engine, UsageDailyPerson)] == ["stayer"]
     [hour] = await _all(engine, UsageHourly)
     assert (hour["requests"], hour["input_tokens"], hour["people"]) == (2, 15, 2), "the sums keep their totals"
+
+
+@needs_postgres
+@pytest.mark.anyio
+async def test_what_turns_up_again_of_an_erased_person_is_removed_by_every_run_for_30_days(
+    engine: AsyncEngine,
+) -> None:
+    """A run that read the log just before the erasure wrote a person row back; a request ended after it."""
+    await _log(engine, H11 - timedelta(days=3), user_id="leaver", prompt_tokens=10)
+    await _log(engine, H11 - timedelta(days=3), user_id="stayer", prompt_tokens=5)
+    await usage_rollup.run_once(engine, UTC_SETTINGS, now=NOW)
+    async with AsyncSession(engine) as session:
+        await erasure.erase_user(session, None, "leaver")
+        await session.commit()
+    stale_day = (H11 - timedelta(days=3)).date()
+    async with engine.begin() as conn:
+        await conn.execute(insert(UsageDailyPerson).values(
+            day=stale_day, tenant_id="t1", user_id="leaver", requests=1, input_tokens=10,
+        ))
+    await _log(engine, NOW - timedelta(minutes=2), user_id="leaver", prompt_tokens=3)
+
+    await usage_rollup.run_once(engine, UTC_SETTINGS, now=NOW)
+
+    assert [r["user_id"] for r in await _all(engine, UsageDailyPerson)] == ["stayer"]
+    async with engine.connect() as conn:
+        users = (await conn.execute(select(LLMGatewayRequestLog.user_id))).scalars().all()
+    assert users == ["stayer"]
+    days = {r["day"]: r["input_tokens"] for r in await _all(engine, UsageDaily, UsageDaily.day)}
+    assert days[stale_day] == 15, "the closed day's sum keeps its total"
+
+    # The rollup itself writes no person row for them, even from a log row it still sees.
+    await _log(engine, NOW - timedelta(minutes=1), user_id="leaver", prompt_tokens=4)
+    async with engine.connect() as conn:
+        await usage_rollup._days(conn, NOW.date(), NOW.date(), UTC, "UTC")  # noqa: SLF001
+        await conn.commit()
+    assert {r["user_id"] for r in await _all(engine, UsageDailyPerson)} == {"stayer"}
+
+    later = NOW + usage_rollup.ERASED_KEPT + timedelta(days=1)
+    await usage_rollup.run_once(engine, UTC_SETTINGS, now=later)
+    assert await _all(engine, UsageErased) == [], "forgotten after 30 days"
 
 
 # ── The team's path, from the backend's groups ───────────────────────
