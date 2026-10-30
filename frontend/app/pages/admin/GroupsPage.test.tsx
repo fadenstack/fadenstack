@@ -108,6 +108,24 @@ describe("groups as a tree", () => {
     );
   });
 
+  it("keeps a sub-group of an archived group below it, marked, and lets it keep that parent", async () => {
+    list.mockResolvedValue([...TREE, group("Legacy", { parent_id: "Old" })]);
+    const { container } = renderPage(<GroupsPage />);
+    await screen.findByText("Legacy");
+
+    expect(order(container)).toEqual(["Engineering:1", "Old:1", "Legacy:2", "Sales:1", "EMEA:2", "Berlin:3"]);
+    const old = container.querySelector("[data-team-row='Old']") as HTMLElement;
+    expect(within(old).getByText("Archived")).toBeInTheDocument();
+
+    const row = container.querySelector("[data-team-row='Legacy']")!.closest("tr")!;
+    await userEvent.click(within(row).getByTitle("Edit Group"));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("combobox", { name: "Parent" })).toHaveTextContent("Old");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(write.update).toHaveBeenCalledWith("Legacy", expect.objectContaining({ parent_id: "Old" })));
+  });
+
   it("words the tree's refusals", async () => {
     write.update.mockRejectedValue(new ApiError("unprocessable", 422, "team_too_deep"));
     const { container } = renderPage(<GroupsPage />);
