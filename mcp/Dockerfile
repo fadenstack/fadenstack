@@ -3,7 +3,7 @@ ARG BASE_IMAGE=ghcr.io/fadenstack/base:latest
 # Node.js for npx-based MCP servers: the LTS from Node's own image. Debian bookworm's package is Node 18, out of
 # support since April 2025, and current MCP servers need 20 or later (server-everything 2.0 stopped on its missing
 # global crypto, 0.5.0 on the release server).
-FROM node:24.22.0-bookworm-slim AS node
+FROM node:26.12.1-bookworm-slim AS node
 
 FROM ${BASE_IMAGE} AS prod
 
