@@ -2117,7 +2117,7 @@
       "usage_auditor": "Auditeur d'utilisation"
     },
     "builtin_hints": {
-      "usage_auditor": "usage_auditor : peut consulter les chiffres d'utilisation d'une personne tant que le suivi par personne est activé, en indiquant un motif à chaque fois. Être superutilisateur ne donne pas ce droit."
+      "usage_auditor": "usage_auditor : peut consulter les chiffres d'utilisation d'une personne tant que le suivi par personne est activé, en indiquant un motif à chaque fois. Il ouvre aussi la page Utilisation de la console : aucun autre rôle n'est nécessaire. Être superutilisateur ne donne pas ce droit."
     }
   },
   "groups": {

@@ -1974,7 +1974,7 @@
       "usage_auditor": "用量审计员"
     },
     "builtin_hints": {
-      "usage_auditor": "usage_auditor：在按人员统计开启时，每次说明理由后可查看单个人员的用量数据。超级用户身份并不自动拥有此权限。"
+      "usage_auditor": "usage_auditor：在按人员统计开启时，每次说明理由后可查看单个人员的用量数据。该角色也可打开控制台中的用量页面，无需其他角色。超级用户身份并不自动拥有此权限。"
     }
   },
   "groups": {

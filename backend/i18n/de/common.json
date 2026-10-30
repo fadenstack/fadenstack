@@ -1974,7 +1974,7 @@
       "usage_auditor": "Nutzungsprüfer"
     },
     "builtin_hints": {
-      "usage_auditor": "usage_auditor: darf die Nutzungszahlen einer einzelnen Person ansehen, solange die personenbezogene Auswertung eingeschaltet ist, jedes Mal mit Begründung. Superuser zu sein gibt dieses Recht nicht."
+      "usage_auditor": "usage_auditor: darf die Nutzungszahlen einer einzelnen Person ansehen, solange die personenbezogene Auswertung eingeschaltet ist, jedes Mal mit Begründung. Die Rolle öffnet auch die Seite Nutzung in der Konsole, eine weitere Rolle ist nicht nötig. Superuser zu sein gibt dieses Recht nicht."
     }
   },
   "groups": {
