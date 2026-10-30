@@ -69,6 +69,9 @@ def test_settings_out_of_range_take_the_nearest_end_and_a_bad_zone_the_default()
         daily_retention_months=25,
     )
     assert usage_settings.from_values({"time_zone": "Europe/Berlin"}).time_zone == "Europe/Berlin"
+    assert usage_settings.from_values({"min_group_size": 2}).min_group_size == 5, "k is never below five"
+    assert usage_settings.from_values({"min_group_size": "12"}).min_group_size == 12
+    assert usage_settings.from_values({"min_group_size": 99}).min_group_size == 50
     assert usage_settings.from_values({}) == usage_settings.defaults()
 
 
@@ -255,7 +258,10 @@ async def test_the_first_run_backfills_history_and_purges_only_after_its_grace(e
     later = NOW + timedelta(days=8)
     second = await usage_rollup.run_once(engine, settings, now=later)
     assert second is not None and second.purge_from == first.purge_from, "set once, at the first backfill"
-    assert second.purged == {"request_log": 1, "usage_daily_person": 1, "usage_hourly": 1, "usage_daily": 0}
+    assert second.purged == {
+        "request_log": 1, "usage_daily_person": 1, "usage_hourly": 1, "usage_daily": 0,
+        "usage_hourly_folded": 0, "usage_daily_folded": 0,
+    }
     async with engine.connect() as conn:
         left = (await conn.execute(select(LLMGatewayRequestLog.prompt_tokens))).scalars().all()
     assert sorted(left) == [20, 30]
@@ -399,6 +405,51 @@ async def test_what_turns_up_again_of_an_erased_person_is_removed_by_every_run_f
     later = NOW + usage_rollup.ERASED_KEPT + timedelta(days=1)
     await usage_rollup.run_once(engine, UTC_SETTINGS, now=later)
     assert await _all(engine, UsageErased) == [], "forgotten after 30 days"
+
+
+@needs_postgres
+@pytest.mark.anyio
+async def test_beyond_the_person_retention_cells_of_fewer_than_k_fold_into_one_without_team_or_agent(
+    engine: AsyncEngine,
+) -> None:
+    """Nothing is left to count their people exactly: a team of two's day is the two's (M04, M12)."""
+    old_day, recent_day = (NOW - timedelta(days=100)).date(), (NOW - timedelta(days=10)).date()
+    old_hour = H11 - timedelta(days=100)
+    cell = {"tenant_id": "t1", "model_alias": "m1", "provider_instance_id": PROVIDER, "currency": "EUR"}
+    async with engine.begin() as conn:
+        for row in [
+            {"day": old_day, **cell, "group_id": "g1", "group_path": ["g1"], "agent_id": "a1", "people": 2,
+             "requests": 5, "input_tokens": 50, "cost": Decimal("1.5")},
+            {"day": old_day, **cell, "group_id": "g2", "group_path": ["g2"], "people": 3, "requests": 7,
+             "input_tokens": 70, "cost": None},
+            {"day": old_day, **cell, "people": 1, "requests": 1, "input_tokens": 10, "cost": Decimal("0.5")},
+            {"day": old_day, **cell, "group_id": "big", "group_path": ["big"], "people": 8, "requests": 20},
+            {"day": recent_day, **cell, "group_id": "g1", "group_path": ["g1"], "people": 2, "requests": 4},
+        ]:
+            await conn.execute(insert(UsageDaily).values(**row))
+        await conn.execute(insert(UsageHourly).values(hour=old_hour, **cell, agent_id="a1", people=1, requests=3))
+        await conn.execute(text(
+            "INSERT INTO usage_rollup_state (id, backfilled_through, purge_from) VALUES (1, :t, :p) "
+            "ON CONFLICT (id) DO UPDATE SET backfilled_through = :t, purge_from = :p",
+        ), {"t": H11, "p": NOW - timedelta(days=1)})
+
+    settings = UsageSettings(time_zone="UTC", hourly_retention_days=180)  # the old hour is kept
+    run = await usage_rollup.run_once(engine, settings, now=NOW)
+
+    assert run is not None and (run.purged["usage_daily_folded"], run.purged["usage_hourly_folded"]) == (1, 1)
+    old = {(r["group_id"], r["agent_id"]): r for r in await _all(engine, UsageDaily) if r["day"] == old_day}
+    assert set(old) == {(None, None), ("big", None)}
+    folded = old[(None, None)]
+    assert (folded["group_path"], folded["requests"], folded["input_tokens"], folded["people"]) == (
+        None, 13, 130, 3,
+    ), "totals kept; people the largest of the folded, a floor"
+    assert folded["cost"] == Decimal("2.0000000000")
+    assert old[("big", None)]["requests"] == 20, "a cell of k people or more stays"
+    assert [r["group_id"] for r in await _all(engine, UsageDaily) if r["day"] == recent_day] == ["g1"], (
+        "within the per-person retention nothing folds"
+    )
+    [hour] = await _all(engine, UsageHourly)
+    assert (hour["agent_id"], hour["requests"]) == (None, 3)
 
 
 # ── The team's path, from the backend's groups ───────────────────────

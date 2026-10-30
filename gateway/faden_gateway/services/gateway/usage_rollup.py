@@ -24,7 +24,10 @@ the erasure, person rows a run wrote from a log read just before it -- and write
    than ``usage.request_log_retention_days`` (never at or after the watermark), person-level days older
    than ``usage.person_retention_days``, hours older than ``usage.hourly_retention_days``, days older than
    ``usage.daily_retention_months``. The sums without a person are not recomputed for closed windows, so
-   they keep their totals when the log is purged or a person is erased.
+   they keep their totals when the log is purged or a person is erased. Beyond the per-person retention, an
+   hourly or daily cell of fewer than k people (``usage.min_group_size``) is person-level data with nothing
+   left to count its people exactly: it folds into the cell of its period, tenant, model, provider and
+   currency without a team, a path or an agent, which keeps its totals (M04, M12).
 
 What is counted (``db/models/usage.py``): ``requests`` is every request that reached the gateway (every row
 of the log), failed and refused ones included; ``refused`` those a cap or an admission check refused -- the
@@ -286,6 +289,42 @@ async def _roll_up(conn: AsyncConnection, config: UsageSettings, now: datetime |
     return RollupRun(now=now, caught_up_from=started, backfilled_through=through, purge_from=purge_from)
 
 
+#: What each folded cell sums (``people``: the largest of the folded cells, a lower bound of the distinct).
+_FOLD_COUNTS = _MEASURES[:-1]  # all but the cost, which may be NULL
+
+
+async def _fold(conn: AsyncConnection, table: str, period: str, before: date | datetime, k: int) -> int:
+    """Fold *table*'s cells of fewer than *k* people before *before* into their cell without team and agent.
+
+    The cell of the same period, tenant, model, provider instance and currency with ``group_id``,
+    ``group_path`` and ``agent_id`` NULL takes their figures (made, or added to); its ``people`` is the
+    largest of theirs and its own. Returns how many such cells were made or added to.
+    """
+    sums = ", ".join(f"SUM({name})" for name in _FOLD_COUNTS)
+    added = ", ".join(f"{name} = {table}.{name} + EXCLUDED.{name}" for name in _FOLD_COUNTS)
+    keys = f"{period}, tenant_id, model_alias, provider_instance_id, currency"
+    statement = text(f"""
+        WITH moved AS (
+            DELETE FROM {table}
+            WHERE {period} < :before AND people < :k
+              AND (group_id IS NOT NULL OR group_path IS NOT NULL OR agent_id IS NOT NULL)
+            RETURNING {keys}, people, {", ".join(_FOLD_COUNTS)}, cost
+        )
+        INSERT INTO {table} ({keys}, group_id, group_path, agent_id, people, {", ".join(_FOLD_COUNTS)}, cost)
+        SELECT {keys}, NULL, NULL, NULL, MAX(people), {sums}, SUM(cost)
+        FROM moved
+        GROUP BY {keys}
+        ON CONFLICT ({period}, tenant_id, group_id, group_path, agent_id, model_alias, provider_instance_id,
+                     currency)
+        DO UPDATE SET
+            people = GREATEST({table}.people, EXCLUDED.people),
+            {added},
+            cost = CASE WHEN {table}.cost IS NULL AND EXCLUDED.cost IS NULL THEN NULL
+                        ELSE COALESCE({table}.cost, 0) + COALESCE(EXCLUDED.cost, 0) END
+    """)  # noqa: S608 - the table, period and measure names are this module's fixed strings
+    return (await conn.execute(statement, {"before": before, "k": k})).rowcount or 0
+
+
 async def _purge(conn: AsyncConnection, config: UsageSettings, run: RollupRun) -> dict[str, int]:
     """Delete what is older than its retention; request-log rows only before the watermark."""
     now = run.now
@@ -312,6 +351,9 @@ async def _purge(conn: AsyncConnection, config: UsageSettings, run: RollupRun) -
         )),
     ):
         purged[name] = (await conn.execute(statement)).rowcount or 0
+    kept, k = timedelta(days=config.person_retention_days), config.min_group_size
+    purged["usage_hourly_folded"] = await _fold(conn, "usage_hourly", "hour", now - kept, k)
+    purged["usage_daily_folded"] = await _fold(conn, "usage_daily", "day", today - kept, k)
     await _state(conn, last_purge_at=now)
     await conn.commit()
     return purged

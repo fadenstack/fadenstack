@@ -1,4 +1,4 @@
-"""The usage settings the gateway follows: the usage time zone and the retention periods (category ``usage``).
+"""The usage settings the gateway follows: the usage time zone, the retention periods, the minimum group size.
 
 The backend keeps them in its system settings (``system_setting_value``, ``{"value": ...}``); the gateway
 reads them from the backend's database at each run of the rollup job (``usage_rollup.py``), so a change
@@ -34,6 +34,8 @@ RETENTION: dict[str, tuple[int, int, int]] = {
     "hourly_retention_days": (90, 31, 180),
     "daily_retention_months": (25, 13, 60),
 }
+#: The minimum group size k (M04): (default, smallest, largest), as the backend allows it.
+MIN_GROUP_SIZE = (5, 5, 50)
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,6 +47,8 @@ class UsageSettings:
     person_retention_days: int = 90
     hourly_retention_days: int = 90
     daily_retention_months: int = 25
+    #: Beyond the per-person retention, a rollup cell of fewer than k people folds (``usage_rollup._fold``).
+    min_group_size: int = 5
 
     @property
     def zone(self) -> tzinfo:
@@ -63,7 +67,10 @@ def _zone_name(value: Any, default: str) -> str:
 
 
 def _within(name: str, value: Any) -> int:
-    default, low, high = RETENTION[name]
+    return _bounded(value, *RETENTION[name])
+
+
+def _bounded(value: Any, default: int, low: int, high: int) -> int:
     if isinstance(value, bool) or not isinstance(value, (int, float, str)):
         return default
     try:
@@ -86,6 +93,8 @@ def from_values(values: dict[str, Any]) -> UsageSettings:
     }
     if "time_zone" in values:
         found["time_zone"] = _zone_name(values["time_zone"], base.time_zone)
+    if values.get("min_group_size") is not None:
+        found["min_group_size"] = _bounded(values["min_group_size"], *MIN_GROUP_SIZE)
     return replace(base, **found)
 
 
