@@ -15,6 +15,11 @@ sub-team row holds (the smaller sub-teams, and the people whose home is the pare
 k people, else the smallest shown sibling folds in too (complementary suppression); so the parent minus its
 shown sub-teams never singles out fewer than k people. The same holds for the top level and its ``other``
 row (``parent_key`` null). Counts beyond the per-person retention err towards hiding (``suppression.py``).
+
+The two structures are protected against each other: after a team moved, a team's figure today minus its
+figure as recorded is what moved with it. A team not shown in one structure (folded, or below a folded team)
+is not shown in the other either, and a team whose two figures differ by a part of fewer than k people is
+shown in neither (:class:`Moves`, :func:`rows`).
 """
 
 from __future__ import annotations
@@ -25,7 +30,8 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from faden_backend.services.teams import Tree
-from faden_backend.services.usage.measures import Measures, hidden
+from faden_backend.services.usage.measures import Measures
+from faden_backend.services.usage.measures import hidden as hidden_figures
 
 Structure = Literal["recorded", "current"]
 Path = tuple[str, ...]
@@ -103,10 +109,70 @@ def _together(parts: list[Part]) -> int:
     return max([len(users), *(part.people for part in parts)], default=0)
 
 
-def rows(built: Built, k: int, label: Callable[[str], str | None]) -> list[dict[str, Any]]:
-    """The tree's rows, top-down, siblings by name: shown teams, ``other`` rows, and Unassigned."""
+@dataclass
+class Moves:
+    """Per team, what one structure books under it and the other does not: what moved with a team.
+
+    ``away``: booked under the team as recorded, under another team today (it moved out); ``toward``: the
+    other way round.
+    """
+
+    away: dict[str, Part] = field(default_factory=dict)
+    toward: dict[str, Part] = field(default_factory=dict)
+
+    def _parts(self, recorded: Path | None, current: Path | None) -> list[Part]:
+        then, now = set(recorded or ()), set(current or ())
+        return [
+            *(self.away.setdefault(team, Part()) for team in then - now),
+            *(self.toward.setdefault(team, Part()) for team in now - then),
+        ]
+
+    def add_cells(self, recorded: Path | None, current: Path | None, row: dict[str, Any]) -> None:
+        """One summed rollup row, with its path in each structure."""
+        for part in self._parts(recorded, current):
+            part.measures.add(row)
+            part.floor = max(part.floor, int(row.get("floor") or 0))
+
+    def add_person(self, recorded: Path | None, current: Path | None, user_id: str) -> None:
+        """A person active on the paths."""
+        for part in self._parts(recorded, current):
+            part.users.add(user_id)
+
+    def small(self, k: int) -> set[str]:
+        """The teams whose figures differ between the structures by a part of fewer than k people."""
+        return {
+            team
+            for parts in (self.away, self.toward)
+            for team, part in parts.items()
+            if not part.empty and part.people < k
+        }
+
+
+def rows(
+    built: dict[Structure, Built],
+    structure: Structure,
+    k: int,
+    label: Callable[[str], str | None],
+    forced: set[str] | None = None,
+) -> list[dict[str, Any]]:
+    """The tree's rows in *structure*, top-down, siblings by name: shown teams, ``other`` rows, Unassigned.
+
+    *built* holds both structures of the same rows. A team is not shown in one when it is not shown in the
+    other (folded, or under a folded team), nor when it is in *forced* (``Moves.small``): repeated until no
+    structure hides a team the other shows.
+    """
+    hidden = set(forced or ())
+    while True:
+        unseen: set[str] = set()
+        for each in built.values():
+            seen: set[Path] = set()
+            _level(each, (), k, label, [], seen, hidden)
+            unseen |= {path[-1] for path in each.subtree if path not in seen}
+        if unseen <= hidden:
+            break
+        hidden |= unseen
     found: list[dict[str, Any]] = []
-    _level(built, (), k, label, found)
+    _level(built[structure], (), k, label, found, set(), hidden)
     return found
 
 
@@ -117,16 +183,26 @@ def _sort_key(label: Callable[[str], str | None], path: Path | None) -> tuple[bo
 
 
 def _level(
-    built: Built, parent: Path, k: int, label: Callable[[str], str | None], found: list[dict[str, Any]],
+    built: Built,
+    parent: Path,
+    k: int,
+    label: Callable[[str], str | None],
+    found: list[dict[str, Any]],
+    seen: set[Path],
+    hidden: set[str],
 ) -> None:
     cells: dict[Path | None, Part] = {path: built.subtree[path] for path in built.children(parent)}
     if not parent and not built.unassigned.empty:
         cells[None] = built.unassigned
     direct = built.direct.get(parent) if parent else None
     rest: list[Part] = [direct] if direct is not None and not direct.empty else []
-    folded = [path for path, part in cells.items() if not part.empty and part.people < k]
+
+    def held_back(path: Path | None, part: Part) -> bool:
+        return part.people < k or (path is not None and path[-1] in hidden)
+
+    folded = [path for path, part in cells.items() if not part.empty and held_back(path, part)]
     shown = sorted(
-        (path for path, part in cells.items() if not part.empty and part.people >= k),
+        (path for path, part in cells.items() if not part.empty and not held_back(path, part)),
         key=lambda path: (cells[path].people, cells[path].measures.requests, str(path)),
     )
     if folded or rest:
@@ -140,12 +216,13 @@ def _level(
                 "people": part.people, "suppressed": False, **part.measures.as_json(),
             })
             continue
+        seen.add(path)
         found.append({
             "key": path[-1], "label": label(path[-1]), "parent_key": path[-2] if len(path) > 1 else None,
             "path": list(path), "other": False, "people": part.people, "suppressed": False,
             **part.measures.as_json(),
         })
-        _level(built, path, k, label, found)
+        _level(built, path, k, label, found, seen, hidden)
     if folded:
         held = rest + [cells[p] for p in folded]
         together = Measures()
@@ -154,5 +231,5 @@ def _level(
         found.append({
             "key": None, "label": None, "parent_key": parent[-1] if parent else None, "path": list(parent),
             "other": True, "people": None, "suppressed": True,
-            **(together.as_json() if _together(held) >= k else hidden()),
+            **(together.as_json() if _together(held) >= k else hidden_figures()),
         })

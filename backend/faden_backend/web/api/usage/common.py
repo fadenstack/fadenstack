@@ -66,11 +66,26 @@ def day_range(first: str | None, last: str | None, zone: ZoneInfo, *, max_days: 
     return DayRange(frm, to)
 
 
+def _whole_hour(moment: datetime) -> datetime:
+    return moment.replace(minute=0, second=0, microsecond=0)
+
+
 def utc_bounds(days: DayRange, zone: ZoneInfo) -> tuple[datetime, datetime]:
-    """The range as UTC instants: from the first day's local midnight to the midnight after the last."""
+    """The range as whole UTC hours: from the first day's local midnight to the midnight after the last.
+
+    The hourly rollups are whole UTC hours; a time zone half an hour off (Asia/Kolkata, +05:30) has its
+    midnight in the middle of one. Both ends are floored to the hour, so each UTC hour belongs to the local
+    day in which it ends (:func:`day_of_hour`), and the hours of consecutive days follow each other without a
+    gap.
+    """
     start = datetime.combine(days.first, time(), zone).astimezone(UTC)
     end = datetime.combine(days.last + timedelta(days=1), time(), zone).astimezone(UTC)
-    return start, end
+    return _whole_hour(start), _whole_hour(end)
+
+
+def day_of_hour(hour: datetime, zone: ZoneInfo) -> date:
+    """The local day a UTC hour counts toward: the day of its last instant (``utc_bounds``)."""
+    return (hour + timedelta(hours=1) - timedelta(microseconds=1)).astimezone(zone).date()
 
 
 def periods(days: DayRange, bucket: str, zone: ZoneInfo) -> list[Hashable]:

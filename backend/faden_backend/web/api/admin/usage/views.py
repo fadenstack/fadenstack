@@ -3,7 +3,8 @@
 - ``GET /api/admin/usage`` (``usage:read``): totals, a series by hour, day or month, and groups by team (a
   tree, ``services/usage/tree.py``), agent, model or provider, with no person in them. Every figure about
   fewer than k people is hidden, with complementary suppression (M04, M05; ``services/usage/suppression.py``);
-  hours only where at least k people are (M10). Below k for the whole range the totals and the series are
+  hours only where at least k people are (M10). The series' months, days and hours nest and are protected
+  together, as are the tree's two structures, so that no answer can be subtracted from another. Below k for the whole range the totals and the series are
   hidden too, and ``small_instance`` is set (S12); a usage auditor who gives a reason sees them while
   person-level reporting is on, recorded like a view of named people (M07).
 - ``GET /api/admin/usage/people``: named people's figures, per day or month, sorted by name, never by usage
@@ -18,7 +19,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from collections.abc import Hashable
+from collections.abc import Callable, Hashable
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
@@ -41,12 +42,13 @@ from faden_backend.services.usage import config as usage_config
 from faden_backend.services.usage import labels, people, rollups, statement, tree
 from faden_backend.services.usage.measures import Measures, hidden
 from faden_backend.services.usage.people import PeopleRefusal
-from faden_backend.services.usage.suppression import Cell, hide
+from faden_backend.services.usage.suppression import Cell, hide, hide_nested
 from faden_backend.web.api.rbac import require_permission
 from faden_backend.web.api.usage import views as usage_views
 from faden_backend.web.api.usage.common import (
     MAX_DAYS,
     MAX_HOUR_DAYS,
+    day_of_hour,
     day_range,
     gateway_session,
     period_text,
@@ -118,16 +120,39 @@ async def _groups(
 async def _team_tree(
     session: AsyncSession, gw: AsyncSession, days: rollups.DayRange, structure: tree.Structure, k: int,
 ) -> list[dict[str, Any]]:
-    """The teams as a tree, each with its sub-teams, k people per row at least (services/usage/tree.py)."""
+    """The teams as a tree, each with its sub-teams, k people per row at least (services/usage/tree.py).
+
+    Both structures are built from the same rows, so that neither shows what the other hides.
+    """
     now_tree = await teams.load(session)
-    built = tree.Built()
+    structures: tuple[tree.Structure, ...] = ("recorded", "current")
+    built = {each: tree.Built() for each in structures}
+    moves = tree.Moves()
     for row in await rollups.team_cells(gw, days):
-        built.add_cells(tree.path_of(row["group_id"], row["group_path"], structure, now_tree), row)
+        group_id, group_path = row["group_id"], row["group_path"]
+        paths = {each: tree.path_of(group_id, group_path, each, now_tree) for each in structures}
+        for each in structures:
+            built[each].add_cells(paths[each], row)
+        moves.add_cells(paths["recorded"], paths["current"], row)
     for group_id, group_path, user_id in await rollups.team_people(gw, days):
-        built.add_person(tree.path_of(group_id, group_path, structure, now_tree), user_id)
-    keys = {key for path in built.subtree for key in path}
+        paths = {each: tree.path_of(group_id, group_path, each, now_tree) for each in structures}
+        for each in structures:
+            built[each].add_person(paths[each], user_id)
+        moves.add_person(paths["recorded"], paths["current"], user_id)
+    keys = {key for path in built[structure].subtree for key in path}
     names = await labels.label(session, gw, "team", keys)
-    return tree.rows(built, k, names.get)
+    return tree.rows(built, structure, k, names.get, moves.small(k))
+
+
+async def _period_level(
+    gw: AsyncSession, days: rollups.DayRange, bucket: Literal["day", "month"],
+) -> dict[Hashable, Cell]:
+    """The days or months of the range, each with its exact count of people where there is one."""
+    cells = await rollups.period_cells(gw, days, bucket)
+    exact = await rollups.people_per_key(gw, days, rollups.PERIODS[bucket])
+    for key, cell in cells.items():
+        cell.floor = max(cell.floor, exact.get(key, 0))
+    return cells
 
 
 async def _series(
@@ -135,34 +160,41 @@ async def _series(
     days: rollups.DayRange,
     bucket: rollups.Bucket,
     config: usage_config.UsageSettings,
+    total_people: int,
     *,
     unhidden: bool = False,
 ) -> list[dict[str, Any]]:
     """Every period of the range; one about fewer than k people (with its complement) carries no figures.
 
-    *unhidden*: a usage auditor's look with a reason (person-level reporting on): nothing is hidden.
+    The months of the range (the first and the last cut to the range), the days of each month and the hours
+    of each day nest: the hidden ones are worked out from the top down (``suppression.hide_nested``), so that
+    no month minus its shown days, and no day minus its shown hours, gives a hidden day or hour away (M05).
+    *unhidden*: a usage auditor's look with a reason at a small instance (person-level reporting on): nothing
+    is hidden.
     """
     k = 0 if unhidden else config.k
+    zone = config.zone
+    levels: list[dict[Hashable, Cell]] = [await _period_level(gw, days, "month")]
+    parents: list[Callable[[Hashable], Hashable]] = [lambda _key: None]
+    if bucket in ("day", "hour"):
+        levels.append(await _period_level(gw, days, "day"))
+        parents.append(lambda key: key.replace(day=1))  # type: ignore[attr-defined]
     if bucket == "hour":
-        start, end = utc_bounds(days, config.zone)
-        cells = await rollups.hour_cells(gw, start, end)
-        period_key: str | None = None  # no person hours: each hour's own count is all there is
-    else:
-        cells = await rollups.period_cells(gw, days, bucket)
-        period_key = rollups.PERIODS[bucket]
-        exact = await rollups.people_per_key(gw, days, period_key)
-        for key, cell in cells.items():
-            cell.floor = max(cell.floor, exact.get(key, 0))
+        start, end = utc_bounds(days, zone)
+        levels.append(await rollups.hour_cells(gw, start, end))
+        parents.append(lambda key: day_of_hour(key, zone))  # type: ignore[arg-type]
 
-    async def together(group: list[Cell]) -> int:
+    async def together(level: int, group: list[Cell]) -> int:
         floor = max(cell.floor for cell in group)
-        if period_key is not None:
-            floor = max(floor, await rollups.people_in(gw, days, period_key, [cell.key for cell in group]))
+        if level < 2:  # no person hours: each hour's own count is all there is
+            period = rollups.PERIODS["month" if level == 0 else "day"]
+            floor = max(floor, await rollups.people_in(gw, days, period, [cell.key for cell in group]))
         return floor
 
-    hidden_keys, _ = await hide(list(cells.values()), k, together)
+    hidden_keys = (await hide_nested(levels, parents, total_people, k, together))[-1]
+    cells = levels[-1]
     series: list[dict[str, Any]] = []
-    for period in periods(days, bucket, config.zone):
+    for period in periods(days, bucket, zone):
         if period in hidden_keys:
             series.append({"period": period_text(period), "suppressed": True, **hidden()})
         else:
@@ -214,7 +246,7 @@ async def admin_usage(
             **(total.measures.as_json() if shown_totals else hidden()),
             "people": total_people if total_people >= k or unhidden else None,
         },
-        "series": await _series(gw, days, bucket, config, unhidden=unhidden),
+        "series": await _series(gw, days, bucket, config, total_people, unhidden=unhidden),
         "groups": groups,
         "person_reporting": config.person_reporting,
         "can_view_people": config.person_reporting and await people.holds_audit_grant(session, user),
