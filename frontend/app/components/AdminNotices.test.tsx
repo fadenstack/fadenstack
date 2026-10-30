@@ -54,6 +54,14 @@ describe("admin notices", () => {
     expect(await screen.findByTestId("admin-notice-licence_expiring")).toHaveTextContent("11 days");
   });
 
+  it("sends failing mail to Settings > Mail without blaming the mail server", async () => {
+    list.mockResolvedValue([{ code: "mail_failing", severity: "error", params: { code: "mailer_unreachable" } }]);
+    render(<AdminNotices isSuperuser />);
+    const notice = await screen.findByTestId("admin-notice-mail_failing");
+    expect(notice).toHaveTextContent("Mail is failing (mailer_unreachable): Settings → Mail shows why and what to do.");
+    expect(notice).not.toHaveTextContent("mail server said");
+  });
+
   it("says something for a code it has no words for", async () => {
     list.mockResolvedValue([{ code: "brand_new", severity: "info", params: {} }]);
     render(<AdminNotices isSuperuser />);

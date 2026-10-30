@@ -109,6 +109,15 @@
 "Wie melden sich Benutzer mit Active Directory oder LDAP an?" = ""
 "Werden im Verzeichnis deaktivierte Benutzer hier gesperrt?" = "add-the-directory"
 
+["administer/mail.md"]
+"Wie richte ich Mail ein?" = ""
+"Wie verschicke ich Mail über unseren eigenen Mailserver?" = "set-up-mail"
+"Wie verschicke ich Mail über Microsoft 365?" = "microsoft-365"
+"Passwort-Zurücksetzungen kommen nicht an" = "when-it-does-not-work"
+"Dem Zertifikat des Mailservers wird nicht vertraut" = "when-it-does-not-work"
+"Wie sende ich eine Testmail?" = "set-up-mail"
+"Wohin gehen die Warnungen für Administratoren?" = "set-up-mail"
+
 ["administer/sign-in-provisioning.md"]
 "Wie richte ich die SCIM-Provisionierung aus Entra ID oder Okta ein?" = ""
 "Werden Benutzer, die gehen, ohne Anmeldung gesperrt?" = "what-changes-here"
