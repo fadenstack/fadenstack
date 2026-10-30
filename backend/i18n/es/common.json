@@ -4895,7 +4895,7 @@
       "unhide": "Mostrar de todos modos",
       "unhide_title": "Mostrar cifras sobre menos de {{k}} personas",
       "unhide_intro": "Como auditor de uso puede ver estas cifras indicando un motivo. La consulta se registra con su motivo, como la consulta de las cifras de una persona.",
-      "unhidden_note": "Estas cifras abarcan menos de {{k}} personas. Se le muestran como auditor de uso, y cada consulta se registra con su motivo.",
+      "unhidden_note": "Estas cifras abarcan menos de {{k}} personas. Se le muestran como auditor de uso, y cada consulta se registra con su motivo. Su motivo vale solo para esta vista: si cambia el periodo, las cifras por o la agrupación, vuelven a ocultarse.",
       "menu": "Uso de todos los equipos"
     },
     "errors": {

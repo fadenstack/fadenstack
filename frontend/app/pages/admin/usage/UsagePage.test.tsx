@@ -257,6 +257,48 @@ describe("teams as a tree", () => {
     await waitFor(() => expect(container.querySelector("[data-usage-unhidden]")).not.toBeNull());
   });
 
+  it("drops the reason when the range, the bucket or the grouping changes", async () => {
+    usage.admin.mockResolvedValue(
+      adminUsage({ totals: { ...hiddenMeasures(), people: null }, small_instance: true, can_view_people: true }),
+    );
+    view();
+
+    const showAgain = async () => {
+      await userEvent.click(await screen.findByRole("button", { name: "Show anyway" }));
+      const dialog = await screen.findByRole("dialog");
+      await userEvent.type(within(dialog).getByRole("textbox", { name: "Reason" }), "Cost dispute of the pilot team");
+      await userEvent.click(within(dialog).getByRole("button", { name: "Show figures" }));
+      await waitFor(() => expect(usage.admin).toHaveBeenLastCalledWith(expect.objectContaining({ reason: expect.any(String) })));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    };
+    const sentWithout = () =>
+      waitFor(() => expect(usage.admin).toHaveBeenLastCalledWith(expect.not.objectContaining({ reason: expect.anything() })));
+
+    await showAgain();
+    await userEvent.click(screen.getByRole("button", { name: "90 days" }));
+    await sentWithout();
+
+    await showAgain();
+    await userEvent.click(screen.getByRole("button", { name: "Month" }));
+    await sentWithout();
+
+    await showAgain();
+    await userEvent.click(screen.getByRole("button", { name: "Agent" }));
+    await sentWithout();
+  });
+
+  it("offers no unhiding of hours", async () => {
+    usage.admin.mockResolvedValue(
+      adminUsage({ bucket: "hour", totals: { ...hiddenMeasures(), people: null }, small_instance: true, can_view_people: true }),
+    );
+    const { container } = view();
+    await userEvent.click(await screen.findByRole("button", { name: "Hour" }));
+
+    await waitFor(() => expect(usage.admin).toHaveBeenLastCalledWith(expect.objectContaining({ bucket: "hour" })));
+    expect(container.querySelector("[data-usage-small-instance]")).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "Show anyway" })).toBeNull();
+  });
+
   it("words a refused reason and stops sending it", async () => {
     usage.admin.mockResolvedValue(
       adminUsage({ totals: { ...hiddenMeasures(), people: null }, small_instance: true, can_view_people: true }),

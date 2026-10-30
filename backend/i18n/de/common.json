@@ -4895,7 +4895,7 @@
       "unhide": "Trotzdem zeigen",
       "unhide_title": "Zahlen über weniger als {{k}} Personen zeigen",
       "unhide_intro": "Als Nutzungsprüfer dürfen Sie diese Zahlen mit Begründung sehen. Die Einsicht wird mit Ihrer Begründung protokolliert, wie die Einsicht in die Zahlen einer Person.",
-      "unhidden_note": "Diese Zahlen umfassen weniger als {{k}} Personen. Sie werden Ihnen als Nutzungsprüfer gezeigt, und jede Einsicht wird mit Ihrer Begründung protokolliert.",
+      "unhidden_note": "Diese Zahlen umfassen weniger als {{k}} Personen. Sie werden Ihnen als Nutzungsprüfer gezeigt, und jede Einsicht wird mit Ihrer Begründung protokolliert. Ihre Begründung gilt nur für diese Ansicht: Wenn Sie Zeitraum, Zahlen pro oder Gruppierung ändern, werden die Zahlen wieder verborgen.",
       "menu": "Nutzung aller Teams"
     },
     "errors": {

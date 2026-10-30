@@ -66,7 +66,8 @@ export default function UsagePage() {
   const dates = lastDays(RANGE_DAYS[range], zone);
 
   // A usage auditor's reason to see figures about fewer than k people anyway; sent with every load while
-  // set (each is recorded), dropped when the server refuses it.
+  // set (each is recorded), dropped when the server refuses it, and dropped when the range, the bucket or
+  // the grouping changes: a reason is given for one look, not for whatever is looked at next.
   const [unhideReason, setUnhideReason] = useState<string | null>(null);
   const [unhideOpen, setUnhideOpen] = useState(false);
   // A refusal of that reason stays on screen; the page reloads without the reason meanwhile.
@@ -101,13 +102,26 @@ export default function UsagePage() {
 
   // Hours only over a month at most (the server keeps hours for a range of up to 31 days).
   const pickRange = (next: RangeKey) => {
+    if (next !== range) setUnhideReason(null);
     setRange(next);
     if (bucket === "hour" && RANGE_DAYS[next] > MAX_HOUR_DAYS) setBucket("day");
   };
   const pickBucket = (next: AdminBucket) => {
+    if (next !== bucket) setUnhideReason(null);
     setBucket(next);
     if (next === "hour" && RANGE_DAYS[range] > MAX_HOUR_DAYS) setRange("7d");
   };
+  const pickGroupBy = (next: GroupBy) => {
+    if (next !== groupBy) setUnhideReason(null);
+    setGroupBy(next);
+  };
+  const pickStructure = (next: TeamStructure) => {
+    if (next !== structure) setUnhideReason(null);
+    setStructure(next);
+  };
+  // Hours are never shown about fewer than k people, reason or not (the server refuses that too).
+  const mayUnhide = Boolean(data?.can_view_people && data.small_instance && isHidden(data.totals) && !data.unhidden) &&
+    bucket !== "hour";
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2, pb: 2 }}>
@@ -148,7 +162,7 @@ export default function UsagePage() {
           severity="warning"
           data-usage-small-instance
           action={
-            data.can_view_people && isHidden(data.totals) && !data.unhidden ? (
+            mayUnhide ? (
               <Button color="inherit" size="small" onClick={() => setUnhideOpen(true)}>
                 {t("usage.admin.unhide")}
               </Button>
@@ -246,14 +260,14 @@ export default function UsagePage() {
                       value: s,
                       label: t(`usage.admin.structure.${s}`),
                     }))}
-                    onChange={setStructure}
+                    onChange={pickStructure}
                     ariaLabel={t("usage.admin.structure_label")}
                   />
                 )}
                 <RangeToggle
                   value={groupBy}
                   options={GROUP_BYS.map((g) => ({ value: g, label: t(`usage.admin.group_by.${g}`) }))}
-                  onChange={setGroupBy}
+                  onChange={pickGroupBy}
                   ariaLabel={t("usage.admin.group_by_label")}
                 />
               </>
