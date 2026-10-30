@@ -4679,6 +4679,22 @@
     "action": "Inicios de sesión vinculados",
     "of_title": "Inicios de sesión vinculados de {{email}}"
   },
+  "app_sign_ins": {
+    "title": "Aplicaciones con sesión iniciada",
+    "intro": "Las aplicaciones y los dispositivos en los que usted ha iniciado sesión: la aplicación de escritorio, los complementos de Office y la extensión del navegador.",
+    "none": "Ninguna aplicación tiene la sesión iniciada.",
+    "col_app": "Aplicación",
+    "col_device": "Dispositivo",
+    "col_signed_in": "Sesión iniciada",
+    "col_last_used": "Último uso",
+    "sign_out": "Cerrar sesión",
+    "confirm_title": "Cerrar la sesión de {{agent}}",
+    "confirm": "¿Cerrar la sesión de {{agent}} en {{device}}? Habrá que volver a iniciar sesión en la aplicación.",
+    "unnamed_device": "dispositivo sin nombre",
+    "never_used": "aún sin usar",
+    "load_failed": "No se pudieron cargar las aplicaciones con sesión iniciada.",
+    "sign_out_failed": "No se pudo cerrar la sesión."
+  },
   "api_tokens": {
     "title": "Tokens de API",
     "description": "Los tokens de API de todas las personas, con quién es su propietario y cómo se usa. Cada solicitud hecha con un token queda registrada: cuándo, desde qué dirección, con qué aplicación y en qué ruta.",

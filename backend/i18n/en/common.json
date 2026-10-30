@@ -4677,6 +4677,22 @@
     "action": "Linked sign-ins",
     "of_title": "Linked sign-ins of {{email}}"
   },
+  "app_sign_ins": {
+    "title": "Signed-in apps",
+    "intro": "The apps and devices you are signed in on: the desktop app, Office add-ins and the browser extension.",
+    "none": "No apps are signed in.",
+    "col_app": "App",
+    "col_device": "Device",
+    "col_signed_in": "Signed in",
+    "col_last_used": "Last used",
+    "sign_out": "Sign out",
+    "confirm_title": "Sign out of {{agent}}",
+    "confirm": "Sign out {{agent}} on {{device}}? The app must be signed in again.",
+    "unnamed_device": "unnamed device",
+    "never_used": "not used yet",
+    "load_failed": "The signed-in apps could not be loaded.",
+    "sign_out_failed": "Signing out failed."
+  },
   "api_tokens": {
     "title": "API tokens",
     "description": "Everyone's API tokens, with who owns each and how it is used. Every request made with a token is recorded: when, from which address, with which application, on which route.",

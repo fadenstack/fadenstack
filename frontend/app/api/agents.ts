@@ -315,6 +315,9 @@ export function agentRights(can: (permission: string) => boolean) {
   };
 }
 
+/** The caller's own sign-ins to agents (`/api/agent-tokens/mine`), across devices. */
+export const mySignIns = () => requester("/api/agent-tokens")<AgentSignIn[]>("/mine");
+
 /** Ends a device's sign-in (`/api/agent-tokens/{device}`): its user, or the agent's maintainers. */
 export const revokeSignIn = (deviceId: string) =>
   requester("/api/agent-tokens")<void>(`/${segment(deviceId)}`, json("DELETE"));

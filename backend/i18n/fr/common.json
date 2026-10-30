@@ -4679,6 +4679,22 @@
     "action": "Connexions liées",
     "of_title": "Connexions liées de {{email}}"
   },
+  "app_sign_ins": {
+    "title": "Applications connectées",
+    "intro": "Les applications et appareils sur lesquels vous êtes connecté : l'application de bureau, les compléments Office et l'extension de navigateur.",
+    "none": "Aucune application n'est connectée.",
+    "col_app": "Application",
+    "col_device": "Appareil",
+    "col_signed_in": "Connecté le",
+    "col_last_used": "Dernière utilisation",
+    "sign_out": "Se déconnecter",
+    "confirm_title": "Déconnecter {{agent}}",
+    "confirm": "Déconnecter {{agent}} sur {{device}} ? L'application devra se reconnecter.",
+    "unnamed_device": "appareil sans nom",
+    "never_used": "pas encore utilisée",
+    "load_failed": "Les applications connectées n'ont pas pu être chargées.",
+    "sign_out_failed": "La déconnexion a échoué."
+  },
   "api_tokens": {
     "title": "Jetons d'API",
     "description": "Les jetons d'API de chacun, avec leur propriétaire et leur usage. Chaque requête faite avec un jeton est enregistrée : quand, depuis quelle adresse, avec quelle application, sur quelle route.",

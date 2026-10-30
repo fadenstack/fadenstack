@@ -4679,6 +4679,22 @@
     "action": "已关联的登录方式",
     "of_title": "{{email}} 已关联的登录方式"
   },
+  "app_sign_ins": {
+    "title": "已登录的应用",
+    "intro": "您已登录的应用和设备：桌面应用、Office 加载项和浏览器扩展。",
+    "none": "没有已登录的应用。",
+    "col_app": "应用",
+    "col_device": "设备",
+    "col_signed_in": "登录时间",
+    "col_last_used": "最后使用",
+    "sign_out": "退出登录",
+    "confirm_title": "退出 {{agent}}",
+    "confirm": "要在 {{device}} 上退出 {{agent}} 吗？该应用必须重新登录。",
+    "unnamed_device": "未命名设备",
+    "never_used": "尚未使用",
+    "load_failed": "无法加载已登录的应用。",
+    "sign_out_failed": "退出登录失败。"
+  },
   "api_tokens": {
     "title": "API 令牌",
     "description": "所有人的 API 令牌，包括每个令牌的所有者及其使用情况。使用令牌发出的每个请求都会被记录：时间、来源地址、所用应用程序和访问路径。",

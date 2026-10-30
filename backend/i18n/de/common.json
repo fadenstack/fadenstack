@@ -4679,6 +4679,22 @@
     "action": "Verknüpfte Anmeldungen",
     "of_title": "Verknüpfte Anmeldungen von {{email}}"
   },
+  "app_sign_ins": {
+    "title": "Angemeldete Apps",
+    "intro": "Die Apps und Geräte, auf denen Sie angemeldet sind: die Desktop-App, Office-Add-ins und die Browser-Erweiterung.",
+    "none": "Es ist keine App angemeldet.",
+    "col_app": "App",
+    "col_device": "Gerät",
+    "col_signed_in": "Angemeldet",
+    "col_last_used": "Zuletzt verwendet",
+    "sign_out": "Abmelden",
+    "confirm_title": "{{agent}} abmelden",
+    "confirm": "{{agent}} auf {{device}} abmelden? Die App muss danach erneut angemeldet werden.",
+    "unnamed_device": "unbenanntes Gerät",
+    "never_used": "noch nicht verwendet",
+    "load_failed": "Die angemeldeten Apps konnten nicht geladen werden.",
+    "sign_out_failed": "Das Abmelden ist fehlgeschlagen."
+  },
   "api_tokens": {
     "title": "API-Tokens",
     "description": "Die API-Tokens aller Personen, mit wem jedes gehört und wie es genutzt wird. Jede Anfrage mit einem Token wird festgehalten: wann, von welcher Adresse, mit welcher Anwendung, auf welchem Weg.",

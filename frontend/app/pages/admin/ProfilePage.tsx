@@ -33,6 +33,7 @@ import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 
 import AppearanceSettings from "~/components/AppearanceSettings";
 import { TokenLastUse, TokenUsesDialog } from "~/components/users/ApiTokenUses";
+import { AppSignInsCard } from "~/components/users/AppSignInsCard";
 import { LinkedSignInsCard } from "~/components/users/LinkedSignInsCard";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { adminUsers, type ApiTokenInfo } from "~/api/admin";
@@ -225,6 +226,7 @@ export default function ProfilePage() {
       </Card>
 
       <LinkedSignInsCard />
+      <AppSignInsCard />
 
       {/* ── Password Change Card ──────────────────────────────────── */}
       <Card variant="outlined" sx={{ mb: 3 }}>

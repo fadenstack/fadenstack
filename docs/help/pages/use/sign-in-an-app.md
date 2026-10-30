@@ -54,6 +54,8 @@ The page asks **Sign in** *the agent* **on** *the device*, and shows:
 
 ## See and end the sign-in
 
+- **In the console:** under **Signed-in apps** in **My Profile** you see every app and device you are signed in
+  on, and select **Sign out** to end one (see [Your account](account.md#signed-in-apps)).
 - **In the app:** signing out in the app ends its sign-in at the server, too.
 - **Everywhere at once:** changing your password ends all your sign-ins, the apps' on your devices included (see
   [Your account](account.md#change-your-password)).

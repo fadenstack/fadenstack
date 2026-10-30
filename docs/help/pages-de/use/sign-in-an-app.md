@@ -58,6 +58,8 @@ Die Seite fragt, ob *der Agent* auf *dem Gerät* angemeldet werden soll, und zei
 
 ## Die Anmeldung sehen und beenden {#see-and-end-the-sign-in}
 
+- **In der Konsole:** Unter **Angemeldete Apps** in **Mein Profil** sehen Sie jede App und jedes Gerät, auf dem Sie
+  angemeldet sind, und beenden eine mit **Abmelden** (siehe [Ihr Konto](account.md#signed-in-apps)).
 - **In der App:** Wenn Sie sich in der App abmelden, endet ihre Anmeldung auch am Server.
 - **Überall auf einmal:** Eine Änderung Ihres Passworts beendet alle Ihre Anmeldungen, auch die der Apps auf
   Ihren Geräten (siehe [Ihr Konto](account.md#change-your-password)).
