@@ -26,7 +26,8 @@ Gruppen, und entziehen Sie jemandem den Zugang.
     | `default_user` | Den Chat: Chats, Projekte und Anhänge, im Chat und über die API, eigene Skills (erstellen und teilen) und das Lesen der Sammlungen der Wissensdatenbank, die für den Benutzer freigegeben sind. Jedes neue Konto erhält diese Rolle, sofern Sie keine anderen Rollen auswählen. |
     | `viewer` | Das Lesen des Zustands von Modellen, Clustern, Maschinen, Containern und Logs über die API. |
     | `operator` | Was `viewer` umfasst, und das Betreiben von Modellen über die API: Cluster und Bereitstellungen erstellen, ändern, skalieren, stoppen und starten. Nicht löschen. |
-    | `admin` | Jede Berechtigung, darunter Löschen, einen Skill für die ganze Organisation sichtbar machen (`skills:publish`), jeden Skill verwalten (`skills:manage`) sowie Agenten erstellen und löschen (`agents:create`, `agents:delete`). |
+    | `admin` | Jede Berechtigung bis auf eine, darunter Löschen, einen Skill für die ganze Organisation sichtbar machen (`skills:publish`), jeden Skill verwalten (`skills:manage`), Agenten erstellen und löschen (`agents:create`, `agents:delete`) sowie die Nutzungszahlen für Gruppen (`usage:read`). Nicht die, die `usage_auditor` gibt. |
+    | `usage_auditor` | Die Nutzungszahlen einer einzelnen Person ansehen, solange die personenbezogene Auswertung eingeschaltet ist, und die Nutzungsdaten einer Person für ein Auskunftsersuchen herunterladen, jedes Mal mit Begründung (`usage.people:audit`), und die Nutzungszahlen für Gruppen (`usage:read`), sodass die Rolle allein **Observability → Nutzung** öffnet. Bei der Installation hat sie niemand, und ein Superuser hat sie nicht von selbst. Siehe [Nutzung und Datenschutz](usage-privacy.md#looking-at-one-persons-figures). |
     | `rag_manager`, `rag_editor`, `rag_viewer` | Das Verwalten oder Bearbeiten der Wissensdatenbank (`rag_manager`, `rag_editor`: Sie sehen jede Sammlung und legen fest, wer welche liest) oder das Lesen (`rag_viewer`). |
 
 !!! note
@@ -104,7 +105,7 @@ Eine Gruppe fasst Personen zusammen, für drei Dinge:
 - **Teilen.** Skills und Agenten lassen sich mit einer Gruppe teilen (siehe [Skills](skills.md) und
   [Agenten](agents.md)).
 - **Nutzung.** Die **Nutzungsgruppe** einer Person ist die Gruppe, der ihre Anfragen zugerechnet werden (siehe
-  [Nutzung und Kosten](usage.md)). Sie wird pro Person festgelegt, auf der Seite **Benutzer**.
+  [Nutzung und Limits](usage.md)). Sie wird pro Person festgelegt, auf der Seite **Benutzer**.
 
 So erstellen Sie eine: Öffnen Sie **Zugriffskontrolle → Gruppen**, wählen Sie **Gruppe erstellen**, geben Sie ihr
 einen Namen, kreuzen Sie unter **Rollen zuweisen** ihre Rollen an, speichern Sie sie, und wählen Sie dann
@@ -113,6 +114,33 @@ einen Namen, kreuzen Sie unter **Rollen zuweisen** ihre Rollen an, speichern Sie
 Wenn Sie jemanden aus einer Gruppe entfernen, verliert die Person die Rollen der Gruppe, und mit der Gruppe
 geteilte Skills erreichen ihre Chats sofort nicht mehr. Der Eintritt in eine Gruppe oder der Austritt meldet die
 Person ab, wie jede Änderung ihrer Rechte (siehe [Anmeldungen und API-Tokens](#sign-ins-and-api-tokens)).
+
+### Teams als Baum {#teams-in-a-tree}
+
+Gruppen können einen Baum bilden, so wie Ihre Organisation: Abteilungen, ihre Teams und Teams darin. Der Baum
+bestimmt, wo Nutzung gezählt wird (siehe [Nutzung und Limits](usage.md#teams-on-the-usage-page)); er gibt
+niemandem Rechte.
+
+1. Öffnen Sie **Zugriffskontrolle → Gruppen** und bearbeiten Sie die Gruppe.
+2. Wählen Sie ihre **Übergeordnete Gruppe**. Die Liste bietet nur Gruppen an, mit denen der Baum ein Baum bleibt,
+   und zeigt die Ebene jeder Gruppe.
+3. Tragen Sie ihre **Kostenstelle** ein, wenn Ihre Finanzabteilung eine verwendet (freier Text).
+4. Speichern Sie. Die Liste unter **Gruppen** zeigt den Baum.
+
+- **Eine übergeordnete Gruppe je Gruppe**, und höchstens sechs Ebenen von der obersten Gruppe abwärts. Eine
+  Gruppe kann nicht unter eine ihrer eigenen Untergruppen gesetzt werden.
+- **Die Nutzungsgruppe einer Person ist ihr Stammteam**, auf jeder Ebene, festgelegt hier in Fadenstack unter
+  **Benutzer**. Ihre Nutzung zählt für diese Gruppe und für jede Gruppe darüber.
+- **Rollen wirken nicht im Baum nach unten.** Die Rollen einer Gruppe gelten für ihre eigenen Mitglieder, nicht
+  für die Mitglieder ihrer Untergruppen.
+- **Wird eine Gruppe gelöscht**, rücken ihre Untergruppen zu ihrer übergeordneten Gruppe auf.
+- **Archivieren** Sie eine Gruppe, die es nicht mehr gibt: Sie behält ihre Geschichte in den Nutzungszahlen,
+  kann aber niemandes Nutzungsgruppe mehr sein, keine neuen Mitglieder bekommen und wird nicht mehr angeboten, wo
+  man eine Gruppe auswählt. Die Liste blendet archivierte Gruppen aus, bis Sie **2 archivierte Gruppen zeigen** (mit
+  ihrer Anzahl) einschalten; **Zurückholen** macht eine wieder aktiv.
+- **Eine Gruppe, die ein Anmeldeanbieter verwaltet** (siehe [Provisionierung](sign-in-provisioning.md)), kann
+  trotzdem eine übergeordnete Gruppe und eine Kostenstelle bekommen: Der Baum gehört Ihrer Organisation, der
+  Anbieter benennt die Gruppe und ihre Mitglieder.
 
 ## Entwicklermodus {#developer-mode}
 
@@ -225,8 +253,9 @@ vor dieser Version gelöscht wurden, sind auf dem Server geblieben; `faden chats
 Zwei Rechte betreffen Vertrauen statt Arbeit; jedes lässt sich vergeben, entziehen und übergeben:
 
 - Ein **Administrator** (Superuser) darf in der Konsole alles.
-- Ein **Prüfer** (die eingebaute Rolle `auditor`) liest das Audit-Protokoll und ändert nichts. Administratoren
-  lesen es auch; Betrachter und Operatoren nicht, weil es E-Mail- und IP-Adressen enthält.
+- Ein **Prüfer** (die eingebaute Rolle `auditor`) liest das Audit-Protokoll und die Nutzungszahlen für Gruppen
+  (**Observability → Nutzung**) und ändert nichts. Administratoren lesen sie auch; Betrachter und Operatoren
+  nicht, weil das Audit-Protokoll E-Mail- und IP-Adressen enthält.
 
 Starten Sie dafür zuerst den **Root-Modus**, öffnen Sie **Zugriffskontrolle → Benutzer** und wählen Sie in der
 Zeile der Person **Rechte** (das Schild-Symbol):

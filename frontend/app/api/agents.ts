@@ -99,15 +99,22 @@ export interface AccessExplanation {
   detail: string;
 }
 
+/**
+ * An agent's usage, without names. `suppressed`: fewer than `min_group_size` (k) people used it in the
+ * range (and not only the caller), so no figure is given; a day about fewer people is `suppressed` too,
+ * its figures null (M04).
+ */
 export interface AgentUsage {
-  requests: number;
-  errors: number;
-  prompt_tokens: number;
-  completion_tokens: number;
-  total_tokens: number;
-  users: number;
-  conversations: number;
-  by_day: { day: string; requests: number; total_tokens: number }[];
+  suppressed?: boolean;
+  min_group_size?: number;
+  requests: number | null;
+  errors: number | null;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
+  users: number | null;
+  conversations: number | null;
+  by_day: { day: string; requests: number | null; total_tokens: number | null; suppressed?: boolean }[];
 }
 
 /** What the SDKs reported -- names, counts, durations, never content. */
@@ -116,7 +123,8 @@ export type ClientEventType = "tool.executed" | "approval.decided" | "local_mcp.
 export interface ClientEvent {
   id: string;
   type: ClientEventType | string;
-  user_id: string;
+  /** Only the caller's own events name them; another person's name nobody (null). */
+  user_id: string | null;
   device_id: string | null;
   conversation_id: string | null;
   data: Record<string, unknown>;
@@ -149,7 +157,8 @@ export interface AppSeen {
   first_seen_at: string;
   last_seen_at: string;
   reports: number;
-  last_user_id: string;
+  /** Who reported it last, and their address: only when that was the caller; null otherwise. */
+  last_user_id: string | null;
   last_user_label: string | null;
   tools: string[];
   context: { id: string; title?: string; kind?: string }[];

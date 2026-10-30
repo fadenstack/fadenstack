@@ -43,10 +43,11 @@ Der Dialog zeigt dann die **Letzte Anfrage des Anbieters** und die **Letzte abge
     | Eine E-Mail-Adresse (die geschäftliche oder primäre) | Ja: die Adresse des Kontos |
     | Aktiv oder nicht (`active`) | Ja: Das Konto ist gesperrt oder nicht |
     | Name und Mitglieder einer Gruppe | Ja: eine Gruppe hier und ihre Mitglieder |
-    | Namen, Telefonnummern, Postanschriften, Funktion, Abteilung, Vorgesetzte, Personalnummer, Fotos, weitere Attribute | Nein |
+    | Kostenstelle und Abteilung (`costCenter`, `department` der Enterprise-Erweiterung) | Ja, für [Budgets](budgets.md#the-settings): Eine Regel kann das Team einer Kostenstelle zur Nutzungsgruppe der Person machen. Sichtbar für Administratoren; gelöscht mit dem Konto |
+    | Namen, Telefonnummern, Postanschriften, Funktion, Vorgesetzte, Personalnummer, Fotos, weitere Attribute | Nein |
 
-    Ordnen Sie beim Anbieter nur die Attribute der ersten fünf Zeilen zu (unten) und löschen Sie die übrigen
-    Zuordnungen.
+    Ordnen Sie beim Anbieter nur die Attribute der ersten sechs Zeilen zu (unten) und löschen Sie die übrigen
+    Zuordnungen. Ordnen Sie Kostenstelle und Abteilung nur zu, wenn Sie Budgets nutzen.
 
 ## Was sich hier ändert {#what-changes-here}
 

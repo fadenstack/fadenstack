@@ -127,6 +127,7 @@ describe("diagnose", () => {
     expect(ids(call({ status_code: 404, error_code: "model_not_found" }))).toEqual(["unknown_model"]);
     expect(ids(call({ status_code: 503, error_code: "pii_scan_incomplete" }))).toEqual(["pii"]);
     expect(ids(call({ status_code: 429 }))).toEqual(["rate_limited"]);
+    expect(ids(call({ status_code: 429, error_code: "budget_exceeded" }))).toEqual(["budget_exceeded"]);
     expect(ids(call({ status_code: 400, error_code: "validation_error" }))).toEqual(["client_error"]);
     expect(isErrorCall(call({ status_code: 200, error_code: "upstream_refused" }))).toBe(true);
   });

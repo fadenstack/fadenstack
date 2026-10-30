@@ -35,7 +35,7 @@ er verbunden ist, wird er im Chat und über die API neben Ihren eigenen Modellen
    Provider ihn schreibt.
 8. Wählen Sie **Weiter**.
 9. Geben Sie unter **Preise (Optional)** ein, was eine Million Eingabe- und Ausgabe-Tokens kosten, damit die
-   Konsole die Kosten der Nutzung schätzen kann (siehe [Nutzung und Kosten](usage.md)). Lassen Sie beide Felder
+   Konsole die Kosten der Nutzung schätzen kann (siehe [Nutzung und Limits](usage.md)). Lassen Sie beide Felder
    leer, um diesen Schritt zu überspringen.
 10. Wählen Sie **Erstellen**.
 

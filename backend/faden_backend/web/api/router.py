@@ -14,6 +14,7 @@ from faden_backend.web.api.node_files import router as node_files_router
 from faden_backend.web.api.provenance.public import router as public_provenance_router
 from faden_backend.web.api.provenance.views import router as provenance_router
 from faden_backend.web.api.skills.views import router as skills_router
+from faden_backend.web.api.usage import router as usage_router
 
 api_router = APIRouter()
 api_router.include_router(monitoring.router)
@@ -34,6 +35,8 @@ api_router.include_router(provenance_router)
 api_router.include_router(public_provenance_router)
 api_router.include_router(agents_router)
 api_router.include_router(agent_tokens_router)
+# Every signed-in person's own usage (the administrators' view is /admin/usage).
+api_router.include_router(usage_router, prefix="/usage", tags=["usage"])
 api_router.include_router(logs.router, prefix="/logs", tags=["logs"])
 api_router.include_router(i18n.router, prefix="/i18n", tags=["i18n"])
 api_router.include_router(node_files_router)

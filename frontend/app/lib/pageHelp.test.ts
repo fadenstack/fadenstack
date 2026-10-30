@@ -26,6 +26,12 @@ describe("links from the console to Help", () => {
     expect(helpUrl()).toBe("/help/");
   });
 
+  it("links to a section of a Help page", () => {
+    expect(resolvePageHelp("/admin/usage")?.doc).toBe("administer/usage#the-usage-page");
+    expect(helpUrl("administer/usage#the-usage-page")).toBe("/help/administer/usage/#the-usage-page");
+    expect(helpUrl("administer/usage#the-usage-page", "de")).toBe("/help/de/administer/usage/#the-usage-page");
+  });
+
   it("links a German console to the German Help, the other languages to the English", () => {
     expect(helpUrl("operate/clusters", "de")).toBe("/help/de/operate/clusters/");
     expect(helpUrl(undefined, "de-DE")).toBe("/help/de/");

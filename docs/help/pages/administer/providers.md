@@ -34,7 +34,7 @@ offered in the chat and at the API next to your own models, under the same rules
 7. Under **Model**, pick the model to offer, or type its name as the provider spells it.
 8. Select **Next**.
 9. Under **Pricing (Optional)**, enter what a million input and output tokens cost, so that the console can
-   estimate what usage costs (see [Usage and costs](usage.md)). Leave both empty to skip.
+   estimate what usage costs (see [Usage and limits](usage.md)). Leave both empty to skip.
 10. Select **Create**.
 
 The model is available in the chat and through the API at once, under the model's name as you entered it.

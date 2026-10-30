@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import uuid
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
@@ -641,7 +642,9 @@ async def create_embeddings(
             payload=payload,
             request_id=request_id,
         )
-        response = JSONResponse(status_code=routed.status_code, content=routed.payload)
+        response = JSONResponse(
+            status_code=routed.status_code, content=routed.payload, headers=routed.headers,
+        )
         response.headers["x-request-id"] = request_id
         response.headers["x-provider-instance-id"] = routed.provider_instance_id
         if routed.trace_id:
@@ -692,7 +695,9 @@ async def serve_images(
             request_id=request_id,
             agent=agent,
         )
-        response = JSONResponse(status_code=routed.status_code, content=routed.payload)
+        response = JSONResponse(
+            status_code=routed.status_code, content=routed.payload, headers=routed.headers,
+        )
         response.headers["x-request-id"] = request_id
         response.headers["x-provider-instance-id"] = routed.provider_instance_id
         if routed.trace_id:
@@ -727,7 +732,9 @@ async def create_rerank(
             payload=payload,
             request_id=request_id,
         )
-        response = JSONResponse(status_code=routed.status_code, content=routed.payload)
+        response = JSONResponse(
+            status_code=routed.status_code, content=routed.payload, headers=routed.headers,
+        )
         response.headers["x-request-id"] = request_id
         response.headers["x-provider-instance-id"] = routed.provider_instance_id
         if routed.trace_id:
@@ -841,6 +848,8 @@ async def serve_chat_completions(
         json_response = JSONResponse(
             status_code=non_stream.status_code,
             content=non_stream.payload,
+            # The tenant's caps' x-ratelimit-* headers, when it has caps.
+            headers=non_stream.headers,
         )
         json_response.headers["x-request-id"] = request_id
         json_response.headers["x-provider-instance-id"] = (
@@ -892,7 +901,7 @@ async def _log_refusal(
             model_alias=str(payload.get("model") or "") or None, provider_instance_id=None,
             endpoint="/v1/chat/completions", status_code=status_code, latency_ms=0, ttft_ms=None,
             prompt_tokens=None, completion_tokens=None, total_tokens=None, error_code=code,
-            stream=bool(payload.get("stream")),
+            stream=bool(payload.get("stream")), admitted=False,
             session_id=str(payload["session_id"]) if payload.get("session_id") else None, **fields,
         )
     except Exception:
@@ -900,8 +909,8 @@ async def _log_refusal(
 
 
 def _streamed_response(streamed: StreamingGatewayResponse, request_id: str) -> StreamingResponse:
-    """A streamed chat completion, with the ids the client reads from its headers."""
-    response = StreamingResponse(streamed.stream, media_type="text/event-stream")
+    """A streamed chat completion, with the ids the client reads from its headers (and the caps')."""
+    response = StreamingResponse(streamed.stream, media_type="text/event-stream", headers=streamed.headers)
     response.headers["x-request-id"] = request_id
     response.headers["x-provider-instance-id"] = streamed.provider_instance_id
     response.headers["cache-control"] = "no-cache"
@@ -987,6 +996,8 @@ async def retry_turn(
             error_type=exc.error_type,
             param=exc.param,
             code=exc.code,
+            # A cap's Retry-After and x-ratelimit-* headers too.
+            headers=exc.headers,
         )
 
 
@@ -1121,9 +1132,18 @@ async def stream_resume(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+#: What a client's ``x-request-id`` may be: the request log's column holds 128 characters.
+_REQUEST_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
+
+
 def _request_id(request: Request) -> str:
+    """The client's ``x-request-id`` when it is up to 128 of ``A-Z a-z 0-9 . _ : -``; else one of ours.
+
+    Anything else -- too long, other characters -- would make the request log's insert fail, and the
+    request's row with it.
+    """
     header_val = request.headers.get("x-request-id", "").strip()
-    return header_val or str(uuid.uuid4())
+    return header_val if _REQUEST_ID.fullmatch(header_val) else str(uuid.uuid4())
 
 
 async def _get_json_payload(request: Request, *, max_bytes: int | None = None) -> dict[str, Any]:

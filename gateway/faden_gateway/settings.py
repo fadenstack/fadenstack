@@ -257,6 +257,11 @@ class Settings(BaseSettings):
     #: Days a chat its person deleted is kept before it is erased; the console's setting
     #: (``chat.deleted_retention_days``) wins when set. `faden deploy` asks for it.
     chat_deleted_retention_days: int = 30
+    #: The usage time zone when the console's setting (``usage.time_zone``) has no value: an IANA name.
+    #: Calendar days of the tokens-per-day cap and of the daily usage rollups are days of this zone.
+    usage_time_zone: str = "UTC"
+    #: How often the usage rollup job runs (services/gateway/usage_rollup.py); 0 switches it off.
+    usage_rollup_interval_sec: int = 300
     session_max_recent_messages: int = 20
     session_token_budget: int = 4096
     session_summary_threshold: int = 10

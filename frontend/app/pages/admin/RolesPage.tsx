@@ -4,6 +4,7 @@ import { adminUsers, type RbacRole, type RbacPermission } from "~/api/admin";
 import { DataTable, type ColumnDef } from "~/components/DataTable";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { FormDialog } from "~/components/FormDialog";
+import { roleHint, roleLabel } from "~/lib/roleLabels";
 import { useAsyncData } from "~/lib/useAsyncData";
 
 import Alert from "@mui/material/Alert";
@@ -154,10 +155,18 @@ export default function RolesPage() {
       label: t("roles.name"),
       sortable: true,
       sortValue: (r) => r.name,
-      searchValue: (r) => r.name,
+      searchValue: (r) => `${r.name} ${roleLabel(r.name, t)}`,
       render: (r) => (
         <Stack direction="row" spacing={1} alignItems="center">
-          <Typography fontWeight={600}>{r.name}</Typography>
+          <Stack sx={{ minWidth: 0 }}>
+            <Typography fontWeight={600}>{roleLabel(r.name, t)}</Typography>
+            {/* A named built-in role: its key too, as Help and the API write it. */}
+            {roleHint(r.name, t) && (
+              <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>
+                {r.name}
+              </Typography>
+            )}
+          </Stack>
           {r.is_builtin && (
             <Chip
               icon={<LockIcon />}
