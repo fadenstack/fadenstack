@@ -8,7 +8,12 @@
  *   least k people (M04, M05); no person dimension (M11).
  * - `/api/admin/usage/people`: per-person figures of others, only with
  *   person-level reporting on, the usage auditor grant and a reason (M02, M06,
- *   M07); the server records each call.
+ *   M07); the server records each call. `/people/choices` lists whom to pick
+ *   (people, teams) under the same gate, so a usage auditor needs no
+ *   administrator's lists.
+ * - A reason travels in the `X-Faden-Reason` header, percent-encoded, never in
+ *   an address: servers and proxies log addresses (ASVS 14.2.1). The server
+ *   refuses one in the query (422 `reason_in_query`).
  * - `/api/admin/usage/settings`, `/limits`, `/statement`: the privacy settings,
  *   the instance's caps, the configuration statement (S09).
  *
@@ -184,6 +189,21 @@ export interface PeopleUsage {
   rows: PersonUsageRow[];
 }
 
+/** Whom a usage auditor may pick for the per-person view: people by address, teams by name. */
+export interface PeopleChoices {
+  people: { id: string; email: string }[];
+  /** `parent_id` and `archived_at` when the server sends them (the picker then shows the tree). */
+  teams: { id: string; name: string; parent_id?: string | null; archived_at?: string | null }[];
+  /** How long per-person figures are kept, when the server says; the view's range stays inside it. */
+  person_retention_days?: number;
+}
+
+/** A file the server sent: its content and the name to save it under. */
+export interface DownloadedFile {
+  blob: Blob;
+  filename: string;
+}
+
 /** The `usage.*` system settings, without the prefix (C2). */
 export interface UsageSettings {
   person_reporting: boolean;
@@ -242,6 +262,14 @@ export function reasonOk(reason: string): boolean {
   return n >= REASON_MIN && n <= REASON_MAX;
 }
 
+/** The request header a reason travels in (never the query string: addresses end up in logs). */
+export const REASON_HEADER = "X-Faden-Reason";
+
+/** The headers that carry `reason` (percent-encoded UTF-8, as the server reads it); none without one. */
+export function reasonHeaders(reason?: string | null): Record<string, string> {
+  return reason ? { [REASON_HEADER]: encodeURIComponent(reason) } : {};
+}
+
 /** The refusals the console words itself (`usage.errors.<code>`). */
 export const USAGE_ERROR_CODES = [
   "person_reporting_off",
@@ -295,6 +323,23 @@ function put<T>(url: string, body: unknown): Promise<T> {
   return request<T>(url, { method: "PUT", body: JSON.stringify(body) });
 }
 
+/** The file name a `Content-Disposition: attachment` answer gives, if any (no path parts). */
+export function attachmentName(res: Pick<Response, "headers">): string | null {
+  const header = res.headers.get("content-disposition") ?? "";
+  const encoded = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(header);
+  let name: string | null = null;
+  if (encoded) {
+    try {
+      name = decodeURIComponent(encoded[1].trim());
+    } catch {
+      name = null;
+    }
+  }
+  name ??= /filename\s*=\s*"([^"]*)"/i.exec(header)?.[1] ?? /filename\s*=\s*([^;\s]+)/i.exec(header)?.[1] ?? null;
+  const base = name?.split(/[\\/]/).pop()?.trim();
+  return base ? base : null;
+}
+
 export interface RangeParams {
   from?: string;
   to?: string;
@@ -313,26 +358,38 @@ export const usageApi = {
 
   /**
    * Totals and groups, k-suppressed; by team, as recorded (default) or in today's structure. `reason`
-   * (a usage auditor's, 10-500 characters) shows totals and series about fewer than k people anyway;
-   * refused like `people`.
+   * (a usage auditor's, 10-500 characters, sent as a header) shows totals and series about fewer than k
+   * people anyway on a small instance; refused like `people`.
    */
-  admin(
-    params: RangeParams & { bucket?: AdminBucket; group_by?: GroupBy; structure?: TeamStructure; reason?: string } = {},
-  ) {
-    return request<AdminUsage>(`${ADMIN}${query({ ...params })}`);
+  admin({
+    reason,
+    ...params
+  }: RangeParams & { bucket?: AdminBucket; group_by?: GroupBy; structure?: TeamStructure; reason?: string } = {}) {
+    return request<AdminUsage>(`${ADMIN}${query({ ...params })}`, { headers: reasonHeaders(reason) });
   },
 
-  /** Per-person figures of a team or a person; refused with a code unless allowed. */
-  people(params: PeopleQuery) {
-    return request<PeopleUsage>(`${ADMIN}/people${query({ ...params })}`);
+  /** Per-person figures of a team or a person (the reason as a header); refused with a code unless allowed. */
+  people({ reason, ...params }: PeopleQuery) {
+    return request<PeopleUsage>(`${ADMIN}/people${query({ ...params })}`, { headers: reasonHeaders(reason) });
+  },
+
+  /** Whom the per-person view may be asked about; the same gate as `people` (the switch on, the grant). */
+  peopleChoices() {
+    return request<PeopleChoices>(`${ADMIN}/people/choices`);
   },
 
   /**
-   * Where a usage auditor downloads one person's data: the same gate as `people` (switch on, the grant,
-   * a reason of 10-500 characters), and each download recorded with that reason (M07, M13).
+   * One person's data for a usage auditor to save: the same gate as `people` (switch on, the grant, a
+   * reason of 10-500 characters, as a header), and each download recorded with that reason (M07, M13).
+   * Fetched, not linked: a link cannot carry the header.
    */
-  peopleExportUrl(userId: string, format: "json" | "csv", reason: string) {
-    return `${ADMIN}/people/${segment(userId)}/export${query({ format, reason })}`;
+  async peopleExport(userId: string, format: "json" | "csv", reason: string): Promise<DownloadedFile> {
+    const res = await fetch(`${ADMIN}/people/${segment(userId)}/export${query({ format })}`, {
+      headers: reasonHeaders(reason),
+      credentials: "include",
+    });
+    if (!res.ok) throw await readError(res);
+    return { blob: await res.blob(), filename: attachmentName(res) ?? `usage-${userId}.${format}` };
   },
 
   settings() {

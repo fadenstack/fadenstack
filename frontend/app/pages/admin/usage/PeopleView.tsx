@@ -5,10 +5,12 @@
  *
  * Nothing is fetched before a reason is given: the dialog asks whose figures
  * (one person or one team) and why, 10 to 500 characters, and only then calls
- * the server, which records the view with that reason. The rows come sorted by
- * name, then period, and stay so -- no column sorts by usage (M11). One person
- * of the view can then be downloaded (JSON, CSV) under the same reason, each
- * download recorded by the server too (M07, M13).
+ * the server, which records the view with that reason. Whom to pick comes from
+ * the server under the same gate (`/people/choices`): a usage auditor need not
+ * be an administrator. The rows come sorted by name, then period, and stay so
+ * -- no column sorts by usage (M11). One person of the view can then be
+ * downloaded (JSON, CSV) under the same reason, each download recorded by the
+ * server too (M07, M13). The reason travels as a header, never in an address.
  */
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -29,16 +31,16 @@ import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
 import DownloadIcon from "@mui/icons-material/Download";
 
-import { adminGroups, adminUsers, type AdminUser, type Group } from "~/api/admin";
-import { errorText } from "~/api/http";
-import { REASON_MAX, REASON_MIN, reasonOk, usageApi, type PeopleUsage } from "~/api/usage";
+import { REASON_MAX, REASON_MIN, reasonOk, usageApi, type PeopleChoices, type PeopleUsage } from "~/api/usage";
 import { WidgetCard, WidgetEmpty } from "~/components/dashboard/kit";
 import { MeasuresTable } from "~/components/usage/UsageParts";
 import { USAGE_HELP, UsageHelpLink } from "~/components/usage/UsageHelpLink";
 import { periodLabel, usageErrorText } from "~/components/usage/usageFormat";
+import { saveFile } from "~/lib/saveFile";
 import { pickableTeams } from "~/lib/teamTree";
 
 type Scope = "person" | "team";
+type Choice = PeopleChoices["people"][number];
 
 interface Someone {
   id: string;
@@ -138,12 +140,29 @@ export default function PeopleView({ from, to }: { from: string; to: string }) {
 
 /**
  * Download one person's data, under the reason the view was given for: the
- * server checks it again and records each download (M07). Links, so the
- * browser downloads with the session; nothing is fetched until one is used.
+ * server checks it again and records each download (M07). Fetched with the
+ * reason as a header (a link would have to put it in the address) and saved
+ * from the page; nothing is fetched until a button is used.
  */
 function PersonExport({ people, reason }: { people: Someone[]; reason: string }) {
   const { t } = useTranslation();
   const [id, setId] = useState(people[0].id);
+  const [busy, setBusy] = useState<"json" | "csv" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function download(format: "json" | "csv") {
+    setBusy(format);
+    setError(null);
+    try {
+      const file = await usageApi.peopleExport(id, format, reason);
+      saveFile(file.blob, file.filename);
+    } catch (err) {
+      setError(usageErrorText(err, (key) => t(key)));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <Stack gap={1} sx={{ mt: 2 }} data-usage-person-export>
       <Typography variant="subtitle2" component="h3">
@@ -168,23 +187,26 @@ function PersonExport({ people, reason }: { people: Someone[]; reason: string })
           variant="outlined"
           size="small"
           startIcon={<DownloadIcon />}
-          component="a"
-          href={usageApi.peopleExportUrl(id, "json", reason)}
-          download
+          disabled={busy !== null}
+          onClick={() => void download("json")}
         >
-          {t("usage.my.export_json")}
+          {busy === "json" ? t("common.loading") : t("usage.my.export_json")}
         </Button>
         <Button
           variant="outlined"
           size="small"
           startIcon={<DownloadIcon />}
-          component="a"
-          href={usageApi.peopleExportUrl(id, "csv", reason)}
-          download
+          disabled={busy !== null}
+          onClick={() => void download("csv")}
         >
-          {t("usage.my.export_csv")}
+          {busy === "csv" ? t("common.loading") : t("usage.my.export_csv")}
         </Button>
       </Stack>
+      {error && (
+        <Alert severity="error" onClose={() => setError(null)} data-usage-export-error>
+          {error}
+        </Alert>
+      )}
       <Typography variant="caption" color="text.secondary">
         {t("usage.admin.people.export_note")}
       </Typography>
@@ -208,33 +230,32 @@ function PeopleDialog({
 }) {
   const { t, i18n } = useTranslation();
   const [scope, setScope] = useState<Scope>("person");
-  const [person, setPerson] = useState<AdminUser | null>(null);
+  const [person, setPerson] = useState<Choice | null>(null);
   const [team, setTeam] = useState("");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [teams, setTeams] = useState<Group[]>([]);
+  const [choices, setChoices] = useState<PeopleChoices>({ people: [], teams: [] });
   const [listsError, setListsError] = useState<string | null>(null);
 
-  // The people and teams to pick from, each time the dialog opens.
+  // The people and teams to pick from, each time the dialog opens: from the usage API, under the same
+  // gate as the view (a usage auditor may not read the administrators' lists of users and teams).
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
     setListsError(null);
-    Promise.all([adminUsers.list(), adminGroups.list()])
-      .then(([u, g]) => {
-        if (cancelled) return;
-        setUsers(u);
-        setTeams(g);
+    usageApi
+      .peopleChoices()
+      .then((found) => {
+        if (!cancelled) setChoices({ ...found, people: found.people ?? [], teams: found.teams ?? [] });
       })
       .catch((err: unknown) => {
-        if (!cancelled) setListsError(errorText(err));
+        if (!cancelled) setListsError(usageErrorText(err, (key) => t(key)));
       });
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, t]);
 
   const target = scope === "person" ? person?.id : team || undefined;
   const trimmed = reason.trim();
@@ -296,8 +317,8 @@ function PeopleDialog({
             </ToggleButtonGroup>
           </Box>
           {scope === "person" ? (
-            <Autocomplete<AdminUser>
-              options={users}
+            <Autocomplete<Choice>
+              options={choices.people}
               value={person}
               onChange={(_, picked) => setPerson(picked)}
               getOptionLabel={(u) => u.email}
@@ -314,7 +335,7 @@ function PeopleDialog({
               value={team}
               onChange={(e) => setTeam(e.target.value)}
             >
-              {pickableTeams(teams, i18n.language).map(({ team: g, depth }) => (
+              {pickableTeams(choices.teams, i18n.language).map(({ team: g, depth }) => (
                 <MenuItem key={g.id} value={g.id} sx={{ pl: 2 + (depth - 1) * 2 }}>
                   {g.name}
                 </MenuItem>
