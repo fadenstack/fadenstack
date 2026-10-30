@@ -10,6 +10,8 @@
   people (M07) -- only then, by day or month as fine as the per-person figures, never by hour (M10).
 - ``GET /api/admin/usage/people``: named people's figures, per day or month, sorted by name, never by usage
   (M11). Only with the switch on, the explicit grant, and a reason, and recorded (M02, M06, M07).
+- ``GET /api/admin/usage/people/choices``: the people and teams a usage auditor can pick from (switch on and
+  the explicit grant).
 
 A reason travels in the ``X-Faden-Reason`` header, never in the query string (``common.reason_header``).
 - ``GET``/``PUT /api/admin/usage/settings``: the ``usage.*`` settings; the switch needs Root Mode (M08: each
@@ -28,7 +30,7 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from fastapi.responses import Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
@@ -38,6 +40,7 @@ from faden_backend.db.dao.system_settings_dao import SystemSettingsDAO
 from faden_backend.db.dependencies import get_db_session
 from faden_backend.db.models.api_tokens import ACCOUNT_TENANT
 from faden_backend.db.models.containers import AuditResult
+from faden_backend.db.models.groups import Group
 from faden_backend.db.models.users import User, current_active_user
 from faden_backend.services import teams
 from faden_backend.services.extensions import usage_sections
@@ -370,6 +373,37 @@ async def admin_usage_people(
         reason=cleaned,
     )
     return {"granularity": config.person_granularity, "rows": rows}
+
+
+@router.get("/people/choices", name="admin_usage_people_choices")
+async def admin_usage_people_choices(
+    user: Annotated[User, Depends(current_active_user)],
+    session: AsyncSession = Depends(get_db_session),
+    _reason: str | None = Depends(reason_header),  # refuses one in the query string; none is needed here
+) -> dict[str, Any]:
+    """The people and teams a usage auditor can pick for ``/people``, by address and by name; no figures.
+
+    ``{"people": [{"id", "email"}], "teams": [{"id", "name", "archived"}]}``. With the switch on and the
+    explicit grant, like ``/people`` (403 ``person_reporting_off``, ``not_usage_auditor``), so a usage auditor
+    who is no administrator can choose; no reason, nothing recorded. Archived teams are listed (their history
+    is still kept), marked.
+    """
+    config = await usage_config.read(session)
+    if not config.person_reporting:
+        refuse(PeopleRefusal(status.HTTP_403_FORBIDDEN, "person_reporting_off"))
+    if not await people.holds_audit_grant(session, user):
+        refuse(PeopleRefusal(status.HTTP_403_FORBIDDEN, "not_usage_auditor"))
+    accounts = await session.execute(select(User.id, User.email).order_by(func.lower(User.email), User.id))
+    groups = await session.execute(
+        select(Group.id, Group.name, Group.archived_at).order_by(func.lower(Group.name), Group.id),
+    )
+    return {
+        "people": [{"id": str(account_id), "email": str(email)} for account_id, email in accounts],
+        "teams": [
+            {"id": str(group_id), "name": name, "archived": archived_at is not None}
+            for group_id, name, archived_at in groups
+        ],
+    }
 
 
 @router.get("/people/{user_id}/export", name="admin_usage_person_export")

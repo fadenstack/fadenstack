@@ -4,6 +4,7 @@
   client leaks it into access logs (ASVS 5.0 14.2.1).
 - It unhides only a small instance's totals and series, never by hour, and by day only while per-person
   figures are by day (M10, M07); the record names the people of the unhidden cells.
+- The people and teams to pick from for the per-person view, for a usage auditor who is no administrator.
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
 from faden_backend.db.models.containers import AuditEvent, AuditResult
+from faden_backend.db.models.groups import Group
 from tests.usage_fixtures import gateway, hourly, person, set_usage, sign_in, usage
 
 __all__ = ["gateway"]
@@ -56,7 +58,7 @@ async def auditor(fastapi_app: FastAPI, gateway: AsyncSession) -> Any:
 
 
 @pytest.mark.parametrize("path", [
-    "/api/admin/usage", "/api/admin/usage/people",
+    "/api/admin/usage", "/api/admin/usage/people", "/api/admin/usage/people/choices",
     f"/api/admin/usage/people/{uuid.uuid4()}/export",
 ])
 async def test_a_reason_in_the_query_string_is_refused(
@@ -133,3 +135,51 @@ async def test_with_monthly_person_figures_a_reason_unhides_months_not_days(
     [look] = await _looks(gateway)
     details = json.loads(look.metadata_json or "{}")
     assert (look.result, details["bucket"], details["person_ids"]) == (AuditResult.ALLOW, "month", ["p1", "p2", "p3"])
+
+
+# ── The people and teams to pick from ────────────────────────────────
+
+
+async def test_a_usage_auditor_who_is_no_administrator_can_pick_and_open_usage(
+    client: AsyncClient, fastapi_app: FastAPI, gateway: AsyncSession,
+) -> None:
+    await set_usage(gateway, person_reporting=True)
+    tag = _tag()
+    team = Group(id=uuid.uuid4(), name=f"Sales-{tag}")
+    gone = Group(id=uuid.uuid4(), name=f"Archived-{tag}", archived_at=datetime.now(UTC))
+    gateway.add_all([team, gone])
+    holder = await person(gateway, f"ua-{tag}@example.com", roles=["usage_auditor"])
+    sign_in(fastapi_app, holder)
+
+    response = await client.get("/api/admin/usage/people/choices")
+
+    assert response.status_code == status.HTTP_200_OK, response.text
+    body = response.json()
+    assert {"id": str(holder.id), "email": holder.email} in body["people"]
+    assert set(body["people"][0]) == {"id", "email"}
+    teams = {row["id"]: row for row in body["teams"]}
+    assert teams[str(team.id)] == {"id": str(team.id), "name": team.name, "archived": False}
+    assert teams[str(gone.id)]["archived"] is True
+    emails = [row["email"].lower() for row in body["people"]]
+    assert emails == sorted(emails), "by address, never by usage"
+    assert await _looks(gateway) == []
+    assert (await client.get("/api/admin/usage", params=DAY)).status_code == status.HTTP_200_OK
+
+
+@pytest.mark.parametrize(
+    ("switch", "roles", "superuser", "code"),
+    [
+        (False, ["usage_auditor"], False, "person_reporting_off"),
+        (True, ["admin"], True, "not_usage_auditor"),
+        (True, ["auditor"], False, "not_usage_auditor"),
+    ],
+)
+async def test_the_choices_have_the_switch_and_the_grant_as_gates(
+    client: AsyncClient, fastapi_app: FastAPI, gateway: AsyncSession,
+    switch: bool, roles: list[str], superuser: bool, code: str,
+) -> None:
+    await set_usage(gateway, person_reporting=switch)
+    sign_in(fastapi_app, await person(gateway, f"x-{_tag()}@example.com", roles=roles, superuser=superuser))
+    response = await client.get("/api/admin/usage/people/choices")
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.json()["detail"] == {"code": code}
