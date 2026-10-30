@@ -14,19 +14,28 @@ Postgres advisory lock (``pg_try_advisory_lock``), every five minutes (``usage_r
 3. **Recompute**: the current and the previous hour (UTC) and day (the usage time zone) are deleted and
    written again from the log, in one transaction each: idempotent, so a run may repeat, and a reader sees
    the old sums or the new.
+Before all that, every run removes the usage of the people erased in the last 30 days (``usage_erased``,
+written by ``erasure.erase_user``) that turned up again -- request-log rows of a request that ended after
+the erasure, person rows a run wrote from a log read just before it -- and writes no person row for them.
+
 4. **Purge**, once the watermark has caught up, only with the settings read, and not before
    ``usage_rollup_state.purge_from`` -- a week after the first backfill was done, so that after an upgrade
    administrators set the retention before anything is deleted (plan decision 9): request-log rows older
    than ``usage.request_log_retention_days`` (never at or after the watermark), person-level days older
    than ``usage.person_retention_days``, hours older than ``usage.hourly_retention_days``, days older than
    ``usage.daily_retention_months``. The sums without a person are not recomputed for closed windows, so
-   they keep their totals when the log is purged or a person is erased.
+   they keep their totals when the log is purged or a person is erased. Beyond the per-person retention, an
+   hourly or daily cell of fewer than k people (``usage.min_group_size``) is person-level data with nothing
+   left to count its people exactly: it folds into the cell of its period, tenant, model, provider and
+   currency without a team, a path or an agent, which keeps its totals (M04, M12).
 
 What is counted (``db/models/usage.py``): ``requests`` is every request that reached the gateway (every row
-of the log), failed and refused ones included; ``refused`` those a cap or an admission check refused
-(``error_code`` ``rate_limit_*``, ``quota_*``, ``budget_*``); ``failed`` the others with a status of 400 or
-more. ``currency`` is the price's currency for a request a price applied to, else NULL, and ``cost`` the sum
-of the requests' estimates. A row logged before teams had paths books on ``[group_id]``.
+of the log), failed and refused ones included; ``refused`` those a cap or an admission check refused -- the
+log's ``refused``, which the gateway sets on every row whatever the refusal's code (an extension's check
+chooses its own), and for a row from before it (NULL) its ``error_code`` (``rate_limit_*``, ``quota_*``,
+``budget_*``); ``failed`` the others with a status of 400 or more. ``currency`` is the price's currency for
+a request a price applied to, else NULL, and ``cost`` the sum of the requests' estimates. A row logged before
+teams had paths books on ``[group_id]``.
 """
 
 from __future__ import annotations
@@ -62,7 +71,13 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 from sqlalchemy.sql.selectable import Subquery
 
 from faden_gateway.db.models.gateway import LLMGatewayRequestLog
-from faden_gateway.db.models.usage import UsageDaily, UsageDailyPerson, UsageHourly, UsageRollupState
+from faden_gateway.db.models.usage import (
+    UsageDaily,
+    UsageDailyPerson,
+    UsageErased,
+    UsageHourly,
+    UsageRollupState,
+)
 from faden_gateway.services.gateway import usage_settings
 from faden_gateway.services.gateway.usage_settings import UsageSettings
 
@@ -77,7 +92,10 @@ PURGE_BATCH = 5000
 #: The first purge waits this long after the first backfill: after an upgrade, administrators set the
 #: retention before anything is deleted (the backend shows a notice until ``purge_from``).
 PURGE_GRACE = timedelta(days=7)
-#: An ``error_code`` with one of these marks a request a cap or an admission check refused.
+#: How long an erased person's usage is removed again by every run (``usage_erased``).
+ERASED_KEPT = timedelta(days=30)
+#: An ``error_code`` with one of these marks a request a cap or an admission check refused, on a row logged
+#: before the log said so itself (``refused`` NULL).
 REFUSED_PREFIXES = ("rate_limit_", "quota_", "budget_")
 
 _HOUR = timedelta(hours=1)
@@ -130,7 +148,9 @@ def _months_before(day: date, months: int) -> date:
 def _log_rows(start: datetime, end: datetime, zone_name: str) -> Subquery:
     """The request log's rows in ``[start, end)``, with what the rollups group and count them by."""
     refused = func.coalesce(
-        or_(*(func.starts_with(_LOG.error_code, prefix) for prefix in REFUSED_PREFIXES)), false(),
+        _LOG.refused,
+        or_(*(func.starts_with(_LOG.error_code, prefix) for prefix in REFUSED_PREFIXES)),
+        false(),
     )
     priced = or_(_LOG.estimated_total_cost.is_not(None), _LOG.price_catalog_id.is_not(None))
     group_path = func.coalesce(
@@ -199,8 +219,26 @@ async def _days(conn: AsyncConnection, first: date, last: date, zone: tzinfo, zo
     daily = select(*keys, *_measures(rows), people).where(within).group_by(*keys)
     await conn.execute(insert(UsageDaily).from_select([*_DAILY_KEYS, *_MEASURES, "people"], daily))
     keys = [rows.c[name] for name in _PERSON_KEYS]
-    person = select(*keys, *_measures(rows)).where(within).group_by(*keys)
+    erased = select(UsageErased.user_id).scalar_subquery()
+    person = select(*keys, *_measures(rows)).where(within, rows.c.user_id.not_in(erased)).group_by(*keys)
     await conn.execute(insert(UsageDailyPerson).from_select([*_PERSON_KEYS, *_MEASURES], person))
+
+
+async def forget_erased(conn: AsyncConnection, now: datetime) -> dict[str, int]:
+    """Remove what turned up again of the people erased within ``ERASED_KEPT``; forget older erasures.
+
+    Their request-log rows (with their tool calls, ``ON DELETE CASCADE``) and person-level rows. The caller
+    commits.
+    """
+    recent = select(UsageErased.user_id).where(UsageErased.erased_at >= now - ERASED_KEPT).scalar_subquery()
+    removed = {
+        "request_log": (await conn.execute(delete(_LOG).where(_LOG.user_id.in_(recent)))).rowcount or 0,
+        "usage_daily_person": (await conn.execute(
+            delete(UsageDailyPerson).where(UsageDailyPerson.user_id.in_(recent)),
+        )).rowcount or 0,
+    }
+    await conn.execute(delete(UsageErased).where(UsageErased.erased_at < now - ERASED_KEPT))
+    return removed
 
 
 async def _state(conn: AsyncConnection, **values: Any) -> None:
@@ -215,6 +253,8 @@ async def _roll_up(conn: AsyncConnection, config: UsageSettings, now: datetime |
     current_hour = _floor_hour(now)
     previous_hour = current_hour - _HOUR
     today = now.astimezone(zone).date()
+    await forget_erased(conn, now)
+    await conn.commit()
     await conn.execute(pg_insert(UsageRollupState).values(id=1).on_conflict_do_nothing())
     through = (await conn.execute(
         select(UsageRollupState.backfilled_through).where(UsageRollupState.id == 1),
@@ -249,6 +289,42 @@ async def _roll_up(conn: AsyncConnection, config: UsageSettings, now: datetime |
     return RollupRun(now=now, caught_up_from=started, backfilled_through=through, purge_from=purge_from)
 
 
+#: What each folded cell sums (``people``: the largest of the folded cells, a lower bound of the distinct).
+_FOLD_COUNTS = _MEASURES[:-1]  # all but the cost, which may be NULL
+
+
+async def _fold(conn: AsyncConnection, table: str, period: str, before: date | datetime, k: int) -> int:
+    """Fold *table*'s cells of fewer than *k* people before *before* into their cell without team and agent.
+
+    The cell of the same period, tenant, model, provider instance and currency with ``group_id``,
+    ``group_path`` and ``agent_id`` NULL takes their figures (made, or added to); its ``people`` is the
+    largest of theirs and its own. Returns how many such cells were made or added to.
+    """
+    sums = ", ".join(f"SUM({name})" for name in _FOLD_COUNTS)
+    added = ", ".join(f"{name} = {table}.{name} + EXCLUDED.{name}" for name in _FOLD_COUNTS)
+    keys = f"{period}, tenant_id, model_alias, provider_instance_id, currency"
+    statement = text(f"""
+        WITH moved AS (
+            DELETE FROM {table}
+            WHERE {period} < :before AND people < :k
+              AND (group_id IS NOT NULL OR group_path IS NOT NULL OR agent_id IS NOT NULL)
+            RETURNING {keys}, people, {", ".join(_FOLD_COUNTS)}, cost
+        )
+        INSERT INTO {table} ({keys}, group_id, group_path, agent_id, people, {", ".join(_FOLD_COUNTS)}, cost)
+        SELECT {keys}, NULL, NULL, NULL, MAX(people), {sums}, SUM(cost)
+        FROM moved
+        GROUP BY {keys}
+        ON CONFLICT ({period}, tenant_id, group_id, group_path, agent_id, model_alias, provider_instance_id,
+                     currency)
+        DO UPDATE SET
+            people = GREATEST({table}.people, EXCLUDED.people),
+            {added},
+            cost = CASE WHEN {table}.cost IS NULL AND EXCLUDED.cost IS NULL THEN NULL
+                        ELSE COALESCE({table}.cost, 0) + COALESCE(EXCLUDED.cost, 0) END
+    """)  # noqa: S608 - the table, period and measure names are this module's fixed strings
+    return (await conn.execute(statement, {"before": before, "k": k})).rowcount or 0
+
+
 async def _purge(conn: AsyncConnection, config: UsageSettings, run: RollupRun) -> dict[str, int]:
     """Delete what is older than its retention; request-log rows only before the watermark."""
     now = run.now
@@ -275,6 +351,9 @@ async def _purge(conn: AsyncConnection, config: UsageSettings, run: RollupRun) -
         )),
     ):
         purged[name] = (await conn.execute(statement)).rowcount or 0
+    kept, k = timedelta(days=config.person_retention_days), config.min_group_size
+    purged["usage_hourly_folded"] = await _fold(conn, "usage_hourly", "hour", now - kept, k)
+    purged["usage_daily_folded"] = await _fold(conn, "usage_daily", "day", today - kept, k)
     await _state(conn, last_purge_at=now)
     await conn.commit()
     return purged

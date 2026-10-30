@@ -7,7 +7,7 @@ from collections.abc import Hashable
 import pytest
 
 from faden_backend.services.usage.measures import Measures
-from faden_backend.services.usage.suppression import Cell, hide
+from faden_backend.services.usage.suppression import Cell, hide, hide_nested
 
 pytestmark = pytest.mark.anyio()
 
@@ -90,3 +90,60 @@ async def test_empty_cells_are_neither_hidden_nor_taken_along() -> None:
 
 async def _async(value: int) -> int:
     return value
+
+
+# ── Nested tables (months, their days) ──────────────────────────────
+
+
+async def _nested(
+    months: dict[str, set[str]], days: dict[str, set[str]], k: int = 5,
+) -> tuple[set[Hashable], set[Hashable]]:
+    """Months ``"10"`` and days ``"10-31"``: which of each are hidden."""
+    members = {**months, **days}
+    levels = [
+        {key: _cell(key, people)[0] for key, people in months.items()},
+        {key: _cell(key, people)[0] for key, people in days.items()},
+    ]
+    everyone = set().union(*months.values())
+
+    async def together(level: int, cells: list[Cell]) -> int:
+        return len(set().union(*(members[cell.key] for cell in cells)))
+
+    found = await hide_nested(
+        levels, [lambda key: None, lambda key: str(key).split("-")[0]], len(everyone), k, together,
+    )
+    return found[0], found[1]
+
+
+async def test_a_small_day_takes_a_day_of_its_own_month_along() -> None:
+    """Not a day of another month: its own month minus its shown days would be the small day."""
+    crowd = {f"p{i}" for i in range(6)}
+    months, days = await _nested(
+        {"09": crowd, "10": crowd | {"lonely"}},
+        {"09-30": crowd, "10-01": crowd, "10-02": crowd, "10-31": {"lonely"}},
+    )
+    assert months == set() and days == {"10-01", "10-31"}
+
+
+async def test_a_hidden_month_keeps_one_of_its_days_hidden() -> None:
+    """October is hidden with September; were all its days shown, they would add up to October."""
+    crowd = {f"p{i}" for i in range(6)}
+    months, days = await _nested(
+        {"09": {"lonely"}, "10": crowd},
+        {"09-30": {"lonely"}, "10-01": crowd, "10-02": crowd},
+    )
+    assert months == {"09", "10"} and days == {"09-30", "10-01"}
+
+
+async def test_a_range_of_fewer_than_k_people_hides_every_level() -> None:
+    months, days = await _nested({"10": {"a", "b"}}, {"10-01": {"a"}, "10-02": {"b"}})
+    assert months == {"10"} and days == {"10-01", "10-02"}
+
+
+async def test_the_hidden_days_of_a_month_hold_k_people_or_all_its_days_are_hidden() -> None:
+    """Every day of October alone has fewer than k, October has six: all its days go, October stays."""
+    months, days = await _nested(
+        {"10": {"a", "b", "c", "d", "e", "f"}},
+        {"10-01": {"a", "b"}, "10-02": {"c", "d"}, "10-03": {"e", "f"}},
+    )
+    assert months == set() and days == {"10-01", "10-02", "10-03"}

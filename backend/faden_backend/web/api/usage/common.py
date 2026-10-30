@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator, Hashable
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Any, NoReturn
+from urllib.parse import unquote
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException, Request
@@ -46,6 +47,33 @@ def refuse(refusal: PeopleRefusal) -> NoReturn:
     raise HTTPException(status_code=refusal.status_code, detail={"code": refusal.code})
 
 
+#: The request header a usage auditor's reason travels in: percent-encoded UTF-8 (``encodeURIComponent``).
+REASON_HEADER = "X-Faden-Reason"
+
+
+def reason_header(request: Request) -> str | None:
+    """The reason a usage auditor gave, from ``X-Faden-Reason``; ``None`` without the header.
+
+    Never from the query string, which ends up in access logs, browser history and proxies (ASVS 5.0 14.2.1):
+    a ``reason`` there is refused with 422 ``reason_in_query``, so no client keeps sending one. The header is
+    percent-encoded UTF-8; one that is not (characters outside ASCII, bytes that are not UTF-8) counts as no
+    reason given (``""``), which the routes refuse as ``reason_required``.
+    """
+    if "reason" in request.query_params:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail={"code": "reason_in_query"},
+        )
+    raw = request.headers.get(REASON_HEADER)
+    if raw is None:
+        return None
+    if not raw.isascii():
+        return ""
+    try:
+        return unquote(raw, encoding="utf-8", errors="strict")
+    except UnicodeDecodeError:
+        return ""
+
+
 def _date(value: str | None, field: str) -> date | None:
     if value is None or value == "":
         return None
@@ -66,11 +94,26 @@ def day_range(first: str | None, last: str | None, zone: ZoneInfo, *, max_days: 
     return DayRange(frm, to)
 
 
+def _whole_hour(moment: datetime) -> datetime:
+    return moment.replace(minute=0, second=0, microsecond=0)
+
+
 def utc_bounds(days: DayRange, zone: ZoneInfo) -> tuple[datetime, datetime]:
-    """The range as UTC instants: from the first day's local midnight to the midnight after the last."""
+    """The range as whole UTC hours: from the first day's local midnight to the midnight after the last.
+
+    The hourly rollups are whole UTC hours; a time zone half an hour off (Asia/Kolkata, +05:30) has its
+    midnight in the middle of one. Both ends are floored to the hour, so each UTC hour belongs to the local
+    day in which it ends (:func:`day_of_hour`), and the hours of consecutive days follow each other without a
+    gap.
+    """
     start = datetime.combine(days.first, time(), zone).astimezone(UTC)
     end = datetime.combine(days.last + timedelta(days=1), time(), zone).astimezone(UTC)
-    return start, end
+    return _whole_hour(start), _whole_hour(end)
+
+
+def day_of_hour(hour: datetime, zone: ZoneInfo) -> date:
+    """The local day a UTC hour counts toward: the day of its last instant (``utc_bounds``)."""
+    return (hour + timedelta(hours=1) - timedelta(microseconds=1)).astimezone(zone).date()
 
 
 def periods(days: DayRange, bucket: str, zone: ZoneInfo) -> list[Hashable]:

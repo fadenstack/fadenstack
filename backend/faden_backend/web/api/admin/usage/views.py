@@ -3,11 +3,17 @@
 - ``GET /api/admin/usage`` (``usage:read``): totals, a series by hour, day or month, and groups by team (a
   tree, ``services/usage/tree.py``), agent, model or provider, with no person in them. Every figure about
   fewer than k people is hidden, with complementary suppression (M04, M05; ``services/usage/suppression.py``);
-  hours only where at least k people are (M10). Below k for the whole range the totals and the series are
-  hidden too, and ``small_instance`` is set (S12); a usage auditor who gives a reason sees them while
-  person-level reporting is on, recorded like a view of named people (M07).
+  hours only where at least k people are (M10). The series' months, days and hours nest and are protected
+  together, as are the tree's two structures, so that no answer can be subtracted from another. Below k for
+  the whole range the totals and the series are hidden too, and ``small_instance`` is set (S12); a usage
+  auditor who gives a reason sees them while person-level reporting is on, recorded like a view of named
+  people (M07) -- only then, by day or month as fine as the per-person figures, never by hour (M10).
 - ``GET /api/admin/usage/people``: named people's figures, per day or month, sorted by name, never by usage
   (M11). Only with the switch on, the explicit grant, and a reason, and recorded (M02, M06, M07).
+- ``GET /api/admin/usage/people/choices``: the people and teams a usage auditor can pick from (switch on and
+  the explicit grant).
+
+A reason travels in the ``X-Faden-Reason`` header, never in the query string (``common.reason_header``).
 - ``GET``/``PUT /api/admin/usage/settings``: the ``usage.*`` settings; the switch needs Root Mode (M08: each
   change is recorded like every settings change).
 - ``GET``/``PUT /api/admin/usage/limits``: the instance's caps in the gateway's ``tenant_llm_policy`` (S11).
@@ -18,13 +24,13 @@ from __future__ import annotations
 
 import json
 import uuid
-from collections.abc import Hashable
+from collections.abc import Callable, Hashable
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from fastapi.responses import Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
@@ -34,6 +40,7 @@ from faden_backend.db.dao.system_settings_dao import SystemSettingsDAO
 from faden_backend.db.dependencies import get_db_session
 from faden_backend.db.models.api_tokens import ACCOUNT_TENANT
 from faden_backend.db.models.containers import AuditResult
+from faden_backend.db.models.groups import Group
 from faden_backend.db.models.users import User, current_active_user
 from faden_backend.services import teams
 from faden_backend.services.extensions import usage_sections
@@ -41,17 +48,19 @@ from faden_backend.services.usage import config as usage_config
 from faden_backend.services.usage import labels, people, rollups, statement, tree
 from faden_backend.services.usage.measures import Measures, hidden
 from faden_backend.services.usage.people import PeopleRefusal
-from faden_backend.services.usage.suppression import Cell, hide
+from faden_backend.services.usage.suppression import Cell, hide, hide_nested
 from faden_backend.web.api.rbac import require_permission
 from faden_backend.web.api.usage import views as usage_views
 from faden_backend.web.api.usage.common import (
     MAX_DAYS,
     MAX_HOUR_DAYS,
+    day_of_hour,
     day_range,
     gateway_session,
     period_text,
     periods,
     problems,
+    reason_header,
     refuse,
     utc_bounds,
 )
@@ -118,16 +127,39 @@ async def _groups(
 async def _team_tree(
     session: AsyncSession, gw: AsyncSession, days: rollups.DayRange, structure: tree.Structure, k: int,
 ) -> list[dict[str, Any]]:
-    """The teams as a tree, each with its sub-teams, k people per row at least (services/usage/tree.py)."""
+    """The teams as a tree, each with its sub-teams, k people per row at least (services/usage/tree.py).
+
+    Both structures are built from the same rows, so that neither shows what the other hides.
+    """
     now_tree = await teams.load(session)
-    built = tree.Built()
+    structures: tuple[tree.Structure, ...] = ("recorded", "current")
+    built = {each: tree.Built() for each in structures}
+    moves = tree.Moves()
     for row in await rollups.team_cells(gw, days):
-        built.add_cells(tree.path_of(row["group_id"], row["group_path"], structure, now_tree), row)
+        group_id, group_path = row["group_id"], row["group_path"]
+        paths = {each: tree.path_of(group_id, group_path, each, now_tree) for each in structures}
+        for each in structures:
+            built[each].add_cells(paths[each], row)
+        moves.add_cells(paths["recorded"], paths["current"], row)
     for group_id, group_path, user_id in await rollups.team_people(gw, days):
-        built.add_person(tree.path_of(group_id, group_path, structure, now_tree), user_id)
-    keys = {key for path in built.subtree for key in path}
+        paths = {each: tree.path_of(group_id, group_path, each, now_tree) for each in structures}
+        for each in structures:
+            built[each].add_person(paths[each], user_id)
+        moves.add_person(paths["recorded"], paths["current"], user_id)
+    keys = {key for path in built[structure].subtree for key in path}
     names = await labels.label(session, gw, "team", keys)
-    return tree.rows(built, k, names.get)
+    return tree.rows(built, structure, k, names.get, moves.small(k))
+
+
+async def _period_level(
+    gw: AsyncSession, days: rollups.DayRange, bucket: Literal["day", "month"],
+) -> dict[Hashable, Cell]:
+    """The days or months of the range, each with its exact count of people where there is one."""
+    cells = await rollups.period_cells(gw, days, bucket)
+    exact = await rollups.people_per_key(gw, days, rollups.PERIODS[bucket])
+    for key, cell in cells.items():
+        cell.floor = max(cell.floor, exact.get(key, 0))
+    return cells
 
 
 async def _series(
@@ -135,34 +167,41 @@ async def _series(
     days: rollups.DayRange,
     bucket: rollups.Bucket,
     config: usage_config.UsageSettings,
+    total_people: int,
     *,
     unhidden: bool = False,
 ) -> list[dict[str, Any]]:
     """Every period of the range; one about fewer than k people (with its complement) carries no figures.
 
-    *unhidden*: a usage auditor's look with a reason (person-level reporting on): nothing is hidden.
+    The months of the range (the first and the last cut to the range), the days of each month and the hours
+    of each day nest: the hidden ones are worked out from the top down (``suppression.hide_nested``), so that
+    no month minus its shown days, and no day minus its shown hours, gives a hidden day or hour away (M05).
+    *unhidden*: a usage auditor's look with a reason at a small instance (person-level reporting on): nothing
+    is hidden.
     """
     k = 0 if unhidden else config.k
+    zone = config.zone
+    levels: list[dict[Hashable, Cell]] = [await _period_level(gw, days, "month")]
+    parents: list[Callable[[Hashable], Hashable]] = [lambda _key: None]
+    if bucket in ("day", "hour"):
+        levels.append(await _period_level(gw, days, "day"))
+        parents.append(lambda key: key.replace(day=1))  # type: ignore[attr-defined]
     if bucket == "hour":
-        start, end = utc_bounds(days, config.zone)
-        cells = await rollups.hour_cells(gw, start, end)
-        period_key: str | None = None  # no person hours: each hour's own count is all there is
-    else:
-        cells = await rollups.period_cells(gw, days, bucket)
-        period_key = rollups.PERIODS[bucket]
-        exact = await rollups.people_per_key(gw, days, period_key)
-        for key, cell in cells.items():
-            cell.floor = max(cell.floor, exact.get(key, 0))
+        start, end = utc_bounds(days, zone)
+        levels.append(await rollups.hour_cells(gw, start, end))
+        parents.append(lambda key: day_of_hour(key, zone))  # type: ignore[arg-type]
 
-    async def together(group: list[Cell]) -> int:
+    async def together(level: int, group: list[Cell]) -> int:
         floor = max(cell.floor for cell in group)
-        if period_key is not None:
-            floor = max(floor, await rollups.people_in(gw, days, period_key, [cell.key for cell in group]))
+        if level < 2:  # no person hours: each hour's own count is all there is
+            period = rollups.PERIODS["month" if level == 0 else "day"]
+            floor = max(floor, await rollups.people_in(gw, days, period, [cell.key for cell in group]))
         return floor
 
-    hidden_keys, _ = await hide(list(cells.values()), k, together)
+    hidden_keys = (await hide_nested(levels, parents, total_people, k, together))[-1]
+    cells = levels[-1]
     series: list[dict[str, Any]] = []
-    for period in periods(days, bucket, config.zone):
+    for period in periods(days, bucket, zone):
         if period in hidden_keys:
             series.append({"period": period_text(period), "suppressed": True, **hidden()})
         else:
@@ -182,12 +221,14 @@ async def admin_usage(
     bucket: rollups.Bucket = "day",
     group_by: rollups.GroupBy = "team",
     structure: tree.Structure = "recorded",
-    reason: str | None = Query(default=None, max_length=2000),
+    reason: str | None = Depends(reason_header),
 ) -> dict[str, Any]:
     """Usage of teams, agents, models or providers over the range (default the last 30 days); no person.
 
-    With a *reason*, a usage auditor (person-level reporting on) sees the totals and the series unhidden;
-    refused like ``/people`` otherwise, and recorded either way.
+    With a *reason* (``X-Faden-Reason``), a usage auditor (person-level reporting on) sees the totals and the
+    series of a small instance unhidden, by day or month no finer than the per-person figures: refused like
+    ``/people`` otherwise, and recorded either way. Where nothing would be unhidden -- an instance of k people
+    or more, hours, days while per-person figures are by month -- the reason is not used and nothing recorded.
     """
     config = await usage_config.read(session)
     k = config.k
@@ -195,7 +236,10 @@ async def admin_usage(
     total = await rollups.total_cell(gw, days)
     total_people = max(total.floor, await rollups.people_in(gw, days, None, []))
     small = total.measures.requests > 0 and total_people < k
-    unhidden = reason is not None and await _auditor_look(session, gw, user, config, days, reason, small)
+    unhidden = (
+        reason is not None and small and _may_unhide(bucket, config)
+        and await _auditor_look(session, gw, user, config, days, bucket, reason)
+    )
     shown_totals = not small or unhidden
     if group_by == "team":
         groups = await _team_tree(session, gw, days, structure, k)
@@ -214,7 +258,7 @@ async def admin_usage(
             **(total.measures.as_json() if shown_totals else hidden()),
             "people": total_people if total_people >= k or unhidden else None,
         },
-        "series": await _series(gw, days, bucket, config, unhidden=unhidden),
+        "series": await _series(gw, days, bucket, config, total_people, unhidden=unhidden),
         "groups": groups,
         "person_reporting": config.person_reporting,
         "can_view_people": config.person_reporting and await people.holds_audit_grant(session, user),
@@ -223,33 +267,40 @@ async def admin_usage(
     }
 
 
+def _may_unhide(bucket: rollups.Bucket, config: usage_config.UsageSettings) -> bool:
+    """Whether a reason may unhide a small instance's series by *bucket*.
+
+    Never by hour (M10), and by day only while per-person figures are by day.
+    """
+    return bucket == "month" or (bucket == "day" and config.person_granularity == "day")
+
+
 async def _auditor_look(
     session: AsyncSession,
     gw: AsyncSession,
     user: User,
     config: usage_config.UsageSettings,
     days: rollups.DayRange,
+    bucket: rollups.Bucket,
     reason: str,
-    small: bool,
 ) -> bool:
-    """A usage auditor's look at totals and series below k: allowed and recorded, or refused and recorded.
+    """A usage auditor's look at a small instance's totals and series: allowed or refused, recorded.
 
-    The people of the range are named in the record when the range holds fewer than k of them: the look was at
-    their figures, and each sees it in their own list (S03).
+    Every cell unhidden is about the people of the range, who are fewer than k: they are named in the record,
+    and each sees the look in their own list (S03).
     """
+    details = {"from": days.first.isoformat(), "to": days.last.isoformat(), "bucket": bucket}
     try:
         cleaned = await people.entitled(session, user, config, reason)
     except PeopleRefusal as refusal:
         await people.record_view(
             session, user, target_type="usage_aggregate", target_id="instance", person_ids=[],
-            details={"from": days.first.isoformat(), "to": days.last.isoformat()},
-            reason=reason.strip()[:500] or None, refused=refusal.code,
+            details=details, reason=reason.strip()[:500] or None, refused=refusal.code,
         )
         refuse(refusal)
     await people.record_view(
         session, user, target_type="usage_aggregate", target_id="instance",
-        person_ids=await rollups.people_ids(gw, days) if small else [],
-        details={"from": days.first.isoformat(), "to": days.last.isoformat()}, reason=cleaned,
+        person_ids=await rollups.people_ids(gw, days), details=details, reason=cleaned,
     )
     return True
 
@@ -277,7 +328,7 @@ async def admin_usage_people(
     last: str | None = Query(default=None, alias="to"),
     team: str | None = None,
     person: str | None = None,
-    reason: str | None = Query(default=None, max_length=2000),
+    reason: str | None = Depends(reason_header),
 ) -> dict[str, Any]:
     """One team's people, or one person: figures per person and day (or month), sorted by name."""
     config = await usage_config.read(session)
@@ -324,13 +375,51 @@ async def admin_usage_people(
     return {"granularity": config.person_granularity, "rows": rows}
 
 
+@router.get("/people/choices", name="admin_usage_people_choices")
+async def admin_usage_people_choices(
+    user: Annotated[User, Depends(current_active_user)],
+    session: AsyncSession = Depends(get_db_session),
+    _reason: str | None = Depends(reason_header),  # refuses one in the query string; none is needed here
+) -> dict[str, Any]:
+    """The people and teams a usage auditor can pick for ``/people``, by address and by name; no figures.
+
+    ``{"people": [{"id", "email"}], "teams": [{"id", "name", "parent_id", "archived_at"}],
+    "person_retention_days": n}``: the teams with their place in the tree, archived ones too (their history is
+    still kept; ``archived_at`` set), and how far back per-person figures go (a range for ``/people`` is at
+    most that long). With the switch on and the explicit grant, like ``/people`` (403
+    ``person_reporting_off``, ``not_usage_auditor``), so a usage auditor who is no administrator can choose;
+    no reason, nothing recorded.
+    """
+    config = await usage_config.read(session)
+    if not config.person_reporting:
+        refuse(PeopleRefusal(status.HTTP_403_FORBIDDEN, "person_reporting_off"))
+    if not await people.holds_audit_grant(session, user):
+        refuse(PeopleRefusal(status.HTTP_403_FORBIDDEN, "not_usage_auditor"))
+    accounts = await session.execute(select(User.id, User.email).order_by(func.lower(User.email), User.id))
+    groups = await session.execute(
+        select(Group.id, Group.name, Group.parent_id, Group.archived_at)
+        .order_by(func.lower(Group.name), Group.id),
+    )
+    return {
+        "people": [{"id": str(account_id), "email": str(email)} for account_id, email in accounts],
+        "teams": [
+            {
+                "id": str(group_id), "name": name, "parent_id": str(parent_id) if parent_id else None,
+                "archived_at": archived_at.isoformat() if archived_at else None,
+            }
+            for group_id, name, parent_id, archived_at in groups
+        ],
+        "person_retention_days": config.person_retention_days,
+    }
+
+
 @router.get("/people/{user_id}/export", name="admin_usage_person_export")
 async def admin_usage_person_export(
     user_id: uuid.UUID,
     user: Annotated[User, Depends(current_active_user)],
     session: AsyncSession = Depends(get_db_session),
     gw: AsyncSession = Depends(gateway_session),
-    reason: str | None = Query(default=None, max_length=2000),
+    reason: str | None = Depends(reason_header),
     format: Literal["json", "csv"] = "json",
 ) -> Response:
     """One person's usage data as they download it themselves, for an access request (M13; GDPR Art. 15).

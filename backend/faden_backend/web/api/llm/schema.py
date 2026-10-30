@@ -577,13 +577,10 @@ class LLMCallDTO(BaseModel):
     estimated_total_cost: float | None = None
     currency: str | None = None
     stream: bool | None = None
-    session_id: str | None = None
+    #: No device, session, conversation or project id: each stands for one person (calls_service.py).
     agent_id: str | None = None
-    device_id: str | None = None
-    conversation_id: str | None = None
     turn_id: str | None = None
     group_id: str | None = None
-    project_id: str | None = None
     finish_reason: str | None = None
     retry_count: int | None = None
     skills_used: Any = None
@@ -672,10 +669,9 @@ class LLMCallDetailDTO(BaseModel):
     call: LLMCallDTO
     tool_calls: list[LLMCallToolDTO] = Field(default_factory=list)
     policy_decisions: list[LLMCallPolicyDTO] = Field(default_factory=list)
-    #: The other calls of the same conversation, session or trace, oldest first.
+    #: The other calls of the same conversation, session or trace (``related_by``), oldest first; not the id.
     related: list[LLMCallDTO] = Field(default_factory=list)
     related_by: str | None = None
-    related_key: str | None = None
     #: The calls of the same turn (one user request: the model's rounds), oldest first.
     turn_calls: list[LLMCallDTO] = Field(default_factory=list)
     #: The tools the agent's app ran and the approvals it waited for during the turn.
@@ -687,10 +683,8 @@ class LLMTurnDTO(BaseModel):
 
     key: str
     turn_id: str | None = None
-    conversation_id: str | None = None
-    session_id: str | None = None
+    #: No conversation, session or device id: each stands for one person (calls_service.py).
     agent_id: str | None = None
-    device_id: str | None = None
     tenant_id: str
     user_id: str | None = None  # nobody is named (services/llm/calls_service.py)
     started_at: datetime

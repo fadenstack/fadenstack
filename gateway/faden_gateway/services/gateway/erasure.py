@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, cast
 
 from sqlalchemy import CursorResult, delete, select, text
@@ -36,7 +36,7 @@ from faden_gateway.db.models.gateway import (
     SessionStatus,
     SessionSummary,
 )
-from faden_gateway.db.models.usage import UsageDailyPerson
+from faden_gateway.db.models.usage import UsageDailyPerson, UsageErased
 
 log = logging.getLogger(__name__)
 
@@ -132,9 +132,12 @@ async def erase_user(session: AsyncSession, file_store: Any, user_id: str) -> Er
 
     Their usage is their request-log rows (with their tool calls) and their person-level usage days
     (M12). The hourly and daily sums, which name no person, keep their totals: the rollup job recomputes
-    only the current and the previous hour and day from the log.
+    only the current and the previous hour and day from the log. The person is noted in ``usage_erased``:
+    a rollup run that read the log before this, or a request of theirs that ends after it, would write some
+    of it again, and each run removes that for 30 days (``usage_rollup.forget_erased``).
     """
     erased = Erased()
+    await session.merge(UsageErased(user_id=user_id, erased_at=datetime.now(UTC)))
     logs = select(LLMGatewayRequestLog.id).where(LLMGatewayRequestLog.user_id == user_id)
     await session.execute(delete(LLMToolCallLog).where(LLMToolCallLog.request_log_id.in_(logs)))
     rows = await session.execute(delete(LLMGatewayRequestLog).where(LLMGatewayRequestLog.user_id == user_id))

@@ -209,9 +209,11 @@ _DEFAULT_ROLES: dict[str, dict[str, list[str]]] = {
         **USAGE_READ,
         **CONTENT_CHECK,
     },
-    # The usage of named people, and nothing else; assigned to nobody at install (M06).
+    # The usage of named people, and the aggregates the Usage page opens with; assigned to nobody at install
+    # (M06). A holder who is no administrator reaches the per-person view through that page.
     USAGE_AUDITOR_ROLE: {
         USAGE_PEOPLE_AUDIT[0]: [USAGE_PEOPLE_AUDIT[1]],
+        **USAGE_READ,
         **CONTENT_CHECK,
     },
     "default_user": {

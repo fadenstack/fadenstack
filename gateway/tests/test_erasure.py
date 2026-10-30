@@ -26,7 +26,7 @@ from faden_gateway.db.models.gateway import (
     MemoryFact,
     SessionStatus,
 )
-from faden_gateway.db.models.usage import UsageDaily, UsageDailyPerson
+from faden_gateway.db.models.usage import UsageDaily, UsageDailyPerson, UsageErased
 from faden_gateway.services.gateway import erasure
 from faden_gateway.services.gateway.auth import AuthContext, get_auth_context
 from faden_gateway.settings import settings
@@ -147,6 +147,10 @@ async def test_erasing_a_person_takes_their_usage_and_leaves_the_sums(db_session
     assert await _count(db_session, LLMToolCallLog) == 0
     assert set((await db_session.execute(select(UsageDailyPerson.user_id))).scalars()) == {"u2"}
     assert (await db_session.execute(select(UsageDaily.requests))).scalar_one() == 2, "the sums keep their totals"
+    [noted] = (await db_session.execute(select(UsageErased))).scalars()
+    assert noted.user_id == "u1", "noted, so the rollup removes what of theirs turns up again"
+    await erasure.erase_user(db_session, _Store(), "u1")
+    assert await _count(db_session, UsageErased) == 1, "erased twice: noted once, with the later time"
 
 
 def _grant(scope: str, target: str, *, typ: str = "chat_erase") -> str:

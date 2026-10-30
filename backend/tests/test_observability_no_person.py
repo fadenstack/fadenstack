@@ -62,6 +62,28 @@ async def test_the_csv_export_names_nobody(client: AsyncClient, seen: Any) -> No
     assert "person-a" not in response.text
 
 
+async def test_the_time_series_hides_a_bucket_of_fewer_than_k_people_with_its_complement(
+    client: AsyncClient, fastapi_app: FastAPI, gateway: AsyncSession,
+) -> None:
+    """Six people at 08:00 and at 09:00, one alone at 10:00: 10:00 is hidden, and 09:00 with it (M04, M05)."""
+    sign_in(fastapi_app, await person(gateway, f"a-{uuid.uuid4().hex[:6]}@example.com", roles=["admin"]))
+    day = datetime(2026, 10, 1, tzinfo=UTC)
+    for hour, people, extra in ((8, 6, 2), (9, 6, 0), (10, 1, 0)):
+        for n in range(people + extra):
+            await request_log(gateway, f"h{hour}-p{n % people}", day + timedelta(hours=hour, minutes=n))
+
+    response = await client.get("/api/admin/observability/timeseries", params={
+        "start": day.isoformat(), "end": (day + timedelta(days=1)).isoformat(), "granularity": "hour",
+    })
+
+    assert response.status_code == status.HTTP_200_OK, response.text
+    buckets = {row["bucket"][11:16]: row for row in response.json()}
+    assert buckets["08:00"]["suppressed"] is False and buckets["08:00"]["total_requests"] == 8
+    assert buckets["09:00"]["suppressed"] is True and buckets["09:00"]["total_requests"] is None
+    assert buckets["10:00"] | {} == {**buckets["10:00"], "suppressed": True, "total_requests": None,
+                                     "total_tokens": None, "error_count": None, "avg_latency_ms": None}
+
+
 @pytest.mark.parametrize(("method", "path"), [
     ("POST", "budgets"), ("GET", "forecast"), ("POST", "alerts"), ("GET", "chargeback"),
 ])

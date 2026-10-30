@@ -45,6 +45,7 @@ Both cost a request nothing while they are empty
 from __future__ import annotations
 
 import logging
+import uuid
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -73,12 +74,17 @@ class AdmissionContext:
     agent_id: str | None
     model_alias: str
     endpoint: str
+    #: The request id the client may have chosen (``x-request-id``, checked): for logs, not to key anything
+    #: on -- several requests can carry the same one.
     request_id: str
     #: What core's caps reserved for it: the input estimate and, for a chat, its answer (``max_tokens``, else
     #: 1024). The real usage follows in the ``UsageRecord``.
     estimated_tokens: int
     #: The team's path at the time of use, root first, ending with ``group_id``; empty without a team.
     group_path: tuple[str, ...] = ()
+    #: The gateway's own id for this request, unique, never the client's: what a check keys a reservation on.
+    #: The request's ``UsageRecord`` carries the same one.
+    reservation_id: str = field(default_factory=lambda: uuid.uuid4().hex)
 
 
 @dataclass(frozen=True)
@@ -136,6 +142,12 @@ class UsageRecord:
     created_at: datetime
     #: The team's path at the time of use, as the request log keeps it; empty without a team.
     group_path: tuple[str, ...] = ()
+    #: ``AdmissionContext.reservation_id`` of the same request, if admission checks saw it; a fresh id
+    #: otherwise.
+    reservation_id: str = ""
+    #: Whether the caps and the admission checks let the request in. ``False`` when one refused it (or it was
+    #: refused before them): a check releases what it reserved instead of settling it.
+    admitted: bool = True
 
 
 #: Told each request's usage; what it returns is not used.

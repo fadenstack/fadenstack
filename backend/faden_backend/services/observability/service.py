@@ -7,7 +7,8 @@ SQL with ``text()`` and bind parameters — no ORM coupling.
 Nothing here names the person who made a request: ``user_id`` is read as ``NULL`` in the request list, its
 detail and the CSV export, there is no breakdown or search by person, and no ranking of people (GDPR Art.
 25(2); M02, M11 of the usage compliance report). The usage of named people is seen only through
-``/api/admin/usage/people``, behind its switch, grant and reason.
+``/api/admin/usage/people``, behind its switch, grant and reason. The time series keeps the minimum group
+size: a bucket of fewer than k people, with its complement, carries no figures (M04, M05).
 """
 
 from __future__ import annotations
@@ -21,6 +22,9 @@ from decimal import Decimal
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from faden_backend.services.usage.measures import Measures
+from faden_backend.services.usage.suppression import Cell, hide
 
 log = logging.getLogger(__name__)
 
@@ -139,26 +143,58 @@ class ObservabilityService:
         start: datetime,
         end: datetime,
         granularity: str = "day",
+        *,
+        k: int = 0,
     ) -> list[dict]:
-        """Return time-bucketed aggregates."""
+        """Return time-bucketed aggregates; a bucket of fewer than *k* people carries none.
+
+        The hidden buckets hold at least *k* people together, else the smallest shown ones are hidden with
+        them (complementary suppression, ``services/usage/suppression.py``); each is ``suppressed`` with its
+        figures ``None``. The people are counted exactly, from the request log.
+        """
         gran = "day" if granularity not in ("hour", "day", "week") else granularity
-        q = text(f"""
+        params = {"gran": gran, "start": start, "end": end}
+        q = text("""
             SELECT
                 date_trunc(:gran, created_at)   AS bucket,
                 COUNT(*)                        AS total_requests,
                 COALESCE(SUM(total_tokens), 0)  AS total_tokens,
                 SUM(estimated_total_cost)       AS estimated_total_cost,
                 COALESCE(SUM(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END), 0) AS error_count,
-                AVG(latency_ms)                 AS avg_latency_ms
+                AVG(latency_ms)                 AS avg_latency_ms,
+                COUNT(DISTINCT user_id)         AS people
             FROM llm_gateway_request_log
             WHERE created_at >= :start AND created_at < :end
             GROUP BY 1
             ORDER BY 1
         """)
-        result = await self._session.execute(
-            q, {"gran": gran, "start": start, "end": end},
-        )
-        return [dict(r) for r in result.mappings().all()]
+        rows = [dict(r) for r in (await self._session.execute(q, params)).mappings().all()]
+        cells: list[Cell] = []
+        for row in rows:
+            measures = Measures()
+            measures.counts["requests"] = int(row["total_requests"] or 0)
+            cells.append(Cell(key=row["bucket"], measures=measures, floor=int(row["people"] or 0)))
+
+        async def together(group: list[Cell]) -> int:
+            union = text("""
+                SELECT COUNT(DISTINCT user_id) FROM llm_gateway_request_log
+                WHERE created_at >= :start AND created_at < :end
+                  AND date_trunc(:gran, created_at) = ANY(:buckets)
+            """)
+            found = await self._session.execute(union, {**params, "buckets": [cell.key for cell in group]})
+            return int(found.scalar_one() or 0)
+
+        hidden, _ = await hide(cells, k, together) if k > 0 else (set(), 0)
+        series: list[dict] = []
+        for row in rows:
+            row.pop("people")
+            if row["bucket"] in hidden:
+                row.update(
+                    total_requests=None, total_tokens=None, estimated_total_cost=None, error_count=None,
+                    avg_latency_ms=None,
+                )
+            series.append({**row, "suppressed": row["bucket"] in hidden})
+        return series
 
     # ── Performance ───────────────────────────────────────────────
 

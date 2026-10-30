@@ -16,7 +16,8 @@ the root down to the team itself. Usage is booked on it (the request log, the
 rollups), so a report shows usage as it was booked after a reorganisation, as
 Google Cloud's billing export records project ancestry at the time of usage.
 Teams form a tree once the backend has ``groups.parent_id``; until then a
-team's path is the team alone.
+team's path is the team alone. Whether it has is asked again every few
+minutes until it has: the backend may be upgraded while the gateway runs.
 """
 
 from __future__ import annotations
@@ -46,6 +47,8 @@ _TREE_SQL = (
     "SELECT EXISTS (SELECT 1 FROM information_schema.columns "
     "WHERE table_schema = current_schema() AND table_name = 'groups' AND column_name = 'parent_id')"
 )
+#: How long "teams form no tree yet" is believed before it is asked again; "they do" is kept for good.
+TREE_RECHECK_SEC = 300.0
 #: The most levels a team's path holds, the team itself included.
 PATH_LEVELS = 6
 #: A team's path, root first: up its parents, at most ``PATH_LEVELS`` levels, stopping at a cycle (a team
@@ -163,14 +166,24 @@ class UsageGroupResolver(Generic[V]):
 class BackendUserGroups:
     """``fetch`` over a small asyncpg pool on the backend database."""
 
-    def __init__(self, dsn: str, *, max_size: int = 2, timeout_sec: float = 2.0) -> None:
+    def __init__(
+        self,
+        dsn: str,
+        *,
+        max_size: int = 2,
+        timeout_sec: float = 2.0,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
         self._dsn = dsn
         self._max_size = max_size
         self._timeout = timeout_sec
+        self._clock = clock
         self._pool: asyncpg.Pool | None = None
         self._lock = asyncio.Lock()
-        #: Whether ``groups.parent_id`` exists: looked up once, on the first use.
-        self._tree: bool | None = None
+        #: Whether ``groups.parent_id`` exists: once it does, for good; until then asked again after
+        #: ``TREE_RECHECK_SEC`` (``_checked_at``: when it was last asked).
+        self._tree = False
+        self._checked_at: float | None = None
 
     async def __call__(self, user_id: str) -> UsageTeam | None:
         """The user's usage team and its path; ``None`` without one."""
@@ -178,12 +191,21 @@ class BackendUserGroups:
         group_id = await pool.fetchval(_SQL, user_id, timeout=self._timeout)
         if not group_id:
             return None
-        if self._tree is None:
-            self._tree = bool(await pool.fetchval(_TREE_SQL, timeout=self._timeout))
         path = None
-        if self._tree:
+        if await self._has_tree(pool):
             path = await pool.fetchval(_PATH_SQL, group_id, PATH_LEVELS, timeout=self._timeout)
         return UsageTeam(group_id=group_id, path=tuple(path) if path else (group_id,))
+
+    async def _has_tree(self, pool: asyncpg.Pool) -> bool:
+        """Whether teams form a tree: a yes is kept, a no believed for ``TREE_RECHECK_SEC``."""
+        if self._tree:
+            return True
+        now = self._clock()
+        if self._checked_at is not None and now - self._checked_at < TREE_RECHECK_SEC:
+            return False
+        self._tree = bool(await pool.fetchval(_TREE_SQL, timeout=self._timeout))
+        self._checked_at = now
+        return self._tree
 
     async def memberships(self, user_id: str) -> tuple[str, ...]:
         """The ids of the groups *user_id* is in."""

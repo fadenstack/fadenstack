@@ -1072,6 +1072,9 @@ class _Prepared:
     #: How many answers a whole answer is asked for one by one (``answer_variety.split``); ``None``: as sent.
     split_choices: int | None = None
     request_id: str | None = None
+    #: The gateway's own id for the request (never the client's ``x-request-id``): what the admission checks
+    #: key their reservations on, in ``AdmissionContext`` and ``UsageRecord`` alike.
+    reservation_id: str = field(default_factory=lambda: uuid.uuid4().hex)
     pii_scope: str = ""
     #: The media URLs the client sent, fetched by the gateway: (url, kind) -> data: URL (media_fetch.py).
     media: dict[tuple[str, str], str] = field(default_factory=dict)
@@ -1093,6 +1096,8 @@ class _Prepared:
     estimated_tokens: int = 0
     #: The caps and the admission checks let the request in.
     admitted: bool = False
+    #: A cap or an admission check refused the request: its row says so (``refused``), whatever its code.
+    refused: bool = False
     #: What the request holds on the tenant's caps until its real usage is known (``ratelimit.py``).
     reservation: Reservation | None = None
     skills: list[ResolvedSkill] = field(default_factory=list)
@@ -1547,6 +1552,9 @@ class GatewayService:
                 ttft_ms=None,
                 **_usage_fields(metered, source),
                 estimated_tokens=req.estimated_tokens if req.admitted else 0,
+                reservation_id=req.reservation_id,
+                admitted=req.admitted,
+                refused=req.refused,
                 error_code=error_code or req.fallback_error_code,
                 stream=False,
                 provider_name=(
@@ -1988,6 +1996,9 @@ class GatewayService:
                     completion_tokens=None,
                     total_tokens=None,
                     estimated_tokens=req.estimated_tokens if req.admitted else 0,
+                    reservation_id=req.reservation_id,
+                    admitted=req.admitted,
+                    refused=req.refused,
                     error_code=pre_stream_error_code or req.fallback_error_code,
                     stream=True,
                     provider_name=(
@@ -2038,6 +2049,7 @@ class GatewayService:
                 zone=usage_settings.current().zone,
             )
             if isinstance(admitted, CapRefusal):
+                req.refused = True
                 raise admitted.error()
             req.reservation = admitted
         checks = extension_registry.admission_checks
@@ -2048,6 +2060,7 @@ class GatewayService:
             )
             refusal = await usage_hooks.first_refusal(checks, context)
             if refusal is not None:
+                req.refused = True
                 if req.reservation is not None:
                     await self.limiter.release(req.reservation)
                 raise usage_hooks.refused(refusal, req.caps_headers)
@@ -2074,6 +2087,7 @@ class GatewayService:
             request_id=request_id,
             estimated_tokens=req.estimated_tokens,
             group_path=req.group_path,
+            reservation_id=req.reservation_id,
         )
 
     async def _project_of(self, auth: AuthContext, session_id: str | None) -> str | None:
@@ -4054,6 +4068,9 @@ class GatewayService:
                 ttft_ms=stats.ttft_ms if stats is not None else None,
                 **_usage_fields(metered, source),
                 estimated_tokens=req.estimated_tokens if req.admitted else 0,
+                reservation_id=req.reservation_id,
+                admitted=req.admitted,
+                refused=req.refused,
                 error_code=final_error_code,
                 stream=True,
                 provider_name=(
