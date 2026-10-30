@@ -44,12 +44,15 @@ class SummaryDTO(BaseModel):
 
 
 class TimeseriesBucketDTO(BaseModel):
+    """One bucket; one of fewer than k people (or its complement) is ``suppressed``, figures ``None``."""
+
     bucket: datetime
-    total_requests: int = 0
-    total_tokens: int = 0
+    total_requests: int | None = 0
+    total_tokens: int | None = 0
     estimated_total_cost: Decimal | None = None
-    error_count: int = 0
+    error_count: int | None = 0
     avg_latency_ms: float | None = None
+    suppressed: bool = False
 
 
 # ── Performance ───────────────────────────────────────────────────

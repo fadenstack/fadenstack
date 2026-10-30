@@ -19,9 +19,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from faden_backend.db.dependencies import get_db_session
 from faden_backend.db.models.users import User
 from faden_backend.services.observability.pricing_service import PricingCRUDService
 from faden_backend.services.observability.service import ObservabilityService
+from faden_backend.services.usage import config as usage_config
 from faden_backend.web.api.admin.observability.schema import (
     PaginatedRequestsDTO,
     PerformanceDTO,
@@ -118,13 +120,15 @@ async def get_summary(
 async def get_timeseries(
     _user: Annotated[User, Depends(require_permission("observability", "read"))],
     gw: AsyncSession = Depends(_get_gateway_session),
+    session: AsyncSession = Depends(get_db_session),
     start: datetime | None = Query(default=None),
     end: datetime | None = Query(default=None),
     granularity: str = Query(default="day"),
 ) -> list[TimeseriesBucketDTO]:
+    """Requests, tokens, cost, errors and latency per hour, day or week; no bucket of fewer than k people."""
     start, end = _parse_range(start, end)
     svc = ObservabilityService(gw)
-    rows = await svc.get_timeseries(start, end, granularity)
+    rows = await svc.get_timeseries(start, end, granularity, k=(await usage_config.read(session)).k)
     return [TimeseriesBucketDTO(**r) for r in rows]
 
 
