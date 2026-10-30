@@ -383,10 +383,12 @@ async def admin_usage_people_choices(
 ) -> dict[str, Any]:
     """The people and teams a usage auditor can pick for ``/people``, by address and by name; no figures.
 
-    ``{"people": [{"id", "email"}], "teams": [{"id", "name", "archived"}]}``. With the switch on and the
-    explicit grant, like ``/people`` (403 ``person_reporting_off``, ``not_usage_auditor``), so a usage auditor
-    who is no administrator can choose; no reason, nothing recorded. Archived teams are listed (their history
-    is still kept), marked.
+    ``{"people": [{"id", "email"}], "teams": [{"id", "name", "parent_id", "archived_at"}],
+    "person_retention_days": n}``: the teams with their place in the tree, archived ones too (their history is
+    still kept; ``archived_at`` set), and how far back per-person figures go (a range for ``/people`` is at
+    most that long). With the switch on and the explicit grant, like ``/people`` (403
+    ``person_reporting_off``, ``not_usage_auditor``), so a usage auditor who is no administrator can choose;
+    no reason, nothing recorded.
     """
     config = await usage_config.read(session)
     if not config.person_reporting:
@@ -395,14 +397,19 @@ async def admin_usage_people_choices(
         refuse(PeopleRefusal(status.HTTP_403_FORBIDDEN, "not_usage_auditor"))
     accounts = await session.execute(select(User.id, User.email).order_by(func.lower(User.email), User.id))
     groups = await session.execute(
-        select(Group.id, Group.name, Group.archived_at).order_by(func.lower(Group.name), Group.id),
+        select(Group.id, Group.name, Group.parent_id, Group.archived_at)
+        .order_by(func.lower(Group.name), Group.id),
     )
     return {
         "people": [{"id": str(account_id), "email": str(email)} for account_id, email in accounts],
         "teams": [
-            {"id": str(group_id), "name": name, "archived": archived_at is not None}
-            for group_id, name, archived_at in groups
+            {
+                "id": str(group_id), "name": name, "parent_id": str(parent_id) if parent_id else None,
+                "archived_at": archived_at.isoformat() if archived_at else None,
+            }
+            for group_id, name, parent_id, archived_at in groups
         ],
+        "person_retention_days": config.person_retention_days,
     }
 
 

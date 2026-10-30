@@ -144,10 +144,14 @@ async def test_a_usage_auditor_who_is_no_administrator_can_pick_and_open_usage(
     client: AsyncClient, fastapi_app: FastAPI, gateway: AsyncSession,
 ) -> None:
     await set_usage(gateway, person_reporting=True)
+    await set_usage(gateway, person_retention_days=120)
     tag = _tag()
     team = Group(id=uuid.uuid4(), name=f"Sales-{tag}")
     gone = Group(id=uuid.uuid4(), name=f"Archived-{tag}", archived_at=datetime.now(UTC))
     gateway.add_all([team, gone])
+    await gateway.flush()
+    north = Group(id=uuid.uuid4(), name=f"Sales North-{tag}", parent_id=team.id)
+    gateway.add(north)
     holder = await person(gateway, f"ua-{tag}@example.com", roles=["usage_auditor"])
     sign_in(fastapi_app, holder)
 
@@ -158,8 +162,10 @@ async def test_a_usage_auditor_who_is_no_administrator_can_pick_and_open_usage(
     assert {"id": str(holder.id), "email": holder.email} in body["people"]
     assert set(body["people"][0]) == {"id", "email"}
     teams = {row["id"]: row for row in body["teams"]}
-    assert teams[str(team.id)] == {"id": str(team.id), "name": team.name, "archived": False}
-    assert teams[str(gone.id)]["archived"] is True
+    assert teams[str(team.id)] == {"id": str(team.id), "name": team.name, "parent_id": None, "archived_at": None}
+    assert teams[str(north.id)]["parent_id"] == str(team.id)
+    assert teams[str(gone.id)]["archived_at"] is not None
+    assert body["person_retention_days"] == 120
     emails = [row["email"].lower() for row in body["people"]]
     assert emails == sorted(emails), "by address, never by usage"
     assert await _looks(gateway) == []
