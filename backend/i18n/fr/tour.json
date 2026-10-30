@@ -372,7 +372,7 @@
       "title": "Appels LLM",
       "description": "Chaque appel via la passerelle : trouvez celui qui a échoué, voyez pourquoi, et voyez où les appels sont routés.",
       "action_find": "Restreignez la liste par heure, modèle, résultat ou n’importe quel id ; cliquez sur Erreurs pour ne voir que les échecs",
-      "action_inspect": "Ouvrez un appel pour son diagnostic, sa chronologie, sa conversation et tous les champs enregistrés ; j et k passent d’un appel à l’autre",
+      "action_inspect": "Ouvrez un appel pour son diagnostic, sa chronologie, les appels liés et les champs enregistrés, jamais qui l’a envoyé ; j et k passent d’un appel à l’autre",
       "action_routing": "Voyez quels fournisseurs ont servi chaque modèle, avec les erreurs et la latence p95",
       "action_live": "Les nouveaux appels arrivent toutes les quelques secondes ; mettez en pause pour lire, et copiez le lien d’un appel pour le partager"
     },
