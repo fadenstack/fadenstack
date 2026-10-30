@@ -50,6 +50,7 @@ from faden_backend.web.api.agents.schema import (
     AgentTokensDTO,
     AgentVersionDTO,
     AgentVersionFields,
+    AgentVersionInput,
     AppSeenDTO,
     AppsReviewDTO,
     ClientEventDTO,
@@ -395,7 +396,7 @@ async def list_versions(
 )
 async def create_version(
     agent_ref: str,
-    payload: AgentVersionFields,
+    payload: AgentVersionInput,
     user: Annotated[User, Depends(current_active_user)],
     dao: AgentsDAO = Depends(),
     rbac: RbacDAO = Depends(),

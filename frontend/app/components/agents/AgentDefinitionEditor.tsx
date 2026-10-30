@@ -24,6 +24,8 @@ import { useAsyncData } from "~/lib/useAsyncData";
 
 import {
   greetingOf,
+  MAX_RUNNING_SESSIONS,
+  maxRunningSessionsOf,
   MIN_TOKEN_LIFETIME_S,
   piiModeSwitch,
   serverToolsMode,
@@ -31,6 +33,7 @@ import {
   TOKEN_LIFETIMES,
   TOKEN_SETTING,
   tokenLifetimeOf,
+  withMaxRunningSessions,
   withPiiModeSwitch,
   withServerToolsMode,
   withTokenLifetime,
@@ -43,6 +46,7 @@ import { HostToolContractEditor } from "./HostToolContractEditor";
 const SERVER_TOOLS_MODES: ServerToolsMode[] = ["default", "listed", "none"];
 const LOCAL_MCP_MODES: LocalMcpMode[] = ["disable", "allow"];
 const PII_MODE_SWITCHES: PiiModeSwitch[] = ["tenant", "allow", "refuse"];
+const SESSION_COUNTS = Array.from({ length: MAX_RUNNING_SESSIONS }, (_, i) => i + 1);
 
 export interface AgentDefinitionEditorProps {
   value: AgentDefinition;
@@ -202,6 +206,25 @@ export function AgentDefinitionEditor({ value, onChange, readOnly = false }: Age
           disabled={readOnly}
           onChange={(next) => onChange(withUi(value, { suggestions: next }))}
         />
+        <TextField
+          select
+          size="small"
+          label={t("agents.definition.sessions")}
+          helperText={t("agents.definition.sessions_help")}
+          value={maxRunningSessionsOf(value) ?? ""}
+          disabled={readOnly}
+          onChange={(e) => onChange(withMaxRunningSessions(value, e.target.value === "" ? null : Number(e.target.value)))}
+          slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
+          data-agent-sessions=""
+          sx={{ maxWidth: 360 }}
+        >
+          <MenuItem value="">{t("agents.definition.sessions_default")}</MenuItem>
+          {SESSION_COUNTS.map((n) => (
+            <MenuItem key={n} value={n}>
+              {n}
+            </MenuItem>
+          ))}
+        </TextField>
       </Section>
 
       {ownLifetimes && (

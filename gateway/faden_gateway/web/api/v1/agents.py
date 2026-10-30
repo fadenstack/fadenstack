@@ -23,11 +23,11 @@ import dataclasses
 import logging
 import re
 from datetime import datetime
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, Self
 
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 from starlette import status
 
 from faden_gateway.db.dao.gateway_dao import GatewayDAO
@@ -510,6 +510,10 @@ async def agent_skills(
 # -- events -------------------------------------------------------------------------
 
 
+#: Who started a tool call: the model, the user, or a UI module by its plugin name.
+_TRIGGER_PATTERN = r"^(model|user|module:[a-z0-9][a-z0-9-]{0,62})$"
+
+
 class _Event(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -526,6 +530,8 @@ class ToolExecuted(_Event):
     server: str | None = Field(default=None, max_length=128)
     duration_ms: int = Field(ge=0)
     outcome: Literal["ok", "error", "denied", "cancelled"]
+    #: What started the call: the model, the user, or a UI module (``module:<plugin>``).
+    trigger: str | None = Field(default=None, pattern=_TRIGGER_PATTERN)
 
 
 class ApprovalDecided(_Event):
@@ -538,7 +544,20 @@ class ApprovalDecided(_Event):
     wait_ms: int | None = Field(default=None, ge=0)
     #: What let an approved call through: the user for this call, this chat, always on the device, or the
     #: app's bypass mode (development and trusted automation).
-    scope: Literal["once", "chat", "always", "bypass"] | None = None
+    #: ``time`` is an approval that stands until ``expires_at`` ("allow for 1 hour").
+    scope: Literal["once", "chat", "always", "bypass", "time"] | None = None
+    #: When a ``time`` approval ends; only with that scope, and required there.
+    expires_at: datetime | None = None
+    #: What started the call: the model, the user, or a UI module (``module:<plugin>``).
+    trigger: str | None = Field(default=None, pattern=_TRIGGER_PATTERN)
+
+    @model_validator(mode="after")
+    def _expiry_matches_scope(self) -> Self:
+        if self.scope == "time" and self.expires_at is None:
+            raise ValueError("expires_at is required when scope is time")
+        if self.scope != "time" and self.expires_at is not None:
+            raise ValueError("expires_at is allowed only when scope is time")
+        return self
 
 
 class LocalMcpAttached(_Event):

@@ -39,7 +39,10 @@ from typing import Any
 
 log = logging.getLogger(__name__)
 
-CORE_FEATURES = ("agents", "agent_tokens", "agent_events", "skills", "sessions", "streaming")
+CORE_FEATURES = (
+    "agents", "agent_tokens", "agent_events", "skills", "sessions", "streaming",
+    "approval_scopes.time", "client_events.trigger",
+)
 
 #: ``(user_id, agent_id) -> reason`` to deny, or ``None`` to allow.
 AgentAccessRule = Callable[[str, str], Awaitable[str | None]]

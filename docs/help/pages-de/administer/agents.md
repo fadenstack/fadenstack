@@ -78,6 +78,12 @@ Die Seite des Agenten öffnet sich. Sein Status in der Liste ist **Entwurf**, **
     eingestuft und fragen deshalb immer zuerst. Personen im **Entwicklermodus** (siehe
     [Benutzer, Gruppen und Rollen](users.md#developer-mode)) dürfen sie in jedem Fall einbinden.
 
+??? info "Mehr zu gleichzeitig laufenden Chat-Sitzungen"
+    **Gleichzeitig laufende Chat-Sitzungen** (unter **Darstellung**) legt fest, wie viele Chat-Sitzungen dieses
+    Agenten auf einem Gerät gleichzeitig arbeiten können: 1 bis 5 oder **Standard (5)**. Mehr Sitzungen kosten
+    mehr und brauchen mehr Aufmerksamkeit. Der Desktop-Agent hält sich an diese Grenze; weitere Einstellungen sind
+    nicht nötig.
+
 ![Der Reiter „Versionen“ des Word-Assistenten: v2 aktiv mit Ansehen und Änderungen, v1 mit Ansehen und Zurücksetzen, unterhalb der Reiter des Agenten und der Schaltflächen Bearbeiten und Stilllegen](../images/administer/agent-versions.png)
 
 Das Speichern der Definition erzeugt eine neue Version (**Als neue Version speichern** oder **Speichern und

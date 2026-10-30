@@ -861,6 +861,7 @@ async def test_the_profile_carries_what_the_sdk_caches_not_the_instructions(
     assert profile["local_mcp"] == {"mode": "disable", "developer_mode": True}
     assert profile["required_client_modules"] == []
     assert profile["edition"] == "community" and "agents" in profile["features"]
+    assert {"approval_scopes.time", "client_events.trigger"} <= set(profile["features"])
     assert profile["user"] == {"language": None}
     assert profile["skills"] is False, "no Skills module here: the SDK shows no skill picker"
 
@@ -1084,7 +1085,9 @@ async def test_events_are_stored_without_content(
         ("session.stats", AGENT_ID, USER, "device-7"),
         ("tool.executed", AGENT_ID, USER, "device-7"),
     ]
-    assert rows[2].data == {"tool": "read_page", "source": "host", "server": None, "duration_ms": 42, "outcome": "ok"}
+    assert rows[2].data == {"tool": "read_page", "source": "host", "server": None, "duration_ms": 42, "outcome": "ok",
+        "trigger": None,
+    }
     assert rows[1].conversation_id == "conv-9"
 
     for bad in (
@@ -1102,7 +1105,7 @@ async def test_features_answer_any_signed_in_caller(client: AsyncClient, backend
         r = await client.get("/v1/features", headers=_headers(token))
         assert r.status_code == 200
         assert r.json()["edition"] == "community"
-        assert {"agents", "streaming"} <= set(r.json()["features"])
+        assert {"agents", "streaming", "approval_scopes.time", "client_events.trigger"} <= set(r.json()["features"])
     assert (await client.get("/v1/features")).status_code == 401
 
 

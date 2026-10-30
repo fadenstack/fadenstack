@@ -6,11 +6,13 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
 
 from faden_backend.db.models.agents import AgentStatus, LocalMcpMode, PrincipalType
 
 SLUG_PATTERN = r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$"
+#: The most chat sessions one agent may run at once on a device (``ui.max_running_sessions``).
+MAX_RUNNING_SESSIONS_LIMIT = 5
 
 
 class HostTool(BaseModel):
@@ -46,6 +48,23 @@ class AgentVersionFields(BaseModel):
     extensions: dict[str, Any] = Field(default_factory=dict)
 
 
+class AgentVersionInput(AgentVersionFields):
+    """A version as the console or the API writes it: checked here, so a stored version always reads back."""
+
+    @field_validator("ui")
+    @classmethod
+    def _max_running_sessions_in_range(cls, ui: dict[str, Any]) -> dict[str, Any]:
+        """``ui.max_running_sessions``, when set, is a whole number from 1 to 5 (chat sessions at once)."""
+        if "max_running_sessions" in ui:
+            value = ui["max_running_sessions"]
+            valid = isinstance(value, int) and not isinstance(value, bool)
+            if not valid or not 1 <= value <= MAX_RUNNING_SESSIONS_LIMIT:
+                raise ValueError(
+                    f"ui.max_running_sessions must be a whole number from 1 to {MAX_RUNNING_SESSIONS_LIMIT}",
+                )
+        return ui
+
+
 class CreateAgentRequest(BaseModel):
     """A new agent: its address, name and first version."""
 
@@ -53,7 +72,7 @@ class CreateAgentRequest(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: str | None = Field(default=None, max_length=4000)
     #: The first version's definition; a draft until published.
-    version: AgentVersionFields = Field(default_factory=AgentVersionFields)
+    version: AgentVersionInput = Field(default_factory=AgentVersionInput)
 
 
 class UpdateAgentRequest(BaseModel):

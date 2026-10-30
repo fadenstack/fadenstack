@@ -8,12 +8,14 @@ import {
   cleanDefinition,
   definitionOf,
   definitionProblems,
+  maxRunningSessionsOf,
   parseAgentImport,
   piiModeSwitch,
   serverToolsMode,
   slugFromName,
   suggestionsOf,
   tokenLifetimeOf,
+  withMaxRunningSessions,
   withPiiModeSwitch,
   withServerToolsMode,
   withTokenLifetime,
@@ -156,5 +158,31 @@ describe("an agent's own token lifetimes", () => {
       "agents.definition.problem_token_short",
     ]);
     expect(definitionProblems(withTokenLifetime(EMPTY_DEFINITION, "access_s", 60))).toEqual([]);
+  });
+});
+
+describe("chat sessions running at once", () => {
+  it("reads 1 to 5 and nothing else", () => {
+    for (const n of [1, 2, 3, 4, 5]) {
+      expect(maxRunningSessionsOf({ ...EMPTY_DEFINITION, ui: { max_running_sessions: n } })).toBe(n);
+    }
+    for (const bad of [0, 6, 2.5, "3", true, null]) {
+      expect(maxRunningSessionsOf({ ...EMPTY_DEFINITION, ui: { max_running_sessions: bad } })).toBeNull();
+    }
+    expect(maxRunningSessionsOf(EMPTY_DEFINITION)).toBeNull();
+  });
+
+  it("sets the key, keeps the other UI settings, and removes it for the default", () => {
+    const base = { ...EMPTY_DEFINITION, ui: { greeting: "Hi" } };
+    const set = withMaxRunningSessions(base, 3);
+    expect(set.ui).toEqual({ greeting: "Hi", max_running_sessions: 3 });
+    expect(withMaxRunningSessions(set, 2).ui).toEqual({ greeting: "Hi", max_running_sessions: 2 });
+    expect(withMaxRunningSessions(set, null).ui).toEqual({ greeting: "Hi" });
+    expect(withMaxRunningSessions(set, 9).ui).toEqual({ greeting: "Hi" });
+    expect(base.ui).toEqual({ greeting: "Hi" });
+  });
+
+  it("counts as a change of the ui field", () => {
+    expect(changedFields(EMPTY_DEFINITION, withMaxRunningSessions(EMPTY_DEFINITION, 2))).toEqual(["ui"]);
   });
 });

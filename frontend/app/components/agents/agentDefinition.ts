@@ -132,6 +132,25 @@ export function withUi(
   return { ...definition, ui: { ...definition.ui, ...changes } };
 }
 
+// ── Chat sessions running at once ────────────────────────────────────────
+
+/** The most chat sessions an agent may run at once on a device; also what a client uses when none is set. */
+export const MAX_RUNNING_SESSIONS = 5;
+
+/** `ui.max_running_sessions`: a whole number from 1 to 5, or null (not set: the client's default). */
+export function maxRunningSessionsOf(definition: AgentDefinition): number | null {
+  const value = definition.ui.max_running_sessions;
+  return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= MAX_RUNNING_SESSIONS ? value : null;
+}
+
+/** Sets the limit; null (or anything outside 1 to 5) removes the key. */
+export function withMaxRunningSessions(definition: AgentDefinition, count: number | null): AgentDefinition {
+  const rest = { ...definition.ui };
+  delete rest.max_running_sessions;
+  const valid = count !== null && Number.isInteger(count) && count >= 1 && count <= MAX_RUNNING_SESSIONS;
+  return { ...definition, ui: valid ? { ...rest, max_running_sessions: count } : rest };
+}
+
 // ── PII ───────────────────────────────────────────────────────────────────
 
 /** `pii.allow_mode_override`: null follows the tenant's setting, true allows, false refuses. */
