@@ -10,6 +10,7 @@ import json
 import uuid
 from datetime import date
 from typing import Any
+from urllib.parse import quote
 
 import pytest
 from fastapi import FastAPI
@@ -54,7 +55,12 @@ async def team(gateway: AsyncSession) -> dict[str, Any]:
 
 
 def _params(**extra: str) -> dict[str, str]:
-    return {"from": "2026-10-01", "to": "2026-10-02", "reason": REASON, **extra}
+    return {"from": "2026-10-01", "to": "2026-10-02", **extra}
+
+
+def _reason(reason: str = REASON) -> dict[str, str]:
+    """The reason as the console sends it: a header, percent-encoded UTF-8."""
+    return {"X-Faden-Reason": quote(reason, safe="")}
 
 
 async def _events(db: AsyncSession) -> list[AuditEvent]:
@@ -66,7 +72,7 @@ async def test_with_the_switch_off_nobody_sees_people_not_even_a_usage_auditor(
     client: AsyncClient, fastapi_app: FastAPI, gateway: AsyncSession, team: dict[str, Any],
 ) -> None:
     sign_in(fastapi_app, await person(gateway, f"ua-{_tag()}@example.com", roles=["usage_auditor"]))
-    response = await client.get("/api/admin/usage/people", params=_params(team=team["id"]))
+    response = await client.get("/api/admin/usage/people", params=_params(team=team["id"]), headers=_reason())
     assert response.status_code == status.HTTP_403_FORBIDDEN
     assert response.json()["detail"] == {"code": "person_reporting_off"}
     [refused] = await _events(gateway)
@@ -80,7 +86,7 @@ async def test_a_superuser_or_an_administrator_without_the_grant_is_refused(
 ) -> None:
     await set_usage(gateway, person_reporting=True)
     sign_in(fastapi_app, await person(gateway, f"root-{_tag()}@example.com", roles=roles, superuser=True))
-    response = await client.get("/api/admin/usage/people", params=_params(team=team["id"]))
+    response = await client.get("/api/admin/usage/people", params=_params(team=team["id"]), headers=_reason())
     assert response.status_code == status.HTTP_403_FORBIDDEN
     assert response.json()["detail"] == {"code": "not_usage_auditor"}
 
@@ -91,12 +97,8 @@ async def test_a_reason_of_10_to_500_characters_is_required(
 ) -> None:
     await set_usage(gateway, person_reporting=True)
     sign_in(fastapi_app, await person(gateway, f"ua-{_tag()}@example.com", roles=["usage_auditor"]))
-    params = _params(team=team["id"])
-    if reason is None:
-        params.pop("reason")
-    else:
-        params["reason"] = reason
-    response = await client.get("/api/admin/usage/people", params=params)
+    headers = {} if reason is None else _reason(reason)
+    response = await client.get("/api/admin/usage/people", params=_params(team=team["id"]), headers=headers)
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
     assert response.json()["detail"] == {"code": "reason_required"}
 
@@ -108,7 +110,7 @@ async def test_a_usage_auditor_sees_the_team_by_name_and_the_view_is_recorded(
     auditor = await person(gateway, f"ua-{_tag()}@example.com", roles=["usage_auditor"])
     sign_in(fastapi_app, auditor)
 
-    response = await client.get("/api/admin/usage/people", params=_params(team=team["id"]))
+    response = await client.get("/api/admin/usage/people", params=_params(team=team["id"]), headers=_reason())
 
     assert response.status_code == status.HTTP_200_OK, response.text
     body = response.json()
@@ -134,7 +136,9 @@ async def test_monthly_granularity_gives_months(
 ) -> None:
     await set_usage(gateway, person_reporting=True, person_granularity="month")
     sign_in(fastapi_app, await person(gateway, f"ua-{_tag()}@example.com", roles=["usage_auditor"]))
-    response = await client.get("/api/admin/usage/people", params=_params(person=str(team["cleo"].id)))
+    response = await client.get(
+        "/api/admin/usage/people", params=_params(person=str(team["cleo"].id)), headers=_reason(),
+    )
     body = response.json()
     assert body["granularity"] == "month"
     assert [(row["period"], row["requests"]) for row in body["rows"]] == [("2026-10-01", 35)]
@@ -157,7 +161,7 @@ async def test_the_grant_through_a_team_counts(
                      UserGroup(user_id=holder.id, group_id=works_council.id)])
     await gateway.flush()
     sign_in(fastapi_app, holder)
-    response = await client.get("/api/admin/usage/people", params=_params(team=team["id"]))
+    response = await client.get("/api/admin/usage/people", params=_params(team=team["id"]), headers=_reason())
     assert response.status_code == status.HTTP_200_OK, response.text
 
 
@@ -166,7 +170,7 @@ async def test_exactly_one_valid_team_or_person_is_asked_for(
 ) -> None:
     sign_in(fastapi_app, await person(gateway, f"ua-{_tag()}@example.com", roles=["usage_auditor"]))
     for params in (_params(), _params(team=team["id"], person=str(team["abe"].id)), _params(team="not-an-id")):
-        response = await client.get("/api/admin/usage/people", params=params)
+        response = await client.get("/api/admin/usage/people", params=params, headers=_reason())
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT, params
 
 
@@ -176,7 +180,7 @@ async def test_the_person_viewed_sees_when_and_why_but_not_who(
     await set_usage(gateway, person_reporting=True)
     auditor = await person(gateway, f"ua-{_tag()}@example.com", roles=["usage_auditor"])
     sign_in(fastapi_app, auditor)
-    await client.get("/api/admin/usage/people", params=_params(team=team["id"]))
+    await client.get("/api/admin/usage/people", params=_params(team=team["id"]), headers=_reason())
 
     sign_in(fastapi_app, team["bea"])
     mine = (await client.get("/api/usage/me")).json()
@@ -208,7 +212,7 @@ async def test_the_auditors_download_is_the_persons_own_and_is_recorded_as_an_ex
     await set_usage(gateway, person_reporting=True)
     auditor = await person(gateway, f"ua-{_tag()}@example.com", roles=["usage_auditor"])
     sign_in(fastapi_app, auditor)
-    response = await client.get(f"/api/admin/usage/people/{cleo.id}/export", params={"reason": REASON})
+    response = await client.get(f"/api/admin/usage/people/{cleo.id}/export", headers=_reason())
 
     assert response.status_code == status.HTTP_200_OK, response.text
     assert "attachment" in response.headers["content-disposition"]
@@ -223,8 +227,8 @@ async def test_the_auditors_download_is_the_persons_own_and_is_recorded_as_an_ex
     }
     assert await _events(gateway) == [], "a download is not recorded as a view"
 
-    csv_export = await client.get(f"/api/admin/usage/people/{cleo.id}/export", params={"reason": REASON,
-                                                                                         "format": "csv"})
+    csv_export = await client.get(f"/api/admin/usage/people/{cleo.id}/export", params={"format": "csv"},
+                                  headers=_reason())
     assert csv_export.headers["content-type"].startswith("text/csv")
 
     sign_in(fastapi_app, cleo)
@@ -246,7 +250,7 @@ async def test_the_download_has_the_same_gates(
 ) -> None:
     await set_usage(gateway, person_reporting=switch)
     sign_in(fastapi_app, await person(gateway, f"x-{_tag()}@example.com", roles=roles, superuser=superuser))
-    response = await client.get(f"/api/admin/usage/people/{team['abe'].id}/export", params={"reason": reason})
+    response = await client.get(f"/api/admin/usage/people/{team['abe'].id}/export", headers=_reason(reason))
     assert response.json()["detail"] == {"code": code}
     [refused] = await _exports(gateway)
     assert refused.result == AuditResult.DENY
@@ -257,5 +261,5 @@ async def test_the_download_of_an_unknown_account_is_404(
 ) -> None:
     await set_usage(gateway, person_reporting=True)
     sign_in(fastapi_app, await person(gateway, f"ua-{_tag()}@example.com", roles=["usage_auditor"]))
-    response = await client.get(f"/api/admin/usage/people/{uuid.uuid4()}/export", params={"reason": REASON})
+    response = await client.get(f"/api/admin/usage/people/{uuid.uuid4()}/export", headers=_reason())
     assert response.status_code == status.HTTP_404_NOT_FOUND

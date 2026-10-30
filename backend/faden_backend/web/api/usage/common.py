@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator, Hashable
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Any, NoReturn
+from urllib.parse import unquote
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException, Request
@@ -44,6 +45,33 @@ def problems(*found: tuple[str, str]) -> NoReturn:
 def refuse(refusal: PeopleRefusal) -> NoReturn:
     """A refusal to show named people's usage, as ``{"detail": {"code": ...}}``."""
     raise HTTPException(status_code=refusal.status_code, detail={"code": refusal.code})
+
+
+#: The request header a usage auditor's reason travels in: percent-encoded UTF-8 (``encodeURIComponent``).
+REASON_HEADER = "X-Faden-Reason"
+
+
+def reason_header(request: Request) -> str | None:
+    """The reason a usage auditor gave, from ``X-Faden-Reason``; ``None`` without the header.
+
+    Never from the query string, which ends up in access logs, browser history and proxies (ASVS 5.0 14.2.1):
+    a ``reason`` there is refused with 422 ``reason_in_query``, so no client keeps sending one. The header is
+    percent-encoded UTF-8; one that is not (characters outside ASCII, bytes that are not UTF-8) counts as no
+    reason given (``""``), which the routes refuse as ``reason_required``.
+    """
+    if "reason" in request.query_params:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail={"code": "reason_in_query"},
+        )
+    raw = request.headers.get(REASON_HEADER)
+    if raw is None:
+        return None
+    if not raw.isascii():
+        return ""
+    try:
+        return unquote(raw, encoding="utf-8", errors="strict")
+    except UnicodeDecodeError:
+        return ""
 
 
 def _date(value: str | None, field: str) -> date | None:

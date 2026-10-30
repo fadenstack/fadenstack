@@ -4,11 +4,14 @@
   tree, ``services/usage/tree.py``), agent, model or provider, with no person in them. Every figure about
   fewer than k people is hidden, with complementary suppression (M04, M05; ``services/usage/suppression.py``);
   hours only where at least k people are (M10). The series' months, days and hours nest and are protected
-  together, as are the tree's two structures, so that no answer can be subtracted from another. Below k for the whole range the totals and the series are
-  hidden too, and ``small_instance`` is set (S12); a usage auditor who gives a reason sees them while
-  person-level reporting is on, recorded like a view of named people (M07).
+  together, as are the tree's two structures, so that no answer can be subtracted from another. Below k for
+  the whole range the totals and the series are hidden too, and ``small_instance`` is set (S12); a usage
+  auditor who gives a reason sees them while person-level reporting is on, recorded like a view of named
+  people (M07) -- only then, by day or month as fine as the per-person figures, never by hour (M10).
 - ``GET /api/admin/usage/people``: named people's figures, per day or month, sorted by name, never by usage
   (M11). Only with the switch on, the explicit grant, and a reason, and recorded (M02, M06, M07).
+
+A reason travels in the ``X-Faden-Reason`` header, never in the query string (``common.reason_header``).
 - ``GET``/``PUT /api/admin/usage/settings``: the ``usage.*`` settings; the switch needs Root Mode (M08: each
   change is recorded like every settings change).
 - ``GET``/``PUT /api/admin/usage/limits``: the instance's caps in the gateway's ``tenant_llm_policy`` (S11).
@@ -54,6 +57,7 @@ from faden_backend.web.api.usage.common import (
     period_text,
     periods,
     problems,
+    reason_header,
     refuse,
     utc_bounds,
 )
@@ -214,12 +218,14 @@ async def admin_usage(
     bucket: rollups.Bucket = "day",
     group_by: rollups.GroupBy = "team",
     structure: tree.Structure = "recorded",
-    reason: str | None = Query(default=None, max_length=2000),
+    reason: str | None = Depends(reason_header),
 ) -> dict[str, Any]:
     """Usage of teams, agents, models or providers over the range (default the last 30 days); no person.
 
-    With a *reason*, a usage auditor (person-level reporting on) sees the totals and the series unhidden;
-    refused like ``/people`` otherwise, and recorded either way.
+    With a *reason* (``X-Faden-Reason``), a usage auditor (person-level reporting on) sees the totals and the
+    series of a small instance unhidden, by day or month no finer than the per-person figures: refused like
+    ``/people`` otherwise, and recorded either way. Where nothing would be unhidden -- an instance of k people
+    or more, hours, days while per-person figures are by month -- the reason is not used and nothing recorded.
     """
     config = await usage_config.read(session)
     k = config.k
@@ -227,7 +233,10 @@ async def admin_usage(
     total = await rollups.total_cell(gw, days)
     total_people = max(total.floor, await rollups.people_in(gw, days, None, []))
     small = total.measures.requests > 0 and total_people < k
-    unhidden = reason is not None and await _auditor_look(session, gw, user, config, days, reason, small)
+    unhidden = (
+        reason is not None and small and _may_unhide(bucket, config)
+        and await _auditor_look(session, gw, user, config, days, bucket, reason)
+    )
     shown_totals = not small or unhidden
     if group_by == "team":
         groups = await _team_tree(session, gw, days, structure, k)
@@ -255,33 +264,40 @@ async def admin_usage(
     }
 
 
+def _may_unhide(bucket: rollups.Bucket, config: usage_config.UsageSettings) -> bool:
+    """Whether a reason may unhide a small instance's series by *bucket*.
+
+    Never by hour (M10), and by day only while per-person figures are by day.
+    """
+    return bucket == "month" or (bucket == "day" and config.person_granularity == "day")
+
+
 async def _auditor_look(
     session: AsyncSession,
     gw: AsyncSession,
     user: User,
     config: usage_config.UsageSettings,
     days: rollups.DayRange,
+    bucket: rollups.Bucket,
     reason: str,
-    small: bool,
 ) -> bool:
-    """A usage auditor's look at totals and series below k: allowed and recorded, or refused and recorded.
+    """A usage auditor's look at a small instance's totals and series: allowed or refused, recorded.
 
-    The people of the range are named in the record when the range holds fewer than k of them: the look was at
-    their figures, and each sees it in their own list (S03).
+    Every cell unhidden is about the people of the range, who are fewer than k: they are named in the record,
+    and each sees the look in their own list (S03).
     """
+    details = {"from": days.first.isoformat(), "to": days.last.isoformat(), "bucket": bucket}
     try:
         cleaned = await people.entitled(session, user, config, reason)
     except PeopleRefusal as refusal:
         await people.record_view(
             session, user, target_type="usage_aggregate", target_id="instance", person_ids=[],
-            details={"from": days.first.isoformat(), "to": days.last.isoformat()},
-            reason=reason.strip()[:500] or None, refused=refusal.code,
+            details=details, reason=reason.strip()[:500] or None, refused=refusal.code,
         )
         refuse(refusal)
     await people.record_view(
         session, user, target_type="usage_aggregate", target_id="instance",
-        person_ids=await rollups.people_ids(gw, days) if small else [],
-        details={"from": days.first.isoformat(), "to": days.last.isoformat()}, reason=cleaned,
+        person_ids=await rollups.people_ids(gw, days), details=details, reason=cleaned,
     )
     return True
 
@@ -309,7 +325,7 @@ async def admin_usage_people(
     last: str | None = Query(default=None, alias="to"),
     team: str | None = None,
     person: str | None = None,
-    reason: str | None = Query(default=None, max_length=2000),
+    reason: str | None = Depends(reason_header),
 ) -> dict[str, Any]:
     """One team's people, or one person: figures per person and day (or month), sorted by name."""
     config = await usage_config.read(session)
@@ -362,7 +378,7 @@ async def admin_usage_person_export(
     user: Annotated[User, Depends(current_active_user)],
     session: AsyncSession = Depends(get_db_session),
     gw: AsyncSession = Depends(gateway_session),
-    reason: str | None = Query(default=None, max_length=2000),
+    reason: str | None = Depends(reason_header),
     format: Literal["json", "csv"] = "json",
 ) -> Response:
     """One person's usage data as they download it themselves, for an access request (M13; GDPR Art. 15).

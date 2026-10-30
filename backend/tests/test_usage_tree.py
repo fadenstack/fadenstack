@@ -12,6 +12,7 @@ import json
 import uuid
 from datetime import date
 from typing import Any
+from urllib.parse import quote
 
 import pytest
 from fastapi import FastAPI
@@ -31,6 +32,7 @@ pytestmark = pytest.mark.anyio()
 D1 = date(2026, 10, 1)
 RANGE = {"from": "2026-10-01", "to": "2026-10-03", "group_by": "team"}
 REASON = "Checking the bill of a small office"
+HEADERS = {"X-Faden-Reason": quote(REASON, safe="")}
 
 
 def _people(prefix: str, count: int) -> list[str]:
@@ -176,7 +178,7 @@ async def test_a_usage_auditor_with_a_reason_sees_them_and_it_is_recorded(
     auditor = await person(gateway, f"ua-{uuid.uuid4().hex[:6]}@example.com", roles=["admin", "usage_auditor"])
     sign_in(fastapi_app, auditor)
 
-    body = (await client.get("/api/admin/usage", params={**RANGE, "reason": REASON})).json()
+    body = (await client.get("/api/admin/usage", params=RANGE, headers=HEADERS)).json()
 
     assert body["unhidden"] is True and body["totals"]["requests"] == 3 and body["totals"]["people"] == 3
     assert body["series"][0] | {} == {**body["series"][0], "suppressed": False, "requests": 3}
@@ -188,7 +190,7 @@ async def test_a_usage_auditor_with_a_reason_sees_them_and_it_is_recorded(
     assert details["person_ids"] == ["p1", "p2", "p3"] and details["reason"] == REASON
 
     sign_in(fastapi_app, await person(gateway, f"a-{uuid.uuid4().hex[:6]}@example.com", roles=["admin"]))
-    refused = await client.get("/api/admin/usage", params={**RANGE, "reason": REASON})
+    refused = await client.get("/api/admin/usage", params=RANGE, headers=HEADERS)
     assert refused.status_code == status.HTTP_403_FORBIDDEN
     assert refused.json()["detail"] == {"code": "not_usage_auditor"}
 
@@ -196,7 +198,8 @@ async def test_a_usage_auditor_with_a_reason_sees_them_and_it_is_recorded(
 async def test_with_the_switch_off_a_reason_gets_nothing(
     client: AsyncClient, fastapi_app: FastAPI, gateway: AsyncSession,
 ) -> None:
+    await usage(gateway, D1, ["p1", "p2", "p3"])
     sign_in(fastapi_app, await person(gateway, f"ua-{uuid.uuid4().hex[:6]}@example.com",
                                       roles=["admin", "usage_auditor"]))
-    refused = await client.get("/api/admin/usage", params={**RANGE, "reason": REASON})
+    refused = await client.get("/api/admin/usage", params=RANGE, headers=HEADERS)
     assert refused.json()["detail"] == {"code": "person_reporting_off"}
