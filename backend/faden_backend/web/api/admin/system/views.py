@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import logging
 import time
 import uuid
@@ -144,6 +145,16 @@ def _refuse_unconfirmed_switch_off(key: str, value: object) -> None:
             )
 
 
+#: The settings whose every change is recorded with its old and new value (M08: the person-level switch, k,
+#: granularity, retention), as ``/api/admin/usage/settings`` records them.
+_RECORDED_WITH_VALUES = "usage."
+
+
+async def _values_before(service: SystemSettingsService, keys: list[str]) -> dict[str, object]:
+    """The values in force of those of *keys* recorded with their old and new value."""
+    return {key: await service.value_of(key) for key in keys if key.startswith(_RECORDED_WITH_VALUES)}
+
+
 @router.get("/settings/schema", response_model=list[SettingsSchemaItemDTO], name="system_settings_schema")
 async def system_settings_schema(
     _user: Annotated[User, Depends(require_permission("system.settings", "read"))],
@@ -175,8 +186,12 @@ async def system_settings_update(
     service: SystemSettingsService = Depends(get_system_settings_service),
     audit_dao: AuditDAO = Depends(),
 ) -> SettingUpdateResponse:
-    """Update one setting and run immediate apply when required."""
+    """Update one setting and run immediate apply when required.
+
+    A ``usage.*`` setting is recorded with its old and new value (``from``, ``to``).
+    """
     _refuse_unconfirmed_switch_off(key, body.value)
+    before = await _values_before(service, [key])
     try:
         result = await service.update_value(
             key=key,
@@ -192,6 +207,13 @@ async def system_settings_update(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
 
+    metadata: dict[str, object] = {
+        "apply_status": result.apply_status,
+        "apply_scope": result.apply_scope,
+        "apply_job_id": str(result.job_id),
+    }
+    if key in before:
+        metadata |= {"from": before[key], "to": await service.value_of(key)}
     await audit_action(
         action="system.settings.update",
         target_type="system_setting",
@@ -200,10 +222,7 @@ async def system_settings_update(
         actor_id=user.id,
         severity="high" if root_mode_active else "normal",
         audit_dao=audit_dao,
-        metadata_json=(
-            f'{{"apply_status":"{result.apply_status}","apply_scope":"{result.apply_scope}",'
-            f'"apply_job_id":"{result.job_id}"}}'
-        ),
+        metadata_json=json.dumps(metadata, ensure_ascii=False),
     )
 
     return SettingUpdateResponse(
@@ -302,9 +321,13 @@ async def wizard_apply(
     service: SystemSettingsService = Depends(get_system_settings_service),
     audit_dao: AuditDAO = Depends(),
 ) -> WizardApplyResponse:
-    """Apply a wizard step payload via shared settings path."""
+    """Apply a wizard step payload via shared settings path.
+
+    Each ``usage.*`` setting it changes is recorded on its own, with its old and new value.
+    """
     for key, value in body.values.items():
         _refuse_unconfirmed_switch_off(key, value)
+    before = await _values_before(service, list(body.values))
     results: list[SettingUpdateResponse] = []
     for key, value in body.values.items():
         result = await service.update_value(
@@ -333,6 +356,20 @@ async def wizard_apply(
         audit_dao=audit_dao,
         metadata_json=f'{{"keys":{list(body.values.keys())}}}',
     )
+    for key, old in before.items():
+        new = await service.value_of(key)
+        if new == old:
+            continue
+        await audit_action(
+            action="system.settings.update",
+            target_type="system_setting",
+            target_id=key,
+            result=AuditResult.ALLOW,
+            actor_id=user.id,
+            severity="high" if root_mode_active else "normal",
+            audit_dao=audit_dao,
+            metadata_json=json.dumps({"from": old, "to": new, "via": "wizard"}, ensure_ascii=False),
+        )
     return WizardApplyResponse(results=results)
 
 

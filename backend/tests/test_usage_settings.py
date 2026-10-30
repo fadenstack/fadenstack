@@ -105,6 +105,28 @@ async def test_the_generic_settings_route_keeps_the_ranges_too(
     assert (await client.put(switch, json={"value": True, "target_host": "local"})).status_code == 403
 
 
+async def test_the_generic_settings_routes_record_a_usage_change_with_its_values(
+    client: AsyncClient, fastapi_app: FastAPI, dbsession: AsyncSession, admin: Any,
+) -> None:
+    """M08: k changed through Settings or the setup wizard is recorded with its old and new value."""
+    url = fastapi_app.url_path_for("system_settings_update", key="usage.min_group_size")
+    response = await client.put(url, json={"value": 8, "target_host": "local"})
+    assert response.status_code == status.HTTP_200_OK, response.text
+    [event] = [e for e in await _events(dbsession, "system.settings.update") if e.target_id == "usage.min_group_size"]
+    assert json.loads(event.metadata_json or "{}") | {} == {
+        **json.loads(event.metadata_json or "{}"), "from": 5, "to": 8, "apply_status": "success",
+    }
+
+    wizard = fastapi_app.url_path_for("system_wizard_apply")
+    body = {"values": {"usage.min_group_size": 9, "usage.time_zone": "UTC"}, "target_host": "local"}
+    assert (await client.post(wizard, json=body)).status_code == status.HTTP_200_OK
+    events = [e for e in await _events(dbsession, "system.settings.update") if e.target_id == "usage.min_group_size"]
+    assert json.loads(events[-1].metadata_json or "{}") == {"from": 8, "to": 9, "via": "wizard"}
+    assert not [e for e in await _events(dbsession, "system.settings.update") if e.target_id == "usage.time_zone"], (
+        "a value set to what it was is no change"
+    )
+
+
 # ── /api/admin/usage/settings ───────────────────────────────────────
 
 
