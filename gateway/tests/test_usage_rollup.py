@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engin
 
 from faden_gateway.db.models.gateway import LLMGatewayRequestLog, LLMToolCallLog, PriceCatalog
 from faden_gateway.db.models.usage import UsageDaily, UsageDailyPerson, UsageHourly, UsageRollupState
-from faden_gateway.services.gateway import erasure, usage_rollup, usage_settings
+from faden_gateway.services.gateway import erasure, usage_group, usage_rollup, usage_settings
 from faden_gateway.services.gateway.usage_group import PATH_LEVELS, BackendUserGroups, UsageTeam
 from faden_gateway.services.gateway.usage_settings import UsageSettings
 
@@ -394,3 +394,27 @@ async def test_a_teams_path_walks_up_its_parents_once_teams_have_them(
         assert await tree(people["loop"]) == UsageTeam(a, (b, a)), "a cycle stops the walk"
     finally:
         await tree.close()
+
+
+@needs_postgres
+@pytest.mark.anyio
+async def test_teams_becoming_a_tree_while_the_gateway_runs_are_seen_within_minutes(
+    backend_schema: tuple[str, asyncpg.Connection],
+) -> None:
+    """The backend is upgraded (``groups.parent_id`` added) after the gateway first asked: it asks again."""
+    dsn, conn = backend_schema
+    root, team, someone = str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4())
+    await conn.execute("INSERT INTO groups (id, name) VALUES ($1::uuid, 'root'), ($2::uuid, 'team')", root, team)
+    await conn.execute('INSERT INTO "user" VALUES ($1::uuid, $2::uuid)', someone, team)
+    now = [1000.0]
+    resolver = BackendUserGroups(dsn, clock=lambda: now[0])
+    try:
+        assert await resolver(someone) == UsageTeam(team, (team,))
+        await conn.execute("ALTER TABLE groups ADD COLUMN parent_id uuid")
+        await conn.execute("UPDATE groups SET parent_id = $1::uuid WHERE id = $2::uuid", root, team)
+        now[0] += 60
+        assert await resolver(someone) == UsageTeam(team, (team,)), "a no is believed for a few minutes"
+        now[0] += usage_group.TREE_RECHECK_SEC
+        assert await resolver(someone) == UsageTeam(team, (root, team))
+    finally:
+        await resolver.close()
