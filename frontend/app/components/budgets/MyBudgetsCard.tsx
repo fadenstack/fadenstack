@@ -84,8 +84,10 @@ export default function MyBudgetsCard({ section }: { section: UsageSection }) {
             </Typography>
             <Stack component="ul" sx={{ m: 0, pl: 2.5 }}>
               {alerts.map((alert, i) => (
-                <Typography component="li" variant="body2" key={`${alert.name}-${alert.threshold}-${i}`}>
-                  {t("budgets.my.alert", { name: alert.name, threshold: alert.threshold, date: fmtDate(alert.at, lang) })}
+                <Typography component="li" variant="body2" key={`${alert.name}-${alert.kind}-${alert.threshold}-${i}`}>
+                  {alert.kind === "forecast" || alert.threshold === null
+                    ? t("budgets.my.alert_forecast", { name: alert.name, date: fmtDate(alert.at, lang) })
+                    : t("budgets.my.alert", { name: alert.name, threshold: alert.threshold, date: fmtDate(alert.at, lang) })}
                 </Typography>
               ))}
             </Stack>

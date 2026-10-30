@@ -23,7 +23,9 @@ Nach der Installation, und solange Sie keine Einstellung ändern:
   stehen, und ihre Summen nur, wenn mindestens fünf Personen die Instanz genutzt haben (siehe
   [Die Mindestgruppengröße](usage.md#the-minimum-group-size)).
 - **Keine Seite listet Anfragen nach Person.** **Kosten-Observability** und **LLM-Aufrufe** zeigen nie, wer eine
-  Anfrage gesendet hat, und finden Anfragen nicht nach Person.
+  Anfrage gesendet hat, und finden Anfragen nicht nach Person. **LLM-Aufrufe** zeigt auch keine Sitzung,
+  Unterhaltung, kein Gerät und kein Projekt einer Anfrage und findet keine danach: Jedes davon würde zu einer
+  Person führen.
 - **Auch die Zahlen eines Agenten brauchen fünf Personen.** Sein Reiter **Aktivität** zeigt sie nur, wenn
   mindestens fünf Personen den Agenten im Zeitraum genutzt haben, und nennt niemanden; der Eigentümer eines
   persönlichen Agenten sieht seine eigenen (siehe [Agenten und Add-ins](agents.md)).
@@ -71,7 +73,9 @@ Die Zahlen einer einzelnen Person sieht nur, wer die Rolle `usage_auditor` hat, 
 Auswertung** eingeschaltet ist, und nur in der personenbezogenen Auswertung unter **Nutzung**: Keine andere Seite
 der Konsole zeigt sie. Die Rolle ist eingebaut, bei der Installation hat sie niemand,
 und ein Superuser hat sie nicht von selbst: Ein Administrator, der personenbezogene Zahlen ansehen soll, braucht
-die Rolle ebenfalls.
+die Rolle ebenfalls. Mehr braucht ein Nutzungsprüfer aber auch nicht: Die Rolle öffnet die Seite **Nutzung** in der
+Konsole, ohne Administratorrechte, und die personenbezogene Auswertung bietet die Personen und Nutzungsgruppen zur
+Auswahl an.
 
 1. Vereinbaren Sie mit Ihrem Datenschutzbeauftragten und Ihrem Betriebsrat, wer hineinsehen darf und aus welchen
    Gründen. Übliche Gründe: ein Streit über Kosten, ein Auskunftsersuchen der Person selbst, ein
@@ -89,7 +93,9 @@ pro Person**:
 3. Geben Sie die **Begründung** der Einsicht an (10 bis 500 Zeichen) und wählen Sie **Zahlen anzeigen**.
 
 Die Zahlen erscheinen pro Person und pro Tag (oder Monat), nach Namen sortiert, nie danach, wie viel jemand
-genutzt hat.
+genutzt hat. Die Auswertung umfasst höchstens die Tage, für die personenbezogene Zahlen aufbewahrt werden
+(**Personenbezogene Zahlen**): Ist der **Zeitraum** der Seite länger, umfasst sie dessen letzte dieser Tage und
+sagt das.
 
 Unter **Daten einer Person herunterladen** lädt **Als JSON herunterladen** oder **Als CSV herunterladen** neben
 einer Person deren Daten herunter: dasselbe, was die Person unter **Meine Nutzung** erhält (siehe
@@ -97,9 +103,18 @@ einer Person deren Daten herunter: dasselbe, was die Person unter **Meine Nutzun
 jemandem zu beantworten, der sich nicht anmelden kann. Der Download wird mit der Begründung der Einsicht
 aufgezeichnet.
 
+!!! note "Nur bei eingeschalteter personenbezogener Auswertung"
+    Der Download braucht, wie die Einsicht, eine eingeschaltete **Personenbezogene Auswertung**. Ist sie
+    ausgeschaltet, bietet die Konsole keinen Weg, die Daten einer anderen Person herunterzuladen. Für ein
+    Auskunftsersuchen von jemandem, der sich nicht anmelden kann, vereinbaren Sie ein Verfahren mit Ihrem
+    Datenschutzbeauftragten, etwa der Person wieder Zugang zu geben, damit sie ihre Daten unter **Meine Nutzung**
+    herunterlädt.
+
 Jede Einsicht und jeder Download wird im Audit-Protokoll festgehalten: wer, in wessen Zahlen, für welchen
-Zeitraum und mit welchem Grund. Die Person sieht in ihrem eigenen Download Datum und angegebenen Grund jeder
-Einsicht und jedes Downloads, nie, wer hineingesehen hat; **Meine Nutzung** zeigt, wie viele es waren.
+Zeitraum und mit welchem Grund. Die Begründung geht in einem Header der Anfrage an den Server, nie in der Adresse
+der Seite, und landet so nicht in den Protokollen von Webservern oder Proxys; das Audit-Protokoll hält sie fest.
+Die Person sieht in ihrem eigenen Download Datum und angegebenen Grund jeder Einsicht und jedes Downloads, nie,
+wer hineingesehen hat; **Meine Nutzung** zeigt, wie viele es waren.
 
 ??? info "Wer die Aufzeichnung prüft"
     Die eingebaute Rolle `auditor` liest das Audit-Protokoll, öffnet die Seite **Nutzung** ohne
@@ -126,8 +141,9 @@ Unter **Ihre Daten** liefern **Als JSON herunterladen** und **Als CSV herunterla
 
 Fragt jemand, was über seine Nutzung gespeichert ist (Art. 15 DSGVO), verweisen Sie ihn dorthin: Der Download
 beantwortet das, zusammen mit Ihren Datenschutzhinweisen für Beschäftigte (Zwecke, Rechtsgrundlage, Empfänger,
-Speicherdauer, Rechte). Für jemanden, der sich nicht anmelden kann, lädt ein Nutzungsprüfer dasselbe herunter
-und gibt das Ersuchen als Grund an (siehe [Die Zahlen einer Person ansehen](#looking-at-one-persons-figures)).
+Speicherdauer, Rechte). Für jemanden, der sich nicht anmelden kann, lädt ein Nutzungsprüfer dasselbe herunter,
+solange die personenbezogene Auswertung eingeschaltet ist, und gibt das Ersuchen als Grund an (siehe
+[Die Zahlen einer Person ansehen](#looking-at-one-persons-figures)).
 
 ## Aufbewahrung und Löschung {#retention-and-erasure}
 
@@ -160,9 +176,11 @@ Aufbewahrt 90 Tage (**Anfrageprotokoll**, `usage.request_log_retention_days`); g
 | Felder | Wozu | Wer sie sieht |
 |---|---|---|
 | `user_id` | Die Person, die die Anfrage gesendet hat: ihre Konto-ID, nicht ihr Name oder ihre E-Mail-Adresse | Die Person, in ihrem Download. Nutzungsprüfer, in der personenbezogenen Auswertung, solange sie eingeschaltet ist, und in einem Download, den sie für eine Person erstellen. Keine andere Seite zeigt sie, auch nicht **Kosten-Observability** und **LLM-Aufrufe** |
-| `group_id`, `project_id`, `agent_id` | Die Nutzungsgruppe (das Team) der Person, das Chat-Projekt, der Agent | Administratoren unter **LLM-Aufrufe**; in Summen unter **Nutzung**; die Person (Projekt, Agent) |
+| `group_id`, `agent_id` | Die Nutzungsgruppe (das Team) der Person, der Agent | Administratoren unter **LLM-Aufrufe**; in Summen unter **Nutzung**; die Person (Agent) |
+| `project_id` | Das Chat-Projekt | Die Person, unter **Meine Nutzung**. Keine Seite für Administratoren zeigt es |
 | `group_path` | Die Stellung des Nutzungsteams im Teambaum zum Zeitpunkt der Nutzung | Administratoren; in Summen unter **Nutzung** |
-| `device_id`, `session_id`, `conversation_id`, `turn_id` | Verbinden die Anfrage eines Agenten mit seiner Anmeldung auf einem Gerät und mit seiner Unterhaltung | Administratoren unter **LLM-Aufrufe**. Nie in den Zahlen oder im Download |
+| `device_id`, `session_id`, `conversation_id` | Verbinden die Anfrage eines Agenten mit seiner Anmeldung auf einem Gerät und mit seiner Unterhaltung | Keine Seite zeigt sie, auch nicht **LLM-Aufrufe**, und keine findet Anfragen danach. Nie in den Zahlen oder im Download |
+| `turn_id` | Fasst die Runden zusammen, die ein Agent für eine Frage brauchte | Administratoren unter **LLM-Aufrufe** |
 | `request_id`, `trace_id`, `tenant_id`, `endpoint`, `stream` | Eine Anfrage finden und wie sie gestellt wurde | Administratoren |
 | `model_alias`, `provider_instance_id` | Welches Modell geantwortet hat und wo es lief | Administratoren; in Summen; die Person (Modell) |
 | `created_at` | Wann, auf die Sekunde | Administratoren; die Person |
@@ -195,7 +213,7 @@ Zahlen oben; diese Tabellen enthalten die Budgets selbst:
 | Tabelle | Eine Zeile pro | Enthält | Aufbewahrt | Wer sie sieht |
 |---|---|---|---|---|
 | `ee.budgets` | Budget | `name`; wofür es gilt (`scope`, `target_id`: ein Team, ein Agent oder, beim Budget einer Person, ihre Konto-ID); `unit`, `currency`, `amount`, `period`, `mode`, `thresholds`; die verantwortliche Person, die seine Benachrichtigungen erhält (`owner_id`); wer es wann angelegt hat. Keine Nutzungszahlen | Bis es gelöscht wird | Administratoren. Das Budget einer Person: nur sein Limit; was die Person verbraucht hat, sieht nur sie unter **Meine Nutzung**, und Nutzungsprüfer, solange die personenbezogene Auswertung eingeschaltet ist |
-| `ee.budget_alerts` | Budget, Zeitraum, Schwelle und Art (`threshold` oder `forecast`) | Wann die Benachrichtigung hinausging, damit sie einmal hinausgeht. Keine Zahlen, keine Person | Mit seinem Budget | Niemand: Die Benachrichtigungen selbst nennen das Budget und die Schwelle, nie die Nutzung einer Person |
+| `ee.budget_alerts` | Budget, Zeitraum, Schwelle und Art (`threshold` oder `forecast`) | Wann die Benachrichtigung hinausging, damit sie einmal hinausgeht, außer die Antwort des Mailservers ging verloren: Dann kann ihre Mail zweimal kommen. Keine Zahlen, keine Person | Mit seinem Budget | Niemand: Die Benachrichtigungen selbst nennen das Budget und die Schwelle, nie die Nutzung einer Person |
 | `ee.scim_person_attributes` | Person, die durch Provisionierung (SCIM) angelegt wurde | `cost_center` und `department`, wie der Anmeldeanbieter sie sendet | Gelöscht mit dem Konto | Administratoren, über die Kostenstellen-Regel |
 | `ee.cost_center_rules` | Kostenstelle | Das Team, das sie zur Nutzungsgruppe einer Person macht | Bis sie entfernt wird; gelöscht mit dem Team | Administratoren |
 
@@ -263,7 +281,8 @@ Nutzungszahlen handeln von Ihren Kolleginnen und Kollegen. Bevor Sie damit arbei
 - Kopieren Sie personenbezogene Zahlen nicht aus Fadenstack heraus, in Screenshots oder Tabellen: Dort entgehen
   sie der Aufbewahrungsdauer und der Aufzeichnung, wer hineingesehen hat.
 - Fragt jemand, was über seine Nutzung gespeichert ist, verweisen Sie ihn auf **Meine Nutzung** und den Download;
-  für jemanden, der sich nicht anmelden kann, lädt ein Nutzungsprüfer ihn herunter.
+  für jemanden, der sich nicht anmelden kann, lädt ein Nutzungsprüfer ihn herunter, solange die personenbezogene
+  Auswertung eingeschaltet ist.
 - Sind Sie unsicher, ob eine Verwendung erlaubt ist, fragen Sie vorher Ihren Datenschutzbeauftragten.
 
 ## Wenn es nicht funktioniert {#when-it-does-not-work}

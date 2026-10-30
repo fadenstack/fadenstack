@@ -63,11 +63,17 @@ export interface Budget {
   percent: number | null;
   /** At the rate so far, the day it runs out before the period ends; null when it lasts (or nothing is known). */
   forecast_end: string | null;
-  /** Shadow budgets: requests this period that a hard budget would have refused. */
-  would_refuse: number;
+  /**
+   * Shadow budgets: requests this period that a hard budget would have refused; null when it is not known
+   * (not a shadow budget, its figures hidden from the caller, or the gateway's counters unreachable).
+   */
+  would_refuse: number | null;
   /** The budgets of the teams below add up to more than this one (each still holds). */
   children_exceed: boolean;
-  /** A person's budget whose use the caller may not see. */
+  /**
+   * Its use is hidden from the caller: a person's budget (unless person-level reporting is on and they hold
+   * the usage auditor role), or a team's or the organisation's that fewer than k people used this period.
+   */
   suppressed: boolean;
 }
 
@@ -146,9 +152,12 @@ export interface MyBudget {
   mode: BudgetMode;
 }
 
+/** An alert of this period: a threshold crossed, or a forecast that the budget runs out before the period ends. */
 export interface MyBudgetAlert {
   name: string;
-  threshold: number;
+  kind: "threshold" | "forecast";
+  /** Percent of the amount; null for a forecast. */
+  threshold: number | null;
   at: string;
 }
 
@@ -198,7 +207,7 @@ export function readBudget(raw: Raw<Budget>): Budget {
     reserved: figure(raw.reserved),
     percent: figure(raw.percent),
     forecast_end: (raw.forecast_end as string | null) ?? null,
-    would_refuse: figure(raw.would_refuse) ?? 0,
+    would_refuse: figure(raw.would_refuse),
     children_exceed: raw.children_exceed === true,
     suppressed: raw.suppressed === true,
   };
@@ -247,7 +256,12 @@ export function readMyBudgets(data: Record<string, unknown> | null | undefined):
       })),
     alerts: alerts
       .filter((a) => a && typeof a === "object")
-      .map((a) => ({ name: String(a.name ?? ""), threshold: figure(a.threshold) ?? 0, at: String(a.at ?? "") })),
+      .map((a) => ({
+        name: String(a.name ?? ""),
+        kind: a.kind === "forecast" ? ("forecast" as const) : ("threshold" as const),
+        threshold: a.kind === "forecast" ? null : figure(a.threshold),
+        at: String(a.at ?? ""),
+      })),
   };
 }
 

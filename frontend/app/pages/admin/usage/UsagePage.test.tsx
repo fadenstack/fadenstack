@@ -9,11 +9,10 @@ import userEvent from "@testing-library/user-event";
 import { ThemeProvider } from "@mui/material/styles";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import * as admin from "~/api/admin";
-import type { AdminUser, Group } from "~/api/admin";
 import { ApiError } from "~/api/http";
 import * as api from "~/api/usage";
 import { getAppTheme } from "~/theme";
+import { saveFile } from "~/lib/saveFile";
 import { renderPage } from "~/test/renderPage";
 import { adminUsage, hiddenMeasures, measures } from "~/test/usageFixtures";
 
@@ -21,17 +20,13 @@ import UsagePage from "./UsagePage";
 
 vi.mock("~/api/usage", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/api/usage")>();
-  return { ...actual, usageApi: { ...actual.usageApi, admin: vi.fn(), people: vi.fn() } };
-});
-
-vi.mock("~/api/admin", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("~/api/admin")>();
   return {
     ...actual,
-    adminUsers: { ...actual.adminUsers, list: vi.fn() },
-    adminGroups: { ...actual.adminGroups, list: vi.fn() },
+    usageApi: { ...actual.usageApi, admin: vi.fn(), people: vi.fn(), peopleChoices: vi.fn(), peopleExport: vi.fn() },
   };
 });
+
+vi.mock("~/lib/saveFile", () => ({ saveFile: vi.fn() }));
 
 // The chart is MUI's; what goes into it is the page's (a gap is null, never 0).
 vi.mock("~/components/dashboard/TimeSeriesChart", () => ({
@@ -41,8 +36,7 @@ vi.mock("~/components/dashboard/TimeSeriesChart", () => ({
 }));
 
 const usage = vi.mocked(api.usageApi);
-const users = vi.mocked(admin.adminUsers);
-const groups = vi.mocked(admin.adminGroups);
+const save = vi.mocked(saveFile);
 
 function view() {
   return renderPage(
@@ -65,8 +59,13 @@ function groupOrder(): string[] {
 beforeEach(() => {
   usage.admin.mockReset();
   usage.people.mockReset();
-  users.list.mockResolvedValue([{ id: "u-1", email: "pat@example.com" } as AdminUser]);
-  groups.list.mockResolvedValue([{ id: "g-sales", name: "Sales" } as Group]);
+  usage.peopleExport.mockReset();
+  save.mockReset();
+  // Whom to pick comes from the usage API, not the administrators' lists (a usage auditor may lack those).
+  usage.peopleChoices.mockResolvedValue({
+    people: [{ id: "u-1", email: "pat@example.com" }],
+    teams: [{ id: "g-sales", name: "Sales" }],
+  });
 });
 
 describe("Usage (administrators)", () => {
@@ -258,6 +257,48 @@ describe("teams as a tree", () => {
     await waitFor(() => expect(container.querySelector("[data-usage-unhidden]")).not.toBeNull());
   });
 
+  it("drops the reason when the range, the bucket or the grouping changes", async () => {
+    usage.admin.mockResolvedValue(
+      adminUsage({ totals: { ...hiddenMeasures(), people: null }, small_instance: true, can_view_people: true }),
+    );
+    view();
+
+    const showAgain = async () => {
+      await userEvent.click(await screen.findByRole("button", { name: "Show anyway" }));
+      const dialog = await screen.findByRole("dialog");
+      await userEvent.type(within(dialog).getByRole("textbox", { name: "Reason" }), "Cost dispute of the pilot team");
+      await userEvent.click(within(dialog).getByRole("button", { name: "Show figures" }));
+      await waitFor(() => expect(usage.admin).toHaveBeenLastCalledWith(expect.objectContaining({ reason: expect.any(String) })));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    };
+    const sentWithout = () =>
+      waitFor(() => expect(usage.admin).toHaveBeenLastCalledWith(expect.not.objectContaining({ reason: expect.anything() })));
+
+    await showAgain();
+    await userEvent.click(screen.getByRole("button", { name: "90 days" }));
+    await sentWithout();
+
+    await showAgain();
+    await userEvent.click(screen.getByRole("button", { name: "Month" }));
+    await sentWithout();
+
+    await showAgain();
+    await userEvent.click(screen.getByRole("button", { name: "Agent" }));
+    await sentWithout();
+  });
+
+  it("offers no unhiding of hours", async () => {
+    usage.admin.mockResolvedValue(
+      adminUsage({ bucket: "hour", totals: { ...hiddenMeasures(), people: null }, small_instance: true, can_view_people: true }),
+    );
+    const { container } = view();
+    await userEvent.click(await screen.findByRole("button", { name: "Hour" }));
+
+    await waitFor(() => expect(usage.admin).toHaveBeenLastCalledWith(expect.objectContaining({ bucket: "hour" })));
+    expect(container.querySelector("[data-usage-small-instance]")).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "Show anyway" })).toBeNull();
+  });
+
   it("words a refused reason and stops sending it", async () => {
     usage.admin.mockResolvedValue(
       adminUsage({ totals: { ...hiddenMeasures(), people: null }, small_instance: true, can_view_people: true }),
@@ -329,15 +370,93 @@ describe("per-person figures for a usage auditor", () => {
     expect(within(table).getAllByText("kim@example.com")).toHaveLength(1); // a name that is the address, once
     expect(within(table).queryAllByRole("button")).toHaveLength(0);
 
-    // One person's data, downloaded under the same reason.
-    const json = screen.getByRole("link", { name: "Download as JSON" });
-    expect(json).toHaveAttribute("href", "/api/admin/usage/people/u-1/export?format=json&reason=budget+dispute+in+Sales");
+    // One person's data, fetched under the same reason (a header, not a link) and saved from the page.
+    const blob = new Blob(["{}"], { type: "application/json" });
+    usage.peopleExport.mockResolvedValue({ blob, filename: "usage-u-1.json" });
+    await userEvent.click(screen.getByRole("button", { name: "Download as JSON" }));
+    await waitFor(() => expect(save).toHaveBeenCalledWith(blob, "usage-u-1.json"));
+    expect(usage.peopleExport).toHaveBeenLastCalledWith("u-1", "json", "budget dispute in Sales");
+    expect(screen.queryByRole("link", { name: /Download/ })).toBeNull();
+
     await userEvent.click(screen.getByRole("combobox", { name: "Person" }));
     await userEvent.click(await screen.findByRole("option", { name: "sam@example.com" }));
-    expect(screen.getByRole("link", { name: "Download as CSV" })).toHaveAttribute(
-      "href",
-      "/api/admin/usage/people/u-2/export?format=csv&reason=budget+dispute+in+Sales",
+    await userEvent.click(screen.getByRole("button", { name: "Download as CSV" }));
+    await waitFor(() => expect(usage.peopleExport).toHaveBeenLastCalledWith("u-2", "csv", "budget dispute in Sales"));
+  });
+
+  it("keeps the range inside the days per-person figures are kept", async () => {
+    usage.admin.mockResolvedValue(adminUsage({ from: "2026-07-31", to: "2026-10-28", person_reporting: true, can_view_people: true }));
+    usage.people.mockResolvedValue({ granularity: "day", rows: [] });
+    const dialog = await openDialog();
+    await pickTeam(dialog);
+
+    // The server has not said how long it keeps them: the shortest the settings allow (31 days).
+    expect(dialog.querySelector("[data-usage-people-range]")!.textContent).toMatch(/kept for 31 days/);
+    await userEvent.type(within(dialog).getByRole("textbox", { name: "Reason" }), "Budget dispute in Sales");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Show figures" }));
+
+    await waitFor(() => expect(usage.people).toHaveBeenCalledWith(expect.objectContaining({ from: "2026-09-28", to: "2026-10-28" })));
+  });
+
+  it("uses the server's keeping when it says it", async () => {
+    usage.admin.mockResolvedValue(adminUsage({ from: "2026-07-31", to: "2026-10-28", person_reporting: true, can_view_people: true }));
+    usage.peopleChoices.mockResolvedValue({ people: [], teams: [{ id: "g-sales", name: "Sales" }], person_retention_days: 120 });
+    usage.people.mockResolvedValue({ granularity: "day", rows: [] });
+    const dialog = await openDialog();
+    await pickTeam(dialog);
+    expect(dialog.querySelector("[data-usage-people-range]")!.textContent).not.toMatch(/kept for/);
+
+    await userEvent.type(within(dialog).getByRole("textbox", { name: "Reason" }), "Budget dispute in Sales");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Show figures" }));
+
+    await waitFor(() => expect(usage.people).toHaveBeenCalledWith(expect.objectContaining({ from: "2026-07-31" })));
+  });
+
+  it("words a range the server refuses as too long", async () => {
+    usage.people.mockRejectedValue(new api.UsageProblemsError([{ field: "to", code: "out_of_range" }]));
+    const dialog = await openDialog();
+    await pickTeam(dialog);
+    await userEvent.type(within(dialog).getByRole("textbox", { name: "Reason" }), "Budget dispute in Sales");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Show figures" }));
+
+    await waitFor(() => expect(dialog.querySelector("[data-usage-people-error]")).not.toBeNull());
+    expect(dialog.querySelector("[data-usage-people-error]")!.textContent).toMatch(
+      /Figures per person are kept for a shorter time than this period\. Choose a shorter period on the page \(at most 31 days\)/,
     );
+  });
+
+  it("picks from the usage API's choices, not the administrators' lists", async () => {
+    const dialog = await openDialog();
+    expect(usage.peopleChoices).toHaveBeenCalled();
+    await userEvent.click(within(dialog).getByRole("combobox", { name: "Person" }));
+    expect(await screen.findByRole("option", { name: "pat@example.com" })).toBeInTheDocument();
+  });
+
+  it("words a refused list of choices", async () => {
+    usage.peopleChoices.mockRejectedValue(new ApiError("forbidden", 403, "not_usage_auditor"));
+    const dialog = await openDialog();
+
+    expect(await within(dialog).findByText(/need the usage auditor role/)).toBeInTheDocument();
+  });
+
+  it("words a refused download", async () => {
+    usage.people.mockResolvedValue({
+      granularity: "day",
+      rows: [{ person: { id: "u-1", name: null, email: "pat@example.com" }, period: "2026-10-27", ...measures() }],
+    });
+    const dialog = await openDialog();
+    await userEvent.type(within(dialog).getByRole("textbox", { name: "Reason" }), "Access request by the person");
+    await userEvent.click(within(dialog).getByRole("combobox", { name: "Person" }));
+    await userEvent.click(await screen.findByRole("option", { name: "pat@example.com" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Show figures" }));
+    await screen.findByRole("table", { name: "Figures per person" });
+
+    usage.peopleExport.mockRejectedValue(new ApiError("forbidden", 403, "person_reporting_off"));
+    await userEvent.click(screen.getByRole("button", { name: "Download as JSON" }));
+
+    await waitFor(() => expect(document.querySelector("[data-usage-export-error]")).not.toBeNull());
+    expect(document.querySelector("[data-usage-export-error]")!.textContent).toMatch(/Person-level reporting is off/);
+    expect(save).not.toHaveBeenCalled();
   });
 
   it.each([

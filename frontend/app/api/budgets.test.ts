@@ -64,6 +64,15 @@ describe("budgets API", () => {
 
     expect(fetchMock.mock.calls[0][0]).toBe("/api/ee/budgets");
     expect(first).toMatchObject({ amount: 1000, spent: 250.5, percent: 25.05, children_exceed: true, suppressed: false });
+    expect(first.would_refuse).toBe(0);
+  });
+
+  it("keeps an unknown would-refuse count unknown, not zero", async () => {
+    fetchMock.mockImplementation(async () => answer(200, [{ id: "b-2", name: "Trial", mode: "shadow", would_refuse: null }]));
+
+    const [first] = await budgetsApi.list();
+
+    expect(first.would_refuse).toBeNull();
   });
 
   it("creates, changes only the fields given, and deletes", async () => {
@@ -159,12 +168,20 @@ describe("the budgets on My usage", () => {
   it("reads the block defensively", () => {
     const read = readMyBudgets({
       budgets: [{ name: "Mine", kind: "personal", unit: "money", currency: "EUR", amount: "20.0000", spent: "5", percent: 25, period_end: "2026-10-31", mode: "soft" }, null],
-      alerts: [{ name: "Mine", threshold: 80, at: "2026-10-20" }],
+      alerts: [
+        { name: "Mine", kind: "threshold", threshold: 80, at: "2026-10-20" },
+        { name: "Mine", kind: "forecast", threshold: null, at: "2026-10-21" },
+        { name: "Old server", threshold: 100, at: "2026-10-22" },
+      ],
     });
     expect(read.budgets).toEqual([
       { name: "Mine", kind: "personal", unit: "money", currency: "EUR", amount: 20, spent: 5, percent: 25, period_end: "2026-10-31", mode: "soft" },
     ]);
-    expect(read.alerts).toEqual([{ name: "Mine", threshold: 80, at: "2026-10-20" }]);
+    expect(read.alerts).toEqual([
+      { name: "Mine", kind: "threshold", threshold: 80, at: "2026-10-20" },
+      { name: "Mine", kind: "forecast", threshold: null, at: "2026-10-21" },
+      { name: "Old server", kind: "threshold", threshold: 100, at: "2026-10-22" },
+    ]);
     expect(readMyBudgets(undefined)).toEqual({ budgets: [], alerts: [] });
   });
 });

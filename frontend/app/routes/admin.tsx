@@ -288,9 +288,12 @@ function AdminLayoutInner() {
 
   // The pages someone who is not a superuser may open; any other console address leads to the first.
   const pages = consolePages(isSuperuser, permissionKeys);
+  // Until that redirect has happened, a page they may not open is not rendered at all: it would ask the
+  // server for what it shows, and get 403s, before the address changes.
+  const pageOpens = pages === null || mayOpen(pages, location.pathname);
   useEffect(() => {
-    if (!authReady || pages === null || mayOpen(pages, location.pathname)) return;
-    navigate(pages[0] ?? "/chat", { replace: true });
+    if (!authReady || pageOpens) return;
+    navigate(pages?.[0] ?? "/chat", { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authReady, isSuperuser, permissionKeys, location.pathname]);
 
@@ -501,14 +504,16 @@ function AdminLayoutInner() {
             },
           }}
         >
-          <Outlet
-            context={{
-              rootModeActive: isRootActive,
-              can: hasPermission,
-              isSuperuser,
-              userEmail: currentUserEmail,
-            }}
-          />
+          {pageOpens && (
+            <Outlet
+              context={{
+                rootModeActive: isRootActive,
+                can: hasPermission,
+                isSuperuser,
+                userEmail: currentUserEmail,
+              }}
+            />
+          )}
         </Box>
       </Box>
     </Box>

@@ -68,7 +68,8 @@ Sie sie einschalten.
 > **Wer was sieht.** Sie sehen Ihre eigene Nutzung auf der Plattform unter **Meine Nutzung** und können sie
 > herunterladen. Die Administratoren [Funktionen] sehen Summen für Teams, Agenten und Modelle nur dort, wo
 > mindestens [5] Personen hinter einer Zahl stehen. Die Einträge zu Anfragen, mit denen sie die Ursache eines
-> Fehlers suchen, zeigen nicht, wer eine Anfrage gesendet hat. Niemand wertet Ihre persönliche Nutzung aus.
+> Fehlers suchen, zeigen nicht, wer eine Anfrage gesendet hat, auch nicht ihr Gerät, ihre Sitzung oder ihre
+> Unterhaltung, und lassen sich nicht nach Person durchsuchen. Niemand wertet Ihre persönliche Nutzung aus.
 >
 > **Speicherdauer.** Einträge zu Anfragen [90] Tage; Ihre täglichen Zahlen [90] Tage; Zahlen ohne Personenbezug
 > [90] Tage pro Stunde und [25] Monate pro Tag. Wird Ihr Konto gelöscht, werden Ihre Einträge und täglichen Zahlen
@@ -110,7 +111,7 @@ Ein Eintrag für Ihr Verzeichnis von Verarbeitungstätigkeiten (Art. 30 Abs. 1 D
 | Kategorien von Empfängern | Administratoren [Funktionen]; [Nutzungsprüfer [Funktionen], wenn die personenbezogene Auswertung eingeschaltet ist]; [IT-Dienstleister als Auftragsverarbeiter nach Art. 28 DSGVO] |
 | Übermittlung in Drittländer | Keine für die Nutzungsdaten |
 | Löschfristen | Einträge zu Anfragen [90] Tage; tägliche Zahlen pro Person [90] Tage; Zahlen ohne Personenbezug [90] Tage stündlich, [25] Monate täglich; Löschung mit dem Konto; Audit-Protokoll [Dauer] |
-| Technische und organisatorische Maßnahmen (Art. 32 DSGVO) | Rollenbasierter Zugriff; eine eigene Rolle für persönliche Zahlen, die niemand hat, solange sie nicht vergeben wird, und die Administratorrechte nicht einschließen; Mindestgruppengröße [5] für jede angezeigte Zahl mit Unterdrückung des Rests; persönliche Zahlen höchstens pro Tag, kein Gerät und keine Uhrzeit in den Zahlen; Begründung und Aufzeichnung jeder Einsicht; automatische Löschung; manipulationssicheres Audit-Protokoll; eigene Ansicht und Download für jede Person; [Verschlüsselung der Datenträger des Servers, Sicherungen, Zugang zum Server: nach Ihrem Betrieb]. Konfigurationsbeschreibung vom [Datum] beigefügt |
+| Technische und organisatorische Maßnahmen (Art. 32 DSGVO) | Rollenbasierter Zugriff; eine eigene Rolle für persönliche Zahlen, die niemand hat, solange sie nicht vergeben wird, und die Administratorrechte nicht einschließen; Mindestgruppengröße [5] für jede angezeigte Zahl mit Unterdrückung des Rests; persönliche Zahlen höchstens pro Tag, kein Gerät und keine Uhrzeit in den Zahlen; Einträge zu Anfragen für die Fehlersuche ohne Person, Gerät, Sitzung oder Unterhaltung und nicht danach durchsuchbar; Begründung und Aufzeichnung jeder Einsicht, die Begründung nie in einer Adresse; automatische Löschung; manipulationssicheres Audit-Protokoll; eigene Ansicht und Download für jede Person; [Verschlüsselung der Datenträger des Servers, Sicherungen, Zugang zum Server: nach Ihrem Betrieb]. Konfigurationsbeschreibung vom [Datum] beigefügt |
 
 ## Interessenabwägung {#legitimate-interest-assessment}
 
@@ -215,6 +216,10 @@ Eine Anlage zu Ihrer Betriebsvereinbarung über die KI-Plattform: **Anlage „Nu
 passt zu einem Entwurf von Arbeitnehmerseite wie zu einem von Arbeitgeberseite: Diese unterscheiden sich in der
 gewählten Konfiguration, nicht in dem, was die Anlage regeln muss.
 
+Nr. 3 verpflichtet den Arbeitgeber, personelle Maßnahmen auf Grundlage von Daten, die unter Verstoß gegen die
+Anlage verarbeitet wurden, zu unterlassen. Sie erklärt solche Maßnahmen nicht für unwirksam und schließt die Daten
+nicht als Beweismittel vor Gericht aus: Das kann eine Betriebsvereinbarung nicht (BAG 2 AZR 296/22).
+
 > **Anlage [Nr.] zur Betriebsvereinbarung [Titel] vom [Datum]: Nutzungsmessung und Budgets**
 >
 > **1. Gegenstand.** Diese Anlage regelt die Nutzungsmessung und die Limits der KI-Plattform Fadenstack, Version
@@ -230,8 +235,7 @@ gewählten Konfiguration, nicht in dem, was die Anlage regeln muss.
 > Beschäftigten zu überwachen oder zu bewerten, um Beschäftigte zu vergleichen, oder als Grundlage für
 > Beurteilungen, Vergütung, Beförderungen, Auswahlentscheidungen, Abmahnungen, Kündigungen oder andere personelle
 > Maßnahmen. Personelle Maßnahmen, die auf Daten beruhen, die unter Verstoß gegen diese Anlage verarbeitet wurden,
-> [sind unwirksam / unterbleiben]. Nutzungsdaten dürfen nicht durch ein KI-Modell personenbezogen ausgewertet
-> werden.
+> unterbleiben. Nutzungsdaten dürfen nicht durch ein KI-Modell personenbezogen ausgewertet werden.
 >
 > **4. Daten.** Verarbeitet werden nur die Felder des beigefügten Verzeichnisses. Eine Version, die Felder oder
 > Auswertungen hinzufügt oder eine Voreinstellung ändert, wird erst eingeführt, nachdem der Betriebsrat
@@ -297,7 +301,8 @@ noch berücksichtigt werden können (§ 90 Abs. 2 BetrVG).
 >
 > **Wer was sieht.** Alle Beschäftigten sehen ihre eigenen Zahlen. Administratoren sehen Summen nur dort, wo
 > mindestens [5] Personen hinter einer Zahl stehen; die Einträge zu Anfragen, mit denen sie Fehler
-> nachverfolgen, zeigen nicht, wer eine Anfrage gesendet hat. Niemand sieht Rangfolgen oder Vergleiche von
+> nachverfolgen, zeigen nicht, wer eine Anfrage gesendet hat, auch nicht ihr Gerät, ihre Sitzung oder ihre
+> Unterhaltung, und lassen sich nicht nach Person durchsuchen. Niemand sieht Rangfolgen oder Vergleiche von
 > Personen. [Geplant: [Anzahl] benannte Personen dürfen
 > persönliche Zahlen aus [Gründe] ansehen, jedes Mal mit Begründung, aufgezeichnet.]
 >
@@ -333,7 +338,9 @@ So beantworten Sie Anfragen zu Nutzungsdaten. Die gesetzliche Frist beträgt ein
    Speicherdauer, Rechte, Herkunft. Die Datenschutzhinweise enthalten sie.
 4. Für jemanden, der sich nicht anmelden kann, lädt ein Nutzungsprüfer dieselben Daten in der
    personenbezogenen Auswertung unter **Nutzung** herunter und gibt das Ersuchen als Grund an. Der Download wird
-   aufgezeichnet.
+   aufgezeichnet. Das setzt eine eingeschaltete personenbezogene Auswertung voraus; ist sie ausgeschaltet, bietet
+   die Konsole keinen Download der Daten einer anderen Person. [Ihr Verfahren, zum Beispiel: der Person wieder
+   Zugang geben, damit sie die Daten selbst herunterlädt.]
 
 **Löschung (Art. 17 DSGVO)**
 

@@ -1448,7 +1448,7 @@
   "llm_calls": {
     "title": "LLM Calls",
     "search": "Search calls",
-    "search_placeholder": "Search by request, trace, session, user or agent id, model, error…",
+    "search_placeholder": "Search by request or trace id, model, endpoint, error…",
     "all_models": "All models",
     "outcome": "Outcome",
     "outcome_all": "All",
@@ -1467,8 +1467,6 @@
     "live_paused_page": "Live updates follow the newest calls: go to the first page, sorted by time",
     "refresh": "Refresh",
     "updated_at": "Updated {{time}}",
-    "chip_session": "Conversation {{id}}",
-    "clear_filters": "Clear filters",
     "stat_calls": "Calls",
     "stat_errors": "Errors",
     "stat_p50": "Latency p50",
@@ -1504,7 +1502,6 @@
     "flag_tools": "{{count}} tool calls",
     "flag_truncated": "Cut off at the token limit",
     "flag_retried": "Retried {{count}} times",
-    "flag_conversation": "Part of a conversation",
     "prev": "Previous call (k)",
     "next": "Next call (j)",
     "copy_link": "Copy a link to this call",
@@ -1527,7 +1524,6 @@
     "section_request": "Request",
     "section_routing": "Routing",
     "section_who": "Who",
-    "section_conversation": "Conversation",
     "section_context": "Context",
     "span_first_token": "Waiting for the first token",
     "span_generation": "Generating",
@@ -1538,7 +1534,6 @@
     "related_session_id": "Chat session · {{count}} calls",
     "related_trace_id": "Trace · {{count}} calls",
     "related_summary": "{{tokens}} tokens in all, {{errors}} failed",
-    "related_alone": "The only call of its conversation in the gateway's log.",
     "f_request_id": "Request id",
     "f_trace_id": "Trace id",
     "f_endpoint": "Endpoint",
@@ -1553,11 +1548,7 @@
     "f_user": "User",
     "f_tenant": "Tenant",
     "f_group": "Usage group",
-    "f_project": "Project",
     "f_agent": "Agent",
-    "f_device": "Device",
-    "f_session": "Chat session",
-    "f_conversation": "Conversation",
     "f_turn": "Turn",
     "f_skills": "Skills",
     "f_rag": "Knowledge (RAG)",
@@ -1665,7 +1656,6 @@
     "ev_denied": "denied",
     "ev_error": "failed",
     "ev_timeout": "timed out",
-    "chip_user": "User {{id}}",
     "col_user": "User"
   },
   "rag_runtime": {
@@ -2125,7 +2115,7 @@
       "usage_auditor": "Usage auditor"
     },
     "builtin_hints": {
-      "usage_auditor": "usage_auditor: may look at one person's usage figures while person-level reporting is on, giving a reason each time. Being a superuser does not give this."
+      "usage_auditor": "usage_auditor: may look at one person's usage figures while person-level reporting is on, giving a reason each time. It opens the Usage page in the console too, so no other role is needed. Being a superuser does not give this."
     }
   },
   "groups": {
@@ -4413,7 +4403,10 @@
       "ends": "Ends",
       "sign_out": "Sign out",
       "sign_out_title": "Sign this device out?",
-      "sign_out_confirm": "{{device}} ({{user}}) must sign in again to use the agent."
+      "sign_out_confirm": "{{device}} ({{user}}) must sign in again to use the agent.",
+      "suppressed": "Fewer than {{k}} people used this agent in this period, so its figures are not shown: they would point to single people.",
+      "day_suppressed": "Days with fewer than {{k}} people are left out.",
+      "user_hidden": "Not shown"
     },
     "back_to_chat": "Back to the chat",
     "no_access": "You do not look after any agents. Ask an administrator to make you a maintainer of one."
@@ -4865,7 +4858,12 @@
         "col_person": "Person",
         "col_period": "Period",
         "export_title": "Download one person's data",
-        "export_note": "Each download is recorded with the reason you gave for this view."
+        "export_note": "Each download is recorded with the reason you gave for this view.",
+        "range": "Period: {{from}} to {{to}}.",
+        "range_clamped": "Period: {{from}} to {{to}}. Figures per person are kept for {{days}} days, so this view covers only the last {{days}} days of the page's period.",
+        "range_refused": "Figures per person are kept for a shorter time than this period. Choose a shorter period on the page (at most {{days}} days) and try again.",
+        "target_refused": "Choose exactly one person or one usage group.",
+        "refused": "The server did not accept this request. Check your choice and try again."
       },
       "smaller_teams": "Smaller teams and others",
       "smaller_teams_hint": "Sub-teams too small to show alone, and the people directly in {{name}}",
@@ -4893,7 +4891,7 @@
       "unhide": "Show anyway",
       "unhide_title": "Show figures about fewer than {{k}} people",
       "unhide_intro": "As a usage auditor you may see these figures for a stated reason. The view is recorded with your reason, as a look at one person's figures is.",
-      "unhidden_note": "These figures cover fewer than {{k}} people. They are shown to you as a usage auditor, and each view is recorded with your reason.",
+      "unhidden_note": "These figures cover fewer than {{k}} people. They are shown to you as a usage auditor, and each view is recorded with your reason. Your reason covers this view only: changing the period, the figures per or the grouping hides them again.",
       "menu": "Usage of all teams"
     },
     "errors": {
@@ -5065,7 +5063,9 @@
       "owner": "also to {{owner}}",
       "children_exceed": "The budgets of the teams below add up to more than this one. That is allowed: each request still needs room in this budget too.",
       "currency_none": "No model has a price in {{currency}}: nothing counts toward this budget until one has.",
-      "currency_others": "Only costs in {{currency}} count. Usage of models priced in {{others}} does not count toward this budget."
+      "currency_others": "Only costs in {{currency}} count. Usage of models priced in {{others}} does not count toward this budget.",
+      "would_refuse_unknown": "How many requests it would have refused is not known.",
+      "suppressed_few": "Fewer people than the privacy rule asks for used this budget in this period, so how much is used is not shown: it would point to single people."
     },
     "dialog": {
       "create_title": "New budget",
@@ -5189,7 +5189,8 @@
       "alerts_title": "Alerts this period",
       "alert": "{{name}} reached {{threshold}} % on {{date}}.",
       "private": "Only you see what you use of your personal budget.",
-      "ask": "If you need more, ask an administrator or the budget's owner."
+      "ask": "If you need more, ask an administrator or the budget's owner.",
+      "alert_forecast": "{{name}}: on {{date}} the forecast said it runs out before the period ends."
     },
     "refused": {
       "label": "Budget used up",

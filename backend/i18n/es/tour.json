@@ -372,7 +372,7 @@
       "title": "Llamadas LLM",
       "description": "Cada llamada a través del gateway: encuentre la que falló, vea por qué y vea a dónde se enrutan las llamadas.",
       "action_find": "Acote la lista por hora, modelo, resultado o cualquier id; pulse Errores para ver solo los fallos",
-      "action_inspect": "Abra una llamada para ver su diagnóstico, cronología, conversación y todos los campos registrados; j y k pasan de una a otra",
+      "action_inspect": "Abra una llamada para ver su diagnóstico, cronología, llamadas relacionadas y campos registrados, nunca quién la envió; j y k pasan de una a otra",
       "action_routing": "Vea qué proveedores atendieron cada modelo, con errores y latencia p95",
       "action_live": "Las llamadas nuevas llegan cada pocos segundos; pause para leer y copie el enlace de una llamada para compartirla"
     },

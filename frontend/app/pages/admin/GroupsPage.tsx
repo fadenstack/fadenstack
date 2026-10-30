@@ -5,7 +5,9 @@
  * column. A team gets one parent and a cost centre; the parent picker offers no team that would close a
  * cycle and marks those that would push the tree past six levels. A team that ended is archived: it keeps
  * its history (usage stays counted where it was), gets no new members, cannot be a home team and leaves
- * the pickers; archived teams show on demand and can be brought back. Rights do not flow down the tree.
+ * the pickers; archived teams show on demand and can be brought back. An archived team that still has
+ * active sub-teams stays listed above them, marked archived, and stays their parent when one is edited.
+ * Rights do not flow down the tree.
  */
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -24,7 +26,7 @@ import { DataTable, type ColumnDef } from "~/components/DataTable";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { FormDialog } from "~/components/FormDialog";
 import { roleLabel } from "~/lib/roleLabels";
-import { asTree, descendantsOf, MAX_TEAM_DEPTH, parentOptions, type TreeRow } from "~/lib/teamTree";
+import { activeWithAncestors, asTree, descendantsOf, MAX_TEAM_DEPTH, parentOptions, type TreeRow } from "~/lib/teamTree";
 import { useAsyncData } from "~/lib/useAsyncData";
 
 import Alert from "@mui/material/Alert";
@@ -92,7 +94,8 @@ export default function GroupsPage() {
 
   const [showArchived, setShowArchived] = useState(false);
   const rows = useMemo(
-    () => asTree(showArchived ? groups : groups.filter((g) => !g.archived_at), i18n.language),
+    // Without the archived ones, still with those above an active team: a sub-team keeps its place.
+    () => asTree(showArchived ? groups : activeWithAncestors(groups), i18n.language),
     [groups, showArchived, i18n.language],
   );
   const archivedCount = groups.filter((g) => g.archived_at).length;
@@ -451,14 +454,16 @@ export default function GroupsPage() {
               slotProps={{ htmlInput: { "data-team-parent": "" } }}
             >
               <MenuItem value={TOP}>{t("groups.tree.top")}</MenuItem>
-              {parents.map(({ team, depth, allowed }) => (
+              {parents.map(({ team, depth, allowed, archived }) => (
                 <MenuItem key={team.id} value={team.id} disabled={!allowed} sx={{ pl: 2 + (depth - 1) * 2 }}>
                   <ListItemText
                     primary={team.name}
                     secondary={
-                      allowed
-                        ? t("groups.tree.level", { level: depth })
-                        : t("groups.tree.too_deep_option", { max: MAX_TEAM_DEPTH })
+                      archived
+                        ? `${t("groups.tree.level", { level: depth })} · ${t("groups.tree.archived")}`
+                        : allowed
+                          ? t("groups.tree.level", { level: depth })
+                          : t("groups.tree.too_deep_option", { max: MAX_TEAM_DEPTH })
                     }
                   />
                 </MenuItem>

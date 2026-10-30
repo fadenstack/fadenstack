@@ -126,7 +126,8 @@ mit `error.type` `insufficient_quota`, `error.code` `budget_exceeded` und der Ar
 
 Ein Budget benachrichtigt einmal pro Schwelle und Zeitraum: bei 80 % und 100 %, wenn Sie keine anderen Schwellen
 setzen. Einmal mehr pro Zeitraum benachrichtigt es, wenn es beim bisherigen Verbrauch vor dem Ende des Zeitraums
-aufgebraucht wäre.
+aufgebraucht wäre. Die Mail einer Benachrichtigung geht einmal hinaus, außer die Antwort des Mailservers darauf ging
+verloren: Dann wird sie erneut gesendet und kann zweimal ankommen.
 
 | Budget | Wer benachrichtigt wird, und wie |
 |---|---|

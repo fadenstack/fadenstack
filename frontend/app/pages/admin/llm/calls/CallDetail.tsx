@@ -46,7 +46,8 @@ interface Props {
   onSelect: (callId: string) => void;
   onPrev?: () => void;
   onNext?: () => void;
-  onFilter: (key: "session" | "model_alias", value: string) => void;
+  /** Narrow the list to this model (calls are not narrowed by person, session or conversation). */
+  onFilterModel: (model: string) => void;
 }
 
 function copy(text: string) {
@@ -501,7 +502,7 @@ function FieldGrid({ children }: { children: ReactNode }) {
   return <Box sx={{ display: "grid", gridTemplateColumns: "minmax(110px, 34%) 1fr", columnGap: 1.5 }}>{children}</Box>;
 }
 
-function Details({ call, onFilter }: { call: LlmCall; onFilter: Props["onFilter"] }) {
+function Details({ call, onFilterModel }: { call: LlmCall; onFilterModel: Props["onFilterModel"] }) {
   const { t } = useTranslation();
   const skills = (call.skills_used ?? []).map((s) => s.name ?? s.slug).filter(Boolean).join(", ");
   const rag = call.rag_context
@@ -519,36 +520,24 @@ function Details({ call, onFilter }: { call: LlmCall; onFilter: Props["onFilter"
           <Field label={t("llm_calls.f_finish")} value={call.finish_reason} />
           <Field label={t("llm_calls.f_error")} value={call.error_code} mono />
           <Field label={t("llm_calls.f_retries")} value={String(call.retry_count ?? 0)} />
+          <Field label={t("llm_calls.f_turn")} value={call.turn_id} mono />
         </FieldGrid>
       </Section>
       <Section title={t("llm_calls.section_routing")}>
         <FieldGrid>
-          <Field label={t("llm_calls.f_model")} value={call.model_alias} onFilter={call.model_alias ? () => onFilter("model_alias", call.model_alias!) : undefined} />
+          <Field label={t("llm_calls.f_model")} value={call.model_alias} onFilter={call.model_alias ? () => onFilterModel(call.model_alias!) : undefined} />
           <Field label={t("llm_calls.f_provider")} value={call.provider_name} />
           <Field label={t("llm_calls.f_instance")} value={call.provider_instance_id} mono />
         </FieldGrid>
       </Section>
       <Section title={t("llm_calls.section_who")}>
         <FieldGrid>
-          {/* The server names nobody here: a call's person is hidden, and calls are not found by person. */}
+          {/* The server names nobody here: a call's person is hidden, and calls are not found by person.
+              No session, conversation, device or project either: each would point to one person. */}
           <Field label={t("llm_calls.f_user")} value={call.user_id ?? t("observability.user_hidden")} />
           <Field label={t("llm_calls.f_tenant")} value={call.tenant_id} />
           <Field label={t("llm_calls.f_group")} value={call.group_id} mono />
-          <Field label={t("llm_calls.f_project")} value={call.project_id} mono />
-          <Field label={t("llm_calls.f_agent")} value={call.agent_id} mono />
-          <Field label={t("llm_calls.f_device")} value={call.device_id} mono />
-        </FieldGrid>
-      </Section>
-      <Section title={t("llm_calls.section_conversation")}>
-        <FieldGrid>
-          <Field label={t("llm_calls.f_session")} value={call.session_id} mono onFilter={call.session_id ? () => onFilter("session", call.session_id!) : undefined} />
-          <Field
-            label={t("llm_calls.f_conversation")}
-            value={call.conversation_id}
-            mono
-            onFilter={call.conversation_id ? () => onFilter("session", call.conversation_id!) : undefined}
-          />
-          <Field label={t("llm_calls.f_turn")} value={call.turn_id} mono />
+          {call.agent_id && <Field label={t("llm_calls.f_agent")} value={call.agent_id} mono />}
         </FieldGrid>
       </Section>
       <Section title={t("llm_calls.section_context")}>
@@ -640,7 +629,7 @@ function Related({ detail, current, onSelect }: { detail: LlmCallDetail; current
 }
 
 /** One call, opened beside the list: what went wrong first, then where the time went, then every field. */
-export default function CallDetail({ callId, preview, p95LatencyMs, onClose, onSelect, onPrev, onNext, onFilter }: Props) {
+export default function CallDetail({ callId, preview, p95LatencyMs, onClose, onSelect, onPrev, onNext, onFilterModel }: Props) {
   const { t } = useTranslation();
   const [detail, setDetail] = useState<LlmCallDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -867,16 +856,9 @@ export default function CallDetail({ callId, preview, p95LatencyMs, onClose, onS
             {current && (
               <Related detail={current} current={callId} onSelect={onSelect} />
             )}
-            {current && current.related.length < 2 && (call.session_id || call.conversation_id) && (
-              <Section title={t("llm_calls.section_conversation")}>
-                <Typography variant="body2" color="text.secondary">
-                  {t("llm_calls.related_alone")}
-                </Typography>
-              </Section>
-            )}
           </>
         )}
-        {call && tab === "details" && <Details call={call} onFilter={onFilter} />}
+        {call && tab === "details" && <Details call={call} onFilterModel={onFilterModel} />}
         {tab === "json" && (
           <Box sx={{ position: "relative", mt: 2 }}>
             <Button

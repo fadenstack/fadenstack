@@ -167,7 +167,11 @@ function BudgetRow({
         </Box>
       ) : (
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }} data-budget-suppressed>
-          {budget.scope === "person" ? t("budgets.list.suppressed") : t("budgets.list.spent_unknown")}
+          {budget.scope === "person"
+            ? t("budgets.list.suppressed")
+            : budget.suppressed
+              ? t("budgets.list.suppressed_few")
+              : t("budgets.list.spent_unknown")}
         </Typography>
       )}
 
@@ -179,9 +183,11 @@ function BudgetRow({
         )}
         {budget.mode === "shadow" && (
           <Typography variant="body2" data-budget-would-refuse>
-            {budget.would_refuse > 0
-              ? t("budgets.list.would_refuse", { count: budget.would_refuse, n: fmtInt(budget.would_refuse, lang) })
-              : t("budgets.list.would_refuse_none")}
+            {budget.would_refuse === null
+              ? t("budgets.list.would_refuse_unknown")
+              : budget.would_refuse > 0
+                ? t("budgets.list.would_refuse", { count: budget.would_refuse, n: fmtInt(budget.would_refuse, lang) })
+                : t("budgets.list.would_refuse_none")}
           </Typography>
         )}
         <Typography variant="caption" color="text.secondary">

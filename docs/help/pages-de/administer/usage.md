@@ -11,7 +11,7 @@ Was die Zahlen für die Daten der Beschäftigten bedeuten und wer wessen Zahlen 
 | Wo | Wer | Was es zeigt |
 |---|---|---|
 | **Meine Nutzung**, im Menü hinter der Konto-Schaltfläche | Jede Person, für sich selbst | Die eigenen Tokens und geschätzten Kosten, die geltenden Limits und einen Download der eigenen Daten (siehe [Ihre eigene Nutzung](#your-own-usage)). |
-| **Observability → Nutzung** | Administratoren und Prüfer | Summen und Verlauf nach Team, Agent, Modell oder Provider, nur für Gruppen von mindestens fünf Personen (siehe [Die Seite „Nutzung“](#the-usage-page)). |
+| **Observability → Nutzung** | Administratoren, Prüfer und Nutzungsprüfer | Summen und Verlauf nach Team, Agent, Modell oder Provider, nur für Gruppen von mindestens fünf Personen (siehe [Die Seite „Nutzung“](#the-usage-page)). |
 | [Dashboard](dashboard.md) | Administratoren | Den heutigen Tag auf einen Blick: **Anfragen heute**, **Aktive Benutzer heute**, **Intern bearbeitet**, **Kosten diesen Monat**, **Fehlerquote (1 Std.)**; **KI-Datenverkehr** (wo Anfragen bedient wurden) und **Nutzung** (Anfragen pro Tag, nach Ort der Bearbeitung). |
 | **Observability → Budgets** | Administratoren, mit Fadenstack Enterprise | Was jedes Budget in diesem Zeitraum verbraucht hat, seine Benachrichtigungen und die Verrechnung je Team oder Kostenstelle (siehe [Budgets](budgets.md)). |
 | **Observability → Kosten-Dashboard** | Administratoren | Ausgaben, Anfragen, Tokens, Geschwindigkeit und Fehler der ganzen Instanz sowie die Preise (siehe [Die Kosten- und Nutzungsseiten](#the-cost-and-usage-pages)). |
@@ -58,7 +58,10 @@ Jede Person, die sich anmeldet, sieht ihre eigene Nutzung unter **Meine Nutzung*
 Konto-Schaltfläche:
 
 - ihre Tokens und geschätzten Kosten nach Tag oder Monat, nach Modell, nach Agent und nach Chat-Projekt;
-- die Limits, die für die Instanz gelten, und wie viel davon gerade verbraucht ist;
+- die Limits, die für die Instanz gelten. Beim Tageslimit für Tokens zeigt sie auch, wie viel heute verbraucht
+  ist, aber nur, wenn heute mindestens fünf andere Personen die Instanz genutzt haben (die
+  [Mindestgruppengröße](#the-minimum-group-size)): Bei weniger würde die Zahl zeigen, was sie verbraucht haben. Die
+  Limits pro Minute zeigen nur das Limit, nie, wie viel verbraucht ist;
 - mit Fadenstack Enterprise die Budgets, die für sie gelten (siehe [Budgets](budgets.md#your-own-budgets));
 - ob die personenbezogene Auswertung eingeschaltet ist, wie fein und wie lange ihre Zahlen aufbewahrt werden
   und wie oft ein Nutzungsprüfer sie angesehen hat, mit einem Link zu Ihren Datenschutzhinweisen, wenn Sie
@@ -74,8 +77,8 @@ eine Person nach Art. 15 DSGVO über ihre Nutzung erfragen kann (siehe
 ## Die Seite „Nutzung“ {#the-usage-page}
 
 Die Seite **Nutzung** zeigt, wie viel die Instanz verbraucht und wo, ohne die Zahlen einzelner Personen zu
-zeigen. Administratoren können sie öffnen, ebenso Personen mit der Rolle `auditor`, die dafür keine
-Administratorrechte brauchen (siehe [Administratoren und Prüfer](users.md#administrators-and-auditors)).
+zeigen. Administratoren können sie öffnen, ebenso Personen mit der Rolle `auditor` oder `usage_auditor`, die
+dafür keine Administratorrechte brauchen (siehe [Administratoren und Prüfer](users.md#administrators-and-auditors)).
 
 1. Öffnen Sie **Observability → Nutzung**.
 2. Wählen Sie den **Zeitraum** (**7 Tage** bis **12 Monate**) und **Zahlen pro** **Stunde**, **Tag** oder
@@ -119,8 +122,10 @@ sie unter **Einstellungen → Nutzung und Datenschutz** erhöhen, aber nicht unt
 - Dasselbe gilt über die Zeit: Ließe sich ein ausgeblendeter Zeitraum aus der Summe minus den angezeigten
   errechnen, wird ein weiterer mit ihm ausgeblendet.
 - **Summen** und **Tokens im Zeitverlauf** zeigen nur Zahlen, wenn mindestens fünf Personen die Instanz im
-  Zeitraum genutzt haben. Ein Nutzungsprüfer sieht sie trotzdem, solange die personenbezogene Auswertung
-  eingeschaltet ist.
+  Zeitraum genutzt haben. Auf einer so kleinen Instanz darf ein Nutzungsprüfer sie trotzdem zeigen, solange die
+  personenbezogene Auswertung eingeschaltet ist: mit **Trotzdem zeigen** und einer Begründung, die festgehalten
+  wird, pro Tag oder Monat, nie pro Stunde. Die Begründung gilt für diese eine Ansicht: Wer **Zeitraum**,
+  **Zahlen pro** oder **Gruppieren nach** ändert, blendet die Zahlen wieder aus.
 
 Ein Team aus drei Personen oder ein Agent, den eine Person nutzt, erscheint daher nie allein: Seine Zahlen wären
 die einer Person unter anderem Namen.
@@ -128,7 +133,7 @@ die einer Person unter anderem Namen.
 !!! note "Kleine Instanzen"
     Haben im Zeitraum weniger als fünf Personen die Instanz genutzt, sagt die Seite das (**Eine kleine
     Instanz**), und die Summen zeigen keine Zahlen: Sie lägen nahe an den Zahlen einer einzelnen Person. Ein
-    Nutzungsprüfer, der sie bei eingeschalteter personenbezogener Auswertung trotzdem sieht, behandelt sie wie
+    Nutzungsprüfer, der sie bei eingeschalteter personenbezogener Auswertung trotzdem zeigt, behandelt sie wie
     personenbezogene Daten (siehe [Nutzung und Datenschutz](usage-privacy.md)).
 
 ## Die Kosten- und Nutzungsseiten {#the-cost-and-usage-pages}
@@ -170,7 +175,8 @@ die API, und hält nichts über einzelne Personen fest.
 3. Wählen Sie **Speichern**.
 
 Die Änderung wird mit Ihrem Namen im Audit-Protokoll festgehalten (`usage.limits.update`). **Meine Nutzung**
-zeigt allen die Limits und wie viel davon verbraucht ist.
+zeigt allen die Limits und, wo das auf niemanden hinweist, wie viel vom Tageslimit für Tokens heute verbraucht
+ist (siehe [Ihre eigene Nutzung](#your-own-usage)).
 
 ??? info "Wie ein Limit eine Anfrage zählt"
     - Eine Anfrage zählt, sobald sie beginnt: mit ihrem Prompt und dem Höchsten, was sie schreiben darf (ihrem

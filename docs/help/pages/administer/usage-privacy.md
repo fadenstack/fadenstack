@@ -20,7 +20,8 @@ As installed, and until you change a setting:
   agents, models and providers only where at least five people are behind a figure, and its totals only when at
   least five people used the instance (see [The minimum group size](usage.md#the-minimum-group-size)).
 - **No page lists requests by person.** **Cost Observability** and **LLM Calls** never show who sent a request,
-  and do not find requests by person.
+  and do not find requests by person. **LLM Calls** shows no session, conversation, device or project of a
+  request either, and finds none by them: each would lead to one person.
 - **An agent's figures need five people too.** Its **Activity** tab shows them only when at least five people
   used the agent in the range, and names nobody; the owner of a personal agent sees their own (see
   [Agents and add-ins](agents.md)).
@@ -61,7 +62,9 @@ when. A change applies within minutes; nothing restarts.
 Only someone with the role `usage_auditor`, and only while **Person-level reporting** is on, sees one person's
 figures, and only in the person-level view on **Usage**: no other page in the console shows them. The role is
 built in, nobody holds it at installation, and being a superuser does not give it: an
-administrator who is to look at person-level figures needs the role too.
+administrator who is to look at person-level figures needs the role too. It is also all a usage auditor needs:
+it opens the **Usage** page in the console, without administrator rights, and the person-level view offers the
+people and usage groups to choose from.
 
 1. Agree who may look, and for which reasons, with your DPO and works council. Typical reasons: a dispute about
    costs, a person's own access request, a security incident.
@@ -76,16 +79,24 @@ A usage auditor then finds the person-level view on **Observability → Usage**,
    **Usage group**.
 3. Enter the **Reason** for looking (10 to 500 characters) and select **Show figures**.
 
-The figures appear per person and per day (or month), sorted by name, never by how much someone used.
+The figures appear per person and per day (or month), sorted by name, never by how much someone used. The view
+covers at most the days that person-level figures are kept (**Person-level figures**): with a longer **Period**
+on the page, it covers the last of those days, and says so.
 
 Under **Download one person's data**, **Download as JSON** or **Download as CSV** beside a person downloads their
 data: the same the person gets under **My usage** (see
 [Your own view and the download](#your-own-view-and-the-download)), for example to answer an access request from
 someone who cannot sign in. The download is recorded with the reason given for the view.
 
+!!! note "Only while person-level reporting is on"
+    The download, like the view, needs **Person-level reporting** on. While it is off, the console has no way to
+    download another person's data. For an access request from someone who cannot sign in, agree a procedure with
+    your DPO, for example giving the person access again so that they download their data under **My usage**.
+
 Every look and every download is recorded in the audit log: who, at whose figures, which range, and the reason.
-The person sees, in their own download, the date and the stated reason of each, never who looked; **My usage**
-shows how many there were.
+The reason goes to the server in a request header, never in the page's address, so it does not end up in the
+logs of web servers or proxies; the audit log keeps it. The person sees, in their own download, the date and the
+stated reason of each, never who looked; **My usage** shows how many there were.
 
 ??? info "Who checks the record"
     The built-in role `auditor` reads the audit log and opens the **Usage** page without administrator rights, and
@@ -109,8 +120,8 @@ Under **Your data**, **Download as JSON** and **Download as CSV** give them:
 
 When someone asks what is stored about their usage (Art. 15 GDPR), point them there: the download, together with
 your employee notice (purposes, legal basis, recipients, retention, rights), answers it. For someone who cannot
-sign in, a usage auditor downloads the same for them, giving the request as the reason (see
-[Looking at one person's figures](#looking-at-one-persons-figures)).
+sign in, a usage auditor downloads the same for them while person-level reporting is on, giving the request as the
+reason (see [Looking at one person's figures](#looking-at-one-persons-figures)).
 
 ## Retention and erasure
 
@@ -140,9 +151,11 @@ days (**Request log**, `usage.request_log_retention_days`); erased with the acco
 | Fields | What for | Who sees them |
 |---|---|---|
 | `user_id` | The person who sent the request: their account id, not their name or e-mail | The person, in their download. Usage auditors, in the person-level view while person-level reporting is on, and in a download they take for one person. No other page shows it, **Cost Observability** and **LLM Calls** included |
-| `group_id`, `project_id`, `agent_id` | The person's usage group (team), the chat project, the agent | Administrators on **LLM Calls**; in sums on **Usage**; the person (project, agent) |
+| `group_id`, `agent_id` | The person's usage group (team), the agent | Administrators on **LLM Calls**; in sums on **Usage**; the person (agent) |
+| `project_id` | The chat project | The person, on **My usage**. No page for administrators shows it |
 | `group_path` | The usage team's position in the team tree at the time of use | Administrators; in sums on **Usage** |
-| `device_id`, `session_id`, `conversation_id`, `turn_id` | Tie an agent's request to its sign-in on a device and to its conversation | Administrators on **LLM Calls**. Never in the figures or the download |
+| `device_id`, `session_id`, `conversation_id` | Tie an agent's request to its sign-in on a device and to its conversation | No page shows them, **LLM Calls** included, and none finds requests by them. Never in the figures or the download |
+| `turn_id` | Groups the rounds an agent needed for one question | Administrators on **LLM Calls** |
 | `request_id`, `trace_id`, `tenant_id`, `endpoint`, `stream` | Find a request and how it was asked | Administrators |
 | `model_alias`, `provider_instance_id` | Which model answered and where it ran | Administrators; in sums; the person (model) |
 | `created_at` | When, to the second | Administrators; the person |
@@ -174,7 +187,7 @@ above; these tables hold the budgets themselves:
 | Table | One row per | Holds | Kept | Who sees it |
 |---|---|---|---|---|
 | `ee.budgets` | Budget | `name`; whom it applies to (`scope`, `target_id`: a team, an agent or, for a person's budget, the person's account id); `unit`, `currency`, `amount`, `period`, `mode`, `thresholds`; the owner who gets its alerts (`owner_id`); who created it and when. No usage figures | Until it is deleted | Administrators. A person's budget: its limit only; what the person used shows only to them on **My usage**, and to usage auditors while person-level reporting is on |
-| `ee.budget_alerts` | Budget, period, threshold and kind (`threshold` or `forecast`) | When the alert went out, so it goes out once. No figures, no person | With its budget | Nobody: the alerts themselves name the budget and the threshold, never a person's use |
+| `ee.budget_alerts` | Budget, period, threshold and kind (`threshold` or `forecast`) | When the alert went out, so it goes out once, unless the mail server's answer was lost: then its mail can come twice. No figures, no person | With its budget | Nobody: the alerts themselves name the budget and the threshold, never a person's use |
 | `ee.scim_person_attributes` | Person created by provisioning (SCIM) | `cost_center` and `department`, as the sign-in provider sends them | Erased with the account | Administrators, through the cost-centre rule |
 | `ee.cost_center_rules` | Cost centre | The team it makes a person's usage group | Until removed; deleted with the team | Administrators |
 
@@ -234,7 +247,7 @@ Usage figures are about your colleagues. Before you work with them:
 - Do not copy person-level figures out of Fadenstack, into screenshots or spreadsheets: there they escape the
   retention and the record of who looked.
 - When someone asks what is stored about their usage, point them to **My usage** and its download; for someone
-  who cannot sign in, a usage auditor downloads it for them.
+  who cannot sign in, a usage auditor downloads it for them while person-level reporting is on.
 - If you are unsure whether a use is allowed, ask your DPO first.
 
 ## When it does not work

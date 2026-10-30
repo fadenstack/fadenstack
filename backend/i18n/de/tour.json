@@ -372,7 +372,7 @@
       "title": "LLM-Aufrufe",
       "description": "Jeder Aufruf über das Gateway: den fehlerhaften finden, sehen warum, und sehen, wohin Aufrufe geroutet werden.",
       "action_find": "Liste nach Zeit, Modell, Ergebnis oder einer beliebigen ID eingrenzen; auf Fehler klicken für nur fehlgeschlagene",
-      "action_inspect": "Einen Aufruf öffnen: Diagnose, Zeitverlauf, Unterhaltung und alle erfassten Felder; j und k wechseln zwischen Aufrufen",
+      "action_inspect": "Einen Aufruf öffnen: Diagnose, Zeitverlauf, zugehörige Aufrufe und erfasste Felder, nie, wer ihn gesendet hat; j und k wechseln zwischen Aufrufen",
       "action_routing": "Sehen, welche Anbieter jedes Modell bedient haben, mit Fehlern und p95-Latenz",
       "action_live": "Neue Aufrufe kommen alle paar Sekunden; zum Lesen pausieren und den Link eines Aufrufs zum Teilen kopieren"
     },

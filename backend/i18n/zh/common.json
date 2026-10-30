@@ -1443,7 +1443,7 @@
   "llm_calls": {
     "title": "LLM 调用",
     "search": "搜索调用",
-    "search_placeholder": "按请求、追踪、会话、用户或智能体 ID、模型、错误搜索…",
+    "search_placeholder": "按请求或追踪 ID、模型、端点、错误搜索…",
     "all_models": "全部模型",
     "outcome": "结果",
     "outcome_all": "全部",
@@ -1462,8 +1462,6 @@
     "live_paused_page": "实时模式跟随最新调用：请回到按时间排序的第一页",
     "refresh": "刷新",
     "updated_at": "更新于 {{time}}",
-    "chip_session": "对话 {{id}}",
-    "clear_filters": "清除筛选",
     "stat_calls": "调用",
     "stat_errors": "错误",
     "stat_p50": "延迟 p50",
@@ -1499,7 +1497,6 @@
     "flag_tools": "{{count}} 次工具调用",
     "flag_truncated": "在 token 上限处被截断",
     "flag_retried": "重试 {{count}} 次",
-    "flag_conversation": "属于一个对话",
     "prev": "上一个调用 (k)",
     "next": "下一个调用 (j)",
     "copy_link": "复制此调用的链接",
@@ -1522,7 +1519,6 @@
     "section_request": "请求",
     "section_routing": "路由",
     "section_who": "发起方",
-    "section_conversation": "对话",
     "section_context": "上下文",
     "span_first_token": "等待首个 token",
     "span_generation": "生成中",
@@ -1533,7 +1529,6 @@
     "related_session_id": "聊天会话 · {{count}} 次调用",
     "related_trace_id": "追踪 · {{count}} 次调用",
     "related_summary": "共 {{tokens}} 个 token，{{errors}} 次失败",
-    "related_alone": "网关日志中该对话仅有这一次调用。",
     "f_request_id": "请求 ID",
     "f_trace_id": "追踪 ID",
     "f_endpoint": "端点",
@@ -1548,11 +1543,7 @@
     "f_user": "用户",
     "f_tenant": "租户",
     "f_group": "用量组",
-    "f_project": "项目",
     "f_agent": "智能体",
-    "f_device": "设备",
-    "f_session": "聊天会话",
-    "f_conversation": "对话",
     "f_turn": "轮次",
     "f_skills": "技能",
     "f_rag": "知识库 (RAG)",
@@ -1660,7 +1651,6 @@
     "ev_denied": "已拒绝",
     "ev_error": "失败",
     "ev_timeout": "超时",
-    "chip_user": "用户 {{id}}",
     "col_user": "用户"
   },
   "agents_api_docs": {
@@ -1984,7 +1974,7 @@
       "usage_auditor": "用量审计员"
     },
     "builtin_hints": {
-      "usage_auditor": "usage_auditor：在按人员统计开启时，每次说明理由后可查看单个人员的用量数据。超级用户身份并不自动拥有此权限。"
+      "usage_auditor": "usage_auditor：在按人员统计开启时，每次说明理由后可查看单个人员的用量数据。该角色也可打开控制台中的用量页面，无需其他角色。超级用户身份并不自动拥有此权限。"
     }
   },
   "groups": {
@@ -4415,7 +4405,10 @@
       "ends": "到期",
       "sign_out": "注销",
       "sign_out_title": "注销此设备？",
-      "sign_out_confirm": "{{device}}（{{user}}）需要重新登录才能使用该智能体。"
+      "sign_out_confirm": "{{device}}（{{user}}）需要重新登录才能使用该智能体。",
+      "suppressed": "此期间使用该智能体的人数少于 {{k}}，因此不显示其数据：这些数据会指向具体的个人。",
+      "day_suppressed": "人数少于 {{k}} 的日期未显示。",
+      "user_hidden": "不显示"
     },
     "back_to_chat": "返回聊天",
     "no_access": "您没有负责任何智能体。请让管理员将您设为某个智能体的维护者。"
@@ -4867,7 +4860,12 @@
         "col_person": "人员",
         "col_period": "时间段",
         "export_title": "下载某个人的数据",
-        "export_note": "每次下载都会连同您为此次查看说明的理由一起记录。"
+        "export_note": "每次下载都会连同您为此次查看说明的理由一起记录。",
+        "range": "时间段：{{from}} 至 {{to}}。",
+        "range_clamped": "时间段：{{from}} 至 {{to}}。按人员的数据保留 {{days}} 天，因此此视图仅涵盖页面时间段中的最后 {{days}} 天。",
+        "range_refused": "按人员的数据保留时间短于此时间段。请在页面上选择更短的时间段（最多 {{days}} 天）后重试。",
+        "target_refused": "请恰好选择一个人或一个用量归属组。",
+        "refused": "服务器未接受此请求。请检查您的选择后重试。"
       },
       "smaller_teams": "较小的组及其他",
       "smaller_teams_hint": "因人数太少而未单独显示的下级组，以及直接属于 {{name}} 的人员",
@@ -4895,7 +4893,7 @@
       "unhide": "仍然显示",
       "unhide_title": "显示涵盖少于 {{k}} 人的数据",
       "unhide_intro": "作为用量审计员，您可以在说明理由后查看这些数据。此次查看会连同您的理由一起记录，与查看单个人员的数据相同。",
-      "unhidden_note": "这些数据涵盖的人数少于 {{k}}。它们是以用量审计员身份向您显示的，每次查看都会连同您的理由一起记录。",
+      "unhidden_note": "这些数据涵盖的人数少于 {{k}}。它们是以用量审计员身份向您显示的，每次查看都会连同您的理由一起记录。您的理由仅适用于本次查看：更改时间段、统计单位或分组方式后，这些数据会再次隐藏。",
       "menu": "所有组的用量"
     },
     "errors": {
@@ -5067,7 +5065,9 @@
       "owner": "同时提醒 {{owner}}",
       "children_exceed": "下级组的预算加起来超过了此预算。这是允许的：每个请求仍然也需要在此预算中有余量。",
       "currency_none": "没有模型以 {{currency}} 定价：在有模型以此定价之前，不会有任何用量计入此预算。",
-      "currency_others": "只计入以 {{currency}} 计价的费用。以 {{others}} 定价的模型的用量不计入此预算。"
+      "currency_others": "只计入以 {{currency}} 计价的费用。以 {{others}} 定价的模型的用量不计入此预算。",
+      "would_refuse_unknown": "不清楚它会拒绝多少请求。",
+      "suppressed_few": "本周期内使用此预算的人数少于隐私规则的要求，因此不显示用量：这些数据会指向具体的个人。"
     },
     "dialog": {
       "create_title": "新建预算",
@@ -5191,7 +5191,8 @@
       "alerts_title": "本周期的提醒",
       "alert": "{{name}} 于 {{date}} 达到 {{threshold}} %。",
       "private": "只有您能看到自己对个人预算的用量。",
-      "ask": "如需更多，请联系管理员或该预算的负责人。"
+      "ask": "如需更多，请联系管理员或该预算的负责人。",
+      "alert_forecast": "{{name}}：{{date}} 的预测显示，它将在本周期结束前用完。"
     },
     "refused": {
       "label": "预算已用完",

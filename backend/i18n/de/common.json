@@ -1443,7 +1443,7 @@
   "llm_calls": {
     "title": "LLM-Aufrufe",
     "search": "Aufrufe durchsuchen",
-    "search_placeholder": "Nach Anfrage-, Trace-, Sitzungs-, Benutzer- oder Agenten-ID, Modell, Fehler suchen…",
+    "search_placeholder": "Nach Anfrage- oder Trace-ID, Modell, Endpunkt, Fehler suchen…",
     "all_models": "Alle Modelle",
     "outcome": "Ergebnis",
     "outcome_all": "Alle",
@@ -1462,8 +1462,6 @@
     "live_paused_page": "Live folgt den neuesten Aufrufen: zur ersten Seite, nach Zeit sortiert",
     "refresh": "Aktualisieren",
     "updated_at": "Aktualisiert {{time}}",
-    "chip_session": "Unterhaltung {{id}}",
-    "clear_filters": "Filter zurücksetzen",
     "stat_calls": "Aufrufe",
     "stat_errors": "Fehler",
     "stat_p50": "Latenz p50",
@@ -1499,7 +1497,6 @@
     "flag_tools": "{{count}} Tool-Aufrufe",
     "flag_truncated": "Am Token-Limit abgeschnitten",
     "flag_retried": "{{count}}-mal wiederholt",
-    "flag_conversation": "Teil einer Unterhaltung",
     "prev": "Vorheriger Aufruf (k)",
     "next": "Nächster Aufruf (j)",
     "copy_link": "Link zu diesem Aufruf kopieren",
@@ -1522,7 +1519,6 @@
     "section_request": "Anfrage",
     "section_routing": "Routing",
     "section_who": "Wer",
-    "section_conversation": "Unterhaltung",
     "section_context": "Kontext",
     "span_first_token": "Warten auf das erste Token",
     "span_generation": "Generierung",
@@ -1533,7 +1529,6 @@
     "related_session_id": "Chat-Sitzung · {{count}} Aufrufe",
     "related_trace_id": "Trace · {{count}} Aufrufe",
     "related_summary": "{{tokens}} Tokens insgesamt, {{errors}} fehlgeschlagen",
-    "related_alone": "Der einzige Aufruf seiner Unterhaltung im Protokoll des Gateways.",
     "f_request_id": "Anfrage-ID",
     "f_trace_id": "Trace-ID",
     "f_endpoint": "Endpunkt",
@@ -1548,11 +1543,7 @@
     "f_user": "Benutzer",
     "f_tenant": "Mandant",
     "f_group": "Nutzungsgruppe",
-    "f_project": "Projekt",
     "f_agent": "Agent",
-    "f_device": "Gerät",
-    "f_session": "Chat-Sitzung",
-    "f_conversation": "Unterhaltung",
     "f_turn": "Runde",
     "f_skills": "Skills",
     "f_rag": "Wissen (RAG)",
@@ -1660,7 +1651,6 @@
     "ev_denied": "abgelehnt",
     "ev_error": "fehlgeschlagen",
     "ev_timeout": "Zeitüberschreitung",
-    "chip_user": "Benutzer {{id}}",
     "col_user": "Benutzer"
   },
   "agents_api_docs": {
@@ -1984,7 +1974,7 @@
       "usage_auditor": "Nutzungsprüfer"
     },
     "builtin_hints": {
-      "usage_auditor": "usage_auditor: darf die Nutzungszahlen einer einzelnen Person ansehen, solange die personenbezogene Auswertung eingeschaltet ist, jedes Mal mit Begründung. Superuser zu sein gibt dieses Recht nicht."
+      "usage_auditor": "usage_auditor: darf die Nutzungszahlen einer einzelnen Person ansehen, solange die personenbezogene Auswertung eingeschaltet ist, jedes Mal mit Begründung. Die Rolle öffnet auch die Seite Nutzung in der Konsole, eine weitere Rolle ist nicht nötig. Superuser zu sein gibt dieses Recht nicht."
     }
   },
   "groups": {
@@ -4415,7 +4405,10 @@
       "ends": "Endet",
       "sign_out": "Abmelden",
       "sign_out_title": "Dieses Gerät abmelden?",
-      "sign_out_confirm": "{{device}} ({{user}}) muss sich erneut anmelden, um den Agenten zu nutzen."
+      "sign_out_confirm": "{{device}} ({{user}}) muss sich erneut anmelden, um den Agenten zu nutzen.",
+      "suppressed": "Weniger als {{k}} Personen haben diesen Agenten in diesem Zeitraum genutzt. Seine Zahlen werden deshalb nicht angezeigt: Sie würden auf einzelne Personen hinweisen.",
+      "day_suppressed": "Tage mit weniger als {{k}} Personen sind ausgelassen.",
+      "user_hidden": "Nicht angezeigt"
     },
     "back_to_chat": "Zurück zum Chat",
     "no_access": "Sie betreuen keine Agenten. Bitten Sie einen Administrator, Sie zum Betreuer eines Agenten zu machen."
@@ -4867,7 +4860,12 @@
         "col_person": "Person",
         "col_period": "Zeitraum",
         "export_title": "Daten einer Person herunterladen",
-        "export_note": "Jeder Download wird mit der Begründung protokolliert, die Sie für diese Einsicht angegeben haben."
+        "export_note": "Jeder Download wird mit der Begründung protokolliert, die Sie für diese Einsicht angegeben haben.",
+        "range": "Zeitraum: {{from}} bis {{to}}.",
+        "range_clamped": "Zeitraum: {{from}} bis {{to}}. Zahlen pro Person werden {{days}} Tage aufbewahrt, deshalb umfasst diese Ansicht nur die letzten {{days}} Tage des Zeitraums der Seite.",
+        "range_refused": "Zahlen pro Person werden kürzer aufbewahrt, als dieser Zeitraum lang ist. Wählen Sie auf der Seite einen kürzeren Zeitraum (höchstens {{days}} Tage) und versuchen Sie es erneut.",
+        "target_refused": "Wählen Sie genau eine Person oder eine Nutzungsgruppe.",
+        "refused": "Der Server hat diese Anfrage nicht angenommen. Prüfen Sie Ihre Auswahl und versuchen Sie es erneut."
       },
       "smaller_teams": "Kleinere Teams und weitere",
       "smaller_teams_hint": "Unterteams, die zu klein sind, um einzeln zu erscheinen, und die Personen direkt in {{name}}",
@@ -4895,7 +4893,7 @@
       "unhide": "Trotzdem zeigen",
       "unhide_title": "Zahlen über weniger als {{k}} Personen zeigen",
       "unhide_intro": "Als Nutzungsprüfer dürfen Sie diese Zahlen mit Begründung sehen. Die Einsicht wird mit Ihrer Begründung protokolliert, wie die Einsicht in die Zahlen einer Person.",
-      "unhidden_note": "Diese Zahlen umfassen weniger als {{k}} Personen. Sie werden Ihnen als Nutzungsprüfer gezeigt, und jede Einsicht wird mit Ihrer Begründung protokolliert.",
+      "unhidden_note": "Diese Zahlen umfassen weniger als {{k}} Personen. Sie werden Ihnen als Nutzungsprüfer gezeigt, und jede Einsicht wird mit Ihrer Begründung protokolliert. Ihre Begründung gilt nur für diese Ansicht: Wenn Sie Zeitraum, Zahlen pro oder Gruppierung ändern, werden die Zahlen wieder verborgen.",
       "menu": "Nutzung aller Teams"
     },
     "errors": {
@@ -5067,7 +5065,9 @@
       "owner": "auch an {{owner}}",
       "children_exceed": "Die Budgets der Teams darunter ergeben zusammen mehr als dieses. Das ist erlaubt: Jede Anfrage braucht trotzdem auch in diesem Budget Platz.",
       "currency_none": "Kein Modell hat einen Preis in {{currency}}: Für dieses Budget zählt nichts, bis eines einen hat.",
-      "currency_others": "Nur Kosten in {{currency}} zählen. Die Nutzung von Modellen mit Preisen in {{others}} zählt für dieses Budget nicht."
+      "currency_others": "Nur Kosten in {{currency}} zählen. Die Nutzung von Modellen mit Preisen in {{others}} zählt für dieses Budget nicht.",
+      "would_refuse_unknown": "Wie viele Anfragen es abgelehnt hätte, ist nicht bekannt.",
+      "suppressed_few": "Weniger Personen, als die Datenschutzregel verlangt, haben dieses Budget in diesem Zeitraum genutzt. Wie viel genutzt ist, wird deshalb nicht angezeigt: Es würde auf einzelne Personen hinweisen."
     },
     "dialog": {
       "create_title": "Neues Budget",
@@ -5191,7 +5191,8 @@
       "alerts_title": "Benachrichtigungen in diesem Zeitraum",
       "alert": "{{name}} hat am {{date}} {{threshold}} % erreicht.",
       "private": "Nur Sie sehen, was Sie von Ihrem persönlichen Budget nutzen.",
-      "ask": "Wenn Sie mehr brauchen, wenden Sie sich an die Administration oder an die verantwortliche Person des Budgets."
+      "ask": "Wenn Sie mehr brauchen, wenden Sie sich an die Administration oder an die verantwortliche Person des Budgets.",
+      "alert_forecast": "{{name}}: Am {{date}} sagte die Prognose, dass es vor dem Ende des Zeitraums aufgebraucht ist."
     },
     "refused": {
       "label": "Budget aufgebraucht",

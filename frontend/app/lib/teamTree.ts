@@ -100,19 +100,44 @@ export interface ParentOption<T> {
   depth: number;
   /** False when the team, with its sub-teams, would end up more than six levels down. */
   allowed: boolean;
+  /** The team's current parent, archived: listed so it can stay, though nothing new hangs below it. */
+  archived: boolean;
 }
 
 /**
  * The teams `editing` (null: a new team) may hang below: never itself or one of its own sub-teams (a
- * cycle), never an archived team; those that would push it or its sub-teams past six levels are
- * listed but not allowed, so the reason can be shown.
+ * cycle), never an archived team -- except its current parent, which it keeps (the backend checks only a
+ * move); those that would push it or its sub-teams past six levels are listed but not allowed, so the
+ * reason can be shown.
  */
 export function parentOptions<T extends TreeTeam>(teams: T[], editing: string | null, lang?: string): ParentOption<T>[] {
   const below = editing ? descendantsOf(teams, editing) : new Set<string>();
   const height = editing ? heightOf(teams, editing) : 1;
+  const current = editing ? (teams.find((t) => t.id === editing)?.parent_id ?? null) : null;
   return asTree(teams, lang)
-    .filter(({ team }) => team.id !== editing && !below.has(team.id) && !team.archived_at)
-    .map(({ team, depth }) => ({ team, depth, allowed: depth + height <= MAX_TEAM_DEPTH }));
+    .filter(({ team }) => team.id !== editing && !below.has(team.id) && (!team.archived_at || team.id === current))
+    .map(({ team, depth }) => ({
+      team,
+      depth,
+      allowed: team.id === current || depth + height <= MAX_TEAM_DEPTH,
+      archived: Boolean(team.archived_at),
+    }));
+}
+
+/**
+ * The active teams and, so that none of them loses its place, every archived team above one of them: a
+ * sub-team of an archived team stays below it (shown as archived) instead of moving to the top.
+ */
+export function activeWithAncestors<T extends TreeTeam>(teams: T[]): T[] {
+  const byId = new Map(teams.map((t) => [t.id, t]));
+  const keep = new Set<string>();
+  for (const team of teams) {
+    if (team.archived_at) continue;
+    for (let at: T | undefined = team; at && !keep.has(at.id); at = at.parent_id ? byId.get(at.parent_id) : undefined) {
+      keep.add(at.id);
+    }
+  }
+  return teams.filter((t) => keep.has(t.id));
 }
 
 /** Teams that can be picked (a home team, a team to look at): active ones, as a tree. */

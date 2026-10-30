@@ -1,7 +1,16 @@
 /** Teams as a tree: order, depth, and the parents a team may get (no cycle, at most six levels). */
 import { describe, expect, it } from "vitest";
 
-import { asTree, depthOf, descendantsOf, heightOf, MAX_TEAM_DEPTH, parentOptions, pickableTeams } from "./teamTree";
+import {
+  activeWithAncestors,
+  asTree,
+  depthOf,
+  descendantsOf,
+  heightOf,
+  MAX_TEAM_DEPTH,
+  parentOptions,
+  pickableTeams,
+} from "./teamTree";
 
 const team = (id: string, parent_id: string | null = null, archived_at: string | null = null) => ({
   id,
@@ -45,6 +54,28 @@ describe("the tree", () => {
   });
 });
 
+describe("the list without archived teams", () => {
+  it("keeps every archived team above an active one, so a sub-team keeps its place", () => {
+    const archived = "2026-10-01T00:00:00Z";
+    const teams = [
+      team("Top", null, archived),
+      team("Mid", "Top", archived),
+      team("Leaf", "Mid"),
+      team("Gone", null, archived),
+      team("GoneChild", "Gone", archived),
+      team("Active"),
+    ];
+    const kept = activeWithAncestors(teams);
+    expect(kept.map((t) => t.id).sort()).toEqual(["Active", "Leaf", "Mid", "Top"]);
+    expect(asTree(kept).map((r) => [r.team.id, r.depth])).toEqual([
+      ["Active", 1],
+      ["Top", 1],
+      ["Mid", 2],
+      ["Leaf", 3],
+    ]);
+  });
+});
+
 describe("the parents a team may get", () => {
   it("offers neither the team itself nor one of its sub-teams (no cycle), nor an archived team", () => {
     const withArchived = [...TEAMS, team("Old")];
@@ -65,6 +96,18 @@ describe("the parents a team may get", () => {
     const forPair = parentOptions(withPair, "P");
     expect(forPair.find((o) => o.team.id === "L4")?.allowed).toBe(true);
     expect(forPair.find((o) => o.team.id === "L5")?.allowed).toBe(false);
+  });
+
+  it("keeps an archived current parent, marked, so a sub-team of an archived team can still be edited", () => {
+    const teams = [team("Old", null, "2026-10-01T00:00:00Z"), team("Kept", "Old"), team("Other")];
+    const forKept = parentOptions(teams, "Kept");
+    expect(forKept.map((o) => [o.team.id, o.allowed, o.archived])).toEqual([
+      ["Old", true, true],
+      ["Other", true, false],
+    ]);
+    // Nobody else may move below it.
+    expect(parentOptions(teams, "Other").map((o) => o.team.id)).toEqual(["Kept"]);
+    expect(parentOptions(teams, null).map((o) => o.team.id)).toEqual(["Kept", "Other"]);
   });
 
   it("offers only active teams to pick", () => {
