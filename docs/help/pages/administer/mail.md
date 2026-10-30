@@ -130,8 +130,9 @@ whether it is tried again, or being sent right now. Mails are tried again for a 
 they are of no use any more (a reset link that expired). A mail the mail server refused for good (the sign-in, the
 sender, the recipient or the message) is not tried again.
 
-Each mail goes out once, even when Fadenstack repeats a delivery, for example after the mail server answered too
-late.
+Each mail goes out once, even when Fadenstack repeats a delivery, for example after the mail service answered too
+late. One case remains: when the mail server took a mail but its answer never arrived (the connection broke at
+that moment), the mail is sent again, as the same message, which most mailboxes then show once.
 
 After the mail server refuses a sign-in, Fadenstack does not sign in again with the same settings for 15 minutes:
 many failed sign-ins in a row make mail servers ban the address they come from. A test mail tries at once, and one

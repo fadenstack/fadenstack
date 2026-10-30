@@ -142,8 +142,10 @@ und ungesendet gelöscht, sobald sie nicht mehr nützen (ein abgelaufener Link).
 endgültig abgelehnt hat (die Anmeldung, den Absender, den Empfänger oder die Nachricht), wird nicht erneut
 versucht.
 
-Jede Mail geht einmal hinaus, auch wenn Fadenstack eine Zustellung wiederholt, etwa weil der Mailserver zu spät
-geantwortet hat.
+Jede Mail geht einmal hinaus, auch wenn Fadenstack eine Zustellung wiederholt, etwa weil der Maildienst zu spät
+geantwortet hat. Ein Fall bleibt: Hat der Mailserver eine Mail angenommen, seine Antwort aber nie geschickt (die
+Verbindung brach genau dann ab), wird sie noch einmal gesendet, als dieselbe Nachricht, die die meisten Postfächer
+dann einmal zeigen.
 
 Hat der Mailserver eine Anmeldung abgelehnt, meldet sich Fadenstack mit denselben Einstellungen 15 Minuten lang
 nicht erneut an: Viele gescheiterte Anmeldungen hintereinander bringen Mailserver dazu, die Adresse zu sperren, von
