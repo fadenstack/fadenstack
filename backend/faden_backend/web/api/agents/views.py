@@ -22,6 +22,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi import Path as FastAPIPath
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,13 +34,15 @@ from faden_backend.db.dao.rbac_dao import RbacDAO
 from faden_backend.db.models.agents import (
     Agent,
     AgentMemberRole,
+    AgentPairing,
+    AgentPairingStatus,
     AgentStatus,
     AgentVersion,
     PrincipalType,
 )
 from faden_backend.db.models.containers import AuditResult
 from faden_backend.db.models.users import User, current_active_user
-from faden_backend.services.agents import access, app_review, app_templates, tokens
+from faden_backend.services.agents import access, app_review, app_templates, pairing, tokens
 from faden_backend.services.extensions import registry
 from faden_backend.services.principals import PrincipalOption, find_principals
 from faden_backend.web.api.agents.schema import (
@@ -58,14 +61,25 @@ from faden_backend.web.api.agents.schema import (
     GrantDTO,
     IssueTokenRequest,
     MemberDTO,
+    PairingAgentDTO,
+    PairingClient,
+    PairingCodeRequest,
+    PairingLookupDTO,
+    PairingStartDTO,
+    PairingTokenRequest,
     RefreshTokenRequest,
     ReplaceGrantsRequest,
     ReplaceMembersRequest,
+    RevokeTokenRequest,
+    SignedInUserDTO,
     SignInDTO,
+    SignInLastsDTO,
+    StartPairingRequest,
     ToolReviewDTO,
     UpdateAgentRequest,
     UsageDTO,
 )
+from faden_backend.web.origin import public_origin
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 tokens_router = APIRouter(prefix="/agent-tokens", tags=["agents"])
@@ -878,6 +892,7 @@ def _tokens_dto(issued: tokens.IssuedTokens) -> AgentTokensDTO:
         device_id=issued.device_id,
         agent_id=issued.agent.id,
         agent=issued.agent.slug,
+        user=SignedInUserDTO(id=issued.user.id, email=issued.user.email),
     )
 
 
@@ -960,3 +975,306 @@ async def revoke_sign_in(
     await dao.revoke_family(device_id, datetime.now(UTC))
     await _audit(audit, user, "agent_token.revoke", str(row.agent_id), {"device": str(device_id)})
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@tokens_router.post("/revoke", status_code=status.HTTP_204_NO_CONTENT, name="revoke_agent_tokens")
+async def revoke_agent_tokens(
+    payload: RevokeTokenRequest,
+    dao: AgentsDAO = Depends(),
+    audit: AuditDAO = Depends(),
+) -> Response:
+    """The app ends its own sign-in with its refresh token (signing out on the device).
+
+    Always 204, whether or not the token matched: the answer tells nothing about tokens. A match ends the
+    whole sign-in, every token of its family, as revoking it in *My sign-ins* does.
+    """
+    row = await dao.refresh_token_by_hash(tokens.hash_token(payload.refresh_token))
+    if row is not None and await dao.revoke_family(row.family_id, datetime.now(UTC)):
+        await audit.log(
+            action="agent_token.revoke",
+            target_type="agent",
+            target_id=str(row.agent_id),
+            result=AuditResult.ALLOW,
+            actor_id=row.user_id,
+            metadata_json=json.dumps({"device": str(row.family_id), "by": "app"}),
+        )
+    return Response(status_code=status.HTTP_204_NO_CONTENT, headers=_NO_STORE)
+
+
+# -- pairing (RFC 8628) ------------------------------------------------------------------
+#
+# An app is signed in by a person who approves its code in the console (services/agents/pairing.py). Every
+# answer is ``Cache-Control: no-store``. The app's routes (start, token) need no sign-in; the console's
+# (lookup, approve, deny) need a console user, and the CSRF check covers their POSTs as every other.
+# Neither code ever goes into an address: the user code travels in request bodies and in the fragment of the
+# page link, which browsers never send, so no access log has it (ASVS 5.0 14.2.1). The audit trail (V16) gets
+# agent_pairing.start / .approve / .deny and agent_token.issue, by the pairing's id, never a code.
+
+_NO_STORE = {"Cache-Control": "no-store"}
+#: The one answer for an agent that is unknown, retired or not granted: which of them is nobody's business.
+_NOT_AVAILABLE = "This agent is not available to you."
+#: The console page that approves a pairing.
+PAIRING_PAGE = "/pair"
+
+
+def _refuse(status_code: int, code: str, message: str) -> HTTPException:
+    """An error in the backend's shape, not cached."""
+    return HTTPException(
+        status_code=status_code, detail={"code": code, "message": message}, headers=_NO_STORE,
+    )
+
+
+def _too_many(wait: int, message: str) -> HTTPException:
+    """429 with the seconds to wait (``Retry-After``)."""
+    return HTTPException(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        detail={"code": "too_many_attempts", "message": message, "retry_after": wait},
+        headers={**_NO_STORE, "Retry-After": str(wait)},
+    )
+
+
+def _caller(request: Request) -> str | None:
+    """The caller's address as uvicorn gives it: behind nginx, the client's (``services/agents/pairing``)."""
+    return pairing.address(request.client.host if request.client else None)
+
+
+@tokens_router.post(
+    "/pairings",
+    response_model=PairingStartDTO,
+    status_code=status.HTTP_201_CREATED,
+    name="start_agent_pairing",
+)
+async def start_agent_pairing(
+    payload: StartPairingRequest,
+    request: Request,
+    response: Response,
+    dao: AgentsDAO = Depends(),
+    audit: AuditDAO = Depends(),
+) -> PairingStartDTO:
+    """An app asks to be signed in to an agent: a code to show, and one to poll with (RFC 8628 §3.1, §3.2).
+
+    No sign-in. The answer is the same whatever the agent: whether it exists, and whether the person may use
+    it, is decided at the approval. 10 per address in 10 minutes; beyond, 429 with ``Retry-After``.
+    """
+    now = datetime.now(UTC)
+    ip = _caller(request)
+    wait = await pairing.start_wait(dao.session, ip, now)
+    if wait:
+        raise _too_many(wait, "Too many sign-in requests from this address; try again later.")
+    started = await pairing.start(
+        dao.session,
+        secret=await _secret(dao.session),
+        tenant_id=TENANT,
+        agent_ref=payload.agent,
+        device_label=payload.device_label,
+        client_name=payload.client.name,
+        client_version=payload.client.version,
+        client_os=payload.client.os,
+        ip=ip,
+        now=now,
+    )
+    await audit.log(
+        action="agent_pairing.start",
+        target_type="agent_pairing",
+        target_id=str(started.pairing.id),
+        result=AuditResult.ALLOW,
+        metadata_json=json.dumps({"agent": payload.agent, "ip": ip}),
+    )
+    response.headers["Cache-Control"] = "no-store"
+    page = f"{public_origin(request)}{PAIRING_PAGE}"
+    user_code = pairing.shown(started.user_code)
+    return PairingStartDTO(
+        pairing_code=started.pairing_code,
+        user_code=user_code,
+        verification_uri=page,
+        verification_uri_complete=f"{page}#code={user_code}",
+        expires_in=pairing.LIFETIME_S,
+        interval=pairing.INTERVAL_S,
+    )
+
+
+@tokens_router.post(
+    "/pairings/token",
+    response_model=AgentTokensDTO,
+    status_code=status.HTTP_201_CREATED,
+    name="agent_pairing_token",
+    responses={
+        status.HTTP_400_BAD_REQUEST: {
+            "description": "RFC 8628 §3.5: ``{error, error_description}`` with ``authorization_pending``, "
+            "``slow_down`` (and the new ``interval``), ``access_denied``, ``expired_token`` or "
+            "``invalid_grant``.",
+        },
+    },
+)
+async def agent_pairing_token(
+    payload: PairingTokenRequest,
+    response: Response,
+    dao: AgentsDAO = Depends(),
+    audit: AuditDAO = Depends(),
+) -> Any:
+    """The app polls with its pairing code: 400 with an RFC 8628 error until approved, then once its tokens.
+
+    The tokens are a new sign-in of the approving person on this device (the pairing's device label), with
+    ``user`` saying who that is. After that the pairing is consumed: polling again answers ``invalid_grant``.
+    """
+    try:
+        paired = await pairing.poll(
+            dao, secret=await _secret(dao.session), pairing_code=payload.pairing_code, now=datetime.now(UTC),
+        )
+    except pairing.PairingError as exc:
+        # The poll's time, a raised interval or a noted expiry must stick, although the answer is an error.
+        await dao.session.commit()
+        body: dict[str, Any] = {"error": exc.code, "error_description": exc.description}
+        if exc.interval is not None:
+            body["interval"] = exc.interval
+        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content=body, headers=_NO_STORE)
+    issued = paired.issued
+    await _audit(
+        audit, issued.user, "agent_token.issue", str(issued.agent.id),
+        {"device": str(issued.device_id), "pairing": str(paired.pairing.id)},
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return _tokens_dto(issued)
+
+
+async def _pending_pairing(code: str, request: Request, user: User, dao: AgentsDAO) -> AgentPairing:
+    """The pending pairing *code* names, for the console, after the brute-force limits (RFC 8628 §5.1).
+
+    429 while the person or their address is over a limit; 404 for a wrong or expired code, which counts
+    against both; 409 once it was decided. The account itself is never locked (ASVS 5.0 6.1.1): only these
+    routes wait.
+    """
+    now = datetime.now(UTC)
+    ip = _caller(request)
+    wait = await pairing.failure_wait(dao.session, user.id, ip, now)
+    if wait:
+        raise _too_many(wait, "Too many wrong codes; try again later.")
+    row = await pairing.find(dao.session, secret=await _secret(dao.session), entered=code, now=now)
+    if row is None:
+        await pairing.record_failure(dao.session, user.id, ip, now)
+        # The count, and an expiry noted, must stick although the answer is an error.
+        await dao.session.commit()
+        raise _refuse(
+            status.HTTP_404_NOT_FOUND,
+            "unknown_code",
+            "No sign-in waits for this code. Check it, or get a new one in the app.",
+        )
+    if row.status != AgentPairingStatus.PENDING:
+        raise _refuse(
+            status.HTTP_409_CONFLICT, "already_decided", "This sign-in was already approved or denied.",
+        )
+    return row
+
+
+def _pairing_record(row: AgentPairing, **more: Any) -> str:
+    """What the audit trail keeps about a pairing: never a code."""
+    return json.dumps(
+        {
+            "pairing": str(row.id),
+            "device_label": row.device_label,
+            "requester_ip": str(row.requester_ip) if row.requester_ip is not None else None,
+            **more,
+        },
+    )
+
+
+@tokens_router.post("/pairings/lookup", response_model=PairingLookupDTO, name="lookup_agent_pairing")
+async def lookup_agent_pairing(
+    payload: PairingCodeRequest,
+    request: Request,
+    response: Response,
+    user: Annotated[User, Depends(current_active_user)],
+    dao: AgentsDAO = Depends(),
+) -> PairingLookupDTO:
+    """What asks to be signed in with this code, for the person to check before approving (ASVS 5.0 10.7.1).
+
+    A POST, so the code stays out of addresses and logs. ``available`` is false, and the agent's name null,
+    when the person may not use the agent -- unknown, retired and not granted alike.
+    """
+    row = await _pending_pairing(payload.code, request, user, dao)
+    agent, decision = await pairing.resolve(dao, row, user)
+    available = agent is not None and decision.allowed
+    life = (
+        await tokens.lifetimes(dao, agent)
+        if agent is not None and available
+        else registry.token_lifetimes.lifetimes({})
+    )
+    response.headers["Cache-Control"] = "no-store"
+    day = 86400
+    return PairingLookupDTO(
+        agent=PairingAgentDTO(
+            slug=agent.slug if agent is not None and available else row.agent_ref,
+            name=agent.name if agent is not None and available else None,
+        ),
+        available=available,
+        device_label=row.device_label,
+        client=PairingClient(name=row.client_name, version=row.client_version, os=row.client_os),
+        requester_ip=str(row.requester_ip) if row.requester_ip is not None else None,
+        same_network=pairing.same_network(row.requester_ip, _caller(request)),
+        created_at=row.created_at,
+        expires_at=row.expires_at,
+        sign_in_lasts=SignInLastsDTO(
+            idle_days=round(life.idle_s / day, 2), max_days=round(life.refresh_s / day, 2),
+        ),
+    )
+
+
+@tokens_router.post(
+    "/pairings/approve", status_code=status.HTTP_204_NO_CONTENT, name="approve_agent_pairing",
+)
+async def approve_agent_pairing(
+    payload: PairingCodeRequest,
+    request: Request,
+    user: Annotated[User, Depends(current_active_user)],
+    dao: AgentsDAO = Depends(),
+    audit: AuditDAO = Depends(),
+) -> Response:
+    """The person approves the pairing: the app's next poll gets their tokens for the agent.
+
+    ``access.decide`` first. An agent that is unknown, retired or not granted to them answers the same 403;
+    the pairing stays open (they may deny it, or it expires).
+    """
+    row = await _pending_pairing(payload.code, request, user, dao)
+    agent, decision = await pairing.resolve(dao, row, user)
+    if agent is None or not decision.allowed:
+        await audit.log(
+            action="agent_pairing.approve",
+            target_type="agent_pairing",
+            target_id=str(row.id),
+            result=AuditResult.DENY,
+            actor_id=user.id,
+            metadata_json=_pairing_record(row, agent=row.agent_ref, reason=decision.code),
+        )
+        raise _refuse(status.HTTP_403_FORBIDDEN, "agent_not_available", _NOT_AVAILABLE)
+    await pairing.approve(dao.session, row, agent, user, datetime.now(UTC))
+    await audit.log(
+        action="agent_pairing.approve",
+        target_type="agent_pairing",
+        target_id=str(row.id),
+        result=AuditResult.ALLOW,
+        actor_id=user.id,
+        metadata_json=_pairing_record(row, agent=agent.slug, agent_id=str(agent.id)),
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT, headers=_NO_STORE)
+
+
+@tokens_router.post("/pairings/deny", status_code=status.HTTP_204_NO_CONTENT, name="deny_agent_pairing")
+async def deny_agent_pairing(
+    payload: PairingCodeRequest,
+    request: Request,
+    user: Annotated[User, Depends(current_active_user)],
+    dao: AgentsDAO = Depends(),
+    audit: AuditDAO = Depends(),
+) -> Response:
+    """The person denies the pairing: the app's next poll answers ``access_denied``."""
+    row = await _pending_pairing(payload.code, request, user, dao)
+    await pairing.deny(dao.session, row, user, datetime.now(UTC))
+    await audit.log(
+        action="agent_pairing.deny",
+        target_type="agent_pairing",
+        target_id=str(row.id),
+        result=AuditResult.ALLOW,
+        actor_id=user.id,
+        metadata_json=_pairing_record(row, agent=row.agent_ref),
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT, headers=_NO_STORE)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import unicodedata
 import uuid
 from datetime import datetime
 from typing import Any, Literal
@@ -193,6 +194,15 @@ class RefreshTokenRequest(BaseModel):
     refresh_token: str = Field(min_length=16, max_length=256)
 
 
+class SignedInUserDTO(BaseModel):
+    """Whom agent tokens are for, for the app to show."""
+
+    id: uuid.UUID
+    email: str
+    #: Core keeps no name besides the e-mail address: null.
+    display_name: str | None = None
+
+
 class AgentTokensDTO(BaseModel):
     """An access token for one agent and the refresh token that renews it."""
 
@@ -204,6 +214,116 @@ class AgentTokensDTO(BaseModel):
     device_id: uuid.UUID
     agent_id: uuid.UUID
     agent: str
+    #: Whom the tokens are for (added for the desktop app's sign-in; older clients ignore it).
+    user: SignedInUserDTO | None = None
+
+
+class RevokeTokenRequest(BaseModel):
+    """End the sign-in a refresh token belongs to (the app signing itself out)."""
+
+    refresh_token: str = Field(min_length=1, max_length=256)
+
+
+# -- pairing (RFC 8628) -------------------------------------------------------------------
+
+#: An agent's slug, or its id.
+AGENT_REF_PATTERN = r"^[A-Za-z0-9-]{1,64}$"
+
+
+def _shown_as_is(value: str | None) -> str | None:
+    """Refuse control and format characters (bidi overrides, zero-width ones) in what the console shows.
+
+    The approval page shows the app's own words; such characters could make them read as something else there
+    (ASVS 5.0 10.7.1: the person sees what they approve).
+    """
+    if value is not None and any(unicodedata.category(ch) in {"Cc", "Cf"} for ch in value):
+        raise ValueError("must not contain control or invisible formatting characters")
+    return value
+
+
+class PairingClient(BaseModel):
+    """What the app says it is; the console shows it as the app's own statement."""
+
+    name: str | None = Field(default=None, max_length=100)
+    version: str | None = Field(default=None, max_length=50)
+    os: str | None = Field(default=None, max_length=100)
+
+    @field_validator("name", "version", "os")
+    @classmethod
+    def _plain(cls, value: str | None) -> str | None:
+        return _shown_as_is(value)
+
+
+class StartPairingRequest(BaseModel):
+    """An app asks to be signed in to an agent on this device."""
+
+    #: The agent's slug or id. Whether it exists is told nobody here; the approval resolves it.
+    agent: str = Field(pattern=AGENT_REF_PATTERN)
+    device_label: str = Field(min_length=1, max_length=200)
+    client: PairingClient = Field(default_factory=PairingClient)
+
+    @field_validator("device_label")
+    @classmethod
+    def _plain(cls, value: str) -> str:
+        return _shown_as_is(value) or value
+
+
+class PairingStartDTO(BaseModel):
+    """What the app needs to show the code and to poll (RFC 8628 §3.2)."""
+
+    #: The app's secret for polling; never shown or logged.
+    pairing_code: str
+    #: The code the person compares in the console, ``XXXX-XXXX``.
+    user_code: str
+    verification_uri: str
+    #: The page with the code filled in. The code is in the fragment, which browsers never send: it stays out
+    #: of every access log (ASVS 5.0 14.2.1).
+    verification_uri_complete: str
+    expires_in: int
+    interval: int
+
+
+class PairingTokenRequest(BaseModel):
+    """The app polls for its tokens."""
+
+    pairing_code: str = Field(min_length=16, max_length=256)
+
+
+class PairingCodeRequest(BaseModel):
+    """A user code as the person typed it. In the body, never in the address (ASVS 5.0 14.2.1)."""
+
+    code: str = Field(min_length=1, max_length=32)
+
+
+class PairingAgentDTO(BaseModel):
+    """The agent a pairing asks for."""
+
+    slug: str
+    #: Null when the agent is not available to the person looking (unknown, retired or not granted alike).
+    name: str | None
+
+
+class SignInLastsDTO(BaseModel):
+    """How long the sign-in stays: idle, and at most."""
+
+    idle_days: float
+    max_days: float
+
+
+class PairingLookupDTO(BaseModel):
+    """What the console shows before the person approves (ASVS 5.0 10.7.1, 10.7.2)."""
+
+    agent: PairingAgentDTO
+    #: Whether the person may use the agent; approving answers 403 otherwise.
+    available: bool
+    device_label: str
+    client: PairingClient
+    requester_ip: str | None
+    #: Whether the request came from the network the person's browser is in.
+    same_network: bool
+    created_at: datetime
+    expires_at: datetime
+    sign_in_lasts: SignInLastsDTO
 
 
 class ClientEventDTO(BaseModel):

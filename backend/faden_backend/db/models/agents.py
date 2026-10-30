@@ -19,6 +19,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
+    BigInteger,
     DateTime,
     Enum,
     ForeignKey,
@@ -28,8 +29,9 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, INET, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -62,6 +64,16 @@ class AgentMemberRole(enum.StrEnum):
     """What a member does for an agent. EE adds ``auditor``."""
 
     MAINTAINER = "maintainer"
+
+
+class AgentPairingStatus(enum.StrEnum):
+    """Where a pairing is: waiting, decided in the console, used for its tokens, or run out."""
+
+    PENDING = "pending"
+    APPROVED = "approved"
+    DENIED = "denied"
+    CONSUMED = "consumed"
+    EXPIRED = "expired"
 
 
 def _now_column() -> Mapped[datetime]:
@@ -246,3 +258,85 @@ class AgentRefreshToken(Base):
     idle_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     replaced_by: Mapped[uuid.UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True)
+
+
+class AgentPairing(Base):
+    """An app's request to be signed in to an agent, approved by a person in the console (RFC 8628).
+
+    Neither code is stored: the pairing code (256 bits, the app's) as its SHA-256, the user code (the one the
+    person compares) as an HMAC under a key derived from the backend's secret, so a read of the table does not
+    give away a live code (``services/agents/pairing.py``). Rows go a day after they were made.
+    """
+
+    __tablename__ = "agent_pairings"
+    __table_args__ = (
+        # One live pairing per user code; decided and expired ones may share it with a later one.
+        Index(
+            "uq_agent_pairings_pending_user_code",
+            "user_code_hmac",
+            unique=True,
+            postgresql_where=text("status = 'pending'"),
+        ),
+        Index("ix_agent_pairings_user_code_hmac", "user_code_hmac"),
+        Index("ix_agent_pairings_requester_ip_created_at", "requester_ip", "created_at"),
+        Index("ix_agent_pairings_created_at", "created_at"),
+    )
+
+    #: The only id that appears in logs and the audit trail.
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[str] = mapped_column(String(128), nullable=False, default="default")
+    #: The agent as the app named it (slug or id); resolved at the approval, so starting a pairing does not
+    #: tell whether an agent exists.
+    agent_ref: Mapped[str] = mapped_column(String(64), nullable=False)
+    #: Set at the approval.
+    agent_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("agents.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    pairing_code_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    user_code_hmac: Mapped[str] = mapped_column(String(64), nullable=False)
+    device_label: Mapped[str] = mapped_column(String(200), nullable=False)
+    #: What the app says it is; shown as such.
+    client_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    client_version: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    client_os: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    requester_ip: Mapped[str | None] = mapped_column(INET, nullable=True)
+    status: Mapped[AgentPairingStatus] = mapped_column(
+        Enum(AgentPairingStatus, name="agent_pairing_status", values_callable=lambda e: [m.value for m in e]),
+        nullable=False,
+        default=AgentPairingStatus.PENDING,
+    )
+    #: Who approved or denied it.
+    approved_by: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("user.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = _now_column()
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_polled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: Seconds the app waits between polls; ``slow_down`` adds 5.
+    interval_s: Mapped[int] = mapped_column(Integer, nullable=False, default=5, server_default="5")
+    #: Polls that came too early (each answered ``slow_down``).
+    failed_polls: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+
+
+class AgentPairingFailure(Base):
+    """A wrong or expired user code tried in the console: what the brute-force limits count (RFC 8628 5.1)."""
+
+    __tablename__ = "agent_pairing_failures"
+    __table_args__ = (
+        Index("ix_agent_pairing_failures_user_at", "user_id", "failed_at"),
+        Index("ix_agent_pairing_failures_ip_at", "ip", "failed_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("user.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    ip: Mapped[str | None] = mapped_column(INET, nullable=True)
+    failed_at: Mapped[datetime] = _now_column()

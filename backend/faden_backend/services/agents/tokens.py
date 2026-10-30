@@ -51,6 +51,8 @@ class IssuedTokens:
     refresh_expires_in: int
     device_id: uuid.UUID
     agent: Agent
+    #: Whom the tokens are for.
+    user: User
 
 
 def audience(agent_id: uuid.UUID) -> str:
@@ -90,7 +92,8 @@ def _access_token(*, secret: str, user: User, agent: Agent, device_id: uuid.UUID
     return jwt.encode(claims, secret, algorithm="HS256")
 
 
-async def _lifetimes(dao: AgentsDAO, agent: Agent) -> Lifetimes:
+async def lifetimes(dao: AgentsDAO, agent: Agent) -> Lifetimes:
+    """How long *agent*'s tokens live, after its published version's settings."""
     version = await dao.version_by_id(agent.published_version_id)
     return registry.token_lifetimes.lifetimes(version.extensions if version else {})
 
@@ -107,7 +110,7 @@ async def issue(
     decision = await decide(dao, agent, user)
     if not decision.allowed:
         raise AgentTokenError(403, decision.code, decision.detail)
-    life = await _lifetimes(dao, agent)
+    life = await lifetimes(dao, agent)
     now = datetime.now(UTC)
     refresh = secrets.token_urlsafe(32)
     family = uuid.uuid4()
@@ -135,6 +138,7 @@ async def issue(
         refresh_expires_in=life.refresh_s,
         device_id=family,
         agent=agent,
+        user=user,
     )
 
 
@@ -174,7 +178,7 @@ async def refresh(dao: AgentsDAO, *, secret: str, refresh_token: str) -> IssuedT
         await dao.revoke_family(row.family_id, now)
         raise AgentTokenError(403, decision.code, decision.detail)
 
-    life = await _lifetimes(dao, agent)
+    life = await lifetimes(dao, agent)
     # The sign-in ends where it always would; only idleness is renewed. A
     # lifetime lowered since takes effect now: the end moves closer.
     expires_at = min(row.expires_at, started + timedelta(seconds=life.refresh_s))
@@ -205,4 +209,5 @@ async def refresh(dao: AgentsDAO, *, secret: str, refresh_token: str) -> IssuedT
         refresh_expires_in=max(0, int((replacement.expires_at - now).total_seconds())),
         device_id=row.family_id,
         agent=agent,
+        user=user,
     )
