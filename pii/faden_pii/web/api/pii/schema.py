@@ -178,6 +178,9 @@ class PIIPolicyOptionsResponse(BaseModel):
         "embedding_strings",
     ]
     entity_languages: dict[str, list[str]] = {}
+    #: Per language, what a policy that names no entity types gets: the standard
+    #: types the installed detector finds.
+    default_entities: dict[str, list[str]] = {}
     detector: dict[str, Any] = {}
 
 

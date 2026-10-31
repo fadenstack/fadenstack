@@ -2091,7 +2091,10 @@
       "score_threshold": "Score threshold",
       "entities": "Entities",
       "legacy_entity": "{{entity}} (no longer supported)",
-      "no_entities": "No entities selected.",
+      "legacy_threshold_warning": "The threshold of this policy is on the scale of the older engine. The installed detector refuses it, so requests to remote models are refused. Use the installed profile defaults.",
+      "unsupported_entities_warning": "The installed detector does not find {{types}}. Requests to remote models are refused until these types are removed. You can also use the installed profile defaults.",
+      "no_entities_standard": "None selected, so the installed detector's standard types are found: {{types}}",
+      "no_entities_standard_unknown": "None selected, so the PII service's standard types are found.",
       "add_entity": "Add entity"
     },
     "accuracy_note": "Detection is automatic, and how well it works depends on the language and the structure of the content (tables, lists, code, short fragments). It can miss personal data or flag words that are not personal. Try it on your organisation's typical content before you rely on it."

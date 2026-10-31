@@ -1950,7 +1950,10 @@
       "score_threshold": "Schwellenwert",
       "entities": "Entitäten",
       "legacy_entity": "{{entity}} (nicht mehr unterstützt)",
-      "no_entities": "Keine Entitäten ausgewählt.",
+      "legacy_threshold_warning": "Der Schwellenwert dieser Richtlinie gilt für die Skala der älteren Engine. Die installierte Erkennung lehnt ihn ab, daher werden Anfragen an Remote-Modelle abgelehnt. Verwenden Sie die Standardwerte des installierten Profils.",
+      "unsupported_entities_warning": "Die installierte Erkennung findet {{types}} nicht. Anfragen an Remote-Modelle werden abgelehnt, bis diese Kategorien entfernt sind. Alternativ können die Standardwerte des installierten Profils verwendet werden.",
+      "no_entities_standard": "Keine ausgewählt: Die installierte Erkennung sucht nach ihren Standardkategorien: {{types}}",
+      "no_entities_standard_unknown": "Keine ausgewählt: Der PII-Dienst sucht nach seinen Standardkategorien.",
       "add_entity": "Entität hinzufügen"
     },
     "accuracy_note": "Die Erkennung ist automatisch; wie gut sie arbeitet, hängt von der Sprache und vom Aufbau der Inhalte ab (Tabellen, Listen, Code, kurze Fragmente). Sie kann personenbezogene Daten übersehen oder Wörter markieren, die keine sind. Testen Sie sie mit typischen Inhalten Ihrer Organisation, bevor Sie sich darauf verlassen."

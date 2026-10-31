@@ -1950,7 +1950,10 @@
       "score_threshold": "分数阈值",
       "entities": "实体",
       "legacy_entity": "{{entity}}（已不再支持）",
-      "no_entities": "未选择任何实体。",
+      "legacy_threshold_warning": "此策略的阈值使用旧引擎的刻度。已安装的检测器会拒绝它，因此发往远程模型的请求会被拒绝。请使用已安装配置文件的默认值。",
+      "unsupported_entities_warning": "已安装的检测器无法识别 {{types}}。在移除这些类型之前，发往远程模型的请求会被拒绝。也可以使用已安装配置文件的默认值。",
+      "no_entities_standard": "未选择任何实体，因此将识别已安装检测器的标准类型：{{types}}",
+      "no_entities_standard_unknown": "未选择任何实体，因此将识别 PII 服务的标准类型。",
       "add_entity": "添加实体"
     },
     "accuracy_note": "检测是自动进行的，其准确性取决于语言和内容的结构（表格、列表、代码、短片段）。它可能漏掉个人数据，也可能把并非个人数据的词语标记出来。在依赖它之前，请先用贵组织的典型内容进行测试。"

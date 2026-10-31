@@ -172,6 +172,11 @@ async def get_policy_options(request: Request) -> PIIPolicyOptionsResponse:
             "entity_languages",
             {},
         ),
+        default_entities={
+            language: service.default_entities(language) for language in languages
+        }
+        if service is not None and hasattr(service, "default_entities")
+        else {},
     )
 
 
