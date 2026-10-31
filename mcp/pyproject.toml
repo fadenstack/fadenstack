@@ -33,9 +33,10 @@ dependencies = [
   "alembic>=1.14.0",
   "cryptography>=50.0.0",  # >=50.0.0: clears PYSEC-2026-35/36/3552/3553/3554
   "httpx>=0.27.0",
+  "httpx2>=2.16.0,<3",  # the MCP SDK 2 clients speak httpx2; the transports catch its errors and pass it a client
   "pyjwt>=2.15.0",  # >=2.15.0: clears PYSEC-2026-4140..4152/4183
   "redis[hiredis]>=5.0.0",
-  "mcp>=1.28.1,<2",  # >=1.28.1: clears latest mcp advisories; <2: mcp 2.x is a breaking API change (httpx->httpx2, mcp+mcp-types split)
+  "mcp>=2.3.0,<3",  # 2: the transports use its names (MCPError, input_schema, httpx2)
   "python-multipart>=0.0.31",  # >=0.0.31: clears PYSEC-2026-3036/3037/3038/3039/3040
   # Transitive floors — conservative uv lock, force vulnerable transitives up to the fix:
   "urllib3>=2.8.0",  # >=2.8.0: clears PYSEC-2026-4175..4177

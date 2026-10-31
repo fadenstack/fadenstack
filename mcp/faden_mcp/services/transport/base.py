@@ -10,8 +10,8 @@ from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
 from typing import Any
 
-import httpx
-from mcp.shared.exceptions import McpError
+import httpx2
+from mcp.shared.exceptions import MCPError
 
 
 logger = logging.getLogger(__name__)
@@ -36,19 +36,19 @@ _STATUS_HINTS = {
 
 def describe_failure(cause: BaseException, target: str) -> str:
     """Say why connecting to *target* failed, in terms an operator can act on."""
-    if isinstance(cause, httpx.HTTPStatusError):
+    if isinstance(cause, httpx2.HTTPStatusError):
         response = cause.response
         said = f"{target} answered {response.status_code} {response.reason_phrase}"
         hint = _STATUS_HINTS.get(response.status_code)
         message = f"{said}: {hint}" if hint else f"{said}."
-    elif isinstance(cause, httpx.TimeoutException):
+    elif isinstance(cause, httpx2.TimeoutException):
         message = f"{target} did not answer in time."
-    elif isinstance(cause, httpx.ConnectError):
+    elif isinstance(cause, httpx2.ConnectError):
         message = f"Cannot reach {target}: {cause or 'the connection failed'}."
     elif isinstance(cause, FileNotFoundError):
         missing = cause.filename or cause
         message = f"Cannot start {target}: {missing} is not in the MCP container."
-    elif isinstance(cause, McpError) and "Session terminated" in str(cause):
+    elif isinstance(cause, MCPError) and "Session terminated" in str(cause):
         # How the SDK reports a 404 to the first request: no endpoint there.
         message = f"{target} has no MCP endpoint (it answered 404). {_ENDPOINT_PATHS}"
     else:

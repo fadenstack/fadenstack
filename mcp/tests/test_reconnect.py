@@ -11,16 +11,15 @@ from __future__ import annotations
 from typing import Any
 
 import anyio
-import httpx
+import httpx2
 import pytest
-from mcp.shared.exceptions import McpError
-from mcp.types import ErrorData
+from mcp.shared.exceptions import MCPError
 
 from faden_mcp.services import connection_manager
 from faden_mcp.services.connection_manager import MCPConnectionManager, session_gone
 from faden_mcp.services.transport.base import MCPServerConfig
 
-TERMINATED = McpError(ErrorData(code=32600, message="Session terminated"))
+TERMINATED = MCPError(32600, "Session terminated")
 
 
 @pytest.mark.parametrize(
@@ -28,8 +27,8 @@ TERMINATED = McpError(ErrorData(code=32600, message="Session terminated"))
     [
         (TERMINATED, True),
         (anyio.ClosedResourceError(), True),
-        (httpx.ConnectError("refused"), True),
-        (McpError(ErrorData(code=-32602, message="Invalid arguments")), False),
+        (httpx2.ConnectError("refused"), True),
+        (MCPError(-32602, "Invalid arguments"), False),
         (TimeoutError(), False),  # it may have run: not sent again
         (ValueError("bad"), False),
     ],
@@ -54,7 +53,7 @@ class _Server:
 
     async def connect(self) -> None:
         if not self.connects:
-            raise httpx.ConnectError("refused")
+            raise httpx2.ConnectError("refused")
 
     async def disconnect(self) -> None:
         self.closed = True

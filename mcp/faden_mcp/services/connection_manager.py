@@ -8,8 +8,8 @@ import logging
 from typing import Any
 
 import anyio
-import httpx
-from mcp.shared.exceptions import McpError
+import httpx2
+from mcp.shared.exceptions import MCPError
 
 from faden_mcp.db.models.mcp import MCPServerModel
 from faden_mcp.services import outbound
@@ -90,9 +90,9 @@ def session_gone(exc: BaseException) -> bool:
     run. A closed stream or a refused connection did not send it either. A
     call that failed so can be sent again, on a new connection.
     """
-    if isinstance(exc, McpError):
+    if isinstance(exc, MCPError):
         return "session terminated" in str(exc).lower()
-    gone = (anyio.ClosedResourceError, anyio.BrokenResourceError, httpx.ConnectError)
+    gone = (anyio.ClosedResourceError, anyio.BrokenResourceError, httpx2.ConnectError)
     return isinstance(exc, gone)
 
 
