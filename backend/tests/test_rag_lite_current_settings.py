@@ -9,6 +9,8 @@ stored without ``/v1``, so the embedding client posted to the server's root.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,16 +28,16 @@ def test_a_provider_url_with_or_without_v1_reaches_the_api() -> None:
 
 
 async def test_a_process_reads_rag_lite_settings_as_they_are_now(
-    dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+    dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch, follow_settings: Any,
 ) -> None:
     """As a worker the live change never reached."""
     monkeypatch.setattr(settings, "rag_lite_embedding_model", "old-model")
     monkeypatch.setattr(settings, "rag_lite_embedding_dim", 768)
-    monkeypatch.setattr(settings, "rag_lite_chunk_max_tokens", 512)
+    monkeypatch.setattr(settings, "rag_lite_chunk_max_tokens", 999)
     dbsession.add_all([
         SystemSettingValue(key="rag_lite.embedding_model", value_json={"value": "new-model"}),
         SystemSettingValue(key="rag_lite.embedding_dim", value_json={"value": 1024}),
-        SystemSettingValue(key="rag_lite.chunk_max_tokens", value_json={"value": ""}),  # blank: keep
+        SystemSettingValue(key="rag_lite.chunk_max_tokens", value_json={"value": ""}),  # blank: the start value
     ])
     await dbsession.flush()
 
@@ -43,4 +45,4 @@ async def test_a_process_reads_rag_lite_settings_as_they_are_now(
 
     assert settings.rag_lite_embedding_model == "new-model"
     assert settings.rag_lite_embedding_dim == 1024
-    assert settings.rag_lite_chunk_max_tokens == 512
+    assert settings.rag_lite_chunk_max_tokens == follow_settings.baseline["rag_lite.chunk_max_tokens"] != 999

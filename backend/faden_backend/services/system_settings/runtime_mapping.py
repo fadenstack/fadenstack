@@ -55,19 +55,31 @@ _RUNTIME_SECRET_KEY_MAP: dict[str, str] = {
 #: Keys whose value goes onto an extension's own settings object rather than core's ``settings``.
 _RUNTIME_TARGETS: dict[str, Any] = {}
 
+#: Moves with each registration, so a process loads a key registered after it last loaded the settings.
+_GENERATION = 0
+
 
 def register_runtime_value_key(key: str, attr: str, *, target: Any = None) -> None:
     """Register additional runtime value mapping (for EE/plugin extension); onto *target* when given."""
+    global _GENERATION  # noqa: PLW0603
     _RUNTIME_VALUE_KEY_MAP[key] = attr
     if target is not None:
         _RUNTIME_TARGETS[key] = target
+    _GENERATION += 1
 
 
 def register_runtime_secret_key(key: str, attr: str, *, target: Any = None) -> None:
     """Register additional runtime secret mapping (for EE/plugin extension); onto *target* when given."""
+    global _GENERATION  # noqa: PLW0603
     _RUNTIME_SECRET_KEY_MAP[key] = attr
     if target is not None:
         _RUNTIME_TARGETS[key] = target
+    _GENERATION += 1
+
+
+def registry_generation() -> int:
+    """How many keys have been registered so far: a process that loaded at another count loads again."""
+    return _GENERATION
 
 
 def runtime_target(key: str) -> Any:
@@ -95,28 +107,15 @@ def resolve_runtime_attr(key: str) -> str | None:
 
 
 async def refresh_runtime_values(session: Any, *, prefix: str) -> None:
-    """Load the current values of the runtime keys under *prefix* into ``settings``.
+    """Bring this process's runtime settings up to date with the database, read through *session*.
 
-    A live-reload setting is applied only in the process that handled the
-    change. The taskiq worker -- and any other uvicorn worker -- kept the old
-    value until restarted: after RAG Lite's embedding provider was changed,
-    documents were still embedded with the old one while searches used the
-    new one. Code that must see the current value asks here first.
+    A live-reload setting used to be applied only in the process that handled the change: after RAG Lite's
+    embedding provider was changed, the taskiq worker still embedded documents with the old one while searches
+    used the new one. Each request and task now takes up the changes before it starts
+    (``runtime_sync.py``); this checks once more, for every key (values and secrets, *prefix* is no longer
+    needed), and costs one read when nothing changed.
     """
-    from sqlalchemy import text  # noqa: PLC0415
+    from faden_backend.services.system_settings import runtime_sync  # noqa: PLC0415
 
-    keys = {k: a for k, a in get_runtime_value_key_map().items() if k.startswith(prefix)}
-    if not keys:
-        return
-    rows = await session.execute(
-        text("SELECT key, value_json FROM system_setting_value WHERE key = ANY(:keys)"),
-        {"keys": list(keys)},
-    )
-    for row in rows.mappings():
-        value = row["value_json"]
-        if isinstance(value, dict):
-            value = value.get("value", value)
-        if isinstance(value, str) and not value.strip():
-            continue  # blank keeps the code-level default, as at startup
-        object.__setattr__(runtime_target(str(row["key"])), keys[str(row["key"])], value)
+    await runtime_sync.current(session)
 
