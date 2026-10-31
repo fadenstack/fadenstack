@@ -2094,7 +2094,10 @@
       "score_threshold": "Seuil de score",
       "entities": "Entités",
       "legacy_entity": "{{entity}} (plus pris en charge)",
-      "no_entities": "Aucune entité sélectionnée.",
+      "legacy_threshold_warning": "Le seuil de cette politique est sur l'échelle de l'ancien moteur. Le détecteur installé le refuse, donc les requêtes vers les modèles distants sont refusées. Utilisez les valeurs du profil installé.",
+      "unsupported_entities_warning": "Le détecteur installé ne trouve pas {{types}}. Les requêtes vers les modèles distants sont refusées tant que ces types ne sont pas retirés. Vous pouvez aussi utiliser les valeurs du profil installé.",
+      "no_entities_standard": "Aucune sélectionnée, donc les types standard du détecteur installé sont recherchés : {{types}}",
+      "no_entities_standard_unknown": "Aucune sélectionnée, donc les types standard du service PII sont recherchés.",
       "add_entity": "Ajouter une entité"
     },
     "accuracy_note": "La détection est automatique et sa précision dépend de la langue et de la structure du contenu (tableaux, listes, code, fragments courts). Elle peut manquer des données personnelles ou signaler des mots qui n'en sont pas. Testez-la sur des contenus typiques de votre organisation avant de vous y fier."

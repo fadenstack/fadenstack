@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import time
 from collections.abc import AsyncGenerator
@@ -1306,66 +1307,63 @@ async def _seed_rbac(app: FastAPI) -> None:
         log.info("Seeded RBAC roles and permissions")
 
 
-# Core default PII policy (matches the modularization spec):
-# - 11 of the 12 built-in entity types, score threshold 0.35, English. Not
-#   DATE_TIME: spaCy tags plain numbers as dates -- "add 17 and 25, then tell
-#   me the result" went to the model as "add 17 and <DATE_TIME>" (2026-09-26).
-#   It stays selectable for a tenant that needs dates of birth covered.
-# - Redaction mode (irreversible but safe — Core tier)
-# - Egress scanning enabled for cloud providers only
-# - Fail action: block (safe-by-default)
-_CORE_DEFAULT_PII_POLICY: dict = {
-    "telemetry": {
-        "enabled": False,
-        "mode": "sanitized",
-        "store_raw": False,
-    },
-    "egress": {
-        "enabled_for_cloud": True,
-        "enabled_for_local": False,
-        "mode": "redact",
-        "fail_action": "block",
-    },
-    "presidio": {
-        "language": "en",
-        "threshold": 0.35,
-        "entities": [
-            "PERSON",
-            "EMAIL_ADDRESS",
-            "PHONE_NUMBER",
-            "CREDIT_CARD",
-            "IBAN_CODE",
-            "IP_ADDRESS",
-            "US_SSN",
-            "LOCATION",
-            "NRP",
-            "MEDICAL_LICENSE",
-            "URL",
-        ],
-    },
-}
+_PII_DEFAULT_KEY = "faden_gateway.pii_default_policy"
 
 
 async def _seed_default_settings(app: FastAPI) -> None:
     """Seed system-level defaults that should exist out of the box.
 
-    Idempotent — only inserts if the key has no value yet.
+    The default PII policy (``services/pii_default_policy.py``) is written when there is none, and replaces an
+    earlier default still as it was seeded -- those named types and a threshold the local detectors refuse.
+    The row is locked first, so of several workers starting at once one replaces it and records it.
     """
+    from sqlalchemy import select  # noqa: PLC0415
+
+    from faden_backend.db.dao.audit_dao import AuditDAO  # noqa: PLC0415
     from faden_backend.db.dao.system_settings_dao import SystemSettingsDAO  # noqa: PLC0415
+    from faden_backend.db.models.containers import AuditResult  # noqa: PLC0415
+    from faden_backend.db.models.system_settings import SystemSettingValue  # noqa: PLC0415
+    from faden_backend.services import pii_default_policy  # noqa: PLC0415
 
     async with app.state.db_session_factory() as session:
         dao = SystemSettingsDAO(session)
-
-        existing = await dao.get_value("faden_gateway.pii_default_policy")
+        existing = (
+            await session.execute(
+                select(SystemSettingValue)
+                .where(SystemSettingValue.key == _PII_DEFAULT_KEY)
+                .with_for_update(),
+            )
+        ).scalar_one_or_none()
         if existing is None:
             await dao.upsert_value(
-                key="faden_gateway.pii_default_policy",
-                value_json={"value": _CORE_DEFAULT_PII_POLICY},
+                key=_PII_DEFAULT_KEY,
+                value_json={"value": pii_default_policy.default_policy()},
                 updated_by=None,
             )
             await session.commit()
-            log.info("Seeded default PII policy (Core: redact, 11 entity types, threshold 0.35)")
+            log.info("Seeded the default PII policy: the installed detector's standard types, redacted")
+        elif pii_default_policy.is_earlier_default((existing.value_json or {}).get("value")):
+            await dao.upsert_value(
+                key=_PII_DEFAULT_KEY,
+                value_json={"value": pii_default_policy.default_policy()},
+                updated_by=None,
+            )
+            await AuditDAO(session).log(
+                action="system.settings.update",
+                target_type="system_setting",
+                target_id=_PII_DEFAULT_KEY,
+                result=AuditResult.ALLOW,
+                metadata_json=json.dumps({
+                    "reason": "pii_default_follows_detector",
+                    "from": "earlier default as seeded",
+                    "to": "installed detector's standard types and thresholds",
+                }),
+                source="system",
+            )
+            await session.commit()
+            log.info("Replaced the earlier default PII policy with one that follows the installed detector")
         else:
+            await session.commit()
             log.debug("Default PII policy already configured; skipping seed.")
 
 

@@ -1951,7 +1951,10 @@
       "score_threshold": "Umbral de puntuación",
       "entities": "Entidades",
       "legacy_entity": "{{entity}} (ya no se admite)",
-      "no_entities": "No hay entidades seleccionadas.",
+      "legacy_threshold_warning": "El umbral de esta política está en la escala del motor anterior. El detector instalado lo rechaza, por lo que se rechazan las solicitudes a modelos remotos. Use los valores del perfil instalado.",
+      "unsupported_entities_warning": "El detector instalado no encuentra {{types}}. Las solicitudes a modelos remotos se rechazan hasta que se quiten estos tipos. También puede usar los valores del perfil instalado.",
+      "no_entities_standard": "No hay ninguna seleccionada, así que se buscan los tipos estándar del detector instalado: {{types}}",
+      "no_entities_standard_unknown": "No hay ninguna seleccionada, así que se buscan los tipos estándar del servicio PII.",
       "add_entity": "Añadir entidad"
     },
     "accuracy_note": "La detección es automática y su precisión depende del idioma y de la estructura del contenido (tablas, listas, código, fragmentos cortos). Puede pasar por alto datos personales o marcar palabras que no lo son. Pruébela con contenido típico de su organización antes de confiar en ella."

@@ -32,8 +32,17 @@ Bei eingeschaltetem Modul gilt diese Standardrichtlinie:
 - Sie schützt Anfragen an **Cloud-Provider**; Anfragen an die Modelle Ihrer eigenen Maschinen werden nicht geprüft.
 - Sie **schwärzt**: Personenbezogene Daten werden ersetzt, und das Modell sieht sie nie.
 - Sie **blockiert** eine Anfrage an einen Cloud-Provider, wenn der Filter nicht laufen kann.
-- Sie liest englischen Text und sucht nach diesen Typen: `PERSON`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `CREDIT_CARD`,
-  `IBAN_CODE`, `IP_ADDRESS`, `US_SSN`, `LOCATION`, `NRP`, `MEDICAL_LICENSE`, `URL`.
+- Sie liest englischen Text und nennt keine eigenen Typen: Sie sucht nach den Standardtypen, die die installierte
+  Erkennung findet, mit deren Schwellenwerten. Das sind `PERSON`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `CREDIT_CARD`,
+  `IBAN_CODE`, `IP_ADDRESS`, `US_SSN`, `LOCATION`, `MEDICAL_LICENSE` und `URL`, mit dem älteren Profil
+  `presidio-legacy` außerdem `NRP` (Nationalität, Religion, politische Gruppe), das die lokalen Erkennungen nicht
+  finden. Das Richtlinienformular zeigt sie unter **Entitäten**, solange keine gewählt sind.
+
+Vor 0.6.0 nannte die Standardrichtlinie selbst elf Typen, darunter `NRP`, mit einem Schwellenwert für das ältere
+Profil. Die lokalen Erkennungen lehnen beides ab; mit einer davon wurde deshalb jede Anfrage an einen Cloud-Provider
+abgelehnt. Eine Installation, die diese Standardrichtlinie noch so hat, wie sie eingerichtet wurde, erhält beim Start
+die neue; eine Standardrichtlinie, die Sie geändert haben, bleibt, wie Sie sie gespeichert haben (siehe
+[Ein installiertes Erkennungsprofil übernehmen](#adopt-an-installed-detector-profile)).
 
 ### Wenn das Modul aus ist {#when-the-module-is-off}
 
@@ -96,7 +105,7 @@ Eine **Mandantenrichtlinie** ersetzt die Standardrichtlinie für einen Mandanten
     | **Ausgehende Anfragen**: **Anfragen an Cloud-Anbieter schützen**, **Anfragen an lokale Modelle schützen** | Welche Anfragen geprüft werden. |
     | **Modus** | `redact`: Personenbezogene Daten werden durch einen Platzhalter wie `<PERSON>` ersetzt, und die Antwort behält ihn. `tokenize_reversible`: Jeder Wert wird durch ein Token wie `[PERSON_1]` ersetzt und in der Antwort, die der Benutzer sieht, wieder eingesetzt. Das Modell sieht die Daten in keinem der beiden Fälle. |
     | **Wenn die Erkennung fehlschlägt** | `block`: Die Anfrage wird abgelehnt. `allow`: Sie wird ungeprüft gesendet. `fallback_to_local`: Sie wird ungeprüft an eines Ihrer eigenen Modelle mit demselben Namen gesendet, falls es eines gibt, und sonst abgelehnt. |
-    | **Erkennung (Presidio)**: **Sprache**, **Schwellenwert**, **Entitäten** | Das installierte Profil, die Sprache und die Kategorien. **Schwellenwerte des Profils verwenden** übernimmt die Vorgaben des Profils. Ein höherer manueller Schwellenwert maskiert weniger. Wählen Sie nur angebotene Sprachen und verfügbare Kategorien; andernfalls schlägt die Prüfung fehl und **Wenn die Erkennung fehlschlägt** entscheidet. |
+    | **Erkennung (Presidio)**: **Sprache**, **Schwellenwert**, **Entitäten** | Das installierte Profil, die Sprache und die Kategorien. **Schwellenwerte des Profils verwenden** übernimmt die Vorgaben des Profils. Ein höherer manueller Schwellenwert maskiert weniger. **Entitäten** leer gelassen: die Standardtypen, die die installierte Erkennung findet. Wählen Sie nur angebotene Sprachen und verfügbare Kategorien; andernfalls schlägt die Prüfung fehl und **Wenn die Erkennung fehlschlägt** entscheidet. |
     | **Telemetrie**: **Personenbezogene Daten aus der Telemetrie entfernen**, **Modus** | Für Aufzeichnungen von Anfragen (Traces), die standardmäßig ausgeschaltet sind: ob ein Trace die Anfrage ohne personenbezogene Daten enthält (`sanitized`) oder nur Kennzahlen (`metrics_only`). Ohne Enterprise enthalten Traces ohnehin nur Kennzahlen. |
 
 ### Ein installiertes Erkennungsprofil übernehmen {#adopt-an-installed-detector-profile}
@@ -110,8 +119,11 @@ Mandanten-Overrides, die das Profil verwenden sollen:
 1. Prüfen Sie, ob das installierte Profil verfügbar ist. Eine Meldung über einen nicht verfügbaren Dienst bestätigt
    keinen aktiven Schutz.
 2. Wählen Sie unter **Erkennung (Presidio)** die Schaltfläche **Standardwerte des installierten Profils verwenden**.
-   Dadurch werden das installierte Profil und **Schwellenwerte des Profils verwenden** gewählt. Ihre Kategorien und
-   Einstellungen für ausgehende Anfragen bleiben erhalten.
+   Dadurch werden das installierte Profil und **Schwellenwerte des Profils verwenden** gewählt, und Kategorien, die
+   die installierte Erkennung nicht findet, werden entfernt. Ihre übrigen Kategorien und Einstellungen für ausgehende
+   Anfragen bleiben erhalten. Das Formular warnt, wenn der Schwellenwert oder eine Kategorie einer Richtlinie nicht zur
+   installierten Erkennung passt: Bis das Profil übernommen ist, werden die Anfragen, die die Richtlinie erfasst,
+   abgelehnt.
 3. Wählen Sie **Sprache**. Entfernen Sie Kategorien, die dafür nicht verfügbar sind, und ergänzen Sie unter
    **Entitäten** die benötigten Kategorien. Das Übernehmen des Profils wählt nicht automatisch alle Kategorien aus.
 4. Wählen Sie den Schutz für Cloud-Anfragen, lokale Modelle oder beides. Lassen Sie **Wenn die Erkennung fehlschlägt**
@@ -242,6 +254,7 @@ zweimal abgelehnt, zeigt denselben Wert, und niemand kann den Text daraus zurüc
 | Ein Tool braucht eine Freigabe | „… möchte ausgeführt werden“, mit **Zulassen** und **Ablehnen**. Kommt innerhalb von fünf Minuten keine Antwort, wird der Aufruf nicht ausgeführt (**Abgelaufen**). |
 | Eine gespeicherte Richtlinie gilt, aber das PII-Modul läuft nicht, und die Richtlinie blockiert | Die Antwort schlägt fehl mit „A PII policy is set for this workspace, but the PII module is not running, so nothing was sent.“ |
 | Der Filter für personenbezogene Daten konnte nicht laufen, und die Richtlinie blockiert | Die Antwort schlägt fehl mit „PII service unavailable and fail_action=block.“ An das Modell wurde nichts gesendet. |
+| Die Richtlinie passt nicht zur installierten Erkennung (ein Schwellenwert für das ältere Profil oder eine Kategorie, die sie nicht findet), und die Richtlinie blockiert | Die Antwort schlägt fehl mit „The PII policy does not fit the installed PII detector (…), so nothing was sent.“ Übernehmen Sie das installierte Profil in der Richtlinie (siehe [oben](#adopt-an-installed-detector-profile)). |
 | Eine Eingabe wurde abgelehnt (Inhaltsrichtlinien, <span class="fs-planned">Geplant</span>) | Die Nachricht wird als **Nicht gesendet** markiert, mit der Nachricht der Richtlinie oder „Dies wurde durch eine Richtlinie Ihrer Organisation gestoppt.“ Nichts wird an ein Modell gesendet oder gespeichert. |
 | Eine Antwort wurde abgelehnt (Inhaltsrichtlinien, <span class="fs-planned">Geplant</span>) | Die Antwort bricht ab und wird als **Antwort zurückgehalten** markiert. |
 
