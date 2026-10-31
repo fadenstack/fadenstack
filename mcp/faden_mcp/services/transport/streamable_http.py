@@ -10,9 +10,10 @@ import logging
 from contextlib import AsyncExitStack
 from typing import Any
 
-import httpx
+import httpx2
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
+from mcp.shared.exceptions import MCPError
 
 from faden_mcp.services.transport.base import (
     GenericMCPServer,
@@ -41,20 +42,40 @@ class StreamableHTTPMCPServer(GenericMCPServer):
         url = self.config.url
 
         async def enter(stack: AsyncExitStack) -> ClientSession:
-            # Build an httpx client with custom headers / timeout
+            # The SDK reports an HTTP error status to the first request as a
+            # bare MCP error; keep the response to say 401 or 404 ourselves.
+            refused: list[httpx2.Response] = []
+
+            async def note_refusal(response: httpx2.Response) -> None:
+                if response.status_code >= 400:
+                    refused.append(response)
+
+            # Build an httpx2 client with custom headers / timeout
             http_client = await stack.enter_async_context(
-                httpx.AsyncClient(
+                httpx2.AsyncClient(
                     headers=self.config.headers or {},
-                    timeout=httpx.Timeout(self.config.timeout_sec, read=300),
+                    timeout=httpx2.Timeout(self.config.timeout_sec, read=300),
+                    event_hooks={"response": [note_refusal]},
                 ),
             )
-            read_stream, write_stream, _ = await stack.enter_async_context(
+            read_stream, write_stream = await stack.enter_async_context(
                 streamable_http_client(url=url, http_client=http_client),
             )
             session = await stack.enter_async_context(
                 ClientSession(read_stream, write_stream),
             )
-            await session.initialize()
+            try:
+                await session.initialize()
+            except MCPError as error:
+                if refused:
+                    last = refused[-1]
+                    msg = f"HTTP {last.status_code}"
+                    raise httpx2.HTTPStatusError(
+                        msg,
+                        request=last.request,
+                        response=last,
+                    ) from error
+                raise
             return session
 
         # Opened and closed by a task of its own; see OwnedConnection.
@@ -105,13 +126,13 @@ class StreamableHTTPMCPServer(GenericMCPServer):
                     qualified_name=f"mcp.{self.config.tool_prefix}.{tool.name}",
                     description=tool.description or "",
                     input_schema=(
-                        tool.inputSchema
-                        if isinstance(tool.inputSchema, dict)
+                        tool.input_schema
+                        if isinstance(tool.input_schema, dict)
                         else {}
                     ),
                     title=getattr(tool, "title", None),
                     annotations=(
-                        tool.annotations.model_dump()
+                        tool.annotations.model_dump(by_alias=True)
                         if getattr(tool, "annotations", None)
                         else {}
                     ),
@@ -138,11 +159,11 @@ class StreamableHTTPMCPServer(GenericMCPServer):
                 part["text"] = item.text
             elif hasattr(item, "data"):
                 part["data"] = item.data
-                if hasattr(item, "mimeType"):
-                    part["mimeType"] = item.mimeType
+                if hasattr(item, "mime_type"):
+                    part["mimeType"] = item.mime_type
             content_parts.append(part)
 
         return {
             "content": content_parts,
-            "isError": result.isError if hasattr(result, "isError") else False,
+            "isError": result.is_error,
         }

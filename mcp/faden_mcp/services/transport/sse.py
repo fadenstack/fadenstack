@@ -94,13 +94,13 @@ class SSEMCPServer(GenericMCPServer):
                     qualified_name=f"mcp.{self.config.tool_prefix}.{tool.name}",
                     description=tool.description or "",
                     input_schema=(
-                        tool.inputSchema
-                        if isinstance(tool.inputSchema, dict)
+                        tool.input_schema
+                        if isinstance(tool.input_schema, dict)
                         else {}
                     ),
                     title=getattr(tool, "title", None),
                     annotations=(
-                        tool.annotations.model_dump()
+                        tool.annotations.model_dump(by_alias=True)
                         if getattr(tool, "annotations", None)
                         else {}
                     ),
@@ -127,11 +127,11 @@ class SSEMCPServer(GenericMCPServer):
                 part["text"] = item.text
             elif hasattr(item, "data"):
                 part["data"] = item.data
-                if hasattr(item, "mimeType"):
-                    part["mimeType"] = item.mimeType
+                if hasattr(item, "mime_type"):
+                    part["mimeType"] = item.mime_type
             content_parts.append(part)
 
         return {
             "content": content_parts,
-            "isError": result.isError if hasattr(result, "isError") else False,
+            "isError": result.is_error,
         }
