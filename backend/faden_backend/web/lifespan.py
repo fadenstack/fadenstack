@@ -41,6 +41,7 @@ from faden_backend.services.notifications import (
     NotificationDispatcher,
 )
 from faden_backend.services.rabbit.lifespan import init_rabbit, shutdown_rabbit
+from faden_backend.services.system_settings import runtime_sync
 from faden_backend.services.system_settings.runtime_mapping import (
     get_runtime_secret_key_map,
     get_runtime_value_key_map,
@@ -829,6 +830,7 @@ async def _sign_in_upkeep_loop(app: FastAPI) -> None:
     await asyncio.sleep(300 + random.uniform(0, 300))  # noqa: S311
     while True:
         try:
+            await runtime_sync.current()
             report = await upkeep.run_pass(app.state.db_session_factory)
             if report is not None and (report.suspended or report.groups_changed):
                 log.info("Sign-in upkeep: %d suspended, %d group changes", len(report.suspended),
@@ -984,8 +986,9 @@ async def lifespan_setup(
     except Exception:  # never keep the console from starting over it
         log.exception("The audit chain could not be started; events are written, the chain begins later.")
 
-    # Load DB-backed runtime settings before services that need them
-    await _load_runtime_settings_from_db(app)
+    # Load DB-backed runtime settings before services that need them; from then on, each request, task and
+    # background pass first takes up what was changed since, in any process.
+    await runtime_sync.start(app.state.db_engine, lambda: _load_runtime_settings_from_db(app))
 
     # Auto-seed required secrets (JWT signing/verification) if the DB table is
     # empty.  The function is idempotent — it only generates a new secret when
@@ -1145,6 +1148,7 @@ async def lifespan_setup(
             pass
 
     await _stop_notification_runtime(app)
+    runtime_sync.stop()
 
     # Flush/cancel any pending debounced Prometheus reloads.
     try:

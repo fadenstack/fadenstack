@@ -14,6 +14,7 @@ from faden_backend.db.dependencies import commit_before_responding
 from faden_backend.log import configure_logging
 from faden_backend.services.audit.context import AuditContextMiddleware
 from faden_backend.services.extensions import load_plugin
+from faden_backend.services.system_settings.runtime_sync import FollowSettings
 from faden_backend.settings import settings
 from faden_backend.web.api.router import api_router
 from faden_backend.web.lifespan import lifespan_setup
@@ -64,6 +65,8 @@ def get_app() -> FastAPI:
         openapi_url="/api/openapi.json",
         default_response_class=UJSONResponse,
     )
+    # Settings changed in another worker are taken up before the request is handled.
+    app.add_middleware(FollowSettings)
     # A body or parameter that does not fit is refused without repeating it (Enterprise's routes too).
     app.add_exception_handler(RequestValidationError, _unreadable_request)  # type: ignore[arg-type]
     # The session cookie is Secure whenever the page was served over HTTPS.
