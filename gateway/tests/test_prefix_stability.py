@@ -114,17 +114,28 @@ CONVERSATION = [
 ]
 
 
+def _label(message: dict[str, Any]) -> str:
+    """A message's role; SKILL for a skill's system message, user+SKILL for a question it opens."""
+    content = message.get("content")
+    if isinstance(content, str):
+        return "SKILL" if "ACTIVE SKILL" in content else message["role"]
+    first = content[0].get("text", "") if isinstance(content, list) and content else ""
+    return f"{message['role']}+SKILL" if "ACTIVE SKILL" in first else message["role"]
+
+
 @pytest.mark.anyio
 @pytest.mark.parametrize(
     ("position", "expected"),
     [
+        # date, system, history, the question opened by the skill
+        ("user", ["system", "system", "user", "assistant", "user+SKILL"]),
         # date, system, history, the skill, the question
         ("tail", ["system", "system", "user", "assistant", "SKILL", "user"]),
         # date, system, the skill, history, the question
         ("prefix", ["system", "system", "SKILL", "user", "assistant", "user"]),
     ],
 )
-async def test_a_skill_goes_after_the_history_unless_set_to_the_prefix(
+async def test_a_skill_goes_into_the_question_unless_set_otherwise(
     position: str, expected: list[str],
     fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -140,11 +151,54 @@ async def test_a_skill_goes_after_the_history_unless_set_to_the_prefix(
         "model": ALIAS, "messages": CONVERSATION,
     })
     assert r.status_code == 200
-    roles = [
-        "SKILL" if "ACTIVE SKILL" in (m.get("content") or "") else m["role"]
-        for m in sent[0]["messages"]
-    ]
-    assert roles == expected
+    assert [_label(m) for m in sent[0]["messages"]] == expected
+
+
+def test_the_default_puts_a_turns_skills_into_its_question() -> None:
+    assert settings.session_skills_position == "user"
+
+
+@pytest.mark.anyio
+async def test_a_turn_with_other_skills_keeps_the_start_of_the_prompt(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """On a template that takes one system message, first, a turn's skills went into it.
+
+    Each turn with other skills then changed the start of the prompt, and vLLM computed the whole
+    conversation again: 2.0 s instead of 0.6 s to the first token at 4k tokens of history (the 27B).
+    """
+    await _seed(db_session, provider=ProviderType.VLLM, pii=None)
+    fastapi_app.state.gateway_observability = _Observability()
+    service_registry.configure("skills", enabled=True, url="http://skills.local")
+    monkeypatch.setattr(settings, "skills_service_token", SERVICE_TOKEN)
+    bodies = iter(["Answer in five words.", "Answer in French."])
+
+    async def resolve(self: SkillsClient, **_: Any) -> SkillResolveResult:
+        body = next(bodies)
+        return SkillResolveResult(skills=[ResolvedSkill(
+            skill_id=body, name=body, slug="s", version=1, body_markdown=body, priority=1, score=1,
+        )])
+
+    async def record(self: SkillsClient, **_: Any) -> None: ...
+
+    monkeypatch.setattr(SkillsClient, "resolve_skills", resolve)
+    monkeypatch.setattr(SkillsClient, "record_usage", record)
+    sent: list[dict[str, Any]] = []
+    _model_answers(monkeypatch, "ok", sent)
+
+    turns = [CONVERSATION[:2], [*CONVERSATION[:2], {"role": "assistant", "content": "ok"}, CONVERSATION[3]]]
+    for messages in turns:
+        r = await client.post("/v1/chat/completions", headers={"Authorization": f"Bearer {_token()}"}, json={
+            "model": ALIAS, "messages": messages,
+        })
+        assert r.status_code == 200
+    # As the adapter sends them to such a template: the system messages as one, first.
+    first, second = (_system_first(s["messages"]) or s["messages"] for s in sent)
+    assert first[0] == second[0]
+    assert "ACTIVE SKILL" not in first[0]["content"]
+    assert "Answer in five words." in first[-1]["content"][0]["text"]
+    assert "Answer in French." in second[-1]["content"][0]["text"]
+    assert second[-1]["content"][1] == {"type": "text", "text": "second question"}
 
 
 # ── A template that takes one system message, first ─────────────

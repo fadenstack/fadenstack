@@ -71,8 +71,16 @@ def _skills_off_after() -> Any:
     service_registry.configure("skills", enabled=False, url=None)
 
 
-def _system_text(payload: dict[str, Any]) -> str:
-    return "\n".join(m.get("content") or "" for m in payload["messages"] if m.get("role") == "system")
+def _prompt_text(payload: dict[str, Any]) -> str:
+    """Every text the model was given: a turn's skills open its question's message."""
+    texts: list[str] = []
+    for m in payload["messages"]:
+        content = m.get("content")
+        if isinstance(content, str):
+            texts.append(content)
+        elif isinstance(content, list):
+            texts.extend(p.get("text", "") for p in content if isinstance(p, dict))
+    return "\n".join(texts)
 
 
 @pytest.mark.anyio
@@ -100,7 +108,7 @@ async def test_a_model_that_calls_tools_reads_a_skill_file(
     assert skills.resolved[0]["inline_files_chars"] == 0  # it can read them itself
     first = model.sent[0]
     assert skill_files.NAME in _tool_names(first)
-    assert "references/formulas.md" in _system_text(first)
+    assert "references/formulas.md" in _prompt_text(first)
     assert skills.read == [{"skill_id": "s1", "version": 4, "path": "references/formulas.md", "tenant_id": "tenant-a"}]
     answer = [m for m in model.sent[1]["messages"] if m.get("role") == "tool"]
     assert json.loads(answer[-1]["content"])["text"] == FORMULAS
@@ -121,7 +129,7 @@ async def test_a_model_that_cannot_call_tools_gets_the_small_files_inline(
     assert skills.resolved[0]["inline_files_chars"] == skill_files.INLINE_CHARS
     sent = model.sent[0]
     assert skill_files.NAME not in _tool_names(sent)  # vLLM would refuse the request
-    system = _system_text(sent)
+    system = _prompt_text(sent)
     assert FORMULAS in system
     assert "references/big.md (not included: too long)" in system
 
@@ -141,7 +149,7 @@ async def test_a_skill_without_files_reads_as_before(
     assert (
         "=== ACTIVE SKILL: Sheets (v4) ===\nRead references/formulas.md when a formula is involved.\n"
         "=== END SKILL ==="
-    ) in _system_text(model.sent[0])
+    ) in _prompt_text(model.sent[0])
 
 
 @pytest.mark.anyio

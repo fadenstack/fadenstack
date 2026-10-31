@@ -67,7 +67,7 @@ def has_files(skills: list[ResolvedSkill]) -> bool:
 
 
 def skill_block(skill: ResolvedSkill, *, as_tool: bool) -> str:
-    """The system message that gives the model *skill*."""
+    """The text that gives the model *skill*."""
     parts = [f"=== ACTIVE SKILL: {skill.name} (v{skill.version}) ===", skill.body_markdown]
     if skill.files:
         parts.append(_files_section(skill, as_tool=as_tool))
