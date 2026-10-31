@@ -268,12 +268,14 @@ class Settings(BaseSettings):
     session_summarizer_model: str | None = None
     session_fact_extraction_enabled: bool = False
     session_fact_extraction_model: str | None = None
-    # Where the skills resolved for a turn go: after the history, just before
-    # the question ("tail"), or before the history ("prefix"). They are
-    # resolved per turn from the question, so in the prefix a different set
-    # moved everything after it, and vLLM's prefix cache recomputed the
-    # history.
-    session_skills_position: Literal["prefix", "tail"] = "tail"
+    # Where the skills resolved for a turn go: in the question's own message,
+    # before its text ("user"); or as system messages after the history, just
+    # before the question ("tail"), or before the history ("prefix"). They
+    # are resolved per turn from the question, so wherever a different set
+    # sits early in the prompt, vLLM's prefix cache recomputes everything
+    # after it -- in "tail" too on a template that takes one system message,
+    # first (Qwen 3.5 and later), which moves them up.
+    session_skills_position: Literal["user", "prefix", "tail"] = "user"
     # A tool result replayed with the history is cut to this many characters:
     # a turn's tool exchange is kept with its reply, and one GitHub response
     # can be tens of kilobytes.
