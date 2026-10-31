@@ -125,6 +125,8 @@ describe("diagnose", () => {
     expect(ids(call({ status_code: 503, error_code: "no_capacity" }))).toEqual(["no_capacity"]);
     expect(ids(call({ status_code: 401, error_code: "api_token_expired" }))).toEqual(["auth"]);
     expect(ids(call({ status_code: 404, error_code: "model_not_found" }))).toEqual(["unknown_model"]);
+    // A model the tenant may use whose servers are all down: unreachable, not unknown.
+    expect(ids(call({ status_code: 503, error_code: "model_unreachable" }))).toEqual(["unreachable"]);
     expect(ids(call({ status_code: 503, error_code: "pii_scan_incomplete" }))).toEqual(["pii"]);
     expect(ids(call({ status_code: 429 }))).toEqual(["rate_limited"]);
     expect(ids(call({ status_code: 429, error_code: "budget_exceeded" }))).toEqual(["budget_exceeded"]);

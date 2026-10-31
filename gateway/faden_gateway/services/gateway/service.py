@@ -1092,6 +1092,8 @@ class _Prepared:
     unvaried_payload: dict[str, Any] | None = None
     #: How many answers a whole answer is asked for one by one (``answer_variety.split``); ``None``: as sent.
     split_choices: int | None = None
+    #: Whether what goes to the model ends in ``answer_variety``'s variation: its answer is stripped of it.
+    answer_varied: bool = False
     request_id: str | None = None
     #: The gateway's own id for the request (never the client's ``x-request-id``): what the admission checks
     #: key their reservations on, in ``AdmissionContext`` and ``UsageRecord`` alike.
@@ -1467,6 +1469,9 @@ class GatewayService:
                 result.payload if images is not None
                 else restore_payload(result.payload, req.token_mapping, req.client_tools)
             )
+            if req.answer_varied:
+                # Before the receipt: it covers the answer as the client gets it.
+                response_payload = answer_variety.strip_payload(response_payload)
             if req.faden_events and isinstance(response_payload, dict):
                 # Beside the OpenAI fields, which an OpenAI client reads as ever.
                 events = [*_pii_events(req), *req.faden_whole]
@@ -1829,6 +1834,8 @@ class GatewayService:
                 # and the chat page -- which always streams -- showed
                 # "Hello [PERSON_1]".
                 restored = restore_sse(raw_stream, req.token_mapping, req.client_tools)
+                if req.answer_varied:
+                    restored = answer_variety.strip_sse(restored)
                 if req.faden_events and req.client_offered:
                     restored = self._screen_client_stream(req, restored, auth=auth, request_id=request_id)
                 wrapped_stream, stats = await wrap_sse_stream(
@@ -2839,6 +2846,8 @@ class GatewayService:
                     code="n_not_supported",
                 ) from exc
             egress = answer_variety.vary(egress, req.decision.candidate)
+            # vary gives the payload itself back where it adds nothing; a split request varies each answer.
+            req.answer_varied = req.split_choices is not None or egress is not req.unvaried_payload
         req.egress_payload = egress
         # The model call is next, and it lasts seconds.
         await self._release_request_connection()
@@ -3672,7 +3681,8 @@ class GatewayService:
                                 "finish_reason": None,
                             }]})
 
-            async for chunk in restore_sse(answer(), req.token_mapping):
+            said_out = restore_sse(answer(), req.token_mapping)
+            async for chunk in answer_variety.strip_sse(said_out) if req.answer_varied else said_out:
                 yield chunk
             if ended["failed"]:
                 yield sse(DONE)

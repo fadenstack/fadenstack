@@ -171,6 +171,32 @@ class GatewayDAO:
         )
         return result.scalar_one_or_none()
 
+    async def alias_unreachable(self, *, alias: str, tenant_id: str) -> bool:
+        """Whether *alias* is one the tenant may use, with enabled providers, none of them healthy.
+
+        What :meth:`resolve_candidates` finding nothing means then: the model is there, its servers are
+        down -- not that the tenant may not use it. Asked only after that, and only for an alias the tenant
+        may use, so it tells a tenant nothing about models it is not allowed.
+        """
+        policy = await self.get_tenant_policy(tenant_id)
+        if policy and policy.allowed_model_aliases and alias not in policy.allowed_model_aliases:
+            return False
+        query = (
+            select(LLMProviderInstance.id)
+            .join(LLMPoolMembership, LLMPoolMembership.provider_instance_id == LLMProviderInstance.id)
+            .join(LLMModelAlias, LLMModelAlias.alias == LLMPoolMembership.model_alias)
+            .where(
+                LLMModelAlias.alias == alias,
+                LLMModelAlias.enabled.is_(True),
+                LLMPoolMembership.enabled.is_(True),
+                LLMProviderInstance.enabled.is_(True),
+            )
+            .limit(1)
+        )
+        if policy and policy.allowed_provider_types:
+            query = query.where(LLMProviderInstance.type.in_(policy.allowed_provider_types))
+        return (await self.session.execute(query)).first() is not None
+
     async def resolve_candidates(
         self,
         *,

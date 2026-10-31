@@ -16,10 +16,16 @@ async function send(page: Page, text: string) {
 }
 
 /** The reply is done: no Stop button, and the composer takes text again. */
-async function replyDone(page: Page) {
+async function replyDone(page: Page, timeout = 120_000) {
   // exact: a chat titled "... stops twice ..." in the sidebar is a button whose name contains "stop"
-  await expect(page.getByRole("button", { name: "Stop", exact: true })).toHaveCount(0, { timeout: 120_000 });
+  await expect(page.getByRole("button", { name: "Stop", exact: true })).toHaveCount(0, { timeout });
 }
+
+/**
+ * A skill's answer is long: the release VM's 27B thought 718 tokens and answered 419 more at ~8 tokens a
+ * second, 134 s for the model alone (2026-10-31), and the sweep failed at 120 s while it still streamed.
+ */
+const SKILL_REPLY_MS = 300_000;
 
 /** The chat's sidebar: the panel with the chat search (it is not a navigation landmark). */
 function sidebar(page: Page) {
@@ -154,6 +160,7 @@ test.describe("a chat", () => {
   });
 
   test("offers the skills with $ and answers with one picked", async ({ page, baseURL }) => {
+    test.setTimeout(SKILL_REPLY_MS + 60_000);
     const watch = new Watch(page, new URL(baseURL!).origin);
     await page.goto("/chat");
     const composer = page.getByPlaceholder(/Type a message/);
@@ -168,7 +175,7 @@ test.describe("a chat", () => {
     await composer.fill("The export button shows an error since yesterday.");
     await page.getByRole("button", { name: "Send", exact: true }).click();
     await page.waitForURL(/\/chat\/[0-9a-f-]{36}/);
-    await replyDone(page);
+    await replyDone(page, SKILL_REPLY_MS);
     await watch.inspect();
     await watch.report("chat: a picked skill");
 

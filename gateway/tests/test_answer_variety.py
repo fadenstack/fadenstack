@@ -9,6 +9,7 @@ nothing.
 
 from __future__ import annotations
 
+import json
 import re
 from types import SimpleNamespace
 from typing import Any
@@ -21,12 +22,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from faden_gateway.db.models.gateway import ProviderType
 from faden_gateway.services.gateway import answer_variety, picture_marking
 from faden_gateway.services.gateway import service as service_module
+from faden_gateway.services.gateway.content_hash import text_sha256
 from tests.test_text_receipts import (  # noqa: F401 - the fixtures
     LONG,
+    RECEIPTS,
     _answers,
     _ask,
     _Engine,
     _seeded,
+    _sse,
+    _streamed_text,
     _work_ends_before_the_database,
     engine,
 )
@@ -192,6 +197,99 @@ async def test_n_on_a_stream_of_a_watermarking_model_is_refused_not_copied(
     assert r.status_code == 400, r.text
     assert "n_not_supported" in r.text and "stream" in r.text
     assert sent == [], "the model is not asked"
+
+
+# ── The variation said back ───────────────────────────────────────
+#
+# Asked to repeat a message word for word, the 27B on the release server repeated the variation too
+# (2026-10-31): the person would carry it into whatever they paste the answer into.
+
+WJ, ZW = answer_variety._INVISIBLE  # noqa: SLF001 - the variation's own characters
+SAID_BACK = WJ + ZW + WJ + WJ + ZW + WJ
+
+
+def test_the_variation_said_back_is_taken_out_and_a_single_character_kept() -> None:
+    assert answer_variety.strip_text(f"Page 12.{SAID_BACK}") == "Page 12."
+    assert answer_variety.strip_text(f"A{WJ}{ZW}B") == "AB"
+    assert answer_variety.strip_text(f"word{ZW}joiner") == f"word{ZW}joiner", "one alone may be the answer's own"
+    assert answer_variety.strip_text("﻿marked") == "﻿marked", "the Unicode marker's characters stay"
+    assert answer_variety.strip_text("") == ""
+
+
+def test_a_whole_answer_loses_it_in_every_choice_its_parts_and_its_thinking() -> None:
+    payload = {"id": "a", "choices": [
+        {"index": 0, "message": {"role": "assistant", "content": f"One{SAID_BACK}", "reasoning_content": f"Hm{SAID_BACK}"}},
+        {"index": 1, "message": {"role": "assistant", "content": [{"type": "text", "text": f"Two{SAID_BACK}"}]}},
+        {"index": 2, "message": {"role": "assistant", "content": None, "tool_calls": [{"id": "c"}]}},
+    ]}
+    out = answer_variety.strip_payload(payload)
+    assert out["choices"][0]["message"]["content"] == "One"
+    assert out["choices"][0]["message"]["reasoning_content"] == "Hm"
+    assert out["choices"][1]["message"]["content"] == [{"type": "text", "text": "Two"}]
+    assert out["choices"][2] == payload["choices"][2]
+    assert answer_variety.strip_payload({"error": "x"}) == {"error": "x"}
+
+
+def _event(content: str, finish: str | None = None, field: str = "content") -> bytes:
+    choice = {"index": 0, "delta": {field: content} if content else {}, "finish_reason": finish}
+    return f"data: {json.dumps({'id': 's', 'choices': [choice]})}\n\n".encode()
+
+
+async def _stripped(*events: bytes) -> str:
+    async def stream() -> Any:
+        for event in events:
+            yield event
+
+    out = b"".join([chunk async for chunk in answer_variety.strip_sse(stream())])
+    texts = []
+    for block in out.decode().split("\n\n"):
+        data = block.removeprefix("data: ").strip()
+        if data and data != "[DONE]":
+            for choice in json.loads(data)["choices"]:
+                texts.append((choice.get("delta") or {}).get("content") or "")
+    return "".join(texts)
+
+
+@pytest.mark.anyio
+async def test_a_stream_loses_it_also_when_it_comes_split_over_events() -> None:
+    split = [_event("My name is <PERSON>."), _event(WJ + ZW), _event(WJ), _event(WJ + ZW + WJ, "stop")]
+    assert await _stripped(*split, b"data: [DONE]\n\n") == "My name is <PERSON>."
+    assert await _stripped(_event(f"Hi {ZW}"), _event("there"), b"data: [DONE]\n\n") == f"Hi {ZW}there"
+    assert await _stripped(_event(f"End{WJ}")) == f"End{WJ}", "held to the end, a single one goes out"
+
+
+@pytest.mark.anyio
+async def test_a_streamed_answer_without_the_variation_passes_as_it_came() -> None:
+    assert await _stripped(_event("Plain answer."), _event("", "stop"), b"data: [DONE]\n\n") == "Plain answer."
+
+
+@pytest.mark.anyio
+async def test_the_client_and_the_receipt_get_the_answer_without_it(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+    engine: _Engine,  # noqa: F811 - the fixture
+) -> None:
+    await _seeded(fastapi_app, db_session, node_metadata=WATERMARK)
+    said = f"{LONG}{SAID_BACK}"
+    _answers(monkeypatch, said, completion_tokens=250)
+    r = await _ask(client)
+    assert r.status_code == 200, r.text
+    assert r.json()["choices"][0]["message"]["content"] == LONG
+    [asked] = engine.bodies[RECEIPTS]
+    assert asked["content_sha256"] == text_sha256(LONG), "the receipt covers the answer the client got"
+
+
+@pytest.mark.anyio
+async def test_a_streamed_answer_and_its_receipt_lose_it_too(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+    engine: _Engine,  # noqa: F811 - the fixture
+) -> None:
+    await _seeded(fastapi_app, db_session, node_metadata=WATERMARK)
+    _answers(monkeypatch, f"{LONG}{SAID_BACK}", completion_tokens=250)  # in pieces of five: the run is cut
+    r = await _ask(client, stream=True)
+    assert r.status_code == 200, r.text
+    assert _streamed_text(_sse(r.text)) == LONG
+    [asked] = engine.bodies[RECEIPTS]
+    assert asked["content_sha256"] == text_sha256(LONG)
 
 
 # ── A tool that returned nothing ──────────────────────────────────
