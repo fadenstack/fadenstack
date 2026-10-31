@@ -1,19 +1,23 @@
+import contextlib
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
+from fastapi_users import exceptions
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
 from faden_backend.db.dependencies import get_db_session
 from faden_backend.db.models.users import (
+    UserManager,
     UserRead,  # type: ignore
     UserUpdate,  # type: ignore
     api_users,  # type: ignore
     auth_cookie,  # type: ignore
     auth_jwt,  # type: ignore
     get_jwt_strategy,  # type: ignore
+    get_user_manager,
     login_lifetime_seconds,
 )
 from faden_backend.services import password_reset_links
@@ -27,11 +31,30 @@ router = APIRouter()
 # page), by bootstrap for the first one, or by a sign-in provider set to create them. With it mounted at
 # POST /api/auth/register, anyone who reached the server could make an account with the default role.
 
-router.include_router(
-    api_users.get_reset_password_router(),
-    prefix="/auth",
-    tags=["auth"],
-)
+reset_router = api_users.get_reset_password_router()
+# Not the stock forgot-password: it checks the address as an email address on the internet, which refuses
+# special-use domains (.local, .test, .internal and others) that accounts are made with (a company on
+# firma.local), so such people could never reset their password. This one takes the address as accounts are
+# made with it, and answers the same whether or not an account has it.
+reset_router.routes[:] = [r for r in reset_router.routes if getattr(r, "name", "") != "reset:forgot_password"]
+
+
+@reset_router.post("/forgot-password", status_code=status.HTTP_202_ACCEPTED, name="reset:forgot_password")
+async def forgot_password(
+    request: Request,
+    email: str = Body(..., embed=True, min_length=3, max_length=320, pattern=r"^[^@\s]+@[^@\s]+$"),
+    user_manager: UserManager = Depends(get_user_manager),
+) -> None:
+    """Mail a reset link to the account with *email*, if there is one; 202 either way."""
+    try:
+        user = await user_manager.get_by_email(email)
+    except exceptions.UserNotExists:
+        return
+    with contextlib.suppress(exceptions.UserInactive):
+        await user_manager.forgot_password(user, request)
+
+
+router.include_router(reset_router, prefix="/auth", tags=["auth"])
 
 router.include_router(
     api_users.get_verify_router(UserRead),

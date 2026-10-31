@@ -124,6 +124,7 @@
     "forgot_password_submit": "Reset-Link senden",
     "forgot_password_success": "Falls ein Konto mit dieser E-Mail existiert, wurde ein Reset-Link gesendet.",
     "forgot_password_failed": "Passwort-Reset konnte nicht angefordert werden.",
+    "forgot_password_not_an_address": "Geben Sie eine E-Mail-Adresse ein, z. B. name@example.com.",
     "reset_password_title": "Passwort zurücksetzen",
     "reset_password_desc": "Wählen Sie ein neues Passwort für Ihr Konto.",
     "reset_password_submit": "Passwort zurücksetzen",
