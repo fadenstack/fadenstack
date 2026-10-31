@@ -905,6 +905,50 @@ def _insert_before_question(payload: dict[str, Any], message: dict[str, Any]) ->
     return {**payload, "messages": messages}
 
 
+def _with_skills(payload: dict[str, Any], blocks: list[str]) -> dict[str, Any]:
+    """*payload* with a turn's skills, in their order, where ``session_skills_position`` puts them.
+
+    ``user``: in the last user message, before its text. A turn's skills change from one question to the
+    next. As system messages, a template that takes one system message, first (Qwen 3.5 and later), had
+    them merged into the first (``llm_adapter._system_first``), so a turn with other skills changed the
+    start of the prompt and vLLM computed the whole conversation again: 2.0 s instead of 0.6 s to the
+    first token at 4k tokens of history, 5.1 s instead of 0.7 s at 10k (the release server's 27B,
+    2026-10-31). In the last user message they change only what changes anyway; the message was saved
+    without them. ``tail`` and ``prefix``: as system messages, before the question or after the leading
+    system messages, for a template that takes them there; also without a user message to open.
+    """
+    position = settings.session_skills_position
+    if position == "user":
+        opened = _opened_with(payload, "\n\n".join(blocks))
+        if opened is not None:
+            return opened
+    insert = _insert_after_system if position == "prefix" else _insert_before_question
+    for block in blocks:  # each after the last: they keep their order
+        payload = insert(payload, {"role": "system", "content": block})
+    return payload
+
+
+def _opened_with(payload: dict[str, Any], text: str) -> dict[str, Any] | None:
+    """*payload* with *text* as the first part of its last user message; None without one.
+
+    A part of its own, not joined to the person's words: the PII scan reads a reply to "what is your
+    name?" as a name only when the part holds nothing else.
+    """
+    messages = list(payload.get("messages") or [])
+    at = next((i for i in range(len(messages) - 1, -1, -1) if messages[i].get("role") == "user"), None)
+    if at is None:
+        return None
+    content = messages[at].get("content")
+    if isinstance(content, str):
+        parts = [{"type": "text", "text": content}]
+    elif isinstance(content, list):
+        parts = list(content)
+    else:
+        return None
+    messages[at] = {**messages[at], "content": [{"type": "text", "text": text}, *parts]}
+    return {**payload, "messages": messages}
+
+
 def _file_types(names: list[tuple[str, str]]) -> list[str]:
     """File types as skill triggers name them ("pdf"), from names and media types."""
     types: set[str] = set()
@@ -2724,14 +2768,9 @@ class GatewayService:
             self._knowledge_to_search(req, auth, payload, candidates) if chat else _value(None),
         )
         self._book_on(req, team)
-        insert_skill = (
-            _insert_before_question if settings.session_skills_position == "tail" else _insert_after_system
-        )
-        for skill in req.skills:  # each after the last: they keep their order
-            payload = insert_skill(payload, {
-                "role": "system",
-                "content": skill_files.skill_block(skill, as_tool=searchable),
-            })
+        if req.skills:
+            blocks = [skill_files.skill_block(skill, as_tool=searchable) for skill in req.skills]
+            payload = _with_skills(payload, blocks)
         req.payload = payload
         if chat:
             # The session is resolved (and the user's): its tool mode applies.

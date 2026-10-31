@@ -171,6 +171,14 @@ def _model_answers(monkeypatch: pytest.MonkeyPatch, answer: str, sent: list[dict
     monkeypatch.setattr(LLMAdapter, "completion", completion)
 
 
+def _text(message: dict[str, Any]) -> str:
+    """A message's text, its parts in turn: a turn's skills are the first part of its question."""
+    content = message.get("content")
+    if isinstance(content, list):
+        return "\n\n".join(str(part.get("text") or "") for part in content if isinstance(part, dict))
+    return content or ""
+
+
 def _streamed_text(sse: str) -> str:
     out = []
     for line in sse.splitlines():
@@ -287,7 +295,7 @@ async def test_a_skill_reaches_the_model_when_the_skills_module_is_on(
     await client.post("/v1/chat/completions", headers={"Authorization": f"Bearer {_token()}"}, json={
         "model": ALIAS, "messages": [{"role": "user", "content": "hi"}],
     })
-    assert any("Answer in five words." in (m.get("content") or "") for m in sent[0]["messages"])
+    assert any("Answer in five words." in _text(m) for m in sent[0]["messages"])
 
 
 @pytest.mark.anyio
@@ -331,7 +339,7 @@ async def test_the_skills_a_user_picks_are_asked_for_with_their_groups(
     assert asked[0]["requested"] == ["code-review"]
     assert asked[0]["group_ids"] == ("g-eng", "g-ops")
     assert "skills" not in sent[0]
-    assert any("Find bugs." in (m.get("content") or "") for m in sent[0]["messages"])
+    assert any("Find bugs." in _text(m) for m in sent[0]["messages"])
 
 
 def test_the_audit_log_names_the_exact_version_a_chat_used() -> None:
@@ -604,7 +612,5 @@ async def test_the_session_and_skills_are_looked_up_side_by_side(
     took = time.perf_counter() - started
     assert r.status_code == 200
     assert took < 0.55, f"{took:.2f} s: the lookups ran one after the other"
-    systems = [m["content"] for m in sent[0]["messages"] if m["role"] == "system"]
-    rule1 = next(i for i, c in enumerate(systems) if "Rule 1." in c)
-    rule2 = next(i for i, c in enumerate(systems) if "Rule 2." in c)
-    assert rule1 < rule2, "the skills in the order they were resolved"
+    skills = sent[0]["messages"][-1]["content"][0]["text"]  # the question's first part
+    assert skills.index("Rule 1.") < skills.index("Rule 2."), "the skills in the order they were resolved"

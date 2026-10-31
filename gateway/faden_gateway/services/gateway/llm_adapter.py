@@ -197,9 +197,9 @@ def _late_system_refused(
 ) -> list[dict[str, Any]] | None:
     """The messages to try again with, when a template refused the system messages.
 
-    The gateway sends several: the date, the PII note, memory, a turn's
-    skills after the history, so the prefix vLLM caches stays the same
-    (``session_skills_position``). Llama 3's template takes them anywhere;
+    The gateway sends several: the date, the PII note, memory, and with
+    ``session_skills_position`` ``tail`` a turn's skills after the history.
+    Llama 3's template takes them anywhere;
     one that does not answers 400 with the template's error -- or 500
     behind Ray Serve with vLLM 0.31, which turns the template's exception
     into an internal error (the release server, 2026-10-19: every agent

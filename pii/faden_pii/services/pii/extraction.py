@@ -186,12 +186,15 @@ class ExtractedPayload:
                 raise PIIError("pii_unsupported_surface")
             path = f"/messages/{index}"
             content = message.get("content")
+            # A reply to "what is your name?": a part that is a name alone is
+            # one, in a message of parts too (the gateway puts a turn's skills
+            # in a part before the person's words).
+            hint = (
+                message.get("role") == "user"
+                and index > 0
+                and name_question(messages[index - 1])
+            )
             if isinstance(content, str):
-                hint = (
-                    message.get("role") == "user"
-                    and index > 0
-                    and name_question(messages[index - 1])
-                )
                 self.units.append(TextUnit(path + "/content", message, "content", hint))
             elif isinstance(content, list):
                 for number, part in enumerate(content):
@@ -202,7 +205,7 @@ class ExtractedPayload:
                     ):
                         raise PIIError("pii_unsupported_surface")
                     self.units.append(
-                        TextUnit(f"{path}/content/{number}/text", part, "text")
+                        TextUnit(f"{path}/content/{number}/text", part, "text", hint)
                     )
             elif content is not None:
                 raise PIIError("pii_unsupported_surface")

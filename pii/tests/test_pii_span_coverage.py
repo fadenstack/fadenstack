@@ -159,3 +159,31 @@ async def test_name_question_masks_only_target_and_does_not_change_cached_bare_a
         assert plain.payload["input"] == "Jörg"
     finally:
         await service.close()
+
+
+@pytest.mark.anyio
+async def test_name_question_masks_the_name_in_a_message_of_parts():
+    """The gateway puts a turn's skills in a part before the person's words."""
+    service = make_service(lambda text: [])
+    skill = "=== ACTIVE SKILL: Terse (v1) ===\nAnswer in five words.\n=== END SKILL ==="
+    try:
+        result = await service.sanitize_payload(
+            {
+                "messages": [
+                    {"role": "assistant", "content": "Wie lautet dein Vorname?"},
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": skill},
+                            {"type": "text", "text": "Jörg"},
+                        ],
+                    },
+                ]
+            },
+            mode="tokenize",
+        )
+        parts = result.payload["messages"][1]["content"]
+        assert [p["text"] for p in parts] == [skill, "[PERSON_1]"]
+        assert result.token_mapping == {"[PERSON_1]": "Jörg"}
+    finally:
+        await service.close()
