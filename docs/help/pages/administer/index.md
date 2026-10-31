@@ -54,8 +54,8 @@ under **Help**.
 6. **Set the rules.** Decide what personal data is masked before it reaches a model and which tools may run
    without asking: see [Policies and personal data](policies.md).
 
-After that, the [dashboard](dashboard.md) tells you what needs attention, and [Usage and costs](usage.md)
-shows how much is used and by whom. [What happens to a request](requests.md) explains, in plain terms, what
+After that, the [dashboard](dashboard.md) tells you what needs attention, and [Usage and limits](usage.md)
+shows how much is used, by team, agent and model. [What happens to a request](requests.md) explains, in plain terms, what
 Fadenstack does with each message people send.
 
 ## Modules

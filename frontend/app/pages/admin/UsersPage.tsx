@@ -12,6 +12,8 @@ import { RightsDialog } from "~/components/users/RightsDialog";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import { formatDateTime } from "~/lib/dates";
 import { MIN_PASSWORD_LENGTH } from "~/lib/password";
+import { roleHint, roleLabel } from "~/lib/roleLabels";
+import { asTree, type TreeRow } from "~/lib/teamTree";
 import { useAsyncData } from "~/lib/useAsyncData";
 
 import Alert from "@mui/material/Alert";
@@ -38,8 +40,27 @@ import LinkIcon from "@mui/icons-material/Link";
 import LockResetIcon from "@mui/icons-material/LockReset";
 import PersonOffIcon from "@mui/icons-material/PersonOff";
 
+/** A role to tick: its name, and for a named built-in role (the usage auditor) its key and purpose. */
+function RoleChoice({ label, hint }: { label: string; hint: string | null }) {
+  return (
+    <Box sx={{ py: hint ? 0.5 : 0 }}>
+      <Typography variant="body2">{label}</Typography>
+      {hint && (
+        <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+          {hint}
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
+/** The teams offered as a home team: the active ones as a tree, and an archived one only while it is the current choice. */
+function homeTeamChoices(groups: Group[], current: string, lang: string): TreeRow<Group>[] {
+  return asTree(groups.filter((g) => !g.archived_at || g.id === current), lang);
+}
+
 export default function UsersPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   // ── Data loading via useAsyncData ──
   const {
@@ -244,11 +265,11 @@ export default function UsersPage() {
     {
       key: "roles",
       label: t("users.roles"),
-      searchValue: (u) => u.roles.map((r) => r.name).join(" "),
+      searchValue: (u) => u.roles.map((r) => `${r.name} ${roleLabel(r.name, t)}`).join(" "),
       render: (u) => (
         <Stack direction="row" spacing={0.8} flexWrap="wrap" useFlexGap>
           {u.roles.length ? (
-            u.roles.map((r) => <Chip key={r.id} size="small" label={r.name} />)
+            u.roles.map((r) => <Chip key={r.id} size="small" label={roleLabel(r.name, t)} />)
           ) : (
             <Typography variant="body2" color="text.secondary">{t("users.no_roles")}</Typography>
           )}
@@ -397,10 +418,15 @@ export default function UsersPage() {
                     disabled={saving}
                   />
                 }
-                label={t("users.role_permissions", {
-                  name: role.name,
-                  count: rolePermissionCount[role.id] ?? 0,
-                })}
+                label={
+                  <RoleChoice
+                    label={t("users.role_permissions", {
+                      name: roleLabel(role.name, t),
+                      count: rolePermissionCount[role.id] ?? 0,
+                    })}
+                    hint={roleHint(role.name, t)}
+                  />
+                }
               />
             ))}
           </FormGroup>
@@ -421,9 +447,16 @@ export default function UsersPage() {
             disabled={saving}
           >
             <MenuItem value="">{t("users.usage_group_none")}</MenuItem>
-            {groups.map((g) => (
-              <MenuItem key={g.id} value={g.id}>
-                {g.name}
+            {/* The home team at any level of the tree; an archived team cannot be one (it stays listed,
+                unpickable, only while it still is this person's). */}
+            {homeTeamChoices(groups, selectedUsageGroupId, i18n.language).map(({ team, depth }) => (
+              <MenuItem
+                key={team.id}
+                value={team.id}
+                disabled={Boolean(team.archived_at)}
+                sx={{ pl: 2 + (depth - 1) * 2 }}
+              >
+                {team.archived_at ? t("groups.tree.archived_name", { name: team.name }) : team.name}
               </MenuItem>
             ))}
           </TextField>
@@ -495,7 +528,7 @@ export default function UsersPage() {
                         disabled={creating}
                       />
                     }
-                    label={role.name}
+                    label={<RoleChoice label={roleLabel(role.name, t)} hint={roleHint(role.name, t)} />}
                   />
                 ))}
               </FormGroup>

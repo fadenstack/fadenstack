@@ -22,7 +22,7 @@ from httpx import AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from faden_backend.services.llm.calls_service import CallFilters, LLMCallsService
+from faden_backend.services.llm.calls_service import CallFilters, LLMCallsService, _turn_key
 from faden_backend.services.llm.graph_service import ProviderOwners
 
 pytestmark = pytest.mark.anyio()
@@ -194,10 +194,13 @@ async def test_list_filters_outcome_model_search_and_sorts(gateway: AsyncSession
     assert [c["request_id"] for c in by_id["items"]] == [slow]
     by_error = await svc.list_calls(CallFilters(**{**_window().__dict__, "q": "SERVER_err"}))
     assert [c["request_id"] for c in by_error["items"]] == [slow]
-    by_conversation = await svc.list_calls(CallFilters(**{**_window().__dict__, "session": "conv-1"}))
-    assert [c["request_id"] for c in by_conversation["items"]] == [other]
+    by_conversation = await svc.list_calls(CallFilters(**{**_window().__dict__, "q": "conv-1"}))
+    assert by_conversation["total"] == 0, "nor by a conversation, which is one person's (M02)"
     wildcard = await svc.list_calls(CallFilters(**{**_window().__dict__, "q": "%"}))
     assert wildcard["total"] == 0, "a % in the search is a character, not a wildcard"
+    by_person = await svc.list_calls(CallFilters(**{**_window().__dict__, "q": "u1"}))
+    assert by_person["total"] == 0, "nobody is searched for by their id (M02)"
+    assert all(c["user_id"] is None for c in page["items"]), "nobody is named"
 
     slowest = await svc.list_calls(_window(), sort="slowest", limit=1)
     assert slowest["total"] == 3
@@ -264,7 +267,7 @@ async def test_detail_brings_tools_policies_and_the_conversation(gateway: AsyncS
         {"stage": "input", "outcome": "block", "category": "pii", "check_name": "pii.email",
          "tool_id": None, "created_at": detail["policy_decisions"][0]["created_at"]},
     ], "never the policy's name or the hash of the refused text"
-    assert detail["related_by"] == "conversation_id"
+    assert detail["related_by"] == "conversation_id" and "related_key" not in detail
     assert [c["request_id"] for c in detail["related"]] == [first, second]
 
     alone = await svc.detail(ROW_IDS[await _call(gateway)])
@@ -286,7 +289,8 @@ async def test_a_shared_request_id_does_not_mix_calls(gateway: AsyncSession) -> 
     svc = LLMCallsService(_factory(gateway))
     detail = await svc.detail(mine_row)
     assert detail is not None
-    assert detail["call"]["user_id"] == "u1", "the row asked for, not the newest with that request id"
+    assert detail["call"]["id"] == mine_row, "the row asked for, not the newest with that request id"
+    assert detail["call"]["user_id"] is None, "nobody is named"
     assert detail["tool_calls"] == []
     assert detail["policy_decisions"] == []
 
@@ -350,14 +354,15 @@ async def test_turns_group_an_agents_rounds_with_the_tools_its_app_ran(gateway: 
     await _event(gateway, "c1", "tool.executed", 35, tool="insert_text", source="host", outcome="denied")
     await _event(gateway, "c1", "tool.executed", 5, tool="later", outcome="ok")  # a later turn's
     await _event(gateway, "c2", "tool.executed", 45, tool="elsewhere", outcome="ok")
-    await _call(gateway, age_sec=20)  # a call of no turn: a turn of its own
+    lone = await _call(gateway, age_sec=20)  # a call of no turn: a turn of its own
     await _call(gateway, user_id="u2", agent_id="a1", turn_id="t1", age_sec=10)  # same turn id, another user
 
     svc = LLMCallsService(_factory(gateway))
     page = await svc.list_turns(_window())
     assert page["total"] == 3
-    turns = {(t["user_id"], t["turn_id"]): t for t in page["items"]}
-    turn = turns[("u1", "t1")]
+    assert all(t["user_id"] is None and "u1" not in t["key"] for t in page["items"]), "nobody is named"
+    turns = {t["key"]: t for t in page["items"]}
+    turn = turns[_turn_key("u1", "t1")]
     assert turn["calls"] == 3
     assert turn["tool_rounds"] == 2
     assert turn["finish_reason"] == "stop"
@@ -366,8 +371,8 @@ async def test_turns_group_an_agents_rounds_with_the_tools_its_app_ran(gateway: 
     assert turn["duration_ms"] >= 21_000, "from the first call's start to the last call's end"
     assert (turn["client_tools"], turn["client_tool_errors"]) == (2, 1)
     assert (turn["approvals"], turn["approvals_denied"], turn["approval_wait_ms"]) == (1, 1, 2000)
-    assert turns[("u2", "t1")]["calls"] == 1, "a turn id is the app's: another user's is another turn"
-    assert turns[("u1", None)]["calls"] == 1
+    assert turns[_turn_key("u2", "t1")]["calls"] == 1, "a turn id is the app's: another user's is another turn"
+    assert turns[_turn_key("u1", ROW_IDS[lone])]["calls"] == 1
     assert next(t["turn_id"] for t in page["items"]) == "t1", "newest first: u2's call"
 
     errors_only = await svc.list_turns(CallFilters(**{**_window().__dict__, "model_alias": "nope"}))
@@ -384,6 +389,46 @@ async def test_turns_group_an_agents_rounds_with_the_tools_its_app_ran(gateway: 
     assert alone is not None
     assert [c["id"] for c in alone["turn_calls"]] == [alone["call"]["id"]]
     assert alone["client_events"] == []
+
+
+async def test_no_answer_carries_an_id_that_stands_for_a_person(gateway: AsyncSession) -> None:
+    """No device, session, conversation or project id in a call, a turn or a call's detail (M02, M04)."""
+    ids = {"device_id": "device-secret", "session_id": "session-secret", "conversation_id": "conv-secret",
+           "project_id": "project-secret"}
+    first = await _call(gateway, **ids, agent_id="a1", turn_id="t9", age_sec=30)
+    await _call(gateway, **ids, agent_id="a1", turn_id="t9", age_sec=20)
+
+    svc = LLMCallsService(_factory(gateway))
+    answers = [
+        await svc.list_calls(_window()), await svc.list_turns(_window()), await svc.detail(ROW_IDS[first]),
+    ]
+
+    assert not any(secret in json.dumps(answers, default=str) for secret in ids.values())
+    detail = answers[2]
+    assert detail is not None
+    rows = [*answers[0]["items"], *answers[1]["items"], detail["call"], *detail["related"], *detail["turn_calls"]]
+    assert all(not set(ids) & set(row) for row in rows), "not even the keys"
+    assert len(detail["related"]) == 2, "the calls of one conversation still link"
+
+
+async def test_the_api_has_no_filter_by_agent_or_session(
+    client: AsyncClient, fastapi_app: FastAPI, gateway: AsyncSession,
+) -> None:
+    from unittest.mock import MagicMock
+
+    from faden_backend.db.models.users import User, current_active_user
+    from faden_backend.web.api.llm.dependencies import get_llm_calls_service
+
+    await _call(gateway, agent_id="a1", session_id="s1")
+    await _call(gateway, agent_id="a2", session_id="s2")
+    fastapi_app.dependency_overrides[get_llm_calls_service] = lambda: LLMCallsService(_factory(gateway))
+    user = MagicMock(spec=User)
+    user.id, user.is_active, user.is_superuser, user.is_verified = uuid.uuid4(), True, True, True
+    fastapi_app.dependency_overrides[current_active_user] = lambda: user
+
+    for params in ({"agent_id": "a1"}, {"session": "s1"}):
+        listed = await client.get(fastapi_app.url_path_for("list_llm_calls"), params=params)
+        assert listed.json()["total"] == 2, params
 
 
 async def test_without_gateway_database_the_explorer_is_empty() -> None:

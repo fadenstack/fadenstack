@@ -341,9 +341,19 @@
       "title": "Cost Observability",
       "description": "Cost, usage and speed of the requests the gateway served. Costs are estimates from the prices you set; they do not affect billing.",
       "action_overview": "Spend, requests, tokens, latency and errors over 7 to 90 days",
-      "action_requests": "Browse requests, filter by model or user, and open one to see its pipeline",
+      "action_requests": "Browse requests, filter by model, and open one to see its pipeline",
       "action_pricing": "Set the prices per million tokens",
       "action_export": "Export the data as CSV"
+    },
+    "usage": {
+      "title": "Usage",
+      "description": "What the instance used of the models, by usage group, agent, model and provider. Every figure covers at least the minimum group size of people; nothing names or ranks a single person.",
+      "action_totals": "Requests, tokens and estimated cost over 7 days to 12 months, per hour, day or month",
+      "action_groups": "Group by usage group, agent, model or provider; groups below the minimum group size are counted in one row, \"Fewer than ... people\"",
+      "action_small": "A banner warns when fewer people than the minimum group size use the instance: its totals then count as person-level data",
+      "action_people": "Usage auditors, with person-level reporting on, see figures per person after giving a reason; each view is recorded",
+      "action_settings": "Settings → Usage and privacy sets the minimum group size, the retention periods, the limits and person-level reporting",
+      "action_tree": "Teams as a tree: open a team to its sub-teams, as recorded or in today's structure"
     },
     "logs": {
       "title": "Logs & Audit",
@@ -362,7 +372,7 @@
       "title": "LLM Calls",
       "description": "Every call through the gateway: find the one that went wrong, see why, and see where calls are routed.",
       "action_find": "Narrow the list by time, model, outcome or any id; click Errors to see only failures",
-      "action_inspect": "Open a call for its diagnosis, timeline, conversation and every recorded field; j and k move between calls",
+      "action_inspect": "Open a call for its diagnosis, timeline, related calls and recorded fields, never who sent it; j and k move between calls",
       "action_routing": "See which providers answered each model, with errors and p95 latency",
       "action_live": "New calls arrive every few seconds; pause to read, and copy a call's link to share it"
     },
@@ -476,7 +486,8 @@
       "title": "Groups",
       "description": "A group gives its members roles, and groups their usage in reports.",
       "action_create": "Create a group with its roles",
-      "action_members": "Add or remove members"
+      "action_members": "Add or remove members",
+      "action_tree": "Place a group below another, give it a cost centre, or archive one that ended"
     },
     "api_tokens": {
       "title": "API tokens",
@@ -626,10 +637,18 @@
     },
     "settings": {
       "title": "Settings",
-      "description": "Settings for the whole system, in three tabs.",
+      "description": "Settings for the whole system, in four tabs.",
       "action_general": "General: every system setting, searchable, and the Hugging Face token",
       "action_modules": "Modules: turn optional modules on or off, with their settings",
+      "action_usage": "Usage and privacy: who sees usage figures, how long they are kept, the instance's limits and the configuration statement",
       "action_appearance": "Appearance: the accent color"
+    },
+    "settings_mail": {
+      "title": "Mail",
+      "description": "How this server sends mail (password resets, codes, alerts for administrators) through your organisation's mail server.",
+      "action_server": "Mail server and sign-in: a password, Microsoft 365, or a relay without one",
+      "action_test": "Send a test mail with the form as it is, then save",
+      "action_state": "Mail state: whether mail goes out, how many wait, and the last failure in words"
     },
     "profile": {
       "title": "My Profile",
@@ -654,6 +673,16 @@
       "action_verdict": "Read the verdict and what each layer found: watermark, content credentials, metadata, receipts and records",
       "action_download": "Download the result signed, as a JSON file",
       "action_public": "Offer pictures and files to people without an account under Settings > Modules > Provenance"
+    },
+    "budgets": {
+      "title": "Budgets",
+      "description": "Limits of tokens or money per day, week or month for the organisation, teams, agents and, once switched on, single people; with alerts, a forecast and the chargeback report.",
+      "action_list": "Each budget shows how much is used this period, when it runs out at this rate, and its warnings",
+      "action_create": "New budget: choose whom it applies to (a team from the tree), tokens or money, the amount, the period and the mode",
+      "action_modes": "Hard refuses once used up; soft only alerts; shadow counts what it would have refused",
+      "action_tree": "A request needs room in every budget that applies; a team's budget may not be larger than the one above it",
+      "action_chargeback": "Chargeback: a month per team or cost centre, as an internal estimate, with a CSV download",
+      "action_settings": "Settings: budgets for single people (root mode) and usage groups from cost centres"
     }
   }
 }

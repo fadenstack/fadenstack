@@ -341,9 +341,19 @@
       "title": "Tableau de bord des coûts",
       "description": "Coût, utilisation et rapidité des requêtes servies par la passerelle. Les coûts sont des estimations calculées à partir des prix que vous définissez ; ils n'ont aucun effet sur la facturation.",
       "action_overview": "Dépenses, requêtes, tokens, latence et erreurs sur 7 à 90 jours",
-      "action_requests": "Parcourir les requêtes, filtrer par modèle ou par utilisateur, et en ouvrir une pour voir son pipeline",
+      "action_requests": "Parcourir les requêtes, filtrer par modèle, et en ouvrir une pour voir son pipeline",
       "action_pricing": "Définir les prix par million de tokens",
       "action_export": "Exporter les données en CSV"
+    },
+    "usage": {
+      "title": "Utilisation",
+      "description": "Ce que l'instance a utilisé des modèles, par groupe d'usage, agent, modèle et fournisseur. Chaque chiffre couvre au moins la taille minimale de groupe ; rien ne nomme ni ne classe une seule personne.",
+      "action_totals": "Requêtes, tokens et coût estimé sur 7 jours à 12 mois, par heure, jour ou mois",
+      "action_groups": "Grouper par groupe d'usage, agent, modèle ou fournisseur ; les groupes sous la taille minimale comptent dans une ligne, « Moins de ... personnes »",
+      "action_small": "Un bandeau avertit quand moins de personnes que la taille minimale de groupe utilisent l'instance : ses totaux comptent alors comme des données personnelles",
+      "action_people": "Les auditeurs d'utilisation, avec le suivi par personne activé, voient les chiffres par personne après avoir indiqué un motif ; chaque consultation est enregistrée",
+      "action_settings": "Paramètres → Utilisation et confidentialité fixe la taille minimale de groupe, les durées de conservation, les limites et le suivi par personne",
+      "action_tree": "Les équipes en arbre : ouvrez une équipe pour voir ses sous-équipes, tel qu'enregistré ou dans la structure actuelle"
     },
     "logs": {
       "title": "Journaux et audit",
@@ -362,7 +372,7 @@
       "title": "Appels LLM",
       "description": "Chaque appel via la passerelle : trouvez celui qui a échoué, voyez pourquoi, et voyez où les appels sont routés.",
       "action_find": "Restreignez la liste par heure, modèle, résultat ou n’importe quel id ; cliquez sur Erreurs pour ne voir que les échecs",
-      "action_inspect": "Ouvrez un appel pour son diagnostic, sa chronologie, sa conversation et tous les champs enregistrés ; j et k passent d’un appel à l’autre",
+      "action_inspect": "Ouvrez un appel pour son diagnostic, sa chronologie, les appels liés et les champs enregistrés, jamais qui l’a envoyé ; j et k passent d’un appel à l’autre",
       "action_routing": "Voyez quels fournisseurs ont servi chaque modèle, avec les erreurs et la latence p95",
       "action_live": "Les nouveaux appels arrivent toutes les quelques secondes ; mettez en pause pour lire, et copiez le lien d’un appel pour le partager"
     },
@@ -476,7 +486,8 @@
       "title": "Groupes",
       "description": "Un groupe donne des rôles à ses membres et regroupe leur usage dans les rapports.",
       "action_create": "Créer un groupe avec ses rôles",
-      "action_members": "Ajouter ou retirer des membres"
+      "action_members": "Ajouter ou retirer des membres",
+      "action_tree": "Placer un groupe sous un autre, lui donner un centre de coûts ou archiver un groupe terminé"
     },
     "api_tokens": {
       "title": "Jetons d'API",
@@ -626,10 +637,18 @@
     },
     "settings": {
       "title": "Paramètres",
-      "description": "Les paramètres de tout le système, en trois onglets.",
+      "description": "Les paramètres de tout le système, en quatre onglets.",
       "action_general": "Général : tous les paramètres système, avec recherche, et le jeton Hugging Face",
       "action_modules": "Modules : activer ou désactiver les modules optionnels, avec leurs paramètres",
+      "action_usage": "Utilisation et confidentialité : qui voit les chiffres d'utilisation, combien de temps ils sont conservés, les limites de l'instance et la déclaration de configuration",
       "action_appearance": "Apparence : la couleur d'accent"
+    },
+    "settings_mail": {
+      "title": "Messagerie",
+      "description": "Comment ce serveur envoie les e-mails (réinitialisations de mot de passe, codes, alertes pour les administrateurs) via le serveur de messagerie de votre organisation.",
+      "action_server": "Serveur de messagerie et connexion : un mot de passe, Microsoft 365 ou un relais sans connexion",
+      "action_test": "Envoyer un e-mail de test avec le formulaire tel qu'il est, puis enregistrer",
+      "action_state": "État de la messagerie : si les e-mails partent, combien attendent, et le dernier échec en clair"
     },
     "profile": {
       "title": "Mon profil",
@@ -654,6 +673,16 @@
       "action_verdict": "Lisez le verdict et ce que chaque couche a trouvé : filigrane, identifiants de contenu, métadonnées, reçus et enregistrements",
       "action_download": "Téléchargez le résultat signé, sous forme de fichier JSON",
       "action_public": "Proposez la vérification d'images et de fichiers aux personnes sans compte dans Paramètres > Modules > Provenance"
+    },
+    "budgets": {
+      "title": "Budgets",
+      "description": "Des limites de tokens ou d'argent par jour, semaine ou mois pour l'organisation, les équipes, les agents et, une fois activés, des personnes individuelles ; avec des alertes, une prévision et la refacturation interne.",
+      "action_list": "Chaque budget montre combien est utilisé sur cette période, quand il sera épuisé à ce rythme, et ses avertissements",
+      "action_create": "Nouveau budget : choisissez à qui il s'applique (une équipe de l'arbre), tokens ou argent, le montant, la période et le mode",
+      "action_modes": "Strict refuse une fois épuisé ; Souple alerte seulement ; Simulation compte ce qu'il aurait refusé",
+      "action_tree": "Une requête a besoin de marge dans chaque budget qui s'applique ; le budget d'une équipe ne peut pas dépasser celui du dessus",
+      "action_chargeback": "Refacturation interne : un mois par équipe ou centre de coûts, comme estimation interne, avec un téléchargement CSV",
+      "action_settings": "Paramètres : budgets pour des personnes individuelles (mode Root) et groupes d'usage à partir des centres de coûts"
     }
   }
 }

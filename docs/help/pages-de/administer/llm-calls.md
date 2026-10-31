@@ -39,8 +39,9 @@ Wählen Sie den Pfeil vor einer Anfrage, um ihre Runden zu sehen.
 
 1. Wählen Sie oben einen Zeitraum: **15 Min** bis **30 Tage**.
 2. Grenzen Sie die Liste ein: **Alle Modelle** für ein Modell, **Fehler** oder **Erfolgreich** für das
-   Ergebnis, oder tippen Sie ins Suchfeld. Die Suche findet einen Aufruf an seiner Anfrage-, Trace-, Sitzungs-,
-   Unterhaltungs-, Benutzer- oder Agenten-ID und an einem Teil des Modellnamens oder Fehlercodes.
+   Ergebnis, oder tippen Sie ins Suchfeld. Die Suche findet einen Aufruf an seiner Anfrage- oder Trace-ID und an
+   einem Teil des Modellnamens, Endpunkts oder Fehlercodes. Nach Person, Sitzung, Unterhaltung, Gerät oder Agent
+   findet sie keinen Aufruf.
 3. Sortieren Sie mit den Spaltenköpfen nach **Zeit**, **Dauer** oder **Tokens**.
 
 **Live** holt alle paar Sekunden neue Aufrufe, solange Sie die erste Seite ansehen; wählen Sie es erneut, um
@@ -65,13 +66,13 @@ unten). Dann:
 - **Zeitverlauf** (**Diese Runde** in einer Anfrage): wohin die Zeit dieses Aufrufs ging, das Warten auf das
   erste Token und das Schreiben, und die Tools, die das Gateway dafür ausführte.
 - **Governance**: was eine Richtlinie über den Aufruf entschied, falls eine es tat.
-- **Unterhaltung**: die anderen Aufrufe derselben Unterhaltung, der Reihe nach.
+- **Unterhaltung** oder **Trace**: die anderen Aufrufe, die zu diesem gehören, der Reihe nach, wenn es welche gibt.
 
 ![Der Zeitverlauf einer Anfrage eines Agenten: neun Runden, nach jeder die Freigabe und die Tool-Ausführung, um die das Modell bat](../images/administer/llm-calls-request-timeline.png)
 
-**Details** listet jedes erfasste Feld, mit einer Schaltfläche, um die Liste nach Modell, Benutzer oder
-Unterhaltung des Aufrufs zu filtern. **JSON** zeigt den Datensatz, wie er ist, zum Kopieren in eine
-Fehlermeldung.
+**Details** listet die erfassten Felder des Aufrufs, ohne die Person und ohne die Sitzung, die Unterhaltung, das
+Gerät oder das Projekt, zu denen er gehört, mit einer Schaltfläche, um die Liste nach dem Modell des Aufrufs zu
+filtern. **JSON** zeigt den Datensatz, wie die Seite ihn hat, zum Kopieren in eine Fehlermeldung.
 
 ??? info "Woher die Tools der App kommen"
     Die Tools eines Agenten laufen in seiner App, auf dem Computer der Person, nicht auf dem Server. Die App
@@ -116,13 +117,19 @@ in der Liste ein Aufruf geöffnet, hebt die Karte seinen Weg hervor.
 Zu jedem Aufruf hält das Gateway fest, wer ihn schickte, welches Modell wo antwortete, die Zeiten, die Tokens,
 das Ergebnis und die geschätzten Kosten; bei einem Agenten auch seine Unterhaltung und Anfrage. Der Text der
 Anfrage und der Antwort wird nicht gespeichert, ebenso wenig, was ein Tool las oder schrieb. Die Zahlen hier
-sind dieselben wie unter [Nutzung und Kosten](usage.md).
+sind dieselben wie unter [Nutzung und Limits](usage.md).
+
+Diese Seite zeigt nie, wer einen Aufruf geschickt hat, und findet Aufrufe nicht nach Person. Sie zeigt auch keine
+Sitzungs-, Unterhaltungs-, Geräte- oder Projekt-ID und findet keinen Aufruf danach oder nach Agent: Jedes davon
+würde zu einer Person führen. Die Nutzung einer einzelnen Person zeigt nur die personenbezogene Auswertung unter
+**Nutzung**, einem Nutzungsprüfer, mit Begründung und aufgezeichnet (siehe
+[Nutzung und Datenschutz](usage-privacy.md#looking-at-one-persons-figures)).
 
 ## Wenn es nicht funktioniert {#when-it-does-not-work}
 
 | Sie sehen | Was zu tun ist |
 |---|---|
-| **Keine passenden Aufrufe** | Im Zeitraum passt nichts zu den Filtern. Wählen Sie einen längeren Zeitraum oder **Filter zurücksetzen**. |
+| **Keine passenden Aufrufe** | Im Zeitraum passt nichts zu den Filtern. Wählen Sie einen längeren Zeitraum, **Alle Modelle** und **Alle**, oder leeren Sie das Suchfeld. |
 | Die Anfrage eines Agenten zeigt Runden, aber keine Tools | Das Modell bat um Tools, aber die App meldete keine Ausführung: eine App ohne Tool-Meldungen, oder die Meldungen sind noch unterwegs. Die Runden stehen trotzdem da. |
 | Der Provider steht als **Instanz …** da | Der Provider, der den Aufruf bediente, wurde inzwischen entfernt. |
-| **Gesch. Kosten** zeigt „—" | Die genutzten Modelle haben keinen Preis. Legen Sie einen fest (siehe [Nutzung und Kosten](usage.md#set-prices)). |
+| **Gesch. Kosten** zeigt „—" | Die genutzten Modelle haben keinen Preis. Legen Sie einen fest (siehe [Nutzung und Limits](usage.md#set-prices)). |

@@ -21,7 +21,8 @@ const FILL_MIN_HEIGHT = 140;
 export interface TimeSeries {
   id: string;
   label: string;
-  data: number[];
+  /** null: no value for that x (a gap in the line, never a zero). */
+  data: (number | null)[];
   color: string;
   /** Shade under the line (default true). */
   area?: boolean;

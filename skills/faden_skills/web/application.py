@@ -4,6 +4,7 @@ from pathlib import Path
 
 import sentry_sdk
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
@@ -50,8 +51,26 @@ def get_app() -> FastAPI:
     app.include_router(router=api_router, prefix="/api")
     app.add_exception_handler(SkillError, _skill_error)  # type: ignore[arg-type]
     app.add_exception_handler(BundleError, _bundle_error)  # type: ignore[arg-type]
+    app.add_exception_handler(RequestValidationError, _unreadable_request)  # type: ignore[arg-type]
 
     return app
+
+
+#: What a 422 keeps of each problem: where, what was wrong, and its kind.
+#: Not ``input``, the value sent (a skill's text, a bundle),
+#: nor ``ctx``, which may quote it.
+_PROBLEM_KEYS = ("type", "loc", "msg")
+
+
+async def _unreadable_request(
+    _request: Request, exc: RequestValidationError,
+) -> JSONResponse:
+    """FastAPI's 422 (``{"detail": [...]}``) without the values sent."""
+    problems = [
+        {key: error[key] for key in _PROBLEM_KEYS if key in error}
+        for error in exc.errors()
+    ]
+    return JSONResponse(status_code=422, content={"detail": problems})
 
 
 async def _skill_error(_request: Request, exc: SkillError) -> JSONResponse:

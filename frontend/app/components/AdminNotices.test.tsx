@@ -26,6 +26,26 @@ describe("admin notices", () => {
     expect(screen.getByTestId("admin-notice-licence_seats_over")).toHaveTextContent("12 active accounts");
   });
 
+  it("says when old request records will be deleted, and where to change it", async () => {
+    list.mockResolvedValue([
+      { code: "usage_purge_pending", severity: "warning", params: { days: 90, date: "2026-11-04" } },
+    ]);
+    render(<AdminNotices isSuperuser />);
+    expect(await screen.findByTestId("admin-notice-usage_purge_pending")).toHaveTextContent(
+      "Request records older than 90 days will be deleted from Nov 4, 2026. Change the retention under Settings → Usage and privacy.",
+    );
+  });
+
+  it("words a budget's threshold, its period in the reader's words, and names no person", async () => {
+    list.mockResolvedValue([
+      { code: "budget_threshold", severity: "warning", params: { name: "Sales per month", threshold: 80, period: "month" } },
+    ]);
+    render(<AdminNotices isSuperuser />);
+    expect(await screen.findByTestId("admin-notice-budget_threshold")).toHaveTextContent(
+      "The budget Sales per month has used 80 % of its amount this month.",
+    );
+  });
+
   it("counts one day as one", async () => {
     list.mockResolvedValue([{ code: "licence_grace", severity: "error", params: { days: 1, date: "2026-11-20" } }]);
     render(<AdminNotices isSuperuser />);
@@ -52,6 +72,14 @@ describe("admin notices", () => {
     list.mockResolvedValue([{ code: "licence_expiring", severity: "warning", params: { days: 11, date: "2026-11-05" } }]);
     render(<AdminNotices isSuperuser />);
     expect(await screen.findByTestId("admin-notice-licence_expiring")).toHaveTextContent("11 days");
+  });
+
+  it("sends failing mail to Settings > Mail without blaming the mail server", async () => {
+    list.mockResolvedValue([{ code: "mail_failing", severity: "error", params: { code: "mailer_unreachable" } }]);
+    render(<AdminNotices isSuperuser />);
+    const notice = await screen.findByTestId("admin-notice-mail_failing");
+    expect(notice).toHaveTextContent("Mail is failing (mailer_unreachable): Settings → Mail shows why and what to do.");
+    expect(notice).not.toHaveTextContent("mail server said");
   });
 
   it("says something for a code it has no words for", async () => {

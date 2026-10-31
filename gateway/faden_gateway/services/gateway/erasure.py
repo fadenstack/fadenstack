@@ -19,10 +19,10 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Any
+from datetime import UTC, datetime
+from typing import Any, cast
 
-from sqlalchemy import delete, select, text
+from sqlalchemy import CursorResult, delete, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_gateway.db.models.gateway import (
@@ -30,10 +30,13 @@ from faden_gateway.db.models.gateway import (
     ChatMessage,
     ChatProject,
     ChatSession,
+    LLMGatewayRequestLog,
+    LLMToolCallLog,
     MemoryFact,
     SessionStatus,
     SessionSummary,
 )
+from faden_gateway.db.models.usage import UsageDailyPerson, UsageErased
 
 log = logging.getLogger(__name__)
 
@@ -51,6 +54,9 @@ class Erased:
     projects: int = 0
     files: int = 0
     memory_facts: int = 0
+    #: A person's request-log rows and their person-level usage days (an account erased: M12).
+    request_logs: int = 0
+    usage_days: int = 0
 
     def add(self, other: Erased) -> Erased:
         """This plus *other*."""
@@ -58,6 +64,8 @@ class Erased:
         self.projects += other.projects
         self.files += other.files
         self.memory_facts += other.memory_facts
+        self.request_logs += other.request_logs
+        self.usage_days += other.usage_days
         return self
 
 
@@ -120,8 +128,22 @@ async def erase_attachment(session: AsyncSession, file_store: Any, attachment_id
 
 
 async def erase_user(session: AsyncSession, file_store: Any, user_id: str) -> Erased:
-    """Everything of one person in the chat: projects, chats, files, memory (an account deleted)."""
+    """Everything of one person: projects, chats, files, memory, and their usage (an account deleted).
+
+    Their usage is their request-log rows (with their tool calls) and their person-level usage days
+    (M12). The hourly and daily sums, which name no person, keep their totals: the rollup job recomputes
+    only the current and the previous hour and day from the log. The person is noted in ``usage_erased``:
+    a rollup run that read the log before this, or a request of theirs that ends after it, would write some
+    of it again, and each run removes that for 30 days (``usage_rollup.forget_erased``).
+    """
     erased = Erased()
+    await session.merge(UsageErased(user_id=user_id, erased_at=datetime.now(UTC)))
+    logs = select(LLMGatewayRequestLog.id).where(LLMGatewayRequestLog.user_id == user_id)
+    await session.execute(delete(LLMToolCallLog).where(LLMToolCallLog.request_log_id.in_(logs)))
+    rows = await session.execute(delete(LLMGatewayRequestLog).where(LLMGatewayRequestLog.user_id == user_id))
+    erased.request_logs = cast("CursorResult[Any]", rows).rowcount or 0
+    days = await session.execute(delete(UsageDailyPerson).where(UsageDailyPerson.user_id == user_id))
+    erased.usage_days = cast("CursorResult[Any]", days).rowcount or 0
     for project_id in list((await session.execute(
         select(ChatProject.id).where(ChatProject.user_id == user_id),
     )).scalars()):

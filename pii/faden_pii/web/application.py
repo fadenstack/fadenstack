@@ -3,7 +3,9 @@ from importlib import metadata
 from pathlib import Path
 
 import sentry_sdk
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
@@ -62,7 +64,6 @@ def get_app() -> FastAPI:
         # directly, and warns that UJSONResponse is deprecated -- a warning
         # the tests turn into a failure.
     )
-    from fastapi.responses import JSONResponse
     from faden_pii.services.pii.errors import PIIError
     from faden_pii.services.pii.limits import IngressLimits
 
@@ -74,6 +75,7 @@ def get_app() -> FastAPI:
         )
 
     app.add_exception_handler(PIIError, pii_error_handler)
+    app.add_exception_handler(RequestValidationError, _unreadable_request)
     app.add_middleware(IngressLimits, settings=settings)
 
     # EE plugin routes are included FIRST so they shadow Core 402-gated
@@ -90,3 +92,20 @@ def get_app() -> FastAPI:
     app.mount("/static", StaticFiles(directory=APP_ROOT / "static"), name="static")
 
     return app
+
+
+#: What a 422 keeps of each problem: where, what was wrong, and its kind.
+#: Not ``input``, the value sent (the very text to be scanned),
+#: nor ``ctx``, which may quote it.
+_PROBLEM_KEYS = ("type", "loc", "msg")
+
+
+async def _unreadable_request(
+    _request: Request, exc: RequestValidationError,
+) -> JSONResponse:
+    """FastAPI's 422 (``{"detail": [...]}``) without the values sent."""
+    problems = [
+        {key: error[key] for key in _PROBLEM_KEYS if key in error}
+        for error in exc.errors()
+    ]
+    return JSONResponse(status_code=422, content={"detail": problems})

@@ -38,7 +38,7 @@ export function PageHelpDrawer({ open, onClose }: PageHelpDrawerProps) {
   const location = useLocation();
   const { startGuide } = useGuides();
 
-  const entry = resolvePageHelp(location.pathname);
+  const entry = resolvePageHelp(location.pathname, location.search);
 
   return (
     <Drawer

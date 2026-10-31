@@ -30,8 +30,16 @@ With the module on, the default policy:
 - protects requests to **cloud providers**; requests to your own machines' models are not scanned;
 - **redacts**: personal data is replaced, and the model never sees it;
 - **blocks** a request to a cloud provider when the filter cannot run;
-- reads English text, and looks for these types: `PERSON`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `CREDIT_CARD`,
-  `IBAN_CODE`, `IP_ADDRESS`, `US_SSN`, `LOCATION`, `NRP`, `MEDICAL_LICENSE`, `URL`.
+- reads English text and names no types of its own: it looks for the standard types the installed detector finds,
+  with that detector's thresholds. These are `PERSON`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `CREDIT_CARD`, `IBAN_CODE`,
+  `IP_ADDRESS`, `US_SSN`, `LOCATION`, `MEDICAL_LICENSE` and `URL`, and with the older `presidio-legacy` profile also
+  `NRP` (nationality, religion, political group), which the local detectors do not find. The policy form lists them
+  under **Entities** when none are picked.
+
+Before 0.6.0 the default named eleven types itself, `NRP` among them, with a threshold for the older profile. The
+local detectors refuse both, so with one installed every request to a cloud provider was refused. An install that
+still has that default as it was set up gets the new one when it starts; a default you changed stays as you saved
+it (see [Adopt an installed detector profile](#adopt-an-installed-detector-profile)).
 
 ### When the module is off {#when-the-module-is-off}
 
@@ -91,7 +99,9 @@ override that should use it:
 
 1. Check that the installed profile is available. An unavailable-service notice does not confirm active protection.
 2. Select **Use installed profile defaults** under **Detection (Presidio)**. This selects the installed profile and
-   **Use profile thresholds**; it keeps your selected categories and outgoing-request choices.
+   **Use profile thresholds**, and removes the categories the installed detector does not find; it keeps your other
+   categories and outgoing-request choices. The form warns when a policy's threshold or a category does not fit the
+   installed detector: until it is adopted, requests the policy covers are refused.
 3. Choose **Language**. Remove categories shown as unavailable for that language, then add the categories you need
    under **Entities**. Adopting a profile does not automatically select every available category.
 4. Choose whether to protect cloud requests, local-model requests or both. Keep **If detection fails** at `block`
@@ -122,7 +132,7 @@ the service refuses unsupported coverage instead of silently ignoring that categ
     | **Outgoing requests**: **Protect requests to cloud providers**, **Protect requests to local models** | Which requests are scanned. |
     | **Mode** | `redact`: personal data is replaced with a placeholder such as `<PERSON>`, and the answer keeps it. `tokenize_reversible`: each value is replaced with a token such as `[PERSON_1]`, and put back in the answer the person sees. The model sees neither. |
     | **If detection fails** | `block`: the request is refused. `allow`: it is sent unscanned. `fallback_to_local`: it is sent unscanned to one of your own models under the same name, if there is one, and refused otherwise. |
-    | **Detection (Presidio)**: **Language**, **Score threshold**, **Entities** | The installed profile, language and categories to use. **Use profile thresholds** uses the installed profile's defaults. A manual higher threshold masks less. Choose only an advertised language and supported categories; otherwise the check fails and **If detection fails** decides. |
+    | **Detection (Presidio)**: **Language**, **Score threshold**, **Entities** | The installed profile, language and categories to use. **Use profile thresholds** uses the installed profile's defaults. A manual higher threshold masks less. **Entities** left empty: the standard types the installed detector finds. Choose only an advertised language and supported categories; otherwise the check fails and **If detection fails** decides. |
     | **Telemetry**: **Remove personal data from telemetry**, **Mode** | For request traces, which are off by default: whether a trace keeps the request with personal data removed (`sanitized`) or figures only (`metrics_only`). Without Enterprise, traces keep figures only anyway. |
 
 ### Chats and agents
@@ -225,6 +235,7 @@ back.
 | A tool rule denied a tool | The tool line says **Not run**. The model is told, with the rule's message, and carries on without it. |
 | A tool needs approval | "… wants to run", with **Approve** and **Decline**. Without an answer within five minutes, the call is not run (**Expired**). |
 | The personal data filter could not run, and the policy blocks | The reply fails with "PII service unavailable and fail_action=block." Nothing was sent to the model. |
+| The policy does not fit the installed detector (a threshold for the older profile, or a category it does not find), and the policy blocks | The reply fails with "The PII policy does not fit the installed PII detector (…), so nothing was sent." Adopt the installed profile in the policy (see [above](#adopt-an-installed-detector-profile)). |
 | A policy you saved applies, but the PII module is not running, and the policy blocks | The reply fails with "A PII policy is set for this workspace, but the PII module is not running, so nothing was sent." |
 | A prompt was refused (content policies, <span class="fs-planned">Planned</span>) | The message is marked **Not sent**, with the policy's message or "This was stopped by your organisation's policy." Nothing is sent to a model or stored. |
 | An answer was refused (content policies, <span class="fs-planned">Planned</span>) | The answer stops and is marked **Answer withheld**. |

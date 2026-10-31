@@ -35,6 +35,7 @@ import TourIcon from "@mui/icons-material/Tour";
 import TranslateIcon from "@mui/icons-material/Translate";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import SchoolIcon from "@mui/icons-material/School";
+import DataUsageIcon from "@mui/icons-material/DataUsage";
 
 import AgentAvatar from "~/components/AgentAvatar";
 import { NavLogoButton } from "~/components/NavLogoButton";
@@ -318,6 +319,14 @@ export function AdminTopbar({
           email={currentUserEmail}
           onProfile={() => navigate("/admin/profile")}
           onLogout={onLogout}
+          extraItems={[
+            {
+              key: "usage",
+              label: t("usage.my.menu"),
+              icon: <DataUsageIcon fontSize="small" />,
+              onClick: () => navigate("/usage"),
+            },
+          ]}
         />
       </Toolbar>
     </AppBar>
