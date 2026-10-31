@@ -2252,12 +2252,85 @@ class GatewayService:
             checks.append(gov.ToolRuleCheck(rules))
         return checks
 
+    async def check_host_tool(
+        self,
+        *,
+        auth: AuthContext,
+        agent: AgentRequest,
+        name: str,
+        arguments: dict[str, Any],
+        mode: str,
+        request_id: str,
+    ) -> tuple[dict[str, Any], gov.Verdict | None]:
+        """Check a named device tool without a model call or native execution.
+
+        Uses the chat pipeline's mode/classification and governance checks. A
+        user command must be explicitly in a published host contract; an empty
+        contract is not authority for an arbitrary out-of-band command.
+        """
+        if not agent.agent.published or name not in agent.agent.host_tools:
+            return {
+                "decision": "deny",
+                "tool_class": "unknown",
+                "effective_tool_mode": "off",
+                "required_by_rule": False,
+                "message": "This command is not in the published host tool contract.",
+            }, None
+        req = _Prepared(payload={}, agent=agent, tool_mode_header=mode)
+        req.checks = await self._governance_checks(auth)
+        await self._resolve_tool_mode(req, auth, None)
+        ctx = self._context(
+            req,
+            auth,
+            request_id,
+            gov.GovernanceStage.TOOL,
+            tool_id=name,
+            arguments=arguments,
+        )
+        verdict = await gov.decide(req.checks, ctx)
+        assert req.classifier is not None and req.tool_mode is not None  # noqa: S101
+        classified = req.classifier.classify(name)
+        decision = tool_classes.decide(req.tool_mode.mode, classified)
+        blocked = decision is tool_classes.Decision.HIDDEN or bool(
+            verdict and verdict.blocked
+        )
+        asks = not blocked and (
+            decision is tool_classes.Decision.ASK or verdict is not None
+        )
+        return {
+            "decision": "deny" if blocked else "ask" if asks else "run",
+            "tool_class": classified.tool_class.value,
+            "effective_tool_mode": req.tool_mode.mode.value,
+            "required_by_rule": bool(verdict and verdict.check != ToolModeCheck.name),
+            "message": (
+                verdict.decision.message
+                if verdict
+                else (
+                    tool_classes.reason(req.tool_mode.mode, decision)
+                    if blocked or asks
+                    else "Allowed by current tool policy."
+                )
+            ),
+        }, verdict
+
     async def _check_input(
-        self, req: _Prepared, *, auth: AuthContext, session_id: str | None, request_id: str,
+        self,
+        req: _Prepared,
+        *,
+        auth: AuthContext,
+        session_id: str | None,
+        request_id: str,
     ) -> None:
         """Refuse the prompt before anything is stored; the turn stays as a notice, not text."""
         messages = req.payload.get("messages") or []
-        ctx = self._context(req, auth, request_id, gov.GovernanceStage.INPUT, session_id, messages=messages)
+        ctx = self._context(
+            req,
+            auth,
+            request_id,
+            gov.GovernanceStage.INPUT,
+            session_id,
+            messages=messages,
+        )
         verdict = await gov.decide(req.checks, ctx)
         if verdict is None:
             return
