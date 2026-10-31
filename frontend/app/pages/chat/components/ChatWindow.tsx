@@ -15,6 +15,8 @@ import { useLocation } from "react-router";
 
 import type { ChatSession } from "~/api/chatTypes";
 import type { UiLanguage } from "~/api/i18n";
+import { budgetRefusalKey } from "~/components/budgets/budgetFormat";
+import { fmtWhen } from "~/components/usage/usageFormat";
 import type { InitialMessageState } from "./ChatWelcome";
 import { useChatSkills } from "../hooks/useChatSkills";
 import { useChatStream } from "../hooks/useChatStream";
@@ -67,7 +69,7 @@ export default function ChatWindow({
   title,
   onRename,
 }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const theme = useTheme();
   const [debugTraceId, setDebugTraceId] = useState<string | null>(null);
   const [draft, setDraft] = useState<{ text: string; nonce: number } | null>(null);
@@ -380,12 +382,29 @@ export default function ChatWindow({
                       defaultValue: "Try again in {{seconds}} s.",
                       seconds: errorInfo.retryAfter,
                     })}`
-                  : error
+                  : errorInfo?.kind === "budget"
+                    ? [
+                        // Worded here from the kind of budget, in the reader's language.
+                        t(budgetRefusalKey(errorInfo.param)),
+                        errorInfo.retryAfter
+                          ? t("budgets.refused.until", {
+                              when: fmtWhen(
+                                new Date(Date.now() + errorInfo.retryAfter * 1000).toISOString(),
+                                i18n.language,
+                              ),
+                            })
+                          : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")
+                    : error
               }
               label={
                 errorInfo?.kind === "rate_limit"
                   ? t("rate_limited_label", { ns: "chat", defaultValue: "Rate limit reached" })
-                  : undefined
+                  : errorInfo?.kind === "budget"
+                    ? t("budgets.refused.label")
+                    : undefined
               }
               onRetry={handleRetry}
             />

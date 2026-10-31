@@ -61,6 +61,8 @@
 "Werden meine personenbezogenen Daten geschützt oder maskiert?" = "personal-data-protection"
 "Was wird an externe Provider wie OpenAI gesendet?" = "models-at-outside-providers"
 "Wie lösche ich meine Chats oder Dateien?" = "deleting"
+"Kann mein Administrator sehen, wie viel ich nutze?" = "your-usage"
+"Wo sehe ich meine eigene Nutzung, und kann ich sie herunterladen?" = "your-usage"
 "Warum steht in einer Antwort <PERSON> statt eines Namens?" = "when-it-does-not-work"
 
 ["use/account.md"]
@@ -85,6 +87,9 @@
 "Wie ändere ich die Rolle oder die Berechtigungen von jemandem?" = "change-what-someone-may-do"
 "Wie lege ich eine eigene Rolle an?" = "roles-of-your-own"
 "Wie nutze ich Gruppen?" = "groups"
+"Wie ordne ich Teams und Unterteams als Baum an?" = "teams-in-a-tree"
+"Wie lege ich die Kostenstelle eines Teams fest oder archiviere ein Team?" = "teams-in-a-tree"
+"Gelten Rollen auch für Unterteams?" = "teams-in-a-tree"
 "Wie entferne oder sperre ich einen Benutzer?" = "end-someones-access"
 "Wie lange gelten Anmeldungen und API-Token?" = "sign-ins-and-api-tokens"
 "Wie trenne ich den Anmeldeanbieter einer Person?" = "linked-sign-ins"
@@ -182,9 +187,51 @@
 
 ["administer/usage.md"]
 "Wo sehe ich Nutzung und Kosten?" = "where-to-see-it"
+"Wo sehe ich meine eigene Nutzung?" = "your-own-usage"
 "Wie lege ich Preise für Modelle fest?" = "set-prices"
-"Wie sehe ich die Nutzung pro Person oder Gruppe?" = "usage-per-person-and-per-group"
-"Kann ich Limits oder Budgets festlegen?" = "limits-and-budgets"
+"Wie sehe ich die Nutzung pro Team, Agent oder Modell?" = "the-usage-page"
+"Wie wird die Nutzung von Unterteams gezählt, und was heißt „Nicht zugeordnet“?" = "teams-on-the-usage-page"
+"Warum folgen die Zahlen des Vorjahrs der alten Teamstruktur?" = "teams-on-the-usage-page"
+"Warum steht in einer Zeile „Weniger als 5 Personen“?" = "the-minimum-group-size"
+"Wie begrenze ich Anfragen oder Tokens pro Minute oder pro Tag?" = "limits-for-the-whole-instance"
+"Kann ich Limits für die ganze Instanz festlegen?" = "limits-for-the-whole-instance"
+"Was bedeutet ein Fehler 429 oder quota_tokens_per_day?" = "what-people-see-when-a-limit-refuses"
+"Sind die Kosten das, was der Provider berechnet?" = "where-the-numbers-come-from"
+
+["administer/usage-privacy.md"]
+"Können Administratoren sehen, wie viel jede Person nutzt?" = "private-by-default"
+"Wie schalte ich die personenbezogene Auswertung der Nutzung ein?" = "the-settings"
+"Wie lange werden Nutzungsdaten aufbewahrt?" = "retention-and-erasure"
+"Wer darf die Nutzung einer einzelnen Person ansehen, und wird das festgehalten?" = "looking-at-one-persons-figures"
+"Was ist die Rolle usage_auditor?" = "looking-at-one-persons-figures"
+"Wie bekommt jemand eine Kopie seiner Nutzungsdaten (Auskunft nach DSGVO)?" = "your-own-view-and-the-download"
+"Werden Nutzungsdaten gelöscht, wenn ein Konto gelöscht wird?" = "retention-and-erasure"
+"Welche Datenfelder zur Nutzung werden gespeichert?" = "the-data-fields"
+"Wie verlinke ich unsere Datenschutzhinweise unter Meine Nutzung?" = "the-settings"
+"Dürfen wir Nutzungsdaten zur Bewertung von Beschäftigten verwenden?" = "what-usage-data-is-for"
+
+["administer/budgets.md"]
+"Kann ich Budgets pro Team, Agent oder Person festlegen?" = ""
+"Wie begrenze ich, was ein Team pro Monat nutzen darf?" = "set-up-a-budget"
+"Wofür gilt ein Budget?" = "who-a-budget-applies-to"
+"Warum darf das Budget eines Teams nicht größer sein als das des übergeordneten Teams?" = "the-tree-rule"
+"Warum bekommt ein kleines Team kein Budget?" = "the-tree-rule"
+"Was ist der Unterschied zwischen harten, weichen und Schatten-Budgets?" = "modes"
+"Was bedeutet budget_exceeded?" = "what-people-see-when-a-budget-refuses"
+"Wer erhält Benachrichtigungen zu Budgets?" = "alerts-and-who-gets-them"
+"Wie verrechne ich KI-Kosten an Teams oder Kostenstellen?" = "chargeback"
+"Ist der Export der Verrechnung im Format FinOps FOCUS?" = "chargeback"
+"Wie schalte ich Budgets für einzelne Personen ein?" = "the-settings"
+"Kann eine Kostenstelle aus SCIM die Nutzungsgruppe einer Person setzen?" = "the-settings"
+"Können Administratoren sehen, was eine Person von ihrem Budget verbraucht hat?" = "privacy"
+"Wo sehe ich meine eigenen Budgets?" = "your-own-budgets"
+
+["administer/usage-documents.md"]
+"Was brauchen wir für Betriebsrat und Datenschutzbeauftragten?" = ""
+"Gibt es Datenschutzhinweise für Beschäftigte zur Nutzungsmessung?" = "employee-notice"
+"Gibt es eine Vorlage für das Verarbeitungsverzeichnis oder die DSFA?" = "records-of-processing-entry"
+"Gibt es eine Anlage zur Betriebsvereinbarung für die Nutzungsmessung?" = "works-agreement-annex"
+"Wie beantworten wir ein Auskunfts- oder Löschersuchen zur Nutzung?" = "access-request-and-erasure-procedure"
 
 ["administer/llm-calls.md"]
 "Warum ist eine Anfrage an ein Modell fehlgeschlagen?" = "why-a-call-failed"

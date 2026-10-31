@@ -78,6 +78,8 @@ class SystemSettingsService:
                 "service_targets": list(item.service_targets),
                 "protected": item.protected,
                 "enum_values": list(item.enum_values),
+                "min_value": item.min_value,
+                "max_value": item.max_value,
             }
             for item in SETTINGS_REGISTRY
         ]
@@ -107,6 +109,17 @@ class SystemSettingsService:
                 "is_secret": False,
             }
         return payload
+
+    async def value_of(self, key: str) -> object:
+        """The value in force for a setting that is not secret: its row's, else its default.
+
+        ``None`` for a secret or an unknown key.
+        """
+        defn = self._registry.get(key)
+        if defn is None or defn.is_secret:
+            return None
+        row = await self._dao.get_value(key)
+        return row.value_json.get("value", defn.default) if row else defn.default
 
     async def update_value(
         self,

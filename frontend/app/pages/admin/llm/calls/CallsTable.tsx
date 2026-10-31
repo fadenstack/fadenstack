@@ -14,7 +14,6 @@ import Typography from "@mui/material/Typography";
 import { alpha, useTheme } from "@mui/material/styles";
 import BuildOutlinedIcon from "@mui/icons-material/BuildOutlined";
 import ContentCutIcon from "@mui/icons-material/ContentCut";
-import ForumOutlinedIcon from "@mui/icons-material/ForumOutlined";
 import HandymanOutlinedIcon from "@mui/icons-material/HandymanOutlined";
 import ReplayIcon from "@mui/icons-material/Replay";
 import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
@@ -244,22 +243,8 @@ const Row = memo(function Row({
               <ReplayIcon sx={{ fontSize: 16 }} />
             </Tooltip>
           )}
-          {(call.conversation_id || call.session_id) && (
-            <Tooltip title={t("llm_calls.flag_conversation")}>
-              <ForumOutlinedIcon sx={{ fontSize: 16 }} />
-            </Tooltip>
-          )}
         </Box>
       </TableCell>
-      {!compact && (
-        <TableCell sx={{ width: 96 }}>
-          <Tooltip title={call.user_id}>
-            <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>
-              {shortId(call.user_id)}
-            </Typography>
-          </Tooltip>
-        </TableCell>
-      )}
     </TableRow>
   );
 });
@@ -311,7 +296,7 @@ export default function CallsTable({ calls, selectedId, onSelect, p95LatencyMs, 
           <TableCell>{sortable(t("llm_calls.col_tokens"), "tokens")}</TableCell>
           {!compact && <TableCell>{t("llm_calls.col_cost")}</TableCell>}
           <TableCell>{t("llm_calls.col_flags")}</TableCell>
-          {!compact && <TableCell>{t("llm_calls.col_user")}</TableCell>}
+          {/* No person column: calls name nobody (usage of single people is not shown here). */}
         </TableRow>
       </TableHead>
       <TableBody ref={containerRef}>

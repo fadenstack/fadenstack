@@ -31,12 +31,13 @@ import ModulesTab from "~/components/ModulesTab";
 import { hasFeature } from "~/api/about";
 import { MAIL_SETTINGS } from "~/api/mailSettings";
 import MailSettingsTab from "~/pages/admin/mail/MailSettingsTab";
+import UsagePrivacySettings from "~/components/usage/UsagePrivacySettings";
 import {
   systemSettingsApi,
   type SystemSettingSchemaItem,
 } from "~/api/systemSettings";
 
-type SettingsTab = "general" | "modules" | "mail" | "appearance";
+type SettingsTab = "general" | "modules" | "mail" | "usage" | "appearance";
 
 function getCurrentTab(
   _pathname: string,
@@ -44,6 +45,7 @@ function getCurrentTab(
 ): SettingsTab {
   if (tabQuery === "modules") return "modules";
   if (tabQuery === "mail") return "mail";
+  if (tabQuery === "usage") return "usage";
   if (tabQuery === "appearance") return "appearance";
   return "general";
 }
@@ -91,6 +93,11 @@ function isMailerSettingKey(key: string): boolean {
 /** A setting's description, and for a protected one that changing it needs root mode. */
 function describe(item: SystemSettingSchemaItem, rootModeNote: string): string {
   return item.protected ? `${item.description} ${rootModeNote}`.trim() : item.description;
+}
+
+/** The usage settings have their own tab (Usage and privacy), with their ranges and what they mean. */
+function isUsageSettingKey(key: string): boolean {
+  return key.startsWith("usage.");
 }
 
 export default function SettingsPage() {
@@ -176,6 +183,7 @@ export default function SettingsPage() {
       (item) =>
         !isPiiSettingKey(item.key) &&
         !isMailerSettingKey(item.key) &&
+        !isUsageSettingKey(item.key) &&
         item.category.toLowerCase() !== "modules",
     );
     const items = q
@@ -296,6 +304,7 @@ export default function SettingsPage() {
             value="modules"
           />
           {mailOffered && <Tab label={t("settings.mail.title")} value="mail" />}
+          <Tab label={t("usage.settings.tab")} value="usage" />
           <Tab label={t("settings.appearance.title")} value="appearance" />
         </Tabs>
       </Box>
@@ -545,6 +554,8 @@ export default function SettingsPage() {
             <CircularProgress size={28} />
           </Box>
         )}
+
+        {shownTab === "usage" && <UsagePrivacySettings />}
 
         {shownTab === "appearance" && (
           <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, maxWidth: 720 }}>

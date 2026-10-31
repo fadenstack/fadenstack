@@ -107,3 +107,8 @@ admin_router.include_router(provenance_router, prefix="/provenance", tags=["admi
 from faden_backend.web.api.admin.observability.views import router as observability_router  # noqa: E402
 
 admin_router.include_router(observability_router, prefix="/observability", tags=["admin-observability"])
+
+# --- Usage: aggregates, the usage auditor's view, settings, limits, the statement --
+from faden_backend.web.api.admin.usage.views import router as usage_router  # noqa: E402
+
+admin_router.include_router(usage_router, prefix="/usage", tags=["admin-usage"])

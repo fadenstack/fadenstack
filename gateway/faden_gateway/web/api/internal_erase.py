@@ -80,4 +80,6 @@ async def erase(
     return {
         "chats": erased.chats, "projects": erased.projects, "files": erased.files,
         "memory_facts": erased.memory_facts,
+        # An account's usage: its request-log rows and person-level usage days.
+        "request_logs": erased.request_logs, "usage_days": erased.usage_days,
     }

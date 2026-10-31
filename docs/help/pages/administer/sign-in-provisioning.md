@@ -42,9 +42,11 @@ The dialog then shows the **Last request from the provider** and the **Last refu
     | One e-mail address (the work or primary one) | Yes: the account's address |
     | Active or not (`active`) | Yes: the account is suspended or not |
     | A group's name and members | Yes: a group here and its members |
-    | Names, phone numbers, postal addresses, job title, department, manager, employee number, photos, other attributes | No |
+    | The cost centre and the department (`costCenter`, `department` of the enterprise extension) | Yes, for [budgets](budgets.md#the-settings): a rule can make a cost centre's team the person's usage group. Seen by administrators; erased with the account |
+    | Names, phone numbers, postal addresses, job title, manager, employee number, photos, other attributes | No |
 
-    Map only the attributes in the first five rows at the provider (below), and delete the other mappings.
+    Map only the attributes in the first six rows at the provider (below), and delete the other mappings. Map the
+    cost centre and the department only if you use budgets.
 
 ## What changes here
 

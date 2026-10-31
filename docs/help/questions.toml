@@ -63,6 +63,8 @@
 "Is my personal data protected or masked?" = "personal-data-protection"
 "What is sent to outside providers such as OpenAI?" = "models-at-outside-providers"
 "How do I delete my chats or files?" = "deleting"
+"Can my administrator see how much I use?" = "your-usage"
+"Where do I see my own usage, and can I download it?" = "your-usage"
 "Why does an answer show <PERSON> instead of a name?" = "when-it-does-not-work"
 
 ["use/account.md"]
@@ -87,6 +89,9 @@
 "How do I change someone's role or permissions?" = "change-what-someone-may-do"
 "How do I create a role of my own?" = "roles-of-your-own"
 "How do I use groups?" = "groups"
+"How do I put teams and sub-teams in a tree?" = "teams-in-a-tree"
+"How do I set a team's cost centre or archive a team?" = "teams-in-a-tree"
+"Do roles pass down to sub-teams?" = "teams-in-a-tree"
 "How do I remove or block a user?" = "end-someones-access"
 "How long do sign-ins and API tokens last?" = "sign-ins-and-api-tokens"
 "How do I unlink someone's sign-in provider?" = "linked-sign-ins"
@@ -184,9 +189,51 @@
 
 ["administer/usage.md"]
 "How do I see usage and costs?" = "where-to-see-it"
+"Where do I see my own usage?" = "your-own-usage"
 "How do I set prices for models?" = "set-prices"
-"How do I see usage per person or per group?" = "usage-per-person-and-per-group"
-"Can I set limits or budgets?" = "limits-and-budgets"
+"How do I see usage per team, agent or model?" = "the-usage-page"
+"How is usage of sub-teams counted, and what is Unassigned?" = "teams-on-the-usage-page"
+"Why do last year's figures follow the old team structure?" = "teams-on-the-usage-page"
+"Why does a row say Fewer than 5 people?" = "the-minimum-group-size"
+"How do I limit requests or tokens per minute or per day?" = "limits-for-the-whole-instance"
+"Can I set limits for the whole instance?" = "limits-for-the-whole-instance"
+"What does a 429 or quota_tokens_per_day error mean?" = "what-people-see-when-a-limit-refuses"
+"Are the costs what the provider bills?" = "where-the-numbers-come-from"
+
+["administer/usage-privacy.md"]
+"Can administrators see how much each person uses?" = "private-by-default"
+"How do I switch on person-level usage reporting?" = "the-settings"
+"How long is usage data kept?" = "retention-and-erasure"
+"Who may look at one person's usage, and is it recorded?" = "looking-at-one-persons-figures"
+"What is the usage auditor role?" = "looking-at-one-persons-figures"
+"How does someone get a copy of their usage data (GDPR access request)?" = "your-own-view-and-the-download"
+"Is usage data deleted when an account is deleted?" = "retention-and-erasure"
+"Which usage data fields are stored?" = "the-data-fields"
+"How do I link our privacy notice from My usage?" = "the-settings"
+"May we use usage data to evaluate employees?" = "what-usage-data-is-for"
+
+["administer/budgets.md"]
+"Can I set budgets per team, agent or person?" = ""
+"How do I limit what a team may use per month?" = "set-up-a-budget"
+"Who does a budget apply to?" = "who-a-budget-applies-to"
+"Why may a team's budget not be larger than its parent's?" = "the-tree-rule"
+"Why can a small team not get a budget?" = "the-tree-rule"
+"What is the difference between hard, soft and shadow budgets?" = "modes"
+"What does budget_exceeded mean?" = "what-people-see-when-a-budget-refuses"
+"Who gets budget alerts?" = "alerts-and-who-gets-them"
+"How do I charge AI costs back to teams or cost centres?" = "chargeback"
+"Is the chargeback export in FinOps FOCUS format?" = "chargeback"
+"How do I switch on budgets for single people?" = "the-settings"
+"Can a cost centre from SCIM set a person's usage group?" = "the-settings"
+"Can administrators see what a person used of their budget?" = "privacy"
+"Where do I see my own budgets?" = "your-own-budgets"
+
+["administer/usage-documents.md"]
+"What do we need for the works council and the DPO?" = ""
+"Is there an employee privacy notice for usage measurement?" = "employee-notice"
+"Is there a records-of-processing entry or a DPIA template?" = "records-of-processing-entry"
+"Is there a works-agreement annex for usage measurement?" = "works-agreement-annex"
+"How do we answer an access or erasure request about usage?" = "access-request-and-erasure-procedure"
 
 ["administer/llm-calls.md"]
 "Why did a request to a model fail?" = "why-a-call-failed"

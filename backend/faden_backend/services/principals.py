@@ -82,7 +82,9 @@ async def find_principals(
             select(User).where(User.is_active.is_(True), func.lower(User.email) == wanted),
         )).scalars())
         groups = list(
-            (await session.execute(select(Group).where(func.lower(Group.name) == wanted))).scalars(),
+            (await session.execute(
+                select(Group).where(func.lower(Group.name) == wanted, Group.archived_at.is_(None)),
+            )).scalars(),
         )
     elif q and len(q.strip()) >= MIN_QUERY:
         pattern = contains_pattern(q.strip())
@@ -105,6 +107,7 @@ async def find_principals(
                             Group.name.ilike(pattern, escape=LIKE_ESCAPE),
                             Group.description.ilike(pattern, escape=LIKE_ESCAPE),
                         ),
+                        Group.archived_at.is_(None),  # an archived team is offered to nobody (teams.py)
                     )
                     .order_by(Group.name)
                     .limit(SEARCH_LIMIT),

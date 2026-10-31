@@ -26,7 +26,7 @@ server Fadenstack runs on. This page says what each part shows and what to do ab
 | **AI traffic** | Where requests were served, with the in-house share in the middle of the ring, the busiest destinations, the number of requests, their speed (P50, P95) and errors, for **Today**, **24 h**, **7 d** or **30 d**. | **View traffic** opens the cost and usage pages. |
 | **Needs attention** | Current problems, worst first (below). | Fix them, or mute what you already know about. |
 | **Local AI capacity** | Clusters healthy, machines online, GPUs and free GPUs, and each machine's CPU, GPU and VRAM. **Colour by**: **Health**, **GPU** or **VRAM**. | Select a machine or group for details; **Machines** opens the machines. |
-| **Usage** | Requests per day for the last **7 days** or **30 days**, by where they were served. | See [Usage and costs](usage.md). |
+| **Usage** | Requests per day for the last **7 days** or **30 days**, by where they were served. | See [Usage and limits](usage.md). |
 | **Integrations** | **LLM providers** by where they run and how many answer, **MCP servers** healthy, **Skills** active. | Each opens its page. |
 | **Platform health** | The overall state, the services Fadenstack depends on (database, message queue, Grafana), the modules, gateway errors in the last hour, and database connections in use. | A dependency that is down appears under **Needs attention** too. |
 | **Server resources** | CPU, memory, swap, disk and GPU of the server Fadenstack runs on. | Low disk appears under **Needs attention**. |

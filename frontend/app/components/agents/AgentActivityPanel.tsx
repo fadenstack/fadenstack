@@ -1,7 +1,9 @@
 /**
  * What an agent did: its usage over a window, what the SDKs reported (tools,
  * approvals, local MCP servers, sessions) and the devices signed in to it.
- * Names, counts and durations -- never content.
+ * Names, counts and durations -- never content. And no one's usage: the
+ * figures cover at least k people (else they are hidden, and so is a day about
+ * fewer), and an event names the person only when it is the viewer's own.
  */
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -45,10 +47,13 @@ export function AgentActivityPanel({ agent }: AgentActivityPanelProps) {
   });
   const signIns = useAsyncData(() => agentsApi.signIns(agent.slug), [agent.slug], { initialValue: [] as AgentSignIn[] });
 
-  const nameOf = usePrincipalNames(
+  const { t } = useTranslation();
+  const namePrincipal = usePrincipalNames(
     [...events.data.map((e) => e.user_id), ...signIns.data.map((s) => s.user_id)],
     agentsApi.namePrincipals,
   );
+  // Another person's event names nobody (user_id null).
+  const nameOf = (id: string | null) => (id ? namePrincipal(id) : t("agents.activity.user_hidden"));
 
   return (
     <Stack spacing={2}>
@@ -65,9 +70,12 @@ function UsageCard({ usage, range, onRange }: { usage: Loaded<AgentUsage | null>
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const u = usage.data;
-  const days = u?.by_day ?? [];
+  const hidden = Boolean(u?.suppressed);
+  const k = u?.min_group_size ?? 5;
+  const days = hidden ? [] : (u?.by_day ?? []);
+  const someDayHidden = days.some((d) => d.suppressed);
   const dayFormat = new Intl.DateTimeFormat(i18n.language, { day: "numeric", month: "short" });
-  const value = (n: number | undefined, format = fmtInt) => (u ? format(n, i18n.language) : null);
+  const value = (n: number | null | undefined, format = fmtInt) => (u ? format(n, i18n.language) : null);
 
   return (
     <WidgetCard
@@ -83,13 +91,18 @@ function UsageCard({ usage, range, onRange }: { usage: Loaded<AgentUsage | null>
       }
       status={{ loading: usage.loading && !u, error: usage.error, hasData: Boolean(u), onRetry: () => void usage.refresh() }}
     >
+      {hidden ? (
+        <Typography variant="body2" color="text.secondary" data-agent-usage-suppressed>
+          {t("agents.activity.suppressed", { k })}
+        </Typography>
+      ) : (
       <Stack spacing={2}>
         <StatGrid>
           <StatTile label={t("agents.activity.requests")} value={value(u?.requests)} />
           <StatTile
             label={t("agents.activity.errors")}
             value={value(u?.errors)}
-            tone={u && u.errors > 0 ? "warning" : "default"}
+            tone={(u?.errors ?? 0) > 0 ? "warning" : "default"}
           />
           <StatTile
             label={t("agents.activity.tokens")}
@@ -106,19 +119,27 @@ function UsageCard({ usage, range, onRange }: { usage: Loaded<AgentUsage | null>
           <StatTile label={t("agents.activity.conversations")} value={value(u?.conversations)} />
         </StatGrid>
         {days.length > 0 ? (
-          <TimeSeriesChart
-            x={days.map((d) => d.day)}
-            xFormat={(label) => dayFormat.format(localDay(String(label)))}
-            series={[
-              {
-                id: "requests",
-                label: t("agents.activity.requests"),
-                data: days.map((d) => d.requests),
-                color: theme.palette.primary.main,
-              },
-            ]}
-            ariaLabel={t("agents.activity.chart_aria", { days: range })}
-          />
+          <>
+            <TimeSeriesChart
+              x={days.map((d) => d.day)}
+              xFormat={(label) => dayFormat.format(localDay(String(label)))}
+              series={[
+                {
+                  id: "requests",
+                  label: t("agents.activity.requests"),
+                  // A day about fewer than k people is a gap, never a zero.
+                  data: days.map((d) => (d.suppressed ? null : d.requests)),
+                  color: theme.palette.primary.main,
+                },
+              ]}
+              ariaLabel={t("agents.activity.chart_aria", { days: range })}
+            />
+            {someDayHidden && (
+              <Typography variant="caption" color="text.secondary" data-agent-day-suppressed>
+                {t("agents.activity.day_suppressed", { k })}
+              </Typography>
+            )}
+          </>
         ) : (
           u && (
             <Typography variant="body2" color="text.secondary">
@@ -127,6 +148,7 @@ function UsageCard({ usage, range, onRange }: { usage: Loaded<AgentUsage | null>
           )
         )}
       </Stack>
+      )}
     </WidgetCard>
   );
 }
@@ -140,7 +162,7 @@ function EventsTable({
   events: Loaded<ClientEvent[]>;
   type: string;
   onType: (type: string) => void;
-  nameOf: (id: string) => string;
+  nameOf: (id: string | null) => string;
 }) {
   const { t, i18n } = useTranslation();
 
@@ -237,7 +259,7 @@ function SignInsTable({
 }: {
   agent: Agent;
   signIns: Loaded<AgentSignIn[]>;
-  nameOf: (id: string) => string;
+  nameOf: (id: string | null) => string;
 }) {
   const { t, i18n } = useTranslation();
   const [revoking, setRevoking] = useState<AgentSignIn | null>(null);

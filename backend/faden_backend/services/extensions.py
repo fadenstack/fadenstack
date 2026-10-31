@@ -43,6 +43,14 @@ Extension points for the console:
   the licence running out). A source that fails is left out; the others still show.
 - ``features``: what this server adds beyond core, by name (core: none). The console shows a feature's
   screens only while it is listed (``GET /api/about``).
+
+Extension points for usage:
+
+- ``usage_sections``: blocks an extension adds to a person's own usage (``GET /api/usage/me``, scope ``me``)
+  and to the administrators' (``GET /api/admin/usage``, scope ``admin``), e.g. budgets: ``{"kind", "data"}``
+  each, in ``sections`` (core: none). A section is given the backend session and the person asking; what it
+  shows them is its own decision under the same rules (only their own figures in ``me``; at least k people
+  per figure in ``admin``). One that fails is left out; the others still show.
 """
 
 from __future__ import annotations
@@ -51,9 +59,14 @@ import logging
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Literal, Protocol
+from typing import TYPE_CHECKING, Any, Literal, Protocol
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_backend.settings import settings
+
+if TYPE_CHECKING:
+    from faden_backend.db.models.users import User
 
 log = logging.getLogger(__name__)
 
@@ -146,6 +159,11 @@ class AdminNotice:
 #: ``(session) -> notices``: what a source has to say now.
 AdminNoticeSource = Callable[[Any], Awaitable[list[AdminNotice]]]
 
+#: Where a usage section is shown: a person's own usage, or the administrators' view.
+UsageScope = Literal["me", "admin"]
+#: ``(session, person asking, scope) -> blocks`` (``{"kind": str, "data": dict}`` each) for ``sections``.
+UsageSection = Callable[[AsyncSession, "User", UsageScope], Awaitable[list[dict[str, Any]]]]
+
 
 @dataclass
 class ExtensionRegistry:
@@ -162,10 +180,30 @@ class ExtensionRegistry:
     mail_sender: MailSender | None = None
     admin_notices: list[AdminNoticeSource] = field(default_factory=list)
     features: set[str] = field(default_factory=set)
+    usage_sections: list[UsageSection] = field(default_factory=list)
 
 
 registry = ExtensionRegistry()
 _loaded: set[int] = set()
+
+
+async def usage_sections(session: AsyncSession, user: User, scope: UsageScope) -> list[dict[str, Any]]:
+    """The blocks every registered usage section has for *user* in *scope*, in registration order.
+
+    A section that raises, or returns something other than a list, is logged and left out.
+    """
+    blocks: list[dict[str, Any]] = []
+    for section in registry.usage_sections:
+        try:
+            found = await section(session, user, scope)
+        except Exception:
+            log.exception("A usage section failed; it is left out")
+            continue
+        if not isinstance(found, list):
+            log.warning("A usage section returned %s instead of a list; it is left out", type(found).__name__)
+            continue
+        blocks.extend(block for block in found if isinstance(block, dict))
+    return blocks
 
 
 def mail_available() -> bool:

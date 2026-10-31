@@ -3,10 +3,20 @@
 Everything here comes from what the gateway records about a call -- ids,
 timings, tokens, outcome, tool and policy metadata. Prompts, completions and
 a failed tool's text are not recorded (or are sealed) and are not read.
+
+Nothing here names the person who made a call, and calls cannot be searched by person: ``user_id`` is
+``None`` in every answer (GDPR Art. 25(2); M02 of the usage compliance report). The usage of named people is
+seen only through ``/api/admin/usage/people``, behind its switch, grant and reason. Internally the person
+still ties a call to its turn and its policy decisions.
+
+Nor by what stands for a person (M02, M04): no answer carries a call's device, session, conversation or
+project id, and calls cannot be narrowed to an agent, a session or a conversation -- each would single out
+one person's calls. The ids still tie a call to its conversation's other calls and its app's events inside.
 """
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import uuid
 from collections.abc import Callable
@@ -53,7 +63,7 @@ def _turn_of(event: dict[str, Any], turns: list[dict[str, Any]]) -> dict[str, An
     for turn in turns:
         if (
             turn["conversation_id"] == event["conversation_id"]
-            and turn["user_id"] == event["user_id"]
+            and turn["_person"] == event["user_id"]
             and turn["started_at"] - _EVENT_SLACK <= event["at"] <= turn["ended_at"] + _EVENT_SLACK
         ):
             return turn
@@ -101,9 +111,6 @@ class CallFilters:
     q: str | None = None
     model_alias: str | None = None
     outcome: str | None = None  # "ok" or "error"
-    user_id: str | None = None
-    agent_id: str | None = None
-    session: str | None = None  # a session or conversation id
     min_latency_ms: int | None = None
 
     def where(self) -> tuple[str, dict[str, Any]]:
@@ -117,24 +124,15 @@ class CallFilters:
             clauses.append(_IS_ERROR)
         elif self.outcome == "ok":
             clauses.append(f"NOT {_IS_ERROR}")
-        if self.user_id:
-            clauses.append("l.user_id = :user_id")
-            params["user_id"] = self.user_id
-        if self.agent_id:
-            clauses.append("l.agent_id = :agent_id")
-            params["agent_id"] = self.agent_id
-        if self.session:
-            clauses.append("(l.session_id = :session OR l.conversation_id = :session)")
-            params["session"] = self.session
         if self.min_latency_ms is not None:
             clauses.append("l.latency_ms >= :min_latency_ms")
             params["min_latency_ms"] = self.min_latency_ms
         needle = (self.q or "").strip()
         if needle:
-            # Ids match exactly (they are indexed); names and error codes by part.
+            # A call's own ids match exactly (they are indexed); names and error codes by part. Never an id
+            # that stands for a person or picks one person's calls (module docstring).
             clauses.append(
-                "(l.request_id = :q OR l.trace_id = :q OR l.user_id = :q"
-                " OR l.session_id = :q OR l.conversation_id = :q OR l.agent_id = :q"
+                "(l.request_id = :q OR l.trace_id = :q"
                 " OR l.model_alias ILIKE :q_like OR l.error_code ILIKE :q_like"
                 " OR l.endpoint ILIKE :q_like OR l.finish_reason ILIKE :q_like)",
             )
@@ -147,8 +145,17 @@ def _escape_like(value: str) -> str:
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
+def _turn_key(user_id: object, turn: object) -> str:
+    """A turn's key in the answers: stable, and without the person's id in it."""
+    return hashlib.sha256(f"{user_id}:{turn}".encode()).hexdigest()[:32]
+
+
 def _num(value: object) -> float | None:
     return None if value is None else float(value)  # type: ignore[arg-type]
+
+
+#: Ids read for the links between calls, never answered (module docstring).
+_UNSHOWN_IDS = ("device_id", "session_id", "conversation_id", "project_id")
 
 
 class LLMCallsService:
@@ -176,6 +183,9 @@ class LLMCallsService:
 
     def _call(self, row: dict[str, Any]) -> dict[str, Any]:
         call = dict(row)
+        call["user_id"] = None  # nobody is named (module docstring)
+        for key in _UNSHOWN_IDS:
+            call.pop(key, None)
         call.pop("source_kind", None)
         call.pop("source_id", None)
         call["estimated_total_cost"] = _num(call.get("estimated_total_cost"))
@@ -294,12 +304,17 @@ class LLMCallsService:
             ).mappings().all()
             turns = [self._turn(dict(r)) for r in rows]
             await self._count_client_events(session, turns)
+        for turn in turns:
+            turn.pop("_person", None)
+            for key in _UNSHOWN_IDS:
+                turn.pop(key, None)
         return {"items": turns, "total": int(total), "page": page, "limit": limit}
 
     def _turn(self, row: dict[str, Any]) -> dict[str, Any]:
         turn = dict(row)
-        turn["key"] = f"{turn.pop('user_id')}:{turn.pop('tkey')}"
-        turn["user_id"] = row["user_id"]
+        turn["_person"] = turn.pop("user_id")  # matches the app's events to the turn; dropped after
+        turn["key"] = _turn_key(turn["_person"], turn.pop("tkey"))
+        turn["user_id"] = None  # nobody is named (module docstring)
         turn["provider_id"], turn["provider_name"] = self._provider(row)
         turn.pop("source_kind", None)
         turn.pop("source_id", None)
@@ -394,7 +409,6 @@ class LLMCallsService:
         # The model list ignores the model filter itself, so it stays a list to choose from.
         model_where, model_params = CallFilters(
             start=filters.start, end=filters.end, q=filters.q, outcome=filters.outcome,
-            user_id=filters.user_id, agent_id=filters.agent_id, session=filters.session,
             min_latency_ms=filters.min_latency_ms,
         ).where()
         async with self._factory() as session:
@@ -462,7 +476,9 @@ class LLMCallsService:
             ).mappings().first()
             if row is None:
                 return None
-            call = self._call(dict(row))
+            person = row["user_id"]  # ties the call to its policy decisions and turn; never shown
+            raw = dict(row)  # with the ids that tie it to its conversation; never shown
+            call = self._call(raw)
             tools = (
                 await session.execute(
                     text("""
@@ -489,31 +505,33 @@ class LLMCallsService:
                     {
                         "rid": call["request_id"],
                         "tenant": call["tenant_id"],
-                        "user": call["user_id"],
+                        "user": person,
                         "since": call["created_at"] - timedelta(milliseconds=call["latency_ms"] or 0)
                         - _POLICY_SLACK,
                         "until": call["created_at"] + _POLICY_SLACK,
                     },
                 )
             ).mappings().all()
-            related, group_by, group_value = await self._related(session, call)
-            turn_calls, client_events = await self._turn_detail(session, call)
+            related, group_by = await self._related(session, raw)
+            turn_calls, client_events = await self._turn_detail(session, raw, person)
         return {
             "call": call,
             "tool_calls": [dict(t) for t in tools],
             "policy_decisions": [dict(p) for p in policies],
             "related": related,
             "related_by": group_by,
-            "related_key": group_value,
             "turn_calls": turn_calls,
             "client_events": client_events,
         }
 
     async def _turn_detail(
-        self, session: AsyncSession, call: dict[str, Any],
+        self, session: AsyncSession, call: dict[str, Any], person: str,
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-        """The calls of the call's turn (oldest first) and what its app reported doing meanwhile."""
-        turn_calls = [call]
+        """The calls of the call's turn (oldest first) and what its app reported doing meanwhile.
+
+        *call* is the call's row with the ids that are not answered.
+        """
+        turn_calls = [self._call(call)]
         if call.get("turn_id"):
             rows = (
                 await session.execute(
@@ -526,20 +544,20 @@ class LLMCallsService:
                     """),
                     {
                         "turn": call["turn_id"],
-                        "user": call["user_id"],
+                        "user": person,
                         "since": call["created_at"] - _TURN_REACH,
                         "until": call["created_at"] + _TURN_REACH,
                         "limit": TURN_CALLS_LIMIT,
                     },
                 )
             ).mappings().all()
-            turn_calls = [self._call(dict(r)) for r in rows] or [call]
+            turn_calls = [self._call(dict(r)) for r in rows] or turn_calls
         if not call.get("conversation_id"):
             return turn_calls, []
         started = min(c["created_at"] - timedelta(milliseconds=c["latency_ms"] or 0) for c in turn_calls)
         ended = max(c["created_at"] for c in turn_calls)
         events = await self._client_events(session, [call["conversation_id"]], started, ended)
-        events = [e for e in events if e["user_id"] == call["user_id"]]
+        events = [e for e in events if e["user_id"] == person]
         for e in events:
             for key in ("conversation_id", "user_id", "agent_id"):
                 e.pop(key, None)
@@ -547,8 +565,11 @@ class LLMCallsService:
 
     async def _related(
         self, session: AsyncSession, call: dict[str, Any],
-    ) -> tuple[list[dict[str, Any]], str | None, str | None]:
-        """The other calls of the same conversation, session or trace, oldest first."""
+    ) -> tuple[list[dict[str, Any]], str | None]:
+        """The other calls of the same conversation, session or trace, oldest first, and which of the three.
+
+        *call* is the call's row with the ids that are not answered; the id itself is not answered either.
+        """
         for column in ("conversation_id", "session_id", "trace_id"):
             value = call.get(column)
             if not value or (column == "trace_id" and value == call["request_id"]):
@@ -565,8 +586,8 @@ class LLMCallsService:
                 )
             ).mappings().all()
             if len(rows) > 1:
-                return [self._call(dict(r)) for r in rows], column, str(value)
-        return [], None, None
+                return [self._call(dict(r)) for r in rows], column
+        return [], None
 
     # ── routing ───────────────────────────────────────────────────
 

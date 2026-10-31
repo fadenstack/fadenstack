@@ -1,7 +1,8 @@
 """What administrators should know now (``GET /api/admin/notices``).
 
-The notices come from core's own source (restrictions on the tenant nothing enforces,
-``services/tenant_restrictions.py``) and the sources registered in ``services/extensions.py``
+The notices come from core's own sources (restrictions on the tenant nothing enforces,
+``services/tenant_restrictions.py``; the first purge of old request records still ahead,
+``services/usage/notices.py``) and the sources registered in ``services/extensions.py``
 (``admin_notices``). Each is a code, a severity and its values: the console words it in the reader's
 language. A source that fails is logged and left out, so one broken source never hides the others.
 
@@ -13,9 +14,10 @@ from __future__ import annotations
 
 import json
 import logging
+from functools import partial
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi import Path as FastAPIPath
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,7 +28,8 @@ from faden_backend.db.dependencies import get_db_session
 from faden_backend.db.models.containers import AuditResult
 from faden_backend.db.models.users import User
 from faden_backend.services import tenant_restrictions
-from faden_backend.services.extensions import registry
+from faden_backend.services.extensions import AdminNoticeSource, registry
+from faden_backend.services.usage import notices as usage_notices
 from faden_backend.web.api.admin.dependencies import require_superuser
 
 log = logging.getLogger(__name__)
@@ -46,10 +49,14 @@ class AdminNoticeOut(BaseModel):
 async def admin_notices(
     _admin: Annotated[User, Depends(require_superuser)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    request: Request,
 ) -> list[AdminNoticeOut]:
     """Every registered source's notices, errors first."""
     found: list[AdminNoticeOut] = []
-    for source in [tenant_restrictions.notices, *registry.admin_notices]:
+    gateway = getattr(request.app.state, "llm_graph_trace_session_factory", None)
+    purge = partial(usage_notices.purge_pending, gateway_sessions=gateway)
+    sources: list[AdminNoticeSource] = [tenant_restrictions.notices, purge, *registry.admin_notices]
+    for source in sources:
         try:
             notices = await source(session)
         except Exception:
