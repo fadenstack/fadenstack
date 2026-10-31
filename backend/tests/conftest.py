@@ -53,6 +53,8 @@ class RecordingMailSender:
     def __init__(self) -> None:
         self.on = True
         self.sent: list[tuple[str, dict[str, Any]]] = []
+        #: The key each send was given, in the order of ``sent``.
+        self.keys: list[str] = []
         self.base = "https://console.example.com"
         self.recipients: list[str] = ["ops@example.com"]
 
@@ -60,9 +62,10 @@ class RecordingMailSender:
         """Whether mail goes out: as the test sets ``on``."""
         return self.on
 
-    async def send(self, kind: str, payload: dict[str, Any]) -> None:
-        """Keeps the message."""
+    async def send(self, kind: str, payload: dict[str, Any], *, key: str) -> None:
+        """Keeps the message and its key."""
         self.sent.append((kind, payload))
+        self.keys.append(key)
 
     def link_base(self) -> str:
         """The address links start with, as the test sets ``base``."""
