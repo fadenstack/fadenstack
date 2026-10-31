@@ -27,6 +27,33 @@ Wie Benutzer einen Text, ein Bild oder eine Datei prüfen, steht unter [Inhalte 
     verbergen Sie keine Kennzeichnungen, die Inhalte als KI-erzeugt ausweisen (Wasserzeichen,
     Herkunftsangaben, Metadaten), und helfen Sie anderen nicht dabei."*
 
+## Was bei Ihrer Organisation bleibt {#what-stays-with-your-organisation}
+
+Fadenstack kennzeichnet, was seine Modelle erzeugen, wie Art. 50 Abs. 2 es verlangt, und bietet die Prüfung dazu.
+Andere Pflichten aus Art. 50 liegen bei dem, der die Inhalte verwendet oder ein KI-System anbietet, und die
+Kennzeichnung erfüllt sie nicht:
+
+- **Sichtbare Hinweise** (Art. 50 Abs. 4). Veröffentlicht Ihre Organisation einen *Deepfake* (ein Bild, Audio
+  oder Video, das echte Personen, Gegenstände, Orte oder Ereignisse so zeigt, dass es fälschlich als echt
+  erscheint) oder einen KI-erzeugten Text, der die Öffentlichkeit über Angelegenheiten von öffentlichem Interesse
+  informieren soll, muss sie das dort offenlegen, wo Menschen es sehen. Eine maschinenlesbare Kennzeichnung tut das
+  nicht. Ein Text braucht keinen Hinweis, wenn ein Mensch ihn geprüft hat und jemand die redaktionelle Verantwortung
+  für die Veröffentlichung trägt; bei offensichtlich künstlerischen, satirischen oder fiktionalen Werken darf der
+  Hinweis so gegeben werden, dass er das Werk nicht beeinträchtigt. Die EU stellt dafür freie Symbole bereit.
+- **Sagen, dass man mit einer KI spricht** (Art. 50 Abs. 1). Der Chat sagt es unter dem Eingabefeld („Antworten
+  werden von einer KI erzeugt und können falsch sein.“). Ihre eigenen Anwendungen und Agenten, die mit Menschen
+  sprechen, müssen es ebenfalls sagen, spätestens beim ersten Kontakt (Art. 50 Abs. 5).
+- **Die Kennzeichnung erhalten.** Bitten Sie Ihre Benutzer in Ihren Nutzungsbedingungen, sie nicht zu entfernen
+  (siehe den Hinweis oben).
+- **Agenten, die Sie bauen.** Eine Organisation, die einen Agenten mit den Fadenstack-SDKs baut und unter eigenem
+  Namen einsetzt oder anbietet, ist nach unserem Verständnis der Leitlinien der Kommission der Anbieter dieses
+  Agenten, mit den Pflichten aus Art. 50 für das, was er erzeugt. Die SDKs kennzeichnen, was ein Agent schreibt, und
+  führen die Nachweise; siehe die Dokumentation für Entwickler.
+
+Art. 50 gilt ab dem 2. August 2026; KI-Systeme, die vorher in Verkehr gebracht wurden, haben bis zum 2. Dezember
+2026 Zeit. Diese Seite beschreibt, was Fadenstack tut; sie ist keine Rechtsberatung, und ob Ihre Nutzung mehr
+verlangt, hängt von ihr ab.
+
 ## Bilder {#pictures}
 
 Jedes Bild, das ein Bildmodell über Fadenstack zurückgibt, wird gekennzeichnet, bevor es den Server verlässt:

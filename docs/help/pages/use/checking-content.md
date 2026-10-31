@@ -52,6 +52,13 @@ receipt**, and says whether it **Points to AI generation**. A receipt or record 
     **No mark found** does not prove that a person wrote it: marks can be removed, and content from other systems
     carries none of this installation's marks.
 
+!!! tip "Keep the marks"
+    Do not remove the marks from what you take out of Fadenstack: keep a picture's metadata and content
+    credentials, and do not rewrite a text only to lose its watermark. When you publish a picture, audio or video
+    that could pass as real, or an AI-written text to inform the public, say visibly that AI made it, unless a
+    person reviewed the text and someone answers for publishing it; your administrator can tell you your
+    organisation's rules.
+
 ![A text a person wrote, checked: No mark found, with the text watermark not found](../images/use/check-content-text-nothing.png)
 
 ## Show the result to someone else

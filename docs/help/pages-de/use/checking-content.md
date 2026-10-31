@@ -53,6 +53,14 @@ Nachweis zeigt seine ID.
     **Keine Kennzeichnung gefunden** beweist nicht, dass ein Mensch den Inhalt geschrieben hat: Kennzeichnungen
     lassen sich entfernen, und Inhalte anderer Systeme tragen keine Kennzeichnung dieser Installation.
 
+!!! tip "Die Kennzeichnung erhalten"
+    Entfernen Sie die Kennzeichnung nicht aus dem, was Sie aus Fadenstack übernehmen: Erhalten Sie die Metadaten
+    und Herkunftsangaben eines Bildes, und schreiben Sie einen Text nicht nur um, damit sein Wasserzeichen
+    verschwindet. Veröffentlichen Sie ein Bild, Audio oder Video, das als echt gelten könnte, oder einen von KI
+    geschriebenen Text zur Information der Öffentlichkeit, sagen Sie sichtbar, dass eine KI es erzeugt hat, außer
+    ein Mensch hat den Text geprüft und jemand verantwortet seine Veröffentlichung; die Regeln Ihrer Organisation
+    nennt Ihnen Ihr Administrator.
+
 ![Ein geprüfter Text, den ein Mensch geschrieben hat: Keine Kennzeichnung gefunden, das Text-Wasserzeichen nicht gefunden](../images/use/check-content-text-nothing.png)
 
 ## Das Ergebnis anderen zeigen {#show-the-result-to-someone-else}
