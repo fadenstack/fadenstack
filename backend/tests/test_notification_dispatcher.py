@@ -18,8 +18,10 @@ import pytest
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
+from faden_backend.db.models import notifications as notification_models
 from faden_backend.db.models.notifications import NotificationOutbox
 from faden_backend.services.extensions import registry
+from faden_backend.services.notifications import dispatcher as dispatcher_module
 from faden_backend.services.notifications.dispatcher import LEASE, NotificationDispatcher
 from tests.conftest import RecordingMailSender
 
@@ -172,6 +174,33 @@ async def test_a_worker_past_its_lease_writes_nothing(
 
     await dbsession.refresh(row)
     assert (row.status, row.next_attempt_at, row.sent_at) == ("sending", taken_over, None)
+
+
+class _HourBehind(datetime):
+    """The backend's clock an hour behind the database's: a container's clock drifts from its host's."""
+
+    @classmethod
+    def now(cls, tz: Any = None) -> datetime:  # type: ignore[override]
+        return datetime.now(tz) - timedelta(hours=1)
+
+
+async def test_a_new_mail_is_due_by_the_backends_own_clock(
+    dbsession: AsyncSession, mail_on: RecordingMailSender, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Its next attempt came from the database's clock, and the dispatcher reads its own.
+
+    With the database's ahead, a mail written a moment ago was not due yet: the claim found nothing (the full
+    suite failed so on and off, the database 1.5 ms ahead).
+    """
+    monkeypatch.setattr(dispatcher_module, "datetime", _HourBehind)
+    monkeypatch.setattr(notification_models, "datetime", _HourBehind)
+    row = _mail("ahead@dispatch.example.com")
+    dbsession.add(row)
+    await dbsession.flush()
+    monkeypatch.setattr(dbsession, "commit", dbsession.flush)
+
+    claim = await NotificationDispatcher(_Session(dbsession))._claim()  # type: ignore[arg-type]  # noqa: SLF001
+    assert claim is not None and claim.id == row.id
 
 
 async def test_a_permanent_failure_is_final_at_once(
