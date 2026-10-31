@@ -49,7 +49,7 @@ function failure(call: LlmCall): Finding | null {
   const params = { status, code: code || String(status), wait: formatDuration(call.latency_ms) };
   if (code === "upstream_refused") return { id: "upstream_refused", severity: "error", params };
   if (code === "upstream_authentication_failed") return { id: "provider_key", severity: "error", params };
-  if (code === "upstream_request_failed" || code === "upstream_address_refused")
+  if (code === "upstream_request_failed" || code === "upstream_address_refused" || code === "model_unreachable")
     return { id: "unreachable", severity: "error", params };
   if (code === "no_capacity") return { id: "no_capacity", severity: "error", params };
   if (code === "policy_blocked") return { id: "policy_blocked", severity: "error", params };

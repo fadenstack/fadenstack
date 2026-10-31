@@ -14,9 +14,12 @@ from faden_gateway.db.models.gateway import (
     LLMModelAlias,
     LLMPoolMembership,
     LLMProviderInstance,
+    PrivacyMode,
     ProviderHealthStatus,
     ProviderType,
+    TenantLLMPolicy,
 )
+from faden_gateway.services.gateway.errors import GatewayError
 from faden_gateway.services.gateway.lease import LeaseManager
 from faden_gateway.services.gateway.proxy import UpstreamProxy
 from faden_gateway.services.gateway.routing import RouterService
@@ -168,6 +171,57 @@ async def test_failover_when_ray_deployment_unhealthy(db_session: AsyncSession):
 
 
 from faden_gateway.services.cache.noop import NoOpCache
+
+
+async def _alias_with(db_session: AsyncSession, *healths: ProviderHealthStatus, enabled: bool = True) -> str:
+    alias_name = f"down-alias-{uuid.uuid4().hex[:8]}"
+    db_session.add(LLMModelAlias(alias=alias_name, enabled=True))
+    for health in healths:
+        instance_id = uuid.uuid4()
+        db_session.add(LLMProviderInstance(
+            id=instance_id, type=ProviderType.VLLM, base_url="http://10.0.0.10:8000", enabled=enabled,
+            health_status=health, source_kind="runtime", source_id=instance_id,
+        ))
+        db_session.add(LLMPoolMembership(model_alias=alias_name, provider_instance_id=instance_id, enabled=True))
+    await db_session.flush()
+    return alias_name
+
+
+async def _resolve(db_session: AsyncSession, alias: str, tenant: str = "default") -> GatewayError:
+    router = RouterService(dao=GatewayDAO(db_session), cache=NoOpCache(), lease_manager=LeaseManager(NoOpCache(), ttl_sec=60))
+    with pytest.raises(GatewayError) as refused:
+        await router.resolve_alias(alias=alias, tenant_id=tenant)
+    return refused.value
+
+
+@pytest.mark.anyio
+async def test_a_model_whose_servers_are_all_down_is_unreachable_not_unknown(db_session: AsyncSession):
+    """It read "not available for this tenant", a question of access, when the model was there."""
+    alias = await _alias_with(db_session, ProviderHealthStatus.UNHEALTHY, ProviderHealthStatus.UNHEALTHY)
+    refused = await _resolve(db_session, alias)
+    assert (refused.status_code, refused.code, refused.error_type) == (503, "model_unreachable", "server_error")
+    assert refused.headers.get("Retry-After") == "30"
+    assert alias in refused.message and "not reachable" in refused.message
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("case", ["unknown", "providers-switched-off", "not-allowed"])
+async def test_a_model_the_tenant_cannot_use_stays_not_found(db_session: AsyncSession, case: str):
+    """Not allowed, unknown or without an enabled provider: 404 as before, nothing said about its servers."""
+    tenant = "default"
+    if case == "unknown":
+        alias = "no-such-model"
+    elif case == "providers-switched-off":
+        alias = await _alias_with(db_session, ProviderHealthStatus.UNHEALTHY, enabled=False)
+    else:
+        alias = await _alias_with(db_session, ProviderHealthStatus.UNHEALTHY)
+        tenant = f"tenant-{uuid.uuid4().hex[:6]}"
+        db_session.add(TenantLLMPolicy(
+            tenant_id=tenant, privacy_mode=PrivacyMode.METADATA_ONLY, allowed_model_aliases=["another-model"],
+        ))
+        await db_session.flush()
+    refused = await _resolve(db_session, alias, tenant)
+    assert (refused.status_code, refused.code) == (404, "model_not_found")
 
 
 @pytest.mark.anyio
