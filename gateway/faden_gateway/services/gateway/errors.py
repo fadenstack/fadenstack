@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
@@ -70,6 +71,17 @@ def validation_message(exc: ValidationError) -> str:
         f"{'.'.join(map(str, e['loc']))}: {e['msg']}" if e["loc"] else e["msg"]
         for e in exc.errors(include_url=False, include_input=False)
     )
+
+
+#: What a 422 keeps of each problem: where, what was wrong, and its kind. Not ``input``, the value sent,
+#: nor ``ctx``, which may quote it.
+_PROBLEM_KEYS = ("type", "loc", "msg")
+
+
+def unreadable_request(exc: RequestValidationError) -> JSONResponse:
+    """FastAPI's 422 for a body or parameter that does not fit (``{"detail": [...]}``), without the values."""
+    problems = [{key: error[key] for key in _PROBLEM_KEYS if key in error} for error in exc.errors()]
+    return JSONResponse(status_code=422, content={"detail": problems})
 
 
 def error_from(exc: GatewayError) -> JSONResponse:
