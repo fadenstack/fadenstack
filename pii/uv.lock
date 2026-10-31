@@ -1,21 +1,21 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.11, <4"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform != 'darwin' and extra != 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx'",
-    "python_full_version == '3.13.*' and sys_platform != 'darwin' and extra != 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx'",
-    "python_full_version == '3.12.*' and sys_platform != 'darwin' and extra != 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx'",
-    "python_full_version < '3.12' and sys_platform != 'darwin' and extra != 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx'",
     "python_full_version >= '3.14' and sys_platform == 'darwin' and extra != 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx'",
-    "python_full_version == '3.13.*' and sys_platform == 'darwin' and extra != 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx'",
-    "python_full_version == '3.12.*' and sys_platform == 'darwin' and extra != 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx'",
-    "python_full_version < '3.12' and sys_platform == 'darwin' and extra != 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx'",
     "python_full_version >= '3.14' and extra == 'extra-9-faden-pii-gliner2' and extra != 'extra-9-faden-pii-onnx'",
-    "python_full_version == '3.13.*' and extra == 'extra-9-faden-pii-gliner2' and extra != 'extra-9-faden-pii-onnx'",
-    "python_full_version == '3.12.*' and extra == 'extra-9-faden-pii-gliner2' and extra != 'extra-9-faden-pii-onnx'",
-    "python_full_version < '3.12' and extra == 'extra-9-faden-pii-gliner2' and extra != 'extra-9-faden-pii-onnx'",
     "python_full_version >= '3.14' and extra != 'extra-9-faden-pii-gliner2' and extra != 'extra-9-faden-pii-onnx'",
+    "python_full_version == '3.13.*' and sys_platform != 'darwin' and extra != 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx'",
+    "python_full_version == '3.13.*' and sys_platform == 'darwin' and extra != 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx'",
+    "python_full_version == '3.13.*' and extra == 'extra-9-faden-pii-gliner2' and extra != 'extra-9-faden-pii-onnx'",
     "python_full_version == '3.13.*' and extra != 'extra-9-faden-pii-gliner2' and extra != 'extra-9-faden-pii-onnx'",
+    "python_full_version == '3.12.*' and sys_platform != 'darwin' and extra != 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx'",
+    "python_full_version == '3.12.*' and sys_platform == 'darwin' and extra != 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx'",
+    "python_full_version == '3.12.*' and extra == 'extra-9-faden-pii-gliner2' and extra != 'extra-9-faden-pii-onnx'",
+    "python_full_version < '3.12' and sys_platform != 'darwin' and extra != 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx'",
+    "python_full_version < '3.12' and sys_platform == 'darwin' and extra != 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx'",
+    "python_full_version < '3.12' and extra == 'extra-9-faden-pii-gliner2' and extra != 'extra-9-faden-pii-onnx'",
     "python_full_version < '3.13' and extra != 'extra-9-faden-pii-gliner2' and extra != 'extra-9-faden-pii-onnx'",
 ]
 conflicts = [[
@@ -74,7 +74,7 @@ dependencies = [
     { name = "frozenlist" },
     { name = "multidict" },
     { name = "propcache" },
-    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx')" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
     { name = "yarl" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/6c/4c/bdccd81e9ee225b69c60e7766c9a5b05364f118f4d383713b89a682d772d/aiohttp-3.14.5.tar.gz", hash = "sha256:5558a7f5a05af9ecf744af91e5baefc436f93c9333e656c27ec253f9a6bbe178", size = 8078052, upload-time = "2026-10-11T01:05:12.408Z" }
@@ -242,7 +242,7 @@ version = "1.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "frozenlist" },
-    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx')" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/61/62/06741b579156360248d1ec624842ad0edf697050bbaf7c3e46394e106ad1/aiosignal-1.4.0.tar.gz", hash = "sha256:f47eecd9468083c2029cc99945502cb7708b082c232f9aca65da147157b251c7", size = 25007, upload-time = "2025-07-03T22:54:43.528Z" }
 wheels = [
@@ -287,7 +287,7 @@ version = "4.15.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "idna" },
-    { name = "typing-extensions", marker = "python_full_version < '3.15' or (extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx')" },
+    { name = "typing-extensions", marker = "python_full_version < '3.15'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a9/d2/f4d173e22df740bc37b1db102b386ba719b66e95b0f0d751f556b387e6d2/anyio-4.15.1.tar.gz", hash = "sha256:9f28306018cbd6d329e64a36d58256edff76dd996fe423bc957326e578b82a94", size = 276966, upload-time = "2026-09-05T10:42:39.44Z" }
 wheels = [
@@ -468,7 +468,7 @@ name = "cffi"
 version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pycparser", marker = "implementation_name != 'PyPy' or (extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx')" },
+    { name = "pycparser", marker = "implementation_name != 'PyPy'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/eb/56/b1ba7935a17738ae8453301356628e8147c79dbb825bcbc73dc7401f9846/cffi-2.0.0.tar.gz", hash = "sha256:44d1b5909021139fe36001ae048dbdde8214afa20200eda0f64c068cac5d5529", size = 523588, upload-time = "2025-09-08T23:24:04.541Z" }
 wheels = [
@@ -768,7 +768,7 @@ wheels = [
 
 [package.optional-dependencies]
 toml = [
-    { name = "tomli", marker = "python_full_version <= '3.11' or (extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx')" },
+    { name = "tomli", marker = "python_full_version <= '3.11'" },
 ]
 
 [[package]]
@@ -776,7 +776,7 @@ name = "cryptography"
 version = "50.0.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cffi", marker = "platform_python_implementation != 'PyPy' or (extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx')" },
+    { name = "cffi", marker = "platform_python_implementation != 'PyPy'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/bb/ad/5d6702db60b1e40b41ef513b6967ff5848f307d50f8449baf1634f5908f1/cryptography-50.0.1.tar.gz", hash = "sha256:5dd9bda1c12b4162f6ff568eeb5e0ff956c28d14406e875cfe8a63a2d414ff20", size = 880381, upload-time = "2026-08-25T19:45:45.499Z" }
 wheels = [
@@ -1102,11 +1102,11 @@ wheels = [
 
 [[package]]
 name = "filelock"
-version = "3.25.1"
+version = "4.2.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/b3/8b/4c32ecde6bea6486a2a5d05340e695174351ff6b06cf651a74c005f9df00/filelock-3.25.1.tar.gz", hash = "sha256:b9a2e977f794ef94d77cdf7d27129ac648a61f585bff3ca24630c1629f701aa9", size = 40319, upload-time = "2026-03-09T19:38:47.309Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d5/98/771d8ca889f220d7d7e352addf500666368f0fd081c6080a83767580c6e4/filelock-4.2.1.tar.gz", hash = "sha256:c4c937ccac2a813cee448e662a56366cfb374c0f8702e75f295c412cc1c5d5a3", size = 650997, upload-time = "2026-10-17T16:48:14.435Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a9/b8/2f664b56a3b4b32d28d3d106c71783073f712ba43ff6d34b9ea0ce36dc7b/filelock-3.25.1-py3-none-any.whl", hash = "sha256:18972df45473c4aa2c7921b609ee9ca4925910cc3a0fb226c96b92fc224ef7bf", size = 26720, upload-time = "2026-03-09T19:38:45.718Z" },
+    { url = "https://files.pythonhosted.org/packages/28/00/db89d339bc4ecdc8087fa7b8607ba22ffc27bf96286f340c9620bea428b3/filelock-4.2.1-py3-none-any.whl", hash = "sha256:7be2662e9e826b9bba28afc0f843a123280d799a2ea44bb5d35ccec67905ae44", size = 162455, upload-time = "2026-10-17T16:48:12.937Z" },
 ]
 
 [[package]]
@@ -1730,8 +1730,8 @@ name = "loguru"
 version = "0.7.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx')" },
-    { name = "win32-setctime", marker = "sys_platform == 'win32' or (extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx')" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
+    { name = "win32-setctime", marker = "sys_platform == 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/3a/05/a1dae3dffd1116099471c643b8924f5aa6524411dc6c63fdae648c4f1aca/loguru-0.7.3.tar.gz", hash = "sha256:19480589e77d47b8d85b2c827ad95d49bf31b0dcde16593892eb51dd18706eb6", size = 63559, upload-time = "2024-12-06T11:20:56.608Z" }
 wheels = [
@@ -2073,7 +2073,7 @@ name = "mypy"
 version = "1.19.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "librt", marker = "platform_python_implementation != 'PyPy' or (extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx')" },
+    { name = "librt", marker = "platform_python_implementation != 'PyPy'" },
     { name = "mypy-extensions" },
     { name = "pathspec" },
     { name = "typing-extensions" },
@@ -2136,13 +2136,13 @@ version = "3.7"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform != 'darwin' and extra != 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx'",
-    "python_full_version == '3.13.*' and sys_platform != 'darwin' and extra != 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx'",
-    "python_full_version == '3.12.*' and sys_platform != 'darwin' and extra != 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx'",
     "python_full_version >= '3.14' and sys_platform == 'darwin' and extra != 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx'",
-    "python_full_version == '3.13.*' and sys_platform == 'darwin' and extra != 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx'",
-    "python_full_version == '3.12.*' and sys_platform == 'darwin' and extra != 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx'",
     "python_full_version >= '3.14' and extra == 'extra-9-faden-pii-gliner2' and extra != 'extra-9-faden-pii-onnx'",
+    "python_full_version == '3.13.*' and sys_platform != 'darwin' and extra != 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx'",
+    "python_full_version == '3.13.*' and sys_platform == 'darwin' and extra != 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx'",
     "python_full_version == '3.13.*' and extra == 'extra-9-faden-pii-gliner2' and extra != 'extra-9-faden-pii-onnx'",
+    "python_full_version == '3.12.*' and sys_platform != 'darwin' and extra != 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx'",
+    "python_full_version == '3.12.*' and sys_platform == 'darwin' and extra != 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx'",
     "python_full_version == '3.12.*' and extra == 'extra-9-faden-pii-gliner2' and extra != 'extra-9-faden-pii-onnx'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/dc/76/3af777226b63a5e64a6b36b1ec5855c14e2b94a37096d4760e595fc43511/networkx-3.7.tar.gz", hash = "sha256:fd77a511bd90f39f3d016351345b52cf5319b813bdca01de3f755d3cca62e96a", size = 1866482, upload-time = "2026-09-21T16:45:16.974Z" }
@@ -3131,7 +3131,7 @@ name = "pytest"
 version = "9.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx')" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
     { name = "iniconfig" },
     { name = "packaging" },
     { name = "pluggy" },
@@ -3293,7 +3293,7 @@ name = "redis"
 version = "7.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "async-timeout", marker = "python_full_version < '3.11.3' or (extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx')" },
+    { name = "async-timeout", marker = "python_full_version < '3.11.3'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/da/82/4d1a5279f6c1251d3d2a603a798a1137c657de9b12cfc1fba4858232c4d2/redis-7.3.0.tar.gz", hash = "sha256:4d1b768aafcf41b01022410b3cc4f15a07d9b3d6fe0c66fc967da2c88e551034", size = 4928081, upload-time = "2026-03-06T18:18:16.287Z" }
 wheels = [
@@ -3683,7 +3683,7 @@ name = "sqlalchemy"
 version = "2.0.48"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "greenlet", marker = "platform_machine == 'AMD64' or platform_machine == 'WIN32' or platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'ppc64le' or platform_machine == 'win32' or platform_machine == 'x86_64' or (extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx')" },
+    { name = "greenlet", marker = "platform_machine == 'AMD64' or platform_machine == 'WIN32' or platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'ppc64le' or platform_machine == 'win32' or platform_machine == 'x86_64'" },
     { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/1f/73/b4a9737255583b5fa858e0bb8e116eb94b88c910164ed2ed719147bde3de/sqlalchemy-2.0.48.tar.gz", hash = "sha256:5ca74f37f3369b45e1f6b7b06afb182af1fd5dde009e4ffd831830d98cbe5fe7", size = 9886075, upload-time = "2026-03-02T15:28:51.474Z" }
@@ -3788,7 +3788,7 @@ version = "1.6.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
-    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx')" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b5/b4/205b0d5241d934e8add0c38aa924c4f9fb7330834ff11e5444db964ec3f9/starlette-1.6.0.tar.gz", hash = "sha256:d4e3ac5e546444960c710297a3c9fc3f7ebae1b7e963f3d36173b49da535be9b", size = 2716969, upload-time = "2026-08-08T18:27:57.512Z" }
 wheels = [
@@ -4032,8 +4032,8 @@ dependencies = [
     { name = "filelock", marker = "sys_platform == 'darwin'" },
     { name = "fsspec", marker = "sys_platform == 'darwin'" },
     { name = "jinja2", marker = "sys_platform == 'darwin'" },
-    { name = "networkx", version = "3.6.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.12' and sys_platform == 'darwin' and extra == 'extra-9-faden-pii-onnx') or (python_full_version >= '3.12' and extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx') or (sys_platform != 'darwin' and extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx')" },
-    { name = "networkx", version = "3.7", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.12' and sys_platform == 'darwin' and extra == 'extra-9-faden-pii-onnx') or (python_full_version < '3.12' and extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx') or (sys_platform != 'darwin' and extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx')" },
+    { name = "networkx", version = "3.6.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.12' and sys_platform == 'darwin' and extra == 'extra-9-faden-pii-onnx') or (extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx')" },
+    { name = "networkx", version = "3.7", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.12' and sys_platform == 'darwin' and extra == 'extra-9-faden-pii-onnx') or (extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx')" },
     { name = "setuptools", marker = "python_full_version >= '3.12' and sys_platform == 'darwin'" },
     { name = "sympy", marker = "sys_platform == 'darwin'" },
     { name = "typing-extensions", marker = "sys_platform == 'darwin'" },
@@ -4067,8 +4067,8 @@ dependencies = [
     { name = "filelock", marker = "sys_platform != 'darwin'" },
     { name = "fsspec", marker = "sys_platform != 'darwin'" },
     { name = "jinja2", marker = "sys_platform != 'darwin'" },
-    { name = "networkx", version = "3.6.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.12' and sys_platform != 'darwin' and extra == 'extra-9-faden-pii-onnx') or (python_full_version >= '3.12' and extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx') or (sys_platform == 'darwin' and extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx')" },
-    { name = "networkx", version = "3.7", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.12' and sys_platform != 'darwin' and extra == 'extra-9-faden-pii-onnx') or (python_full_version < '3.12' and extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx') or (sys_platform == 'darwin' and extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx')" },
+    { name = "networkx", version = "3.6.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.12' and sys_platform != 'darwin' and extra == 'extra-9-faden-pii-onnx') or (extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx')" },
+    { name = "networkx", version = "3.7", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.12' and sys_platform != 'darwin' and extra == 'extra-9-faden-pii-onnx') or (extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx')" },
     { name = "setuptools", marker = "python_full_version >= '3.12' and sys_platform != 'darwin'" },
     { name = "sympy", marker = "sys_platform != 'darwin'" },
     { name = "typing-extensions", marker = "sys_platform != 'darwin'" },
@@ -4172,7 +4172,7 @@ name = "tqdm"
 version = "4.67.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx')" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/09/a9/6ba95a270c6f1fbcd8dac228323f2777d886cb206987444e4bce66338dd4/tqdm-4.67.3.tar.gz", hash = "sha256:7d825f03f89244ef73f1d4ce193cb1774a8179fd96f31d7e1dcde62092b960bb", size = 169598, upload-time = "2026-02-03T17:35:53.048Z" }
 wheels = [
@@ -4185,12 +4185,12 @@ version = "5.16.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform != 'darwin'",
-    "python_full_version == '3.13.*' and sys_platform != 'darwin'",
-    "python_full_version == '3.12.*' and sys_platform != 'darwin'",
-    "python_full_version < '3.12' and sys_platform != 'darwin'",
     "python_full_version >= '3.14' and sys_platform == 'darwin'",
+    "python_full_version == '3.13.*' and sys_platform != 'darwin'",
     "python_full_version == '3.13.*' and sys_platform == 'darwin'",
+    "python_full_version == '3.12.*' and sys_platform != 'darwin'",
     "python_full_version == '3.12.*' and sys_platform == 'darwin'",
+    "python_full_version < '3.12' and sys_platform != 'darwin'",
     "python_full_version < '3.12' and sys_platform == 'darwin'",
 ]
 dependencies = [
@@ -4439,11 +4439,11 @@ wheels = [
 
 [package.optional-dependencies]
 standard = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx')" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
     { name = "httptools" },
     { name = "python-dotenv" },
     { name = "pyyaml" },
-    { name = "uvloop", marker = "(platform_python_implementation != 'PyPy' and sys_platform != 'cygwin' and sys_platform != 'win32') or (platform_python_implementation == 'PyPy' and extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx') or (sys_platform == 'cygwin' and extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx') or (sys_platform == 'win32' and extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx')" },
+    { name = "uvloop", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'cygwin' and sys_platform != 'win32'" },
     { name = "watchfiles" },
     { name = "websockets" },
 ]
@@ -4507,7 +4507,7 @@ name = "wasabi"
 version = "1.1.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-9-faden-pii-gliner2' and extra == 'extra-9-faden-pii-onnx')" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ac/f9/054e6e2f1071e963b5e746b48d1e3727470b2a490834d18ad92364929db3/wasabi-1.1.3.tar.gz", hash = "sha256:4bb3008f003809db0c3e28b4daf20906ea871a2bb43f9914197d540f4f2e0878", size = 30391, upload-time = "2024-05-31T16:56:18.99Z" }
 wheels = [
