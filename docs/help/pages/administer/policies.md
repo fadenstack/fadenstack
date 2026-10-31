@@ -57,6 +57,12 @@ Switching the module off therefore does not silently remove a policy you saved. 
 default policy and later switch the module off, requests to cloud providers are no longer masked: save a policy
 for your organisation if that must not happen.
 
+While that is the case, administrators see it at the top of every admin page, as an error that cannot be hidden:
+*"PII is off: requests to cloud models go out with personal data unmasked."* It appears once the module, on
+before, is off, a cloud model is enabled and no policy is saved for your organisation; and it goes when the module
+is on again (`faden module enable pii`), when no cloud model is enabled any more, or when the default policy no
+longer scans cloud models (then sending them unmasked is what you chose).
+
 ??? info "More about dates"
     Dates (`DATE_TIME`) are not on the list. Add them if you need dates of birth covered; plain numbers in a
     message may then be masked as dates too.

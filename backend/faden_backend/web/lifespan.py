@@ -1076,6 +1076,8 @@ async def lifespan_setup(
 
     # Seed default system settings (e.g. PII policy) if not already set.
     await _seed_default_settings(app)
+    # Noted while PII is on: once it is off, administrators are told that cloud requests go out unmasked.
+    await _note_pii_module(app)
 
     # Seed a default admin user in dev mode so the UI is usable immediately
     if settings.environment == "dev":
@@ -1365,6 +1367,17 @@ async def _seed_default_settings(app: FastAPI) -> None:
         else:
             await session.commit()
             log.debug("Default PII policy already configured; skipping seed.")
+
+
+async def _note_pii_module(app: FastAPI) -> None:
+    """Note that the PII module is on (``services/pii_off_notice.py``)."""
+    if not settings.pii_enabled:
+        return
+    from faden_backend.services import pii_off_notice  # noqa: PLC0415
+
+    async with app.state.db_session_factory() as session:
+        await pii_off_notice.note_on(session)
+        await session.commit()
 
 
 async def _assign_dev_admin_role(app: FastAPI) -> None:
