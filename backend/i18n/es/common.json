@@ -124,6 +124,7 @@
     "forgot_password_submit": "Enviar enlace",
     "forgot_password_success": "Si existe una cuenta para ese correo, se envio un enlace para restablecer la contraseña.",
     "forgot_password_failed": "No se pudo solicitar el restablecimiento de contraseña.",
+    "forgot_password_not_an_address": "Ingrese una dirección de correo, p. ej. name@example.com.",
     "reset_password_title": "Restablecer contraseña",
     "reset_password_desc": "Elija una nueva contraseña para su cuenta.",
     "reset_password_submit": "Restablecer contraseña",

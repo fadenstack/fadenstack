@@ -124,6 +124,7 @@
     "forgot_password_submit": "Envoyer le lien de réinitialisation",
     "forgot_password_success": "Si un compte existe pour cet e-mail, un lien de réinitialisation a été envoyé.",
     "forgot_password_failed": "Échec de la demande de réinitialisation du mot de passe.",
+    "forgot_password_not_an_address": "Saisissez une adresse e-mail, par ex. name@example.com.",
     "reset_password_title": "Réinitialiser le mot de passe",
     "reset_password_desc": "Choisissez un nouveau mot de passe pour votre compte.",
     "reset_password_submit": "Réinitialiser le mot de passe",
