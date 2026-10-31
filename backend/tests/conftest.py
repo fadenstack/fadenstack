@@ -53,6 +53,8 @@ class RecordingMailSender:
     def __init__(self) -> None:
         self.on = True
         self.sent: list[tuple[str, dict[str, Any]]] = []
+        #: The key each send was given, in the order of ``sent``.
+        self.keys: list[str] = []
         self.base = "https://console.example.com"
         self.recipients: list[str] = ["ops@example.com"]
 
@@ -60,9 +62,10 @@ class RecordingMailSender:
         """Whether mail goes out: as the test sets ``on``."""
         return self.on
 
-    async def send(self, kind: str, payload: dict[str, Any]) -> None:
-        """Keeps the message."""
+    async def send(self, kind: str, payload: dict[str, Any], *, key: str) -> None:
+        """Keeps the message and its key."""
         self.sent.append((kind, payload))
+        self.keys.append(key)
 
     def link_base(self) -> str:
         """The address links start with, as the test sets ``base``."""
@@ -132,12 +135,13 @@ async def _engine(anyio_backend: Any) -> AsyncGenerator[AsyncEngine]:
     engine = create_async_engine(str(settings.db_url))
     async with engine.begin() as conn:
         await conn.run_sync(meta.create_all)
-        # What the migration adds beside the models: the count of changes to access, and its triggers.
+        # What the migrations add beside the models: the counts of changes to access and to the system
+        # settings, and their triggers.
         from sqlalchemy import text
 
-        from faden_backend.db import access_epoch
+        from faden_backend.db import access_epoch, settings_epoch
 
-        for statement in access_epoch.create_all():
+        for statement in [*access_epoch.create_all(), *settings_epoch.create_all()]:
             await conn.execute(text(statement))
 
     try:
@@ -182,6 +186,36 @@ async def dbsession(
         except Exception:
             pass
         await connection.close()
+
+
+@pytest.fixture
+async def follow_settings(dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch) -> AsyncGenerator[Any]:
+    """This process follows the system settings in the database, as after its startup, through the test's
+    connection (services/system_settings/runtime_sync.py).
+
+    Yields the follower; every registered setting gets its value back afterwards.
+    """
+    from faden_backend.services.system_settings import runtime_sync
+    from faden_backend.services.system_settings.runtime_mapping import (
+        get_runtime_secret_key_map,
+        get_runtime_value_key_map,
+        runtime_target,
+    )
+
+    follower = runtime_sync._Follower()  # noqa: SLF001 - a fresh one per test
+    monkeypatch.setattr(runtime_sync, "_follower", follower)
+    keys = {**get_runtime_value_key_map(), **get_runtime_secret_key_map()}
+    before = {key: (runtime_target(key), attr, getattr(runtime_target(key), attr)) for key, attr in keys.items()}
+
+    async def startup_load() -> None:
+        """Nothing stored yet: the values are the environment's."""
+
+    await runtime_sync.start(await dbsession.connection(), startup_load)
+    try:
+        yield follower
+    finally:
+        for target, attr, value in before.values():
+            object.__setattr__(target, attr, value)
 
 
 @pytest.fixture

@@ -194,6 +194,18 @@ const SHOTS = [
   // Administer
   { name: "administer/dashboard", path: "/admin/dashboard" },
   { name: "administer/users", path: "/admin/users" },
+  {
+    // The swap names the server; its port is the install's own: the usual one, unsaved, and back to the top.
+    name: "administer/mail", path: "/admin/settings?tab=mail", wait: 3000,
+    act: async (p) => {
+      await withoutLicenceNotice(p);
+      await p.getByLabel(K("mail.server.port"), { exact: true }).fill("587");
+      await p.evaluate(() => {
+        document.activeElement?.blur();
+        for (const el of document.querySelectorAll("*")) if (el.scrollTop > 0) el.scrollTop = 0;
+      });
+    },
+  },
   { name: "administer/roles", path: "/admin/roles", wait: 5000 },
   { name: "administer/marketplace", path: "/admin/marketplace" },
   { name: "administer/deployments", path: "/admin/deployments" },

@@ -55,6 +55,11 @@ export default function PiiPolicyForm({
   ).filter(
     (entity) => !selectedEntities.includes(entity),
   );
+  const fromService = options?.source === "pii_service";
+  const localDetector = fromService && !!options?.profile_id && options.profile_id !== "presidio-legacy";
+  // A threshold of its own without a profile named: a local detector refuses it (its scale is another engine's).
+  const legacyThreshold = localDetector && !value.presidio.profile_id && value.presidio.threshold_mode !== "profile";
+  const standardEntities = options?.default_entities?.[value.presidio.language];
   const [entityToAdd, setEntityToAdd] = useState("");
 
   useEffect(() => {
@@ -101,7 +106,7 @@ export default function PiiPolicyForm({
   return (
     <Stack spacing={2}>
       {options?.source === "fallback" || options?.ready === false ? (
-        <Alert severity="warning">{t("pii_policy.form.unavailable", { defaultValue: "PII service is unavailable. These options do not confirm active protection." })}</Alert>
+        <Alert severity="warning">{t("pii_policy.form.unavailable")}</Alert>
       ) : null}
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
@@ -226,25 +231,31 @@ export default function PiiPolicyForm({
         <Stack spacing={1.5}>
           {options?.profile_id && (
             <Stack direction="row" spacing={1} alignItems="center">
-              <Typography variant="body2">{options.profile_id} · {options.calibrated ? t("pii_policy.form.reviewed", { defaultValue: "reviewed thresholds" }) : t("pii_policy.form.unreviewed", { defaultValue: "thresholds awaiting review" })}</Typography>
+              <Typography variant="body2">{options.profile_id} · {options.calibrated ? t("pii_policy.form.reviewed") : t("pii_policy.form.unreviewed")}</Typography>
               <Button disabled={disabled || options.source !== "pii_service" || options.ready === false}
-                onClick={() => patch({ presidio: { ...value.presidio, profile_id: options.profile_id, threshold_mode: "profile", threshold: options.default_score_threshold } })}>
-                {t("pii_policy.form.adopt_profile", { defaultValue: "Use installed profile defaults" })}
+                onClick={() => patch({ presidio: { ...value.presidio, profile_id: options.profile_id, threshold_mode: "profile", threshold: options.default_score_threshold, entities: selectedEntities } })}>
+                {t("pii_policy.form.adopt_profile")}
               </Button>
             </Stack>
           )}
           {options?.detector?.model_id && (
             <Typography variant="body2" color="text.secondary">
-              {t("pii_policy.form.installed_detector", { defaultValue: "Installed detector" })}: {options.detector.model_id} · {options.detector.locale_pack} · {options.detector.execution}
+              {t("pii_policy.form.installed_detector")}: {options.detector.model_id} · {options.detector.locale_pack} · {options.detector.execution}
             </Typography>
           )}
+          {legacyThreshold && (
+            <Alert severity="warning">{t("pii_policy.form.legacy_threshold_warning")}</Alert>
+          )}
+          {fromService && legacyEntities.length > 0 && (
+            <Alert severity="warning">{t("pii_policy.form.unsupported_entities_warning", { types: legacyEntities.join(", ") })}</Alert>
+          )}
           {value.presidio.profile_id && value.presidio.profile_id !== options?.profile_id && (
-            <Alert severity="warning">{t("pii_policy.form.profile_mismatch", { defaultValue: "The policy profile differs from the installed service. Protected requests will fail until a compatible profile is selected." })}</Alert>
+            <Alert severity="warning">{t("pii_policy.form.profile_mismatch")}</Alert>
           )}
           <FormControlLabel control={<Switch checked={value.presidio.threshold_mode === "profile"}
             disabled={disabled || !value.presidio.profile_id}
             onChange={(_, checked) => patch({ presidio: { ...value.presidio, threshold_mode: checked ? "profile" : "override" } })} />}
-            label={t("pii_policy.form.profile_thresholds", { defaultValue: "Use profile thresholds" })} />
+            label={t("pii_policy.form.profile_thresholds")} />
           <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>
             <FormControl size="small" fullWidth>
               <InputLabel>{t("pii_policy.form.language")}</InputLabel>
@@ -309,7 +320,9 @@ export default function PiiPolicyForm({
               ))}
               {entities.length === 0 && (
                 <Typography variant="caption" color="text.secondary">
-                  {t("pii_policy.form.no_entities")}
+                  {standardEntities && standardEntities.length > 0
+                    ? t("pii_policy.form.no_entities_standard", { types: standardEntities.join(", ") })
+                    : t("pii_policy.form.no_entities_standard_unknown")}
                 </Typography>
               )}
             </Stack>

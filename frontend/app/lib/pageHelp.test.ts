@@ -26,6 +26,13 @@ describe("links from the console to Help", () => {
     expect(helpUrl()).toBe("/help/");
   });
 
+  it("knows a tab of its own: Settings > Mail links to the Mail page", () => {
+    expect(resolvePageHelp("/admin/settings", "?tab=mail")?.doc).toBe("administer/mail");
+    expect(resolvePageHelp("/admin/settings", "?tab=mail")?.titleKey).toBe("page_help.settings_mail.title");
+    expect(resolvePageHelp("/admin/settings", "?tab=modules")?.doc).toBe("administer/index");
+    expect(resolvePageHelp("/admin/settings")?.doc).toBe("administer/index");
+  });
+
   it("links to a section of a Help page", () => {
     expect(resolvePageHelp("/admin/usage")?.doc).toBe("administer/usage#the-usage-page");
     expect(helpUrl("administer/usage#the-usage-page")).toBe("/help/administer/usage/#the-usage-page");

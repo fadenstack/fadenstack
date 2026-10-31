@@ -643,6 +643,13 @@
       "action_usage": "Usage and privacy: who sees usage figures, how long they are kept, the instance's limits and the configuration statement",
       "action_appearance": "Appearance: the accent color"
     },
+    "settings_mail": {
+      "title": "Mail",
+      "description": "How this server sends mail (password resets, codes, alerts for administrators) through your organisation's mail server.",
+      "action_server": "Mail server and sign-in: a password, Microsoft 365, or a relay without one",
+      "action_test": "Send a test mail with the form as it is, then save",
+      "action_state": "Mail state: whether mail goes out, how many wait, and the last failure in words"
+    },
     "profile": {
       "title": "My Profile",
       "description": "Your account, your password and your API tokens.",

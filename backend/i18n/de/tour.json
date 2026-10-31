@@ -643,6 +643,13 @@
       "action_usage": "Nutzung und Datenschutz: wer Nutzungszahlen sieht, wie lange sie aufbewahrt werden, die Limits der Instanz und die Konfigurationsbeschreibung",
       "action_appearance": "Darstellung: die Akzentfarbe"
     },
+    "settings_mail": {
+      "title": "Mail",
+      "description": "Wie dieser Server Mail verschickt (Passwort-Zurücksetzungen, Codes, Warnungen für Administratoren): über den Mailserver Ihrer Organisation.",
+      "action_server": "Mailserver und Anmeldung: ein Passwort, Microsoft 365 oder ein Relay ohne Anmeldung",
+      "action_test": "Eine Testmail mit dem Formular senden, wie es ist, dann speichern",
+      "action_state": "Mail-Status: ob Mail hinausgeht, wie viele warten und der letzte Fehler in Worten"
+    },
     "profile": {
       "title": "Mein Profil",
       "description": "Ihr Konto, Ihr Passwort und Ihre API-Tokens.",

@@ -52,7 +52,7 @@ from faden_gateway.services.gateway.observability import (
 )
 from faden_gateway.services.gateway.mcp_client import MCPClient
 from faden_gateway.services.gateway.mcp_tool_cache import MCP_TOOL_PREFIX, MCPToolCache
-from faden_gateway.services.gateway.pii_client import PIIClient
+from faden_gateway.services.gateway.pii_client import PIIClient, PIIPolicyMismatchError
 from faden_gateway.services.gateway.provenance_client import ProvenanceClient, SignedReceipt
 from faden_gateway.services.gateway.session_titles import title_from_message
 from faden_gateway.services.gateway.pii_policy import (
@@ -365,6 +365,27 @@ _PII_MODULE_OFF_MESSAGE = (
     "A PII policy is set for this workspace, but the PII module is not running, so nothing was sent. "
     "An administrator can start the PII module, or switch the policy off if it is not needed."
 )
+
+
+_PII_POLICY_MISMATCH_MESSAGE = (
+    "The PII policy does not fit the installed PII detector ({code}), so nothing was sent. An "
+    "administrator can adapt it on the PII policy page (Use installed profile defaults), or leave the "
+    "entity types empty."
+)
+
+
+def _pii_blocked(exc: BaseException, unavailable: str) -> GatewayError:
+    """A failed PII scan's refusal under fail_action=block: the policy's own fault, else *unavailable*."""
+    if isinstance(exc, PIIPolicyMismatchError):
+        return GatewayError(
+            status_code=502,
+            message=_PII_POLICY_MISMATCH_MESSAGE.format(code=exc.code),
+            error_type="server_error",
+            code="pii_policy_mismatch",
+        )
+    return GatewayError(
+        status_code=502, message=unavailable, error_type="server_error", code="pii_service_unavailable",
+    )
 
 
 class PIIModuleOffError(RuntimeError):
@@ -2806,17 +2827,13 @@ class GatewayService:
             # A policy someone saved, with the PII module off, fails like a scan that errors:
             # fail_action decides. It used to send the payload unscanned, without a word.
             return await self._sanitize(req.payload, pii_policy, req), candidates
-        except Exception:
+        except Exception as exc:
             fail_action = pii_policy.egress.fail_action
             if fail_action == "block":
-                raise GatewayError(
-                    status_code=502,
-                    message=(
-                        _PII_MODULE_OFF_MESSAGE if self.pii_client is None
-                        else "PII service unavailable and fail_action=block."
-                    ),
-                    error_type="server_error",
-                    code="pii_service_unavailable",
+                raise _pii_blocked(
+                    exc,
+                    _PII_MODULE_OFF_MESSAGE if self.pii_client is None
+                    else "PII service unavailable and fail_action=block.",
                 ) from None
             if fail_action == "fallback_to_local" and any(_is_cloud(c) for c in candidates):
                 req.fallback_outcome = "fallback_to_local_attempted"
@@ -3870,15 +3887,12 @@ class GatewayService:
                 request_id=getattr(req, "request_id", None),
                 cache_scope=getattr(req, "pii_scope", ""),
             )
-        except Exception:
+        except Exception as exc:
             if req.pii_policy.egress.fail_action == "allow":
                 logger.warning("PII scan of tool results failed; fail_action=allow, sending them as they are")
                 return answers
-            raise GatewayError(
-                status_code=502,
-                message="PII service unavailable: tool results were not sent to the model.",
-                error_type="server_error",
-                code="pii_service_unavailable",
+            raise _pii_blocked(
+                exc, "PII service unavailable: tool results were not sent to the model.",
             ) from None
         if scanned.token_mapping:
             req.token_mapping = scanned.token_mapping

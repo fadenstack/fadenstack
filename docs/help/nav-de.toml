@@ -22,6 +22,7 @@ nav = [
     { "SAML" = "administer/sign-in-saml.md" },
     { "Verzeichnisse (LDAP, Active Directory)" = "administer/sign-in-ldap.md" },
     { "Provisionierung (SCIM)" = "administer/sign-in-provisioning.md" },
+    { "Mail" = "administer/mail.md" },
     { "Modelle" = "administer/models.md" },
     { "Bereitstellungen" = "administer/deployments.md" },
     { "Externe Provider" = "administer/providers.md" },

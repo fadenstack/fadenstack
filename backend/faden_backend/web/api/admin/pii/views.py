@@ -174,7 +174,7 @@ async def get_pii_config_options(
 
     return {
         "source": "pii_service",
-        **{key: data.get(key) for key in ("profile_id", "profile_fingerprint", "calibrated", "ready", "entity_languages", "supported_surfaces", "detector")},
+        **{key: data.get(key) for key in ("profile_id", "profile_fingerprint", "calibrated", "ready", "entity_languages", "default_entities", "supported_surfaces", "detector")},
         "supported_entities": entities if isinstance(entities, list) else fallback["supported_entities"],
         "supported_languages": languages if isinstance(languages, list) else fallback["supported_languages"],
         "supported_sanitize_modes": sanitize_modes if isinstance(sanitize_modes, list) else fallback["supported_sanitize_modes"],

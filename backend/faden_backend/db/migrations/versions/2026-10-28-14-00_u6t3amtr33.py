@@ -10,7 +10,7 @@ The gateway reads ``parent_id`` for the path it records with each request (its `
 ``groups`` table's trigger on the count of changes to access tells it when the tree changed.
 
 Revision ID: u6t3amtr33
-Revises: tk3nus3
+Revises: s3tep0ch
 Create Date: 2026-10-28 14:00:00
 """
 
@@ -19,7 +19,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "u6t3amtr33"
-down_revision = "tk3nus3"
+down_revision = "s3tep0ch"
 branch_labels = None
 depends_on = None
 

@@ -23,6 +23,8 @@ export interface PageHelpEntry {
 interface PageHelpDef {
   /** A path prefix, or a pattern for a page a prefix cannot single out. */
   prefix: string | RegExp;
+  /** Only on this tab of the page (its `?tab=`). */
+  tab?: string;
   id: string;
   actions: string[];
   guide?: string;
@@ -368,6 +370,13 @@ const PAGES: PageHelpDef[] = [
   },
   {
     prefix: "/admin/settings",
+    tab: "mail",
+    id: "settings_mail",
+    actions: ["server", "test", "state"],
+    doc: "administer/mail",
+  },
+  {
+    prefix: "/admin/settings",
     id: "settings",
     actions: ["general", "modules", "usage", "appearance"],
     doc: "administer/index",
@@ -414,14 +423,17 @@ export function pageHelpDocs(): string[] {
 }
 
 /**
- * Resolve the best-matching page help entry for the current pathname.
- * Returns `null` if no match is found.
+ * Resolve the best-matching page help entry for the current pathname, and the query string (*search*) for
+ * an entry of one tab. Returns `null` if no match is found.
  */
-export function resolvePageHelp(pathname: string): PageHelpEntry | null {
-  const def = PAGES.find((p) =>
-    typeof p.prefix === "string"
-      ? pathname.startsWith(p.prefix)
-      : p.prefix.test(pathname),
+export function resolvePageHelp(pathname: string, search = ""): PageHelpEntry | null {
+  const tab = new URLSearchParams(search).get("tab");
+  const def = PAGES.find(
+    (p) =>
+      (p.tab === undefined || p.tab === tab) &&
+      (typeof p.prefix === "string"
+        ? pathname.startsWith(p.prefix)
+        : p.prefix.test(pathname)),
   );
   return def ? toEntry(def) : null;
 }

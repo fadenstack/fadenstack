@@ -643,6 +643,13 @@
       "action_usage": "Uso y privacidad: quién ve las cifras de uso, cuánto tiempo se conservan, los límites de la instancia y la declaración de configuración",
       "action_appearance": "Apariencia: el color de acento"
     },
+    "settings_mail": {
+      "title": "Correo",
+      "description": "Cómo envía este servidor el correo (restablecimientos de contraseña, códigos, alertas para administradores) a través del servidor de correo de su organización.",
+      "action_server": "Servidor de correo e inicio de sesión: una contraseña, Microsoft 365 o un relay sin inicio de sesión",
+      "action_test": "Enviar un correo de prueba con el formulario tal como está, y luego guardar",
+      "action_state": "Estado del correo: si sale el correo, cuántos esperan y el último fallo en palabras"
+    },
     "profile": {
       "title": "Mi Perfil",
       "description": "Su cuenta, su contraseña y sus tokens de API.",

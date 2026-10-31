@@ -643,6 +643,13 @@
       "action_usage": "Utilisation et confidentialité : qui voit les chiffres d'utilisation, combien de temps ils sont conservés, les limites de l'instance et la déclaration de configuration",
       "action_appearance": "Apparence : la couleur d'accent"
     },
+    "settings_mail": {
+      "title": "Messagerie",
+      "description": "Comment ce serveur envoie les e-mails (réinitialisations de mot de passe, codes, alertes pour les administrateurs) via le serveur de messagerie de votre organisation.",
+      "action_server": "Serveur de messagerie et connexion : un mot de passe, Microsoft 365 ou un relais sans connexion",
+      "action_test": "Envoyer un e-mail de test avec le formulaire tel qu'il est, puis enregistrer",
+      "action_state": "État de la messagerie : si les e-mails partent, combien attendent, et le dernier échec en clair"
+    },
     "profile": {
       "title": "Mon profil",
       "description": "Votre compte, votre mot de passe et vos jetons API.",

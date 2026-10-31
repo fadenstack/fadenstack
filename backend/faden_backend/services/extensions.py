@@ -120,8 +120,18 @@ class MailSender(Protocol):
         """Whether mail goes out now (asked before anything is queued, and by the sign-in page)."""
         ...
 
-    async def send(self, kind: str, payload: dict[str, Any]) -> None:
-        """Deliver one message of *kind* (``password_reset``, ``link_code``, ``admin_alert``), or raise."""
+    async def send(self, kind: str, payload: dict[str, Any], *, key: str) -> None:
+        """Deliver one message of *kind* (``password_reset``, ``link_code``, ``admin_alert``), or raise.
+
+        The outbox tries a failed message again later, unless the exception's ``permanent`` attribute is
+        ``True`` (the same attempt would fail the same way, e.g. a refused sign-in): the message then fails at
+        once. Either way the exception's text is kept as the message's ``last_error``.
+
+        *key* is the same for every attempt of one message (the outbox row's id). The outbox can try a message
+        again that already went out: an attempt that raised after the mail server took it (an answer that
+        came too late), or one by a worker that stopped before it wrote "sent". A sender that cannot tell
+        whether an earlier attempt went out uses *key* so the message goes out once.
+        """
         ...
 
     def link_base(self) -> str:
