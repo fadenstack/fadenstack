@@ -27,7 +27,7 @@ dependencies = [
   "langfuse>=5.0.4",
   "redis[hiredis]>=5.2.1",
   "cryptography>=50.0.0",  # >=50.0.0: clears PYSEC-2026-35/36/3552/3553/3554
-  "aio-pika>=9.5.4,<10",  # <10: aio-pika 10 (pamqp 4) refuses the connection kwargs taskiq-aio-pika passes on
+  "aio-pika>=9.5.4,<11",  # <10: aio-pika 10 (pamqp 4) refuses the connection kwargs taskiq-aio-pika passes on
   "prometheus-client>=0.21.1",
   "prometheus-fastapi-instrumentator>=8.1.0,<9",  # 7.0.0 capped starlette<1.0; 8.x allows starlette 1.x (clears starlette CVEs)
   "sentry-sdk>=2.19.2",
