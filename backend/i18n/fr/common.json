@@ -4871,6 +4871,7 @@
     "lift_tool_mode_ceilings": "Les outils de chaque chat reviennent au mode que chacun choisit. Les limites sont conservées et s'appliquent de nouveau au retour d'Enterprise. Consigné dans le journal d'audit.",
     "usage_purge_pending_one": "Les enregistrements de requêtes de plus de {{days}} jour seront supprimés à partir du {{date}}. Modifiez la durée de conservation sous Paramètres → Utilisation et confidentialité.",
     "usage_purge_pending_other": "Les enregistrements de requêtes de plus de {{days}} jours seront supprimés à partir du {{date}}. Modifiez la durée de conservation sous Paramètres → Utilisation et confidentialité.",
+    "pii_off_cloud": "PII est désactivé : les requêtes vers les modèles cloud partent avec les données personnelles non masquées (PII était actif pour la dernière fois le {{date}}). Réactivez le module PII : faden module enable pii.",
     "budget_threshold": "Le budget {{name}} a utilisé {{threshold}} % de son montant sur cette période ({{period}})."
   },
   "sign_ins": {

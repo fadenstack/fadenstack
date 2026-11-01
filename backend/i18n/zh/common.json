@@ -4871,6 +4871,7 @@
     "lift_tool_mode_ceilings": "所有聊天中的工具恢复为每个人选择的模式。这些限制会被保留，并在 Enterprise 恢复后再次生效。此操作会记录在审计日志中。",
     "usage_purge_pending_one": "超过 {{days}} 天的请求记录将从 {{date}} 起删除。可在 设置 → 用量与隐私 中更改保留期限。",
     "usage_purge_pending_other": "超过 {{days}} 天的请求记录将从 {{date}} 起删除。可在 设置 → 用量与隐私 中更改保留期限。",
+    "pii_off_cloud": "PII 已关闭：发往云端模型的请求将携带未脱敏的个人数据（PII 最后一次开启于 {{date}}）。请重新开启 PII 模块：faden module enable pii。",
     "budget_threshold": "预算 {{name}} 在当前周期（{{period}}）已用掉额度的 {{threshold}} %。"
   },
   "sign_ins": {

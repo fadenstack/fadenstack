@@ -4871,6 +4871,7 @@
     "lift_tool_mode_ceilings": "Tools in jedem Chat folgen wieder dem Modus, den jede Person wählt. Die Grenzen bleiben gespeichert und gelten wieder, sobald Enterprise zurück ist. Wird im Audit-Protokoll festgehalten.",
     "usage_purge_pending_one": "Einträge im Anfrageprotokoll, die älter als {{days}} Tag sind, werden ab dem {{date}} gelöscht. Die Aufbewahrung ändern Sie unter Einstellungen → Nutzung und Datenschutz.",
     "usage_purge_pending_other": "Einträge im Anfrageprotokoll, die älter als {{days}} Tage sind, werden ab dem {{date}} gelöscht. Die Aufbewahrung ändern Sie unter Einstellungen → Nutzung und Datenschutz.",
+    "pii_off_cloud": "PII ist aus: Anfragen an Cloud-Modelle gehen mit unmaskierten personenbezogenen Daten hinaus (PII war zuletzt am {{date}} an). Schalten Sie das PII-Modul wieder ein: faden module enable pii.",
     "budget_threshold": "Das Budget {{name}} hat in diesem Zeitraum ({{period}}) {{threshold}} % seines Betrags erreicht."
   },
   "sign_ins": {

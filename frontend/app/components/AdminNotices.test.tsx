@@ -82,6 +82,17 @@ describe("admin notices", () => {
     expect(notice).not.toHaveTextContent("mail server said");
   });
 
+  it("says that requests to cloud models go out unmasked while PII is off, and cannot be hidden", async () => {
+    list.mockResolvedValue([{ code: "pii_off_cloud", severity: "error", params: { date: "2026-10-30" } }]);
+    render(<AdminNotices isSuperuser />);
+    const notice = await screen.findByTestId("admin-notice-pii_off_cloud");
+    expect(notice).toHaveTextContent(
+      "PII is off: requests to cloud models go out with personal data unmasked (PII was last on Oct 30, 2026). " +
+        "Switch the PII module on again: faden module enable pii.",
+    );
+    expect(notice.querySelector("button")).toBeNull();
+  });
+
   it("says something for a code it has no words for", async () => {
     list.mockResolvedValue([{ code: "brand_new", severity: "info", params: {} }]);
     render(<AdminNotices isSuperuser />);

@@ -62,6 +62,13 @@ Das Ausschalten des Moduls entfernt eine gespeicherte Richtlinie also nicht stil
 auf die Standardrichtlinie verlässt und das Modul später ausschaltet, dessen Anfragen an Cloud-Provider werden
 nicht mehr maskiert. Speichern Sie eine Richtlinie für Ihre Organisation, wenn das nicht passieren darf.
 
+Solange das so ist, sehen Administratoren es oben auf jeder Verwaltungsseite, als Fehler, der sich nicht
+ausblenden lässt: *„PII ist aus: Anfragen an Cloud-Modelle gehen mit unmaskierten personenbezogenen Daten
+hinaus.“* Der Hinweis erscheint, sobald das zuvor eingeschaltete Modul aus ist, ein Cloud-Modell aktiviert ist und
+keine Richtlinie für Ihre Organisation gespeichert ist; er verschwindet, wenn das Modul wieder an ist
+(`faden module enable pii`), kein Cloud-Modell mehr aktiviert ist oder die Standardrichtlinie Cloud-Modelle nicht
+mehr prüft (dann ist das unmaskierte Senden Ihre Entscheidung).
+
 ??? info "Mehr zu Datumsangaben"
     Datumsangaben (`DATE_TIME`) stehen nicht auf der Liste. Fügen Sie sie hinzu, wenn auch Geburtsdaten erfasst
     werden sollen; einfache Zahlen in einer Nachricht können dann ebenfalls als Datum maskiert werden.

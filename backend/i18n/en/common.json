@@ -4869,6 +4869,7 @@
     "lift_tool_mode_ceilings": "Tools in every chat go back to the mode each person picks. The limits are kept and apply again when Enterprise is back. Recorded in the audit log.",
     "usage_purge_pending_one": "Request records older than {{days}} day will be deleted from {{date}}. Change the retention under Settings → Usage and privacy.",
     "usage_purge_pending_other": "Request records older than {{days}} days will be deleted from {{date}}. Change the retention under Settings → Usage and privacy.",
+    "pii_off_cloud": "PII is off: requests to cloud models go out with personal data unmasked (PII was last on {{date}}). Switch the PII module on again: faden module enable pii.",
     "budget_threshold": "The budget {{name}} has used {{threshold}} % of its amount this {{period}}."
   },
   "sign_ins": {

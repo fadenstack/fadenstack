@@ -2,7 +2,8 @@
 
 The notices come from core's own sources (restrictions on the tenant nothing enforces,
 ``services/tenant_restrictions.py``; the first purge of old request records still ahead,
-``services/usage/notices.py``) and the sources registered in ``services/extensions.py``
+``services/usage/notices.py``; requests to cloud models unmasked since PII was switched off,
+``services/pii_off_notice.py``) and the sources registered in ``services/extensions.py``
 (``admin_notices``). Each is a code, a severity and its values: the console words it in the reader's
 language. A source that fails is logged and left out, so one broken source never hides the others.
 
@@ -27,7 +28,7 @@ from faden_backend.db.dao.audit_dao import AuditDAO
 from faden_backend.db.dependencies import get_db_session
 from faden_backend.db.models.containers import AuditResult
 from faden_backend.db.models.users import User
-from faden_backend.services import tenant_restrictions
+from faden_backend.services import pii_off_notice, tenant_restrictions
 from faden_backend.services.extensions import AdminNoticeSource, registry
 from faden_backend.services.usage import notices as usage_notices
 from faden_backend.web.api.admin.dependencies import require_superuser
@@ -55,7 +56,8 @@ async def admin_notices(
     found: list[AdminNoticeOut] = []
     gateway = getattr(request.app.state, "llm_graph_trace_session_factory", None)
     purge = partial(usage_notices.purge_pending, gateway_sessions=gateway)
-    sources: list[AdminNoticeSource] = [tenant_restrictions.notices, purge, *registry.admin_notices]
+    pii_off = partial(pii_off_notice.notices, gateway_sessions=gateway)
+    sources: list[AdminNoticeSource] = [tenant_restrictions.notices, purge, pii_off, *registry.admin_notices]
     for source in sources:
         try:
             notices = await source(session)

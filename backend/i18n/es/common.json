@@ -4871,6 +4871,7 @@
     "lift_tool_mode_ceilings": "Las herramientas de todos los chats vuelven al modo que elige cada persona. Los límites se conservan y vuelven a aplicarse cuando vuelva Enterprise. Queda registrado en el registro de auditoría.",
     "usage_purge_pending_one": "Los registros de solicitudes de más de {{days}} día se eliminarán a partir del {{date}}. Cambie la conservación en Configuración → Uso y privacidad.",
     "usage_purge_pending_other": "Los registros de solicitudes de más de {{days}} días se eliminarán a partir del {{date}}. Cambie la conservación en Configuración → Uso y privacidad.",
+    "pii_off_cloud": "PII está desactivado: las solicitudes a modelos en la nube salen con los datos personales sin enmascarar (PII estuvo activo por última vez el {{date}}). Vuelva a activar el módulo PII: faden module enable pii.",
     "budget_threshold": "El presupuesto {{name}} ha usado el {{threshold}} % de su importe en este periodo ({{period}})."
   },
   "sign_ins": {

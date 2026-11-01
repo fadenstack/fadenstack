@@ -85,7 +85,7 @@ GATEWAY_DDL = (
     """
     CREATE TABLE llm_provider_instance (
         id uuid PRIMARY KEY, type varchar(64) NOT NULL DEFAULT 'vllm', base_url text NOT NULL DEFAULT '',
-        source_kind varchar(64), source_id varchar(128)
+        source_kind varchar(64), source_id varchar(128), enabled boolean NOT NULL DEFAULT true
     )""",
 )
 
