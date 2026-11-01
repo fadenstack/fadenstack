@@ -615,7 +615,7 @@ wheels = [
 
 [[package]]
 name = "faden-mcp"
-version = "0.6.0rc4"
+version = "0.6.0"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },
