@@ -51,6 +51,7 @@ from faden_gateway.services.gateway.auth import (
     sign_in_ended_before,
 )
 from faden_gateway.services.gateway.errors import GatewayError, error_from, error_response, validation_message
+from faden_gateway.services.gateway.mcp_tool_cache import MCP_TOOL_PREFIX
 from faden_gateway.services.gateway.pii_policy import VALID_EGRESS_MODES, mode_switch_allowed
 from faden_gateway.services.gateway.service import GatewayService
 from faden_gateway.services.gateway.skills_client import SkillsUnavailableError
@@ -437,6 +438,50 @@ async def agent_models(
         return JSONResponse(await service.list_models(auth))
     except GatewayError as exc:
         return _error(exc)
+
+
+# -- tools ----------------------------------------------------------------------------
+
+#: The longest tool description the list carries; a server writes it, so it is bounded.
+TOOL_DESCRIPTION_MAX = 500
+
+
+def _mcp_server_label(qualified_name: str) -> str:
+    """The MCP server of a tool named ``mcp.<server>.<tool>``: its tool prefix, as the catalog knows it."""
+    parts = qualified_name.split(".", 2)
+    return parts[1] if len(parts) == 3 else ""
+
+@router.get("/v1/agents/{agent}/tools")
+async def agent_tools(
+    caller: Annotated[tuple[AuthContext, AgentRequest], Depends(agent_request)],
+    service: Annotated[GatewayService, Depends(get_gateway_service)],
+) -> dict[str, Any]:
+    """The MCP tools of the caller's tenant on this server, for a "from your server" list.
+
+    Names and descriptions only, never how a server is reached. ``allowed``: the agent's version lets the
+    model be offered it (``server_tools``). ``enabled``: the administrator has it switched on in the MCP
+    Hub; the catalog the chat uses holds those only, so every tool listed here is enabled. Gateway tools
+    (current time, knowledge, attachments) are not MCP tools and are left out. Sorted by server, then name.
+    """
+    auth, agent = caller
+    cache = service.mcp_tool_cache
+    catalog = await cache.get_tools(auth.tenant_id) if cache is not None else []
+    tools: list[dict[str, Any]] = []
+    for entry in catalog:
+        name = str(entry.get("qualified_name") or "")
+        if not name.startswith(MCP_TOOL_PREFIX):
+            continue
+        function = (entry.get("openai_tool") or {}).get("function") or {}
+        description = function.get("description")
+        tools.append({
+            "name": name,
+            "server": _mcp_server_label(name),
+            "description": description.strip()[:TOOL_DESCRIPTION_MAX] if isinstance(description, str) else "",
+            "allowed": agent.allows_server_tool(name),
+            "enabled": True,
+        })
+    tools.sort(key=lambda tool: (tool["server"], tool["name"]))
+    return {"tools": tools}
 
 
 # -- skills ---------------------------------------------------------------------------

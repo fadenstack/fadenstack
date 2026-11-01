@@ -995,6 +995,133 @@ async def test_only_those_who_may_use_the_agent_list_its_skills(
     assert skills_service.asked == []
 
 
+# -- the MCP tools of the tenant ----------------------------------------------------------------
+
+TOOLS_URL = "/v1/agents/eplan-assistant/tools"
+
+
+def _catalog_entry(name: str, description: str = "Does a thing.") -> dict[str, Any]:
+    """A row of the MCP service's catalog, all of it: the list carries three fields of it."""
+    return {
+        "qualified_name": name,
+        "openai_tool": {
+            "type": "function",
+            "function": {"name": name.replace(".", "__"), "description": description, "parameters": {"type": "object"}},
+        },
+        "server_id": str(uuid.uuid4()), "pii_mode": "allow", "realm": "mcp_remote", "source": "mcp",
+        "annotations": {"readOnlyHint": True},
+    }
+
+
+class _McpService:
+    """The MCP service as the gateway reaches it over HTTP: its catalog, and what it was asked."""
+
+    def __init__(self) -> None:
+        self.catalog: list[dict[str, Any]] = []
+        self.asked: list[httpx.Request] = []
+
+    def answer(self, request: httpx.Request) -> httpx.Response:
+        self.asked.append(request)
+        return httpx.Response(200, json={"catalog_version": 1, "tools": self.catalog})
+
+
+@pytest.fixture
+async def mcp_service(fastapi_app: FastAPI, monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[_McpService]:
+    """The MCP module on, its service faked behind the app's HTTP client; off again afterwards."""
+    fake = _McpService()
+    service_registry.configure("mcp", enabled=True, url="http://mcp.local")
+    monkeypatch.setattr(settings, "mcp_service_token", "mcp-token")
+    async with httpx.AsyncClient(transport=httpx.MockTransport(fake.answer)) as http:
+        monkeypatch.setattr(fastapi_app.state, "http_client", http)
+        yield fake
+    service_registry.configure("mcp", enabled=False, url=None)
+
+
+@pytest.mark.anyio
+async def test_the_tools_list_names_each_mcp_tool_with_its_server_sorted(
+    client: AsyncClient, backend: _Backend, mcp_service: _McpService,
+) -> None:
+    mcp_service.catalog = [
+        _catalog_entry("mcp.github.search_issues", "Finds issues."),
+        _catalog_entry("mcp.docs.read_page", "Reads a page."),
+        _catalog_entry("mcp.github.create_issue", "Opens an issue."),
+    ]
+    r = await client.get(TOOLS_URL, headers=_headers())
+    assert r.status_code == 200, r.text
+    assert r.json() == {"tools": [
+        {"name": "mcp.docs.read_page", "server": "docs", "description": "Reads a page.", "allowed": True,
+         "enabled": True},
+        {"name": "mcp.github.create_issue", "server": "github", "description": "Opens an issue.", "allowed": True,
+         "enabled": True},
+        {"name": "mcp.github.search_issues", "server": "github", "description": "Finds issues.", "allowed": True,
+         "enabled": True},
+    ]}
+    # Asked as the caller's tenant, with the service token; nothing of it reaches the answer.
+    assert dict(mcp_service.asked[-1].url.params) == {"tenant_id": "tenant-a"}
+    assert mcp_service.asked[-1].headers["authorization"] == "Bearer mcp-token"
+    for tool in r.json()["tools"]:
+        assert set(tool) == {"name", "server", "description", "allowed", "enabled"}, "names and descriptions only"
+    for hidden in ("server_id", "pii_mode", "annotations", "openai_tool", "parameters", "mcp-token", "mcp.local"):
+        assert hidden not in r.text
+
+
+@pytest.mark.anyio
+async def test_the_tools_list_says_which_tools_the_agents_version_allows(
+    client: AsyncClient, backend: _Backend, mcp_service: _McpService,
+) -> None:
+    mcp_service.catalog = [_catalog_entry("mcp.github.search_issues"), _catalog_entry("mcp.docs.read_page")]
+
+    async def allowed() -> dict[str, bool]:
+        r = await client.get(TOOLS_URL, headers=_headers())
+        assert r.status_code == 200, r.text
+        return {tool["name"]: tool["allowed"] for tool in r.json()["tools"]}
+
+    assert await allowed() == {"mcp.docs.read_page": True, "mcp.github.search_issues": True}, "None: all allowed"
+    for server_tools, expected in (
+        (("mcp.github.*",), {"mcp.docs.read_page": False, "mcp.github.search_issues": True}),
+        (("mcp.docs.read_page", "current_time"), {"mcp.docs.read_page": True, "mcp.github.search_issues": False}),
+        ((), {"mcp.docs.read_page": False, "mcp.github.search_issues": False}),
+    ):
+        backend.put(_profile(server_tools=server_tools))
+        client_app = client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+        client_app.state.agent_directory.invalidate()
+        assert await allowed() == expected, server_tools
+
+
+@pytest.mark.anyio
+async def test_an_agent_without_mcp_tools_gets_an_empty_list(
+    client: AsyncClient, backend: _Backend, mcp_service: _McpService,
+) -> None:
+    r = await client.get(TOOLS_URL, headers=_headers())
+    assert r.status_code == 200 and r.json() == {"tools": []}, r.text
+    # Gateway tools are no MCP tools: they stay out of the list, whatever the catalog holds.
+    mcp_service.catalog = [_catalog_entry("current_time")]
+    r = await client.get(TOOLS_URL, headers=_headers())
+    assert r.json() == {"tools": []}
+
+
+@pytest.mark.anyio
+async def test_without_the_mcp_module_the_tools_list_is_empty(client: AsyncClient, backend: _Backend) -> None:
+    r = await client.get(TOOLS_URL, headers=_headers())
+    assert r.status_code == 200 and r.json() == {"tools": []}, r.text
+
+
+@pytest.mark.anyio
+async def test_only_those_who_may_use_the_agent_list_its_tools(
+    client: AsyncClient, backend: _Backend, mcp_service: _McpService,
+) -> None:
+    mcp_service.catalog = [_catalog_entry("mcp.github.search_issues")]
+    outsider = _agent_token(sub="44444444-4444-4444-4444-444444444444")
+    refused = await client.get(TOOLS_URL, headers=_headers(outsider))
+    profile = await client.get("/v1/agents/eplan-assistant/profile", headers=_headers(outsider))
+    assert refused.status_code == profile.status_code == 403
+    assert refused.json() == profile.json(), "the same answer as the profile route gives"
+    assert (await client.get(TOOLS_URL)).status_code == 401
+    assert (await client.get(TOOLS_URL, headers=_headers(_agent_token(OTHER_AGENT_ID)))).status_code == 403
+    assert "search_issues" not in refused.text
+    assert mcp_service.asked == [], "a refused caller asks the MCP service nothing"
+
+
 # -- the user's settings ------------------------------------------------------------------------
 
 
