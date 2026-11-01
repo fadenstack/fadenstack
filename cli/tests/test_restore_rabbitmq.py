@@ -4,14 +4,11 @@ RabbitMQ makes its users from ``rabbitmq/definitions.json`` on every start, and 
 passwords in ``.env``. A restore onto a server rebuilt with ``faden deploy`` (Help: Backups, Rebuild a lost
 server) put back the old ``.env`` but kept the file the deploy wrote: RabbitMQ refused the backend and the
 gateway (ACCESS_REFUSED), they stayed unhealthy, and the restore still ended with "Restore complete."
-(release test bed, 1 November 2026).
+(release test bed, 1 November 2026). How the file is written from .env: test_upgrade_rabbitmq.py.
 """
 
 from __future__ import annotations
 
-import base64
-import hashlib
-import json
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -29,26 +26,26 @@ RESTORED_ENV = (
 )
 
 
-def _matches(stored: str, password: str) -> bool:
-    """RabbitMQ's check: base64(salt || sha256(salt || password))."""
-    raw = base64.b64decode(stored)
-    return hashlib.sha256(raw[:4] + password.encode()).digest() == raw[4:]
-
-
 @pytest.fixture
 def install(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
-    """An install whose definitions.json is the deploy's; the restore puts back RESTORED_ENV."""
+    """An install the restore puts RESTORED_ENV back into; every step it takes, in order, in ``steps``."""
     root = tmp_path / "install"
-    (root / "rabbitmq").mkdir(parents=True)
-    deployed = {"users": [{"name": "faden-gateway", "password_hash": "c3RhbGU=", "tags": ""}]}
-    (root / "rabbitmq" / "definitions.json").write_text(json.dumps(deployed), encoding="utf-8")
+    root.mkdir()
     (tmp_path / "backup").mkdir()
     ctx = SimpleNamespace(project_dir=root, env_file=root / ".env")
-    state = SimpleNamespace(root=root, started=0)
+    state = SimpleNamespace(root=root, started=0, steps=[])
 
     def fake_restore(_ctx: object, **_: object) -> RestoreResult:
         (root / ".env").write_text(RESTORED_ENV, encoding="utf-8")
         return RestoreResult(databases_restored=["faden_backend"], env_restored=True)
+
+    def up(_ctx: object, *, services: list[str] | None = None, **_: object) -> int:
+        """Starting postgres works; starting everything returns what the test sets."""
+        state.steps.append(("up", services))
+        return 0 if services else state.started
+
+    def rabbitmq_users(shared_dir: Path, env_vars: dict[str, str], profiles: list[str]) -> None:
+        state.steps.append(("rabbitmq users", shared_dir, env_vars))
 
     monkeypatch.setattr(restore, "load_config", lambda: SimpleNamespace(profiles=[]))
     monkeypatch.setattr(restore, "build_context_from_config", lambda cfg: ctx)
@@ -57,12 +54,9 @@ def install(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     monkeypatch.setattr(restore, "service_names", lambda ctx: ["nginx", "postgres", "rabbitmq", "backend"])
     monkeypatch.setattr(restore, "compose_stop", lambda *a, **k: 0)
     monkeypatch.setattr(restore, "compose_restart", lambda *a, **k: 0)
-    def up(_ctx: object, *, services: list[str] | None = None, **_: object) -> int:
-        """Starting postgres works; starting everything returns what the test sets."""
-        return 0 if services else state.started
-
     monkeypatch.setattr(restore, "compose_up", up)
     monkeypatch.setattr(restore, "restore_backup", fake_restore)
+    monkeypatch.setattr(restore, "_regenerate_rmq_definitions", rabbitmq_users, raising=False)
     monkeypatch.setattr(restore, "_sync_postgres_password", lambda *a, **k: None)
     monkeypatch.setattr(env_gen, "fill_required_env", lambda *a, **k: [])
     monkeypatch.setattr(provenance_keys, "ensure_step", lambda *a, **k: None)
@@ -74,15 +68,20 @@ def _run(tmp_path: Path) -> Any:
     return CliRunner().invoke(restore.restore_cmd, [str(tmp_path / "backup"), "-y"])
 
 
-def test_rabbitmqs_users_are_written_from_the_restored_env(tmp_path: Path, install: SimpleNamespace) -> None:
+def test_rabbitmqs_users_are_written_from_the_restored_env_before_the_start(
+    tmp_path: Path, install: SimpleNamespace
+) -> None:
     result = _run(tmp_path)
 
     assert result.exit_code == 0, result.output
-    written = json.loads((install.root / "rabbitmq" / "definitions.json").read_text())
-    users = {u["name"]: u for u in written["users"]}
-    assert _matches(users["faden-gateway"]["password_hash"], "restored-api")
-    assert _matches(users["faden-backend"]["password_hash"], "restored-backend")
-    assert _matches(users["admin"]["password_hash"], "restored-admin")
+    written = [step for step in install.steps if step[0] == "rabbitmq users"]
+    assert len(written) == 1
+    _, shared_dir, env_vars = written[0]
+    assert shared_dir == install.root
+    assert env_vars["RABBITMQ_API_PASS"] == "restored-api"
+    assert env_vars["RABBITMQ_BACKEND_PASS"] == "restored-backend"
+    assert env_vars["RABBITMQ_ADMIN_PASS"] == "restored-admin"
+    assert install.steps.index(written[0]) < install.steps.index(("up", None)), "before it all starts again"
     assert "Restore complete." in result.output
 
 
