@@ -25,6 +25,24 @@
 series: []
 
 releases:
+  - version: 0.6.0
+    channel: stable
+    date: ""
+    severity: security
+    summary: >-
+      Usage and limits with privacy by default, teams in a tree, cloud models with the local PII detector, faster
+      chats with skills, fixes and security updates. A Preview release.
+    highlights:
+      - "Usage: My usage for everyone; team figures only for groups of 5 or more; limits per minute and per day; teams in a tree."
+      - "PII: requests to cloud models work with the local detector, and administrators see it when PII is off and cloud requests go out unmasked."
+      - "Chats with skills answer sooner; a settings change applies in every backend process at once."
+      - "Fixes: each mail is sent once, password resets work at .local addresses, a restore onto a rebuilt server comes back, and an upgrade from 0.4.x removes the old PII worker."
+      - "Help says what content marking leaves to your organisation under the AI Act."
+      - "Security updates in the services and in the node agent 0.2.12: update the machines' agents after the server."
+      - "Installs first set up with 0.4.2 or 0.4.3: before you upgrade, put a new password in RABBITMQ_ADMIN_PASS in .env; after it, change your console password (My Profile, Change Password). RabbitMQ and Langfuse took it at setup."
+    upgrade_from: 0.4.0
+    components:
+      agent: 0.2.12
   - version: 0.6.0rc4
     channel: preview
     date: ""
