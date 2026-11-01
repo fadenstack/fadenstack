@@ -24,7 +24,7 @@ dependencies = [
   "SQLAlchemy[asyncio] >=2.0.44,<3",
   "alembic >=1.17.2,<2",
   "asyncpg >=0.31.0,<1",
-  "aio-pika >=9.5.8,<11",
+  "aio-pika >=9.5.8,<10",  # <10: aio-pika 10 (pamqp 4) refuses the connection kwargs taskiq-aio-pika passes on
   "prometheus-client >=0.23.1,<1",
   "prometheus-fastapi-instrumentator >=8.1.0,<9",  # 7.x capped starlette<1.0; 8.x allows starlette 1.x (clears starlette CVEs)
   "sentry-sdk >=2.46.0,<3",
@@ -38,7 +38,7 @@ dependencies = [
   "loguru >=0.7.3,<1",
   "taskiq >=0.12.0,<1",
   "taskiq-fastapi >=0.5.0,<1",  # >=0.5.0: removes app.router.startup/shutdown calls, which crash-loop workers on starlette 1.x
-  "taskiq-aio-pika >=0.5.0,<1",
+  "taskiq-aio-pika >=0.5.0,<0.6",  # <0.6: 0.6 drops queue_name, and the backend would share the gateway's queue
   "aiodocker >=0.23.0,<1",
   "huggingface-hub >=0.27.0,<3",
   "hf-xet >=1.1.0,<2",
