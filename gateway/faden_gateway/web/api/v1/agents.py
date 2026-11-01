@@ -51,6 +51,7 @@ from faden_gateway.services.gateway.auth import (
     sign_in_ended_before,
 )
 from faden_gateway.services.gateway.errors import GatewayError, error_from, error_response, validation_message
+from faden_gateway.services.gateway.mcp_client import MCPUnavailableError
 from faden_gateway.services.gateway.mcp_tool_cache import MCP_TOOL_PREFIX
 from faden_gateway.services.gateway.pii_policy import VALID_EGRESS_MODES, mode_switch_allowed
 from faden_gateway.services.gateway.service import GatewayService
@@ -446,11 +447,6 @@ async def agent_models(
 TOOL_DESCRIPTION_MAX = 500
 
 
-def _mcp_server_label(qualified_name: str) -> str:
-    """The MCP server of a tool named ``mcp.<server>.<tool>``: its tool prefix, as the catalog knows it."""
-    parts = qualified_name.split(".", 2)
-    return parts[1] if len(parts) == 3 else ""
-
 @router.get("/v1/agents/{agent}/tools")
 async def agent_tools(
     caller: Annotated[tuple[AuthContext, AgentRequest], Depends(agent_request)],
@@ -458,27 +454,37 @@ async def agent_tools(
 ) -> dict[str, Any]:
     """The MCP tools of the caller's tenant on this server, for a "from your server" list.
 
-    Names and descriptions only, never how a server is reached. ``allowed``: the agent's version lets the
-    model be offered it (``server_tools``). ``enabled``: the administrator has it switched on in the MCP
-    Hub; the catalog the chat uses holds those only, so every tool listed here is enabled. Gateway tools
-    (current time, knowledge, attachments) are not MCP tools and are left out. Sorted by server, then name.
+    Names and descriptions only, never how a server is reached. ``server``: the server's name as the
+    console shows it. ``allowed``: the agent's version lets the model be offered the tool
+    (``server_tools``). ``enabled``: the administrator has the tool and its server switched on in the
+    MCP Hub; a tool switched off is listed too. Gateway tools (current time, knowledge, attachments)
+    are not MCP tools and are left out. Sorted by server, then name. With no MCP module the list is
+    empty; with the MCP service failing it is a gateway error, as the skills list gives.
     """
     auth, agent = caller
-    cache = service.mcp_tool_cache
-    catalog = await cache.get_tools(auth.tenant_id) if cache is not None else []
+    client = service.mcp_client
+    try:
+        listing = await client.list_tools(auth.tenant_id) if client is not None else []
+    except MCPUnavailableError as exc:
+        logger.warning("Could not list the MCP tools for agent %s (reached: %s)", agent.id, exc.reached)
+        raise GatewayError(
+            status_code=502 if exc.reached else 503,
+            message="The tools could not be listed right now; try again.",
+            error_type="server_error",
+            code="mcp_unavailable",
+        ) from exc
     tools: list[dict[str, Any]] = []
-    for entry in catalog:
+    for entry in listing:
         name = str(entry.get("qualified_name") or "")
         if not name.startswith(MCP_TOOL_PREFIX):
             continue
-        function = (entry.get("openai_tool") or {}).get("function") or {}
-        description = function.get("description")
+        description = entry.get("description")
         tools.append({
             "name": name,
-            "server": _mcp_server_label(name),
+            "server": str(entry.get("server_name") or ""),
             "description": description.strip()[:TOOL_DESCRIPTION_MAX] if isinstance(description, str) else "",
             "allowed": agent.allows_server_tool(name),
-            "enabled": True,
+            "enabled": entry.get("enabled") is True,
         })
     tools.sort(key=lambda tool: (tool["server"], tool["name"]))
     return {"tools": tools}

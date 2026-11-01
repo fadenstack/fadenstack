@@ -1000,29 +1000,25 @@ async def test_only_those_who_may_use_the_agent_list_its_skills(
 TOOLS_URL = "/v1/agents/eplan-assistant/tools"
 
 
-def _catalog_entry(name: str, description: str = "Does a thing.") -> dict[str, Any]:
-    """A row of the MCP service's catalog, all of it: the list carries three fields of it."""
-    return {
-        "qualified_name": name,
-        "openai_tool": {
-            "type": "function",
-            "function": {"name": name.replace(".", "__"), "description": description, "parameters": {"type": "object"}},
-        },
-        "server_id": str(uuid.uuid4()), "pii_mode": "allow", "realm": "mcp_remote", "source": "mcp",
-        "annotations": {"readOnlyHint": True},
-    }
+def _listed(name: str, server: str, description: str = "Does a thing.", *, enabled: bool = True) -> dict[str, Any]:
+    """A row of the MCP service's tool listing, all of it: the route carries four fields of it."""
+    return {"qualified_name": name, "server_name": server, "description": description, "enabled": enabled}
 
 
 class _McpService:
-    """The MCP service as the gateway reaches it over HTTP: its catalog, and what it was asked."""
+    """The MCP service as the gateway reaches it over HTTP: its listing, and what it was asked."""
 
     def __init__(self) -> None:
         self.catalog: list[dict[str, Any]] = []
         self.asked: list[httpx.Request] = []
+        self.status = 200
+        self.down = False
 
     def answer(self, request: httpx.Request) -> httpx.Response:
         self.asked.append(request)
-        return httpx.Response(200, json={"catalog_version": 1, "tools": self.catalog})
+        if self.down:
+            raise httpx.ConnectError("Connection refused", request=request)
+        return httpx.Response(self.status, json={"tools": self.catalog})
 
 
 @pytest.fixture
@@ -1042,34 +1038,52 @@ async def test_the_tools_list_names_each_mcp_tool_with_its_server_sorted(
     client: AsyncClient, backend: _Backend, mcp_service: _McpService,
 ) -> None:
     mcp_service.catalog = [
-        _catalog_entry("mcp.github.search_issues", "Finds issues."),
-        _catalog_entry("mcp.docs.read_page", "Reads a page."),
-        _catalog_entry("mcp.github.create_issue", "Opens an issue."),
+        _listed("mcp.github.search_issues", "GitHub", "Finds issues."),
+        _listed("mcp.docs.read_page", "Docs", "  Reads a page.  "),
+        _listed("mcp.github.create_issue", "GitHub", "x" * 600),
     ]
     r = await client.get(TOOLS_URL, headers=_headers())
     assert r.status_code == 200, r.text
     assert r.json() == {"tools": [
-        {"name": "mcp.docs.read_page", "server": "docs", "description": "Reads a page.", "allowed": True,
+        {"name": "mcp.docs.read_page", "server": "Docs", "description": "Reads a page.", "allowed": True,
          "enabled": True},
-        {"name": "mcp.github.create_issue", "server": "github", "description": "Opens an issue.", "allowed": True,
+        {"name": "mcp.github.create_issue", "server": "GitHub", "description": "x" * 500, "allowed": True,
          "enabled": True},
-        {"name": "mcp.github.search_issues", "server": "github", "description": "Finds issues.", "allowed": True,
+        {"name": "mcp.github.search_issues", "server": "GitHub", "description": "Finds issues.", "allowed": True,
          "enabled": True},
     ]}
     # Asked as the caller's tenant, with the service token; nothing of it reaches the answer.
-    assert dict(mcp_service.asked[-1].url.params) == {"tenant_id": "tenant-a"}
-    assert mcp_service.asked[-1].headers["authorization"] == "Bearer mcp-token"
+    [asked] = mcp_service.asked
+    assert (asked.url.host, asked.url.path) == ("mcp.local", "/api/internal/tools/listing")
+    assert dict(asked.url.params) == {"tenant_id": "tenant-a"}
+    assert asked.headers["authorization"] == "Bearer mcp-token"
     for tool in r.json()["tools"]:
         assert set(tool) == {"name", "server", "description", "allowed", "enabled"}, "names and descriptions only"
-    for hidden in ("server_id", "pii_mode", "annotations", "openai_tool", "parameters", "mcp-token", "mcp.local"):
+    for hidden in ("server_name", "qualified_name", "mcp-token", "mcp.local"):
         assert hidden not in r.text
+
+
+@pytest.mark.anyio
+async def test_a_tool_or_server_switched_off_is_listed_as_not_enabled(
+    client: AsyncClient, backend: _Backend, mcp_service: _McpService,
+) -> None:
+    mcp_service.catalog = [
+        _listed("mcp.github.one", "GitHub"),
+        _listed("mcp.github.two", "GitHub", enabled=False),
+        _listed("mcp.old.three", "Old server", enabled=False),
+    ]
+    r = await client.get(TOOLS_URL, headers=_headers())
+    assert r.status_code == 200, r.text
+    assert {t["name"]: t["enabled"] for t in r.json()["tools"]} == {
+        "mcp.github.one": True, "mcp.github.two": False, "mcp.old.three": False,
+    }
 
 
 @pytest.mark.anyio
 async def test_the_tools_list_says_which_tools_the_agents_version_allows(
     client: AsyncClient, backend: _Backend, mcp_service: _McpService,
 ) -> None:
-    mcp_service.catalog = [_catalog_entry("mcp.github.search_issues"), _catalog_entry("mcp.docs.read_page")]
+    mcp_service.catalog = [_listed("mcp.github.search_issues", "GitHub"), _listed("mcp.docs.read_page", "Docs")]
 
     async def allowed() -> dict[str, bool]:
         r = await client.get(TOOLS_URL, headers=_headers())
@@ -1095,7 +1109,7 @@ async def test_an_agent_without_mcp_tools_gets_an_empty_list(
     r = await client.get(TOOLS_URL, headers=_headers())
     assert r.status_code == 200 and r.json() == {"tools": []}, r.text
     # Gateway tools are no MCP tools: they stay out of the list, whatever the catalog holds.
-    mcp_service.catalog = [_catalog_entry("current_time")]
+    mcp_service.catalog = [_listed("current_time", "Gateway")]
     r = await client.get(TOOLS_URL, headers=_headers())
     assert r.json() == {"tools": []}
 
@@ -1107,10 +1121,25 @@ async def test_without_the_mcp_module_the_tools_list_is_empty(client: AsyncClien
 
 
 @pytest.mark.anyio
+async def test_a_failing_mcp_service_is_a_gateway_error_not_a_500(
+    client: AsyncClient, backend: _Backend, mcp_service: _McpService,
+) -> None:
+    mcp_service.status = 500
+    r = await client.get(TOOLS_URL, headers=_headers())
+    assert r.status_code == 502, r.text
+    assert r.json()["error"]["code"] == "mcp_unavailable" and r.json()["error"]["type"] == "server_error"
+
+    mcp_service.down = True
+    r = await client.get(TOOLS_URL, headers=_headers())
+    assert r.status_code == 503, r.text
+    assert r.json()["error"]["code"] == "mcp_unavailable"
+
+
+@pytest.mark.anyio
 async def test_only_those_who_may_use_the_agent_list_its_tools(
     client: AsyncClient, backend: _Backend, mcp_service: _McpService,
 ) -> None:
-    mcp_service.catalog = [_catalog_entry("mcp.github.search_issues")]
+    mcp_service.catalog = [_listed("mcp.github.search_issues", "GitHub")]
     outsider = _agent_token(sub="44444444-4444-4444-4444-444444444444")
     refused = await client.get(TOOLS_URL, headers=_headers(outsider))
     profile = await client.get("/v1/agents/eplan-assistant/profile", headers=_headers(outsider))
