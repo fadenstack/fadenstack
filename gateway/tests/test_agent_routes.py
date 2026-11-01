@@ -50,6 +50,7 @@ from faden_gateway.services.gateway.agents import (
 from faden_gateway.services.gateway.llm_adapter import CompletionResult, LLMAdapter
 from faden_gateway.services.gateway.service import GatewayService, _agent_tools, _Prepared
 from faden_gateway.services.gateway.usage_group import UsageGroupResolver
+from faden_gateway.web.api.v1.agents import REASONING_LEVELS, apply_agent
 from faden_gateway.services.registry import service_registry
 from faden_gateway.settings import settings
 from tests.test_gateway_pipeline_combined import (
@@ -993,6 +994,53 @@ async def test_only_those_who_may_use_the_agent_list_its_skills(
     assert (await client.get(SKILLS_URL, headers=_headers(outsider))).status_code == 403
     assert (await client.get(SKILLS_URL)).status_code == 401
     assert skills_service.asked == []
+
+
+# -- the reasoning cap --------------------------------------------------------------------------
+
+LEVELS = ("none", "minimal", "low", "medium", "high", "xhigh", "max")
+
+
+def _effort(ui: Any, **payload: Any) -> Any:
+    shaped, _ = apply_agent(_profile(ui=ui), {"messages": [], **payload})
+    return shaped.get("reasoning_effort", "<absent>")
+
+
+def test_the_reasoning_scale_is_the_adapters() -> None:
+    from faden_gateway.services.gateway.llm_adapter import _EFFORTS  # noqa: PLC0415
+
+    assert LEVELS == _EFFORTS == REASONING_LEVELS
+
+
+@pytest.mark.parametrize("top", LEVELS)
+def test_a_request_above_the_agents_maximum_is_lowered_and_one_at_or_below_stays(top: str) -> None:
+    ui = {"reasoning": {"max": top}}
+    for level in LEVELS:
+        expected = level if LEVELS.index(level) <= LEVELS.index(top) else top
+        assert _effort(ui, reasoning_effort=level) == expected, (top, level)
+    assert _effort(ui) == top, "no level asked: the maximum"
+
+
+def test_the_request_is_not_changed_in_place() -> None:
+    payload = {"messages": [], "reasoning_effort": "max"}
+    apply_agent(_profile(ui={"reasoning": {"max": "low"}}), payload)
+    assert payload["reasoning_effort"] == "max"
+
+
+@pytest.mark.parametrize("ui", [
+    {}, None, {"greeting": "Hi"}, {"reasoning": {}}, {"reasoning": {"max": None}}, {"reasoning": {"max": 3}},
+    {"reasoning": {"max": "extreme"}}, {"reasoning": {"max": ["low"]}}, {"reasoning": "low"}, {"reasoning": ["max"]},
+])
+def test_without_a_usable_maximum_the_request_is_unchanged(ui: Any) -> None:
+    assert _effort(ui) == "<absent>"
+    assert _effort(ui, reasoning_effort="max") == "max"
+    assert _effort(ui, reasoning_effort="whatever") == "whatever"
+
+
+def test_a_value_off_the_scale_is_held_to_the_maximum() -> None:
+    ui = {"reasoning": {"max": "medium"}}
+    for odd in ("turbo", "", 5, None, ["high"]):
+        assert _effort(ui, reasoning_effort=odd) == "medium", odd
 
 
 # -- the MCP tools of the tenant ----------------------------------------------------------------

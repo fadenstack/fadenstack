@@ -231,6 +231,36 @@ def hold_back(
     return shaped, held
 
 
+#: The reasoning levels, lowest first (the scale the model adapter knows).
+REASONING_LEVELS = ("none", "minimal", "low", "medium", "high", "xhigh", "max")
+
+
+def reasoning_max(profile: AgentProfile) -> str | None:
+    """The highest reasoning level the agent's version allows (``ui.reasoning.max``); ``None``: no cap.
+
+    Anything that is not a level of the scale means no cap.
+    """
+    reasoning = profile.ui.get("reasoning") if isinstance(profile.ui, dict) else None
+    top = reasoning.get("max") if isinstance(reasoning, dict) else None
+    return top if isinstance(top, str) and top in REASONING_LEVELS else None
+
+
+def cap_reasoning(payload: dict[str, Any], top: str | None) -> dict[str, Any]:
+    """The request with its ``reasoning_effort`` held to *top*: lowered when above, set when missing.
+
+    A level at or below the cap stays; so does everything when there is no cap. A value that is not on
+    the scale counts as above it: the server decides, the client is the second line.
+    """
+    if top is None:
+        return payload
+    effort = payload.get("reasoning_effort")
+    if isinstance(effort, str) and effort in REASONING_LEVELS and (
+        REASONING_LEVELS.index(effort) <= REASONING_LEVELS.index(top)
+    ):
+        return payload
+    return {**payload, "reasoning_effort": top}
+
+
 def apply_agent(
     profile: AgentProfile, payload: dict[str, Any], *, local_mcp: bool = False,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -241,6 +271,8 @@ def apply_agent(
     the device may attach local MCP servers (*local_mcp*): their tools are in no contract, and the tool mode
     treats them as unclassified. With no contract at all nothing is held back, and every tool is
     unclassified: the gateway marks its calls for the client to ask (``faden.approval_required``).
+
+    The version's ``ui.reasoning.max`` caps ``reasoning_effort``: see ``cap_reasoning``.
     """
     if "session_id" in payload:
         raise GatewayError(
@@ -252,7 +284,7 @@ def apply_agent(
     held: list[dict[str, Any]] = []
     if profile.host_tool_contract and not local_mcp:
         payload, held = hold_back(payload, profile.host_tools)
-    shaped = dict(payload)
+    shaped = cap_reasoning(dict(payload), reasoning_max(profile))
     if profile.model_alias:
         shaped["model"] = profile.model_alias
     elif shaped.get("model") in (None, "", SDK_MODEL_PLACEHOLDER):
