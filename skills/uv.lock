@@ -470,7 +470,7 @@ wheels = [
 
 [[package]]
 name = "faden-skills"
-version = "0.5.1"
+version = "0.6.0rc3"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },

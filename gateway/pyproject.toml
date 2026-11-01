@@ -1,6 +1,6 @@
 [project]
 name = "faden_gateway"
-version = "0.5.1"
+version = "0.6.0rc3"
 description = ""
 readme = "README.md"
 license = "Apache-2.0"
