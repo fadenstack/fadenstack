@@ -25,6 +25,38 @@
 series: []
 
 releases:
+  - version: 0.6.0rc4
+    channel: preview
+    date: ""
+    severity: security
+    summary: >-
+      The fourth release candidate of 0.6.0, a Preview release: usage and limits with privacy by default, teams in a
+      tree, settings changes in every backend process at once, requests to cloud models with the local PII
+      detector on, faster answers in chats with skills, and security updates.
+    highlights:
+      - "A Preview release: `faden deploy` and `faden upgrade` say what that means and ask before they go on."
+      - "With the PII module's local detector (its CPU and GPU modes), requests to cloud models are no longer all refused: the default policy looks for the types the installed detector finds. An install still on the earlier default gets the new one; a policy that does not fit the detector is named as such."
+      - "Usage: My usage for everyone, with a download; a Usage page that shows figures only for groups of at least 5 people; per-person figures of others only for a usage auditor with a stated reason, and every look is recorded."
+      - "Limits for the instance: requests per minute, tokens per minute and tokens per day, refused as OpenAI clients read it (429 with Retry-After and x-ratelimit headers)."
+      - "Teams in a tree: a team's parent, cost centre and archiving; usage counts toward a person's home team and every team above it."
+      - "Request records are kept 90 days and daily sums 25 months; deleting an account erases its request records. Nothing is deleted in the first 7 days after the upgrade."
+      - "A settings change applies in every backend process at once, not only in the one that saved it."
+      - "Each mail in the outbox goes out once, also with several backend workers. A forgotten password can be reset at addresses on .local and other internal domains."
+      - "A restore onto a rebuilt server comes back: RabbitMQ's users follow the restored .env, and a restore whose services do not all start says so instead of \"Restore complete.\""
+      - "An upgrade from 0.4.x with the PII module on no longer leaves the old PII worker running on its 0.4.x image: `faden upgrade` and `faden up` stop and remove it."
+      - "Chats with skills answer sooner: a turn's skills go into its question, so a model that takes one system message (Qwen 3.5 and later) no longer computes the whole conversation again when the skills change; the first word came 3 to 7 times sooner in tests."
+      - "Agents can ask whether the policy allows a person's own command before they run it, and see whom they work for (for the Nextcloud agent's history commands)."
+      - "A model whose servers are all down says so (503 model_unreachable, with Retry-After) instead of reading as not allowed; answers no longer carry invisible characters a model repeated; the Updates page reads the PII image's version."
+      - "When the PII module is switched off and requests to cloud models go out unmasked, administrators see it at the top of every admin page, until it is on again."
+      - "Help says what content marking leaves to your organisation under the AI Act: visible labels for what you publish, telling people they talk to an AI, and keeping the marks in your terms of use."
+      - "A request the services cannot read is refused without repeating what was sent (a password, a key, a text to scan); with a label allowlist for logs, a query's filters keep to it too."
+      - "The node agent 0.2.12 brings the security updates of its dependencies (dnspython, msgpack) to the machines."
+      - "Security and maintenance updates: LiteLLM, FastAPI, the MCP SDK 2, huggingface-hub 2, aio-pika, taskiq, OpenTelemetry, React and others."
+      - "Installs first set up with 0.4.2 or 0.4.3: RabbitMQ's management and Langfuse still take the console password chosen then, and .env holds it in plain text; later installs give each a password of its own. Before you upgrade, put a new password in RABBITMQ_ADMIN_PASS in .env: the upgrade gives it to RabbitMQ."
+      - "After the upgrade, change your console password (My Profile, Change Password). The old one then opens only Langfuse, which has no command to change it and is reachable only from the server itself unless LANGFUSE_BIND is set. Grafana's password signs in nowhere (its login form is off); to change it all the same: `docker exec faden-grafana grafana cli admin reset-admin-password '<new password>'`, and the same in GRAFANA_ADMIN_PASSWORD."
+    upgrade_from: 0.4.0
+    components:
+      agent: 0.2.12
   - version: 0.6.0rc3
     channel: preview
     date: ""
