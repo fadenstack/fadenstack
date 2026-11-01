@@ -75,3 +75,43 @@ def test_the_catalog_entry_carries_the_servers_annotations() -> None:
         annotations={"readOnlyHint": True, "openWorldHint": True},
     )
     assert entry.model_dump()["annotations"] == {"readOnlyHint": True, "openWorldHint": True}
+
+
+@pytest.mark.anyio
+async def test_the_listing_names_every_tool_with_its_server_and_whether_it_is_on(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Switched-off tools and tools of a disabled server are listed, as off; nothing else leaves."""
+
+    def tool(name: str, server_id: uuid.UUID, *, enabled: bool = True, description: Any = "Does it.") -> SimpleNamespace:
+        row = _tool(name, server_id)
+        row.openai_schema_json = {"type": "function", "function": {"name": name, "description": description,
+                                                                   "parameters": {"secret": 1}}}
+        row.enabled = enabled
+        return row
+
+    async def tools(self: MCPDao, tenant_id: str, **kwargs: Any) -> list[SimpleNamespace]:
+        assert kwargs == {"enabled_only": False}
+        return [
+            tool("mcp.gh.one", ON),
+            tool("mcp.gh.two", ON, enabled=False),
+            tool("mcp.old.three", OFF),
+            tool("mcp.gh.four", ON, description=None),
+            tool("mcp.gone.five", uuid.uuid4()),
+        ]
+
+    async def labels(self: MCPDao, tenant_id: str) -> dict[uuid.UUID, tuple[str, bool]]:
+        return {ON: ("GitHub", True), OFF: ("Old server", False)}
+
+    monkeypatch.setattr(MCPDao, "list_tools_by_tenant", tools)
+    monkeypatch.setattr(MCPDao, "server_labels", labels)
+
+    listing = await views.get_tool_listing(tenant_id="default", session=SimpleNamespace())
+    assert [e.model_dump() for e in listing.tools] == [
+        {"qualified_name": "mcp.gh.one", "server_name": "GitHub", "description": "Does it.", "enabled": True},
+        {"qualified_name": "mcp.gh.two", "server_name": "GitHub", "description": "Does it.", "enabled": False},
+        {"qualified_name": "mcp.old.three", "server_name": "Old server", "description": "Does it.",
+         "enabled": False},
+        {"qualified_name": "mcp.gh.four", "server_name": "GitHub", "description": "", "enabled": True},
+    ]
+    assert "secret" not in listing.model_dump_json()
