@@ -36,9 +36,12 @@ class NotificationOutbox(Base):
     payload_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending", index=True)
     attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # By the backend's clock, which the dispatcher reads (``services/notifications/dispatcher.py``): from the
+    # database's, a mail written a moment ago was not yet due when that clock was ahead.
     next_attempt_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
+        default=lambda: datetime.now(UTC),
         server_default=func.now(),
         index=True,
     )
