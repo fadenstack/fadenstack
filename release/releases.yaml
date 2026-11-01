@@ -42,6 +42,7 @@ releases:
       - "Request records are kept 90 days and daily sums 25 months; deleting an account erases its request records. Nothing is deleted in the first 7 days after the upgrade."
       - "A settings change applies in every backend process at once, not only in the one that saved it."
       - "Each mail in the outbox goes out once, also with several backend workers. A forgotten password can be reset at addresses on .local and other internal domains."
+      - "A restore onto a rebuilt server comes back: RabbitMQ's users follow the restored .env, and a restore whose services do not all start says so instead of \"Restore complete.\""
       - "Chats with skills answer sooner: a turn's skills go into its question, so a model that takes one system message (Qwen 3.5 and later) no longer computes the whole conversation again when the skills change; the first word came 3 to 7 times sooner in tests."
       - "Agents can ask whether the policy allows a person's own command before they run it, and see whom they work for (for the Nextcloud agent's history commands)."
       - "A model whose servers are all down says so (503 model_unreachable, with Retry-After) instead of reading as not allowed; answers no longer carry invisible characters a model repeated; the Updates page reads the PII image's version."
