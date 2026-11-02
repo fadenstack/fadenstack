@@ -1,5 +1,8 @@
 # Mail
 
+<span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span>
+
+
 Fadenstack verschickt Mail für Passwort-Zurücksetzungen, für die Codes, mit denen eine Anmeldung mit einem Konto
 verknüpft wird, und für Warnungen an Administratoren. Jede Mail übergibt es dem Mailserver Ihrer Organisation,
 auf diesem oder einem anderen Rechner, über eine verschlüsselte Verbindung: angemeldet mit dem Passwort eines

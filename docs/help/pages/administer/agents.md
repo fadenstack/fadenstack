@@ -55,7 +55,7 @@ The agent's page opens. Its list status is **Draft**, **Published** or **Retired
 |---|---|
 | **Definition** | The version people get: **Instructions**, **Model**, **Knowledge** (collections it may search), **Server tools** (**What a chat gets**, **Only these**, or **None**), **Local MCP servers**, **Host tools** (the application's tools and their classes), **Appearance** (greeting and suggested prompts) and **Privacy**. |
 | **Versions** | Every version. **Publish** one, **Roll back** to an earlier one, see the **Changes**. |
-| **Access** | **Who may use it**, the **Excluded people** (Enterprise) and its **Maintainers** (with Enterprise: **Maintainers and auditors**). **Check someone's access** says whether a person may use the agent, and why. |
+| **Access** | **Who may use it**, the **Excluded people** <span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span> and its **Maintainers** (with Enterprise: **Maintainers and auditors** <span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span>). **Check someone's access** says whether a person may use the agent, and why. |
 | **Activity** | Usage over a time range (requests, errors, tokens, users, conversations: counts only, never content), shown only when at least five people used the agent in the range; the owner of a personal agent sees its figures all the same. What the applications reported (tools that ran, approvals), and the **Signed-in devices**. It names nobody but you. |
 | **Apps** | What the applications bring, compared with the agent's version (see [When an application brings new tools](#when-an-application-brings-new-tools)). |
 
@@ -85,7 +85,7 @@ change. Publishing a version reaches everyone who uses the agent at their next r
 **Maintainers** change the agent, publish versions and decide who may use it, and can use it before it is
 published. They do this from **Agents** in the chat's user menu; they need no access to the console.
 
-With Enterprise, an agent can also have **Auditors**: choose **Add as** → **Auditor** before picking the
+<span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span> With Enterprise, an agent can also have **Auditors**: choose **Add as** → **Auditor** before picking the
 person, or change a member's role in the list, and select **Save**. Auditors see the agent's versions,
 members, settings and activity and change nothing; to use it, they need it granted like anyone else. Without
 a valid Enterprise licence they no longer see it.
@@ -99,7 +99,7 @@ checked whom (`agent.access.check`).
     performance needs the works council's agreement (BetrVG § 87(1) No. 6): agree the auditor role with it
     before you give it.
 
-With Enterprise, **Excluded people** may not use the agent, even through a team that may: pick the person,
+<span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span> With Enterprise, **Excluded people** may not use the agent, even through a team that may: pick the person,
 give a **Reason** and select **Exclude**. It takes effect in the applications at once and is recorded
 in the audit log. The person is told only that they are excluded; the reason is for the agent's maintainers
 and administrators. Maintainers and administrators always keep the agent and cannot be excluded.
@@ -237,7 +237,7 @@ on their **Agents** page.
     takes effect within ten minutes. These are **Agent sign-in lifetime (s)**, **Agent sign-in idle timeout (s)**
     and **Agent access token lifetime (s)** under **Settings → General**.
 
-    With Enterprise, an agent can have shorter ones: **Sign-in lifetimes** on its **Definition** tab, in
+    <span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span> With Enterprise, an agent can have shorter ones: **Sign-in lifetimes** on its **Definition** tab, in
     seconds, at least 60; an empty field keeps the tenant's. They come with the version you save and publish.
     Longer ones than the tenant's are refused, and lowering the tenant's setting later shortens the agent's too.
     Devices already signed in get the shorter lifetime when their sign-in is next renewed.

@@ -196,6 +196,24 @@
   opacity: 0.8;
 }
 
+/* the chip for what needs Fadenstack Enterprise: a page (under its title), a section (under its heading), or an
+   item in a list or table (after its name) */
+.md-typeset .fs-enterprise {
+  display: inline-block;
+  padding: 0.1em 0.65em;
+  border: 1px solid var(--md-accent-fg-color);
+  border-radius: 999px;
+  background: var(--md-accent-fg-color--transparent);
+  color: var(--md-accent-fg-color);
+  font-size: 0.7em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.6;
+  text-transform: uppercase;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
 @media screen and (min-width: 60em) {
   .md-typeset .grid.cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));

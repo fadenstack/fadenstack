@@ -1,5 +1,8 @@
 # SAML {#saml}
 
+<span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span>
+
+
 Verbinden Sie einen Identitätsanbieter, der SAML 2.0 spricht, etwa AD FS, Shibboleth oder Entra ID. Die
 Benutzer wählen auf der Anmeldeseite **Anmelden mit** und den Namen des Anbieters, melden sich dort an und
 kommen angemeldet zurück. Was für alle Anbieter gilt, steht unter [Anmeldeanbieter](sign-in.md).

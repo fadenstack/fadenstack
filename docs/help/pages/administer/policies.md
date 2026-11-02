@@ -213,6 +213,8 @@ Fadenstack's own tools (the knowledge base search, the time, the tool search) ar
 
 ### Tool mode limits {#tool-mode-limits}
 
+<span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span>
+
 With Enterprise, **Agents → Governance → Tool mode limits** sets the most a chat's tool mode may be, for
 **Everyone**, **A team**, **An agent** or **A person**: choose who it is **For**, pick the team, agent or person,
 choose **At most** and select **Set limit**. Change a limit in its row, or remove it. Several limits can apply

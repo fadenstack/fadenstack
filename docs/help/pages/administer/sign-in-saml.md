@@ -1,5 +1,8 @@
 # SAML
 
+<span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span>
+
+
 Connect an identity provider that speaks SAML 2.0, such as AD FS, Shibboleth or Entra ID. People select
 **Sign in with** and the provider's name on the sign-in page, sign in there, and come back signed in. For
 what all providers share, see [Sign-in providers](sign-in.md).

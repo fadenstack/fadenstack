@@ -1,5 +1,7 @@
 # Budgets
 
+<span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span>
+
 A budget limits how many tokens, or how much money, the whole organisation, a team, an agent or one person
 may use per day, week or month. Every request has to fit into each budget that applies to it; a budget can
 refuse what does not fit, or only alert. The same page gives the monthly chargeback report per team or cost

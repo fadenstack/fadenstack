@@ -172,6 +172,12 @@ const withoutLicenceNotice = (p) =>
     }
   });
 
+/** The notices at the top of admin pages (a purge date, a licence) are that install's state, not the page's. */
+const withoutNotices = (p) =>
+  p.evaluate(() => {
+    for (const el of document.querySelectorAll('[data-testid^="admin-notice-"]')) el.style.display = "none";
+  });
+
 const asHttpsInstall = (p) =>
   p.evaluate((warning) => {
     for (const alert of document.querySelectorAll(".MuiAlert-root")) {
@@ -206,6 +212,22 @@ const SHOTS = [
       });
     },
   },
+  // Usage: taken from an install with an example organisation (fadenstack-dev release/bed/seed_pictures.py).
+  {
+    // The last 7 days (the example organisation's figures start two weeks back), the teams opened.
+    name: "administer/usage", path: "/admin/usage", wait: 4000, viewport: { width: 1440, height: 1300 },
+    act: async (p) => {
+      await withoutNotices(p);
+      await p.getByRole("button", { name: L("7 days"), exact: true }).first().click();
+      await settle(p, 2000);
+      await p.getByRole("button", { name: L("Open all"), exact: true }).first().click();
+    },
+  },
+  {
+    name: "administer/usage-mine", path: "/usage", wait: 4000, viewport: { width: 1440, height: 1100 },
+    act: async (p) => p.getByRole("button", { name: L("7 days"), exact: true }).first().click(),
+  },
+  { name: "administer/usage-privacy", path: "/admin/settings?tab=usage", wait: 3000, act: withoutNotices },
   { name: "administer/roles", path: "/admin/roles", wait: 5000 },
   { name: "administer/marketplace", path: "/admin/marketplace" },
   { name: "administer/deployments", path: "/admin/deployments" },

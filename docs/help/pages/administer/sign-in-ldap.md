@@ -1,5 +1,8 @@
 # Directories (LDAP, Active Directory)
 
+<span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span>
+
+
 Let people sign in with the name and password they have in your directory: Active Directory, OpenLDAP or a
 similar LDAP directory. They pick the directory on the sign-in page and type their **Account name** and
 password; the password is checked by the directory and never stored here. For what all providers share, see

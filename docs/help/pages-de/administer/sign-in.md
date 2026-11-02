@@ -1,5 +1,8 @@
 # Anmeldeanbieter {#sign-in-providers}
 
+<span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span>
+
+
 Die Benutzer melden sich mit dem Konto an, das sie in Ihrer Organisation bereits haben: über einen
 Identitätsanbieter, der OpenID Connect oder SAML spricht, oder mit Name und Passwort aus Ihrem Verzeichnis
 (LDAP, Active Directory). Bei der ersten Anmeldung erhalten sie ein Fadenstack-Konto, mit den Rollen und

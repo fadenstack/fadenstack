@@ -1,5 +1,7 @@
 # Budgets {#budgets}
 
+<span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span>
+
 Ein Budget begrenzt, wie viele Tokens oder wie viel Geld die ganze Organisation, ein Team, ein Agent oder eine
 einzelne Person pro Tag, Woche oder Monat nutzen darf. Jede Anfrage muss in jedes Budget passen, das für sie
 gilt; ein Budget kann ablehnen, was nicht passt, oder nur benachrichtigen. Dieselbe Seite liefert die monatliche
