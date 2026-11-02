@@ -30,11 +30,13 @@ As installed, and until you change a setting:
 - **Person-level figures are kept per day at most, for 90 days.** The request log they come from is kept for 90
   days too. No figure holds the time of day of a person's use, or their device.
 - **The limits for the instance know no person**: they count everyone's requests together.
-- **Budgets for single people are off** (with Fadenstack Enterprise), and once on, a person's use of their
+- **Budgets for single people are off** <span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span> (with Fadenstack Enterprise), and once on, a person's use of their
   budget is shown to them alone (see [Budgets](budgets.md#privacy)).
 - **Who may look at one person's figures** is a role that nobody holds at installation, not even superusers.
 
 ## The settings
+
+![Settings, Usage and privacy: person-level reporting off, the minimum group size and how long figures are kept](../images/administer/usage-privacy.png)
 
 Open **Settings** and select the **Usage and privacy** tab. Administrators change the settings; **Person-level
 reporting** also needs **Root Mode**. Every change is recorded in the audit log with the name of who made it and
@@ -181,7 +183,7 @@ days (**Request log**, `usage.request_log_retention_days`); erased with the acco
 **The limits**: the values set (`rpm_limit`, `tpm_limit`, `tokens_per_day` of the instance's policy), and their
 counts, one per instance, which last only for their minute or day. No personal data.
 
-**Budgets**, with Fadenstack Enterprise (see [Budgets](budgets.md)). What a budget used comes from the figures
+<span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span> **Budgets**, with Fadenstack Enterprise (see [Budgets](budgets.md)). What a budget used comes from the figures
 above; these tables hold the budgets themselves:
 
 | Table | One row per | Holds | Kept | Who sees it |

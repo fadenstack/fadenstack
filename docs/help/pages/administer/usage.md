@@ -12,7 +12,7 @@ and who may see whose, is on [Usage and privacy](usage-privacy.md).
 | **My usage**, in the menu behind the account button | Everyone, for themselves | Their own tokens and estimated cost, the limits that apply, and a download of their data (see [Your own usage](#your-own-usage)). |
 | **Observability → Usage** | Administrators, auditors and usage auditors | Totals and a series over time, by team, agent, model or provider, only for groups of at least five people (see [The Usage page](#the-usage-page)). |
 | [Dashboard](dashboard.md) | Administrators | Today at a glance: **Requests today**, **Active users today**, **Kept in-house**, **Spend this month**, **Error rate (1 h)**; **AI traffic** (where requests were served) and **Usage** (requests per day, by where they were served). |
-| **Observability → Budgets** | Administrators, with Fadenstack Enterprise | What each budget has used this period, its alerts, and the chargeback per team or cost centre (see [Budgets](budgets.md)). |
+| **Observability → Budgets** <span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span> | Administrators, with Fadenstack Enterprise | What each budget has used this period, its alerts, and the chargeback per team or cost centre (see [Budgets](budgets.md)). |
 | **Observability → Cost Dashboard** | Administrators | Spend, requests, tokens, speed and errors of the whole instance, and the prices (see [The cost and usage pages](#the-cost-and-usage-pages)). |
 | **Observability → LLM Calls** | Administrators | Each request and call: why one failed, what an agent did for one question, where calls went (see [LLM calls](llm-calls.md)). |
 | An agent's **Activity** tab | Administrators; the owner of a personal agent | Requests, errors, tokens, users and conversations of that agent, counts only, when at least five people used it in the range; its owner sees a personal agent's figures (see [Agents and add-ins](agents.md)). |
@@ -53,6 +53,8 @@ Each figure on the usage pages counts:
 
 ## Your own usage
 
+![My usage: totals, tokens over the last seven days, the limits, and the use by model, agent and project](../images/administer/usage-mine.png)
+
 Everyone who signs in sees their own usage under **My usage**, in the menu behind their account button:
 
 - their tokens and estimated cost by day or month, by model, by agent and by chat project;
@@ -60,7 +62,7 @@ Everyone who signs in sees their own usage under **My usage**, in the menu behin
   only when at least five other people used the instance today (the
   [minimum group size](#the-minimum-group-size)): with fewer, the figure would show what they used. The
   per-minute limits show the limit only, never how much is used;
-- with Fadenstack Enterprise, the budgets that apply to them (see [Budgets](budgets.md#your-own-budgets));
+- <span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span> with Fadenstack Enterprise, the budgets that apply to them (see [Budgets](budgets.md#your-own-budgets));
 - whether person-level reporting is on, how finely and for how long their figures are kept, and how often a
   usage auditor looked at them, with a link to your privacy notice when you have set one (see
   [Usage and privacy](usage-privacy.md#the-settings));
@@ -72,6 +74,8 @@ each time a usage auditor looked at their figures, without the name of who looke
 may ask under Art. 15 GDPR about their usage (see [Usage and privacy](usage-privacy.md#your-own-view-and-the-download)).
 
 ## The Usage page
+
+![The Usage page: totals, tokens over the last seven days, and the use of Example Corp and its teams Engineering, Sales and Support](../images/administer/usage.png)
 
 The **Usage** page shows how much the instance uses, and where, without showing anyone's own figures.
 Administrators can open it, and so can people with the role `auditor` or `usage_auditor`, who need no

@@ -36,12 +36,14 @@ Nach der Installation, und solange Sie keine Einstellung ändern:
   Anfrageprotokoll, aus dem sie stammen, ebenfalls 90 Tage. Keine Zahl enthält die Uhrzeit, zu der eine Person
   etwas genutzt hat, oder ihr Gerät.
 - **Die Limits der Instanz kennen keine Person**: Sie zählen die Anfragen aller zusammen.
-- **Budgets für einzelne Personen sind ausgeschaltet** (mit Fadenstack Enterprise), und eingeschaltet sieht nur
+- **Budgets für einzelne Personen sind ausgeschaltet** <span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span> (mit Fadenstack Enterprise), und eingeschaltet sieht nur
   die Person selbst, was sie von ihrem Budget verbraucht hat (siehe [Budgets](budgets.md#privacy)).
 - **Wer die Zahlen einer einzelnen Person ansehen darf**, regelt eine Rolle, die bei der Installation niemand
   hat, auch kein Superuser.
 
 ## Die Einstellungen {#the-settings}
+
+![Einstellungen, Nutzung und Datenschutz: personenbezogene Auswertung aus, die Mindestgruppengröße und wie lange Zahlen aufbewahrt werden](../images/administer/usage-privacy.png)
 
 Öffnen Sie **Einstellungen** und wählen Sie den Reiter **Nutzung und Datenschutz**. Administratoren ändern die
 Einstellungen; **Personenbezogene Auswertung** braucht außerdem den **Root-Modus**. Jede Änderung wird mit dem
@@ -207,7 +209,7 @@ Aufbewahrt 90 Tage (**Anfrageprotokoll**, `usage.request_log_retention_days`); g
 und ihre Zählungen, eine pro Instanz, die nur für ihre Minute oder ihren Tag bestehen. Keine
 personenbezogenen Daten.
 
-**Budgets**, mit Fadenstack Enterprise (siehe [Budgets](budgets.md)). Was ein Budget verbraucht hat, kommt aus den
+<span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span> **Budgets**, mit Fadenstack Enterprise (siehe [Budgets](budgets.md)). Was ein Budget verbraucht hat, kommt aus den
 Zahlen oben; diese Tabellen enthalten die Budgets selbst:
 
 | Tabelle | Eine Zeile pro | Enthält | Aufbewahrt | Wer sie sieht |

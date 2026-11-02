@@ -1,5 +1,8 @@
 # Verzeichnisse (LDAP, Active Directory) {#directories-ldap-active-directory}
 
+<span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span>
+
+
 Die Benutzer melden sich mit dem Namen und dem Passwort an, die sie in Ihrem Verzeichnis haben: Active
 Directory, OpenLDAP oder ein ähnliches LDAP-Verzeichnis. Sie wählen auf der Anmeldeseite das Verzeichnis und
 geben ihren **Kontonamen** und ihr Passwort ein; das Passwort prüft das Verzeichnis, gespeichert wird es hier

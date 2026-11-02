@@ -1,5 +1,8 @@
 # Provisionierung (SCIM) {#provisioning-scim}
 
+<span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span>
+
+
 Mit der Provisionierung legt Ihr Identitätsanbieter Benutzer hier an, ändert sie und sperrt, wer geht, sobald es
 dort geschieht, ohne auf eine Anmeldung zu warten. Jede seiner Gruppen wird hier eine Gruppe, mit denselben
 Mitgliedern. Das funktioniert mit Entra ID, Okta und anderen Anbietern, die SCIM 2.0 sprechen, für Anbieter mit

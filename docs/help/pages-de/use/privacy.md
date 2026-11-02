@@ -117,7 +117,7 @@ solcher Link teilt der Website mit, wo er angeklickt wurde (z. B. `ref=console-a
 Organisation oder diesen Server, öffnet sich in einem neuen Tab und gibt die Adresse der Seite, von der Sie kommen,
 nicht weiter. Gesendet wird nur etwas, wenn Sie einen anklicken.
 
-Mit Enterprise können Administratoren die Links der Konsole entfernen (die Anmeldeseite, **Über Fadenstack**,
+<span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span> Mit Enterprise können Administratoren die Links der Konsole entfernen (die Anmeldeseite, **Über Fadenstack**,
 die Versionshinweise unter **Updates**): **Einstellungen → Erscheinungsbild → Show links to fadenstack.com**.
 
 ## Wenn es nicht funktioniert {#when-it-does-not-work}

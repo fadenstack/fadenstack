@@ -58,7 +58,7 @@ Die Seite des Agenten öffnet sich. Sein Status in der Liste ist **Entwurf**, **
 |---|---|
 | **Definition** | Die Version, die Benutzer erhalten: **Anweisungen**, **Modell**, **Wissen** (Sammlungen, die er durchsuchen darf), **Server-Tools** (**Wie im Chat**, **Nur diese** oder **Keine**), **Lokale MCP-Server**, **Host-Tools** (die Tools der Anwendung und ihre Klassen), **Darstellung** (Begrüßung und vorgeschlagene Prompts) und **Datenschutz**. |
 | **Versionen** | Jede Version. Mit **Veröffentlichen** eine Version veröffentlichen, mit **Zurücksetzen** zu einer früheren zurückkehren, unter **Änderungen** die Unterschiede sehen. |
-| **Zugriff** | **Wer ihn nutzen darf**, die Liste **Ausgeschlossene Personen** (Enterprise) und seine **Betreuer** (mit Enterprise: **Betreuer und Prüfer**). **Zugriff prüfen** zeigt, ob eine Person den Agenten nutzen darf, und warum. |
+| **Zugriff** | **Wer ihn nutzen darf**, die Liste **Ausgeschlossene Personen** <span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span> und seine **Betreuer** (mit Enterprise: **Betreuer und Prüfer** <span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span>). **Zugriff prüfen** zeigt, ob eine Person den Agenten nutzen darf, und warum. |
 | **Aktivität** | Nutzung über einen Zeitraum (Anfragen, Fehler, Tokens, Benutzer, Unterhaltungen: nur Zahlen, nie Inhalte), nur, wenn mindestens fünf Personen den Agenten im Zeitraum genutzt haben; der Eigentümer eines persönlichen Agenten sieht dessen Zahlen trotzdem. Was die Anwendungen gemeldet haben (ausgeführte Tools, Zustimmungen) und **Angemeldete Geräte**. Der Reiter nennt niemanden außer Ihnen selbst. |
 | **Apps** | Was die Anwendungen mitbringen, verglichen mit der Version des Agenten (siehe [Wenn eine Anwendung neue Tools mitbringt](#when-an-application-brings-new-tools)). |
 
@@ -90,7 +90,7 @@ nutzen, bei ihrer nächsten Anfrage.
 schon vor der Veröffentlichung nutzen. Das tun sie über **Agenten** im Benutzermenü des Chats; Zugriff auf die
 Konsole brauchen sie nicht.
 
-Mit Enterprise kann ein Agent auch **Prüfer** haben: Wählen Sie **Hinzufügen als** → **Prüfer**, bevor Sie
+<span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span> Mit Enterprise kann ein Agent auch **Prüfer** haben: Wählen Sie **Hinzufügen als** → **Prüfer**, bevor Sie
 die Person auswählen, oder ändern Sie die Rolle eines Mitglieds in der Liste, und wählen Sie **Speichern**.
 Prüfer sehen die Versionen, Mitglieder, Einstellungen und Aktivität des Agenten und ändern nichts; nutzen
 können sie ihn nur, wenn er ihnen wie allen anderen freigegeben ist. Ohne gültige Enterprise-Lizenz sehen sie
@@ -105,7 +105,7 @@ im Audit-Protokoll festgehalten, mit wer wen geprüft hat (`agent.access.check`)
     Leistung der Beschäftigten überwachen kann, braucht die Zustimmung des Betriebsrats (BetrVG § 87 Abs. 1
     Nr. 6): Vereinbaren Sie die Prüferrolle mit ihm, bevor Sie sie vergeben.
 
-Mit Enterprise dürfen **Ausgeschlossene Personen** den Agenten nicht nutzen, auch nicht über ein Team, das ihn
+<span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span> Mit Enterprise dürfen **Ausgeschlossene Personen** den Agenten nicht nutzen, auch nicht über ein Team, das ihn
 nutzen darf: Wählen Sie die Person, geben Sie eine **Begründung** an und wählen Sie **Ausschließen**. Das wirkt
 in den Anwendungen sofort und wird im Audit-Protokoll festgehalten. Die Person erfährt nur,
 dass sie ausgeschlossen ist; die Begründung ist für die Betreuer und Administratoren des Agenten. Betreuer und
@@ -249,7 +249,7 @@ der Konsole oder auf ihrer Seite **Agenten**.
     Zugriffs wirkt innerhalb von zehn Minuten. Diese Werte sind **Agent sign-in lifetime (s)**,
     **Agent sign-in idle timeout (s)** und **Agent access token lifetime (s)** unter **Einstellungen → Allgemein**.
 
-    Mit Enterprise kann ein Agent kürzere haben: **Gültigkeit der Anmeldung** auf seinem Reiter **Definition**,
+    <span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span> Mit Enterprise kann ein Agent kürzere haben: **Gültigkeit der Anmeldung** auf seinem Reiter **Definition**,
     in Sekunden, mindestens 60; ein leeres Feld behält den Wert des Mandanten. Sie gelten mit der Version, die
     Sie speichern und veröffentlichen. Längere als die des Mandanten werden abgelehnt, und wird der Wert des
     Mandanten später gesenkt, verkürzt das auch die des Agenten. Bereits angemeldete Geräte erhalten die kürzere

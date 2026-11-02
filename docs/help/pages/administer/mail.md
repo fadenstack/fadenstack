@@ -1,5 +1,8 @@
 # Mail
 
+<span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span>
+
+
 Fadenstack sends mail for password resets, for the codes that link a sign-in to an account, and for alerts to
 administrators. It hands each mail to your organisation's mail server, on this machine or another one, over an
 encrypted connection: signed in with an account's password, as an app in Microsoft 365, or as a machine your

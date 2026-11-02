@@ -230,6 +230,8 @@ Die eigenen Tools von Fadenstack (die Suche in der Wissensdatenbank, die Uhrzeit
 
 ### Grenzen für den Tool-Modus {#tool-mode-limits}
 
+<span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span>
+
 Mit Enterprise legt **Agenten → Governance → Grenzen für den Tool-Modus** den höchsten Tool-Modus fest, den ein
 Chat haben darf, für **Alle**, **Ein Team**, **Einen Agenten** oder **Eine Person**: Wählen Sie unter **Für**, für
 wen, wählen Sie das Team, den Agenten oder die Person, dann **Höchstens**, und wählen Sie **Grenze setzen**.

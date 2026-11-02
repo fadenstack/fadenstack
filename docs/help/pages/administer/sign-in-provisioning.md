@@ -1,5 +1,8 @@
 # Provisioning (SCIM)
 
+<span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span>
+
+
 With provisioning, your identity provider adds people here, updates them and suspends those who leave as soon as
 it happens there, without waiting for them to sign in. Each of its groups becomes a group here, with the same
 members. It works with Entra ID, Okta and other providers that speak SCIM 2.0, for OpenID Connect and SAML

@@ -13,7 +13,7 @@ Was die Zahlen für die Daten der Beschäftigten bedeuten und wer wessen Zahlen 
 | **Meine Nutzung**, im Menü hinter der Konto-Schaltfläche | Jede Person, für sich selbst | Die eigenen Tokens und geschätzten Kosten, die geltenden Limits und einen Download der eigenen Daten (siehe [Ihre eigene Nutzung](#your-own-usage)). |
 | **Observability → Nutzung** | Administratoren, Prüfer und Nutzungsprüfer | Summen und Verlauf nach Team, Agent, Modell oder Provider, nur für Gruppen von mindestens fünf Personen (siehe [Die Seite „Nutzung“](#the-usage-page)). |
 | [Dashboard](dashboard.md) | Administratoren | Den heutigen Tag auf einen Blick: **Anfragen heute**, **Aktive Benutzer heute**, **Intern bearbeitet**, **Kosten diesen Monat**, **Fehlerquote (1 Std.)**; **KI-Datenverkehr** (wo Anfragen bedient wurden) und **Nutzung** (Anfragen pro Tag, nach Ort der Bearbeitung). |
-| **Observability → Budgets** | Administratoren, mit Fadenstack Enterprise | Was jedes Budget in diesem Zeitraum verbraucht hat, seine Benachrichtigungen und die Verrechnung je Team oder Kostenstelle (siehe [Budgets](budgets.md)). |
+| **Observability → Budgets** <span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span> | Administratoren, mit Fadenstack Enterprise | Was jedes Budget in diesem Zeitraum verbraucht hat, seine Benachrichtigungen und die Verrechnung je Team oder Kostenstelle (siehe [Budgets](budgets.md)). |
 | **Observability → Kosten-Dashboard** | Administratoren | Ausgaben, Anfragen, Tokens, Geschwindigkeit und Fehler der ganzen Instanz sowie die Preise (siehe [Die Kosten- und Nutzungsseiten](#the-cost-and-usage-pages)). |
 | **Observability → LLM-Aufrufe** | Administratoren | Jede Anfrage und jeder Aufruf: warum einer fehlschlug, was ein Agent für eine Frage tat, wohin Aufrufe gingen (siehe [LLM-Aufrufe](llm-calls.md)). |
 | Der Reiter **Aktivität** eines Agenten | Administratoren; der Eigentümer eines persönlichen Agenten | Anfragen, Fehler, Tokens, Benutzer und Unterhaltungen dieses Agenten, nur als Zahlen, wenn mindestens fünf Personen ihn im Zeitraum genutzt haben; die Zahlen eines persönlichen Agenten sieht sein Eigentümer (siehe [Agenten und Add-ins](agents.md)). |
@@ -54,6 +54,8 @@ Jede Zahl auf den Nutzungsseiten zählt:
 
 ## Ihre eigene Nutzung {#your-own-usage}
 
+![Meine Nutzung: Summen, Tokens der letzten sieben Tage, die Limits und die Nutzung nach Modell, Agent und Projekt](../images/administer/usage-mine.png)
+
 Jede Person, die sich anmeldet, sieht ihre eigene Nutzung unter **Meine Nutzung**, im Menü hinter ihrer
 Konto-Schaltfläche:
 
@@ -62,7 +64,7 @@ Konto-Schaltfläche:
   ist, aber nur, wenn heute mindestens fünf andere Personen die Instanz genutzt haben (die
   [Mindestgruppengröße](#the-minimum-group-size)): Bei weniger würde die Zahl zeigen, was sie verbraucht haben. Die
   Limits pro Minute zeigen nur das Limit, nie, wie viel verbraucht ist;
-- mit Fadenstack Enterprise die Budgets, die für sie gelten (siehe [Budgets](budgets.md#your-own-budgets));
+- <span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span> mit Fadenstack Enterprise die Budgets, die für sie gelten (siehe [Budgets](budgets.md#your-own-budgets));
 - ob die personenbezogene Auswertung eingeschaltet ist, wie fein und wie lange ihre Zahlen aufbewahrt werden
   und wie oft ein Nutzungsprüfer sie angesehen hat, mit einem Link zu Ihren Datenschutzhinweisen, wenn Sie
   einen gesetzt haben (siehe [Nutzung und Datenschutz](usage-privacy.md#the-settings));
@@ -75,6 +77,8 @@ eine Person nach Art. 15 DSGVO über ihre Nutzung erfragen kann (siehe
 [Nutzung und Datenschutz](usage-privacy.md#your-own-view-and-the-download)).
 
 ## Die Seite „Nutzung“ {#the-usage-page}
+
+![Die Seite Nutzung: Summen, Tokens der letzten sieben Tage und die Nutzung von Example Corp mit den Teams Engineering, Sales und Support](../images/administer/usage.png)
 
 Die Seite **Nutzung** zeigt, wie viel die Instanz verbraucht und wo, ohne die Zahlen einzelner Personen zu
 zeigen. Administratoren können sie öffnen, ebenso Personen mit der Rolle `auditor` oder `usage_auditor`, die
