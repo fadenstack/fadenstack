@@ -19,6 +19,8 @@ Verrechnung je Team oder Kostenstelle. Budgets erfordern Fadenstack Enterprise.
 
 ## Ein Budget einrichten {#set-up-a-budget}
 
+![Neues Budget: der Name Sales per month, gilt für das Team Sales, zählt Tokens, der Betrag, der Zeitraum, der Modus und die Benachrichtigungen](../images/administer/budgets-new.png)
+
 1. Öffnen Sie **Observability → Budgets** und wählen Sie **Neues Budget**.
 2. Geben Sie einen **Name** ein, z. B. `Vertrieb pro Monat`. Die Benachrichtigungen nennen ihn.
 3. Wählen Sie unter **Gilt für** **Organisation**, **Team**, **Agent** oder **Person** und dann das Team, den
@@ -51,6 +53,8 @@ innerhalb von Sekunden für die Anfragen.
       es und richten ein neues ein.
 
 ## Die Liste {#the-list}
+
+![Der Reiter Budgets: Engineering per week gelb bei 85 %, das Budget der Organisation, Sales per month in Euro mit einem Verantwortlichen und das Schattenbudget Support trial über seinem Betrag](../images/administer/budgets.png)
 
 Jedes Budget auf dem Reiter **Budgets** zeigt für den laufenden Zeitraum:
 
@@ -140,6 +144,8 @@ Keine Benachrichtigung enthält die Nutzung einer einzelnen Person. Die Mail set
 **Einstellungen → Mail** eingerichtet ist.
 
 ## Verrechnung {#chargeback}
+
+![Verrechnung für diesen Monat nach Team: Example Corp mit Engineering, Sales und Support sowie Nicht zugeordnet, mit Tokens und den geschätzten Kosten](../images/administer/budgets-chargeback.png)
 
 Der Reiter **Verrechnung** zeigt die Nutzung und die geschätzten Kosten eines Monats je Team oder je
 Kostenstelle, um Kosten innerhalb der Organisation zu verrechnen.

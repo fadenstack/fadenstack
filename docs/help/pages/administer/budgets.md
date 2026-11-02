@@ -19,6 +19,8 @@ centre. Budgets need Fadenstack Enterprise.
 
 ## Set up a budget
 
+![New budget: the name Sales per month, applies to the team Sales, counts tokens, the amount, the period, the mode and the alerts](../images/administer/budgets-new.png)
+
 1. Open **Observability → Budgets** and select **New budget**.
 2. Enter a **Name**, for example `Sales per month`. Alerts use it.
 3. Under **Applies to**, choose **Organisation**, **Team**, **Agent** or **Person**, and pick the team, agent or
@@ -48,6 +50,8 @@ requests within seconds.
       new one.
 
 ## The list
+
+![The Budgets tab: Engineering per week amber at 85 %, the organisation's budget, Sales per month in euros with an owner, and the shadow budget Support trial over its amount](../images/administer/budgets.png)
 
 Each budget on the **Budgets** tab shows, for the current period:
 
@@ -132,6 +136,8 @@ once, unless the mail server's answer to it was lost: then it is sent again, and
 No alert holds the use of a single person. The mail needs mail to be set up under **Settings → Mail**.
 
 ## Chargeback
+
+![Chargeback for this month per team: Example Corp with Engineering, Sales and Support, and Unassigned, with tokens and the estimated cost](../images/administer/budgets-chargeback.png)
 
 The **Chargeback** tab shows one month's usage and estimated cost per team or per cost centre, to allocate
 costs within the organisation.

@@ -228,6 +228,42 @@ const SHOTS = [
     act: async (p) => p.getByRole("button", { name: L("7 days"), exact: true }).first().click(),
   },
   { name: "administer/usage-privacy", path: "/admin/settings?tab=usage", wait: 3000, act: withoutNotices },
+  // Budgets (Enterprise): taken from an Enterprise install with the example organisation and four budgets
+  // (fadenstack-dev release/ee-kit/usage/seed_budget_pictures.py).
+  {
+    name: "administer/budgets", path: "/admin/budgets", wait: 3000, viewport: { width: 1440, height: 1480 },
+    act: async (p) => {
+      await withoutNotices(p);
+      await withoutLicenceNotice(p);
+    },
+  },
+  {
+    // Filled in as the steps describe, never created.
+    name: "administer/budgets-new", path: "/admin/budgets", wait: 3000, viewport: { width: 1440, height: 1400 },
+    act: async (p) => {
+      await p.getByRole("button", { name: K("budgets.new"), exact: true }).first().click();
+      const dialog = p.getByRole("dialog");
+      await dialog.getByLabel(K("budgets.dialog.name"), { exact: true }).fill(L("Sales per month"));
+      await dialog.getByRole("combobox", { name: K("budgets.dialog.scope") }).click();
+      await p.getByRole("option", { name: K("budgets.scope.team"), exact: true }).click();
+      // The second field named so: "Applies to" now reads "Team" too.
+      await dialog.getByRole("combobox", { name: K("budgets.dialog.team") }).last().click();
+      await p.getByRole("option", { name: "Sales", exact: true }).click();
+      await dialog.getByLabel(K("budgets.dialog.amount"), { exact: true }).fill("1000000");
+    },
+    clip: (p) => p.locator(".MuiDialog-paper"),
+  },
+  {
+    // This month's report: the example organisation's usage is this month's.
+    name: "administer/budgets-chargeback", path: "/admin/budgets?tab=chargeback", wait: 3000,
+    viewport: { width: 1440, height: 1000 },
+    act: async (p) => {
+      await withoutNotices(p);
+      await withoutLicenceNotice(p);
+      await p.getByRole("combobox", { name: K("budgets.chargeback.month") }).click();
+      await p.getByRole("option").first().click();
+    },
+  },
   { name: "administer/roles", path: "/admin/roles", wait: 5000 },
   { name: "administer/marketplace", path: "/admin/marketplace" },
   { name: "administer/deployments", path: "/admin/deployments" },
