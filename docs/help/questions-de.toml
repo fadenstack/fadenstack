@@ -56,6 +56,14 @@
 "Wie lange gilt ein Anmeldecode?" = "limits"
 "Wie beende ich die Anmeldung einer App?" = "see-and-end-the-sign-in"
 
+["use/work-alongside.md"]
+"Wie lasse ich den Assistenten arbeiten, ohne dass er bei jedem Schritt fragt?" = "start-it"
+"Was darf der Assistent ohne Nachfrage, wenn er mit mir zusammenarbeitet?" = "start-it"
+"Wie beende ich die Zusammenarbeit mit dem Assistenten?" = "while-it-works"
+"Warum hat sich in Word der Kommentarrand geöffnet?" = "while-it-works"
+"Was passiert, wenn ich den Bildschirm sperre oder die Desktop-App beende?" = "when-you-step-away"
+"Warum hat die Zusammenarbeit geendet?" = "when-it-ends"
+
 ["use/checking-content.md"]
 "Wie prüfe ich, ob ein Text oder ein Bild von einer KI stammt?" = "check-a-text-a-picture-or-a-file"
 "Was bedeutet das Ergebnis einer Inhaltsprüfung?" = "read-the-result"

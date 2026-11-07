@@ -15,6 +15,7 @@ Fadenstack is your organisation's own AI assistant. You chat with the models you
 | **Work in Chrome** with the browser agent, which reads the page you are on | [The browser agent](browser-agent.md) |
 | **Work in Office** with the add-ins for Word, Excel, PowerPoint and Outlook | [Office add-ins](office-add-ins.md) |
 | **Sign in a desktop app** with a code you approve in the browser, without typing your password into it | [Sign in a desktop app](sign-in-an-app.md) |
+| **Let the assistant work alongside you** in the desktop app, in places you name, for a while, without asking at each step | [Working alongside you](work-alongside.md) |
 | **Check content**: find out whether a text, a picture or a file carries the mark of AI-generated content | [Checking content](checking-content.md) |
 
 ## Before you start

@@ -58,6 +58,14 @@
 "How long does a sign-in code work?" = "limits"
 "How do I end an app's sign-in?" = "see-and-end-the-sign-in"
 
+["use/work-alongside.md"]
+"How do I let the assistant work without asking me at every step?" = "start-it"
+"What may the assistant do without asking while it works alongside me?" = "start-it"
+"How do I stop the assistant working alongside me?" = "while-it-works"
+"Why did Word's comment margin open?" = "while-it-works"
+"What happens when I lock the screen or quit the desktop app?" = "when-you-step-away"
+"Why did working alongside me end?" = "when-it-ends"
+
 ["use/checking-content.md"]
 "How do I check whether a text or a picture was made by AI?" = "check-a-text-a-picture-or-a-file"
 "What does the result of a content check mean?" = "read-the-result"

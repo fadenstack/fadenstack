@@ -79,7 +79,8 @@ They need a state the test install does not have, or a dialog the script does no
   New skill dialog (`/skill`), the `$` list and a picked skill's chip; an attached file's chip and an answer naming
   its document; My Profile's API Token section and the avatar menu; the browser agent's first run, its "cannot read"
   bar and a marked passage; Word's **Agent** group, the add-in's sign-in pane, **More → Sign out** and **Undo agent
-  change**; **Check content** with a result (`use/checking-content.md`) and the public check page.
+  change**; **Check content** with a result (`use/checking-content.md`) and the public check page; the desktop app's
+  **Work alongside you?** card, its marker with **Stop** and an end summary (`use/work-alongside.md`).
 - **Administer**: the Help menu opened; Settings → Modules; the dashboard in Customize mode; Add Provider's Pricing
   step and a remote provider's Edit dialog; a deployment's Offer in chat and reply-wait dialogs and its Logs
   section without errors; the marketplace's Search tab, a model's details and the Delete dialog on On this server;
