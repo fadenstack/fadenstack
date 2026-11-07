@@ -7,6 +7,7 @@ from faden_gateway.web.api.v1.agents import router as agents_router
 from faden_gateway.web.api.v1.approvals import router as approvals_router
 from faden_gateway.web.api.v1.attachments import router as attachments_router
 from faden_gateway.web.api.v1.devices import router as devices_router
+from faden_gateway.web.api.v1.grants import router as grants_router
 from faden_gateway.web.api.v1.memory import router as memory_router
 from faden_gateway.web.api.v1.provenance import router as provenance_router
 from faden_gateway.web.api.v1.sessions import router as sessions_router
@@ -19,6 +20,7 @@ public_router.include_router(v1_router, tags=["gateway"])
 public_router.include_router(agents_router, tags=["agents"])
 public_router.include_router(devices_router, tags=["agents"])
 public_router.include_router(approvals_router, tags=["gateway"])
+public_router.include_router(grants_router, tags=["agents"])
 public_router.include_router(provenance_router, tags=["provenance"])
 public_router.include_router(sessions_router)
 public_router.include_router(memory_router)

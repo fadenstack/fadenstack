@@ -4435,6 +4435,7 @@
       "problem_duplicate_tools": "Dos herramientas del anfitrión tienen el mismo nombre. Cada nombre puede aparecer una sola vez.",
       "problem_never_risky": "No preguntar nunca solo es para herramientas de lectura y escritura. Cambie la clase o la aprobación de la herramienta.",
       "problem_default_above_max": "El modo de herramientas en el que empiezan las conversaciones está por encima del máximo. Baje el inicial o suba el máximo.",
+      "problem_place_incomplete": "El lugar de una herramienta necesita tanto el argumento (que empiece por /) como su tipo.",
       "behaviour": "Comportamiento",
       "instructions": "Instrucciones",
       "instructions_help": "Se anteponen a cada conversación. Los usuarios y el SDK nunca las ven.",
@@ -4495,7 +4496,16 @@
       "approval_ask": "Preguntar",
       "approval_always": "Preguntar siempre",
       "never_read_write": "Solo para lectura y escritura",
-      "approval_help": "Preguntar siempre: pregunta cada vez, y nada de lo que la persona permitió antes responde por ella; úselo para herramientas que deciden sobre personas o actúan en el mundo físico. Preguntar: pregunta incluso donde el modo de herramientas la ejecutaría; la persona puede permitirla para el chat o siempre. No preguntar nunca: una herramienta de lectura o escritura se ejecuta sin preguntar en Preguntar y Automático."
+      "approval_help": "Preguntar siempre: pregunta cada vez, y nada de lo que la persona permitió antes responde por ella; úselo para herramientas que deciden sobre personas o actúan en el mundo físico. Preguntar: pregunta incluso donde el modo de herramientas la ejecutaría; la persona puede permitirla para el chat o siempre. No preguntar nunca: una herramienta de lectura o escritura se ejecuta sin preguntar en Preguntar y Automático.",
+      "place": "Lugar",
+      "place_none": "Ninguno",
+      "place_document": "Documento",
+      "place_folder": "Carpeta",
+      "place_site": "Sitio web",
+      "place_app": "Aplicación",
+      "place_desk": "Escritorio",
+      "target_argument": "Argumento",
+      "place_help": "Lugar: el argumento (un puntero JSON como /path) que indica dónde actúa una llamada y de qué tipo de lugar se trata. Una autorización de trabajo cubre las llamadas de una herramienta solo dentro de los lugares que nombra; una herramienta sin lugar siempre pregunta con una autorización así."
     },
     "versions": {
       "version": "Versión",

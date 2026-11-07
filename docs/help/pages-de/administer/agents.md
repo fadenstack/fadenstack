@@ -214,6 +214,11 @@ oder legen eine [Tool-Regel](policies.md#tool-rules) **Erst nachfragen** an. Zwe
 Entwürfe für die Person; und der Browser-Agent liest oder füllt nie Passwortfelder oder Kartenfelder, die die
 Website als solche kennzeichnet.
 
+Unter **Ort** kann ein Tool angeben, welches seiner Argumente nennt, wo ein Aufruf handelt (ein JSON-Pointer wie
+`/path`), und welche Art von Ort es ist: Dokument, Ordner, Website, App oder Schreibtisch. Eine Arbeitsfreigabe, die
+eine Person einem Agenten für eine Weile geben kann, deckt die Aufrufe des Tools nur an den Orten, die sie nennt. Ein
+Tool ohne Ort fragt weiterhin nach.
+
 ## Wenn eine Anwendung neue Tools mitbringt {#when-an-application-brings-new-tools}
 
 Bei jedem Start teilt eine Anwendung dem Server mit, was sie mitbringt: ihre Tools mit der Klasse, die ihr

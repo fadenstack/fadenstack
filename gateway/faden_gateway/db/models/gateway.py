@@ -1133,6 +1133,69 @@ class GovernanceKey(Base):
     )
 
 
+class ApprovalGrant(Base):
+    """A grant: the person lets one agent on one device run what would ask, for a while (sdk/38 §6).
+
+    ``time`` covers one tool; ``work`` the classes ``read`` and ``write`` in named places. Only a call that would
+    ask is covered, never past the floor, never a destructive or unclassified tool (``services/gateway/grants.py``).
+    ``calls_used`` counts in one conditional update with the database's clock; ``status`` is ``active``,
+    ``paused`` or ``revoked`` -- a grant past ``expires_at`` is expired whatever its status says.
+    """
+
+    __tablename__ = "approval_grant"
+    __table_args__ = (Index("ix_approval_grant_owner", "tenant_id", "user_id", "agent_id", "device_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    #: ``time`` or ``work`` (``plan`` and ``bypass`` come later).
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    tenant_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    user_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    agent_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    agent_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: The agent token's device: only it uses, pauses and resumes the grant.
+    device_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    #: The conversation it is bound to; ``None``: any conversation of the agent on the device (``time`` only).
+    conversation_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    #: ``{tools: [...]}`` for ``time``; ``{classes: [...], targets: [{type, identifiers, actions}]}`` for ``work``.
+    scope: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    max_calls: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    calls_used: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="active", server_default="active")
+    paused_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: ``person``, ``admin`` or ``agent`` (the device ended it).
+    revoked_by: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    #: What allowed it (the agent's version and the limits applied), what is recorded, what the person saw.
+    policy_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    evidence_level: Mapped[str] = mapped_column(String(16), nullable=False, default="decisions")
+    shown_text_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+class ApprovalGrantCall(Base):
+    """A call a grant covered, counted against its budget: the evidence of the stretch of work (L-60, L-61).
+
+    ``arguments`` only for ``work`` grants, as the gateway holds them after its PII masking; the place and the
+    arguments are encrypted at rest (a path or an address can name a person). Every covered call has a row, even
+    one whose request and call ids came before: the request id may be the client's, so it is no key.
+    """
+
+    __tablename__ = "approval_grant_call"
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    grant_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("approval_grant.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
+    request_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    call_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    tool_id: Mapped[str] = mapped_column(String(256), nullable=False)
+    #: The place the call acted on, when its tool names one.
+    target: Mapped[str | None] = mapped_column(EncryptedText("grant-evidence"), nullable=True)
+    arguments: Mapped[dict[str, Any] | None] = mapped_column(EncryptedJSON("grant-evidence"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
 class ToolRule(Base):
     """A tenant's rule for tools the gateway runs or a client offers.
 

@@ -21,11 +21,18 @@ export type LocalMcpMode = "disable" | "allow";
 export type ToolRisk = "read" | "write" | "destructive";
 export type ToolApproval = "never" | "ask" | "always";
 
+/** What kind of place a tool's target argument names. */
+export type ToolPlaceType = "document" | "folder" | "site" | "app" | "desk";
+
 /** A tool the host application provides, as the agent expects it. */
 export interface HostTool {
   name: string;
   risk?: ToolRisk;
   approval?: ToolApproval;
+  /** JSON pointer (RFC 6901) to the call argument that says where the call acts, e.g. `/path`; with target_type. */
+  target_argument?: string;
+  /** What kind of place the target argument names; with target_argument. */
+  target_type?: ToolPlaceType;
   schema_sha256?: string;
 }
 

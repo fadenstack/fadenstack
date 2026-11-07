@@ -202,6 +202,10 @@ None of them shows a tool the tool mode hides. Until Fadenstack can mark tools t
 such as a machine or a door, give them **Always ask**, or set an "Ask first" [tool rule](policies.md#tool-rules). Two examples: the Outlook add-in never sends mail itself, it opens drafts for the person;
 and the browser agent never reads or fills password fields, nor card fields the site marks as such.
 
+Under **Place** a tool can say which of its arguments names where a call acts (a JSON pointer such as `/path`) and
+what kind of place it is: document, folder, website, app or desk. A grant for a stretch of work, which a person can
+give an agent for a while, covers the tool's calls only in the places it names. A tool without a place keeps asking.
+
 ## When an application brings new tools
 
 Each time an application starts, it tells the server what it brings: its tools with the class its developer

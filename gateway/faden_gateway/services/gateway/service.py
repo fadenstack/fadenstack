@@ -43,6 +43,7 @@ from faden_gateway.services.gateway import (
 )
 from faden_gateway.services.extensions import registry as extension_registry
 from faden_gateway.services.gateway import governance as gov
+from faden_gateway.services.gateway import grants
 from faden_gateway.services.gateway import tool_classes
 from faden_gateway.services.gateway.errors import GatewayError
 from faden_gateway.services.gateway.agents import AgentRequest
@@ -1267,6 +1268,9 @@ class _Prepared:
     unmarked: bool = False
     #: The governance checks this request runs: EE's, and the tenant's tool rules.
     checks: list[Any] = field(default_factory=list)
+    #: The calls of this round a grant covered: call id -> the grant. Counted once; the check after a wait
+    #: reads it.
+    grant_covered: dict[str, uuid.UUID] = field(default_factory=dict)
     #: The user's messages this request stored in its session.
     user_message_ids: list[uuid.UUID] = field(default_factory=list)
     #: An output check refused the answer: the decision and the answer's HMAC.
@@ -2305,6 +2309,23 @@ class GatewayService:
         )
         req.checks.append(ToolModeCheck(req.classifier, req.tool_mode.mode))
 
+    async def _grant_snapshot(self, req: _Prepared, auth: AuthContext) -> None:
+        """``faden.grants`` before the answer when the device has live grants for the agent (sdk/40 A2.1).
+
+        The SDK replaces its copy with it, so a grant revoked elsewhere or spent leaves its marker. A device
+        without grants hears nothing, nor does a client that reads no events; a failed read sends nothing.
+        """
+        if not req.faden_events or req.agent is None or not req.agent.device_id:
+            return
+        profile = req.agent.agent
+        owner = grants.Owner(
+            tenant_id=auth.tenant_id, user_id=auth.user_id, agent_id=profile.id,
+            agent_version=profile.version, device_id=req.agent.device_id,
+        )
+        event = await grants.snapshot(self.dao.session.bind, owner)
+        if event is not None:
+            req.faden_leading.append(event)
+
     async def _read_tool_policy(self, req: _Prepared, auth: AuthContext) -> None:
         """The tool rules, the chat's tool mode and its ceilings, read again for the calls about to be run.
 
@@ -2490,8 +2511,15 @@ class GatewayService:
 
     async def _screen_calls(
         self, req: _Prepared, calls: list[dict[str, Any]], *, auth: AuthContext, request_id: str,
+        recheck: bool = False,
     ) -> dict[str, tuple[str, gov.Verdict]]:
-        """The gateway's calls a check objects to: call id -> (tool, verdict)."""
+        """The gateway's calls a check objects to: call id -> (tool, verdict).
+
+        A call a grant covers is not among them: it runs (:meth:`_covered`). *recheck*: the same round again,
+        after a wait; a grant is only read again then, never counted twice.
+        """
+        if not recheck:
+            req.grant_covered = {}
         if not any(gov.GovernanceStage.TOOL in c.stages for c in req.checks):
             return {}
         found: dict[str, tuple[str, gov.Verdict]] = {}
@@ -2503,9 +2531,54 @@ class GatewayService:
                 req, auth, request_id, gov.GovernanceStage.TOOL, tool_id=name, arguments=_tool_arguments(call),
             )
             verdict = await gov.decide(req.checks, ctx)
-            if verdict is not None:
-                found[call.get("id", "")] = (name, verdict)
+            if verdict is None or await self._covered(req, auth, call, name, verdict, recheck=recheck):
+                continue
+            found[call.get("id", "")] = (name, verdict)
         return found
+
+    async def _covered(
+        self, req: _Prepared, auth: AuthContext, call: dict[str, Any], name: str, verdict: gov.Verdict,
+        *, recheck: bool = False,
+    ) -> uuid.UUID | None:
+        """The grant that lets *call* run instead of asking, counted against its budget; ``None``: it asks.
+
+        Only a call that asks because of the chat's tool mode alone looks one up (sdk/38 §6): never a refused
+        call, never a floor item (an admin's rule, a policy, the author's ``approval: always``,
+        :func:`_floor`), and only on the agent's route from a device -- a grant is the device's. The class and
+        the place are checked in ``grants.in_scope``. After a wait (*recheck*) a covered call stays covered
+        while its grant is still active (ASVS 5.0 V8.3.2), and nothing new is looked up.
+        """
+        call_id = str(call.get("id") or "")
+        if recheck:
+            grant_id = req.grant_covered.get(call_id)
+            if grant_id is not None and await grants.still_usable(self.dao.session.bind, grant_id):
+                return grant_id
+            return None
+        if verdict.blocked or any(r.get("check") != ToolModeCheck.name for r in verdict.reasons):
+            return None
+        if req.agent is None or not req.agent.device_id or not call_id or _floor(req, name, verdict):
+            return None
+        profile = req.agent.agent
+        tool = req.classifier.classify(name) if req.classifier is not None else None
+        arguments = _tool_arguments(call)
+        entry = next((t for t in profile.host_tool_contract if t.get("name") == name), None)
+        grant_id = await grants.cover(
+            self.dao.session.bind,
+            grants.Owner(
+                tenant_id=auth.tenant_id, user_id=auth.user_id, agent_id=profile.id,
+                agent_version=profile.version, device_id=req.agent.device_id,
+                conversation_id=req.agent.conversation_id,
+            ),
+            grants.Call(
+                request_id=req.request_id or "", call_id=call_id, tool_id=name,
+                tool_class=tool.tool_class.value if tool is not None else "unknown",
+                approval=tool.approval if tool is not None else None,
+                place=grants.place_of(entry, arguments), arguments=arguments,
+            ),
+        )
+        if grant_id is not None:
+            req.grant_covered[call_id] = grant_id
+        return grant_id
 
     async def _ask_approvals(
         self, req: _Prepared, calls: list[dict[str, Any]], screened: dict[str, tuple[str, gov.Verdict]],
@@ -2556,7 +2629,7 @@ class GatewayService:
         one the user declined still does not.
         """
         await self._read_tool_policy(req, auth)
-        now = await self._screen_calls(req, calls, auth=auth, request_id=request_id)
+        now = await self._screen_calls(req, calls, auth=auth, request_id=request_id, recheck=True)
         changed: set[str] = set()
         for call in calls:
             call_id = call.get("id", "")
@@ -2589,9 +2662,11 @@ class GatewayService:
         allowed -- and ``toolClass`` is the class the gateway holds, which the
         SDK never takes looser than its own: with no contract it is unknown,
         so the SDK asks. Refusals and admins' rules and policies are recorded.
+        A call a grant covers is ``faden.grant_used``: counted here, the client runs it without asking.
         """
         if not req.faden_events or not req.checks:
             return []
+        req.grant_covered = {}
         events: list[dict[str, Any]] = []
         for call in calls:
             name = _tool_name(call)
@@ -2603,6 +2678,10 @@ class GatewayService:
             )
             verdict = await gov.decide(req.checks, ctx)
             if verdict is None:
+                continue
+            grant_id = await self._covered(req, auth, call, name, verdict)
+            if grant_id is not None:
+                events.append(grants.used_event(call, name, grant_id))
                 continue
             rule = _floor(req, name, verdict)
             decision_id = None
@@ -2865,6 +2944,7 @@ class GatewayService:
             await self._resolve_tool_mode(req, auth, {
                 t.get("qualified_name", ""): t["annotations"] for t in mcp_tools or [] if t.get("annotations")
             })
+            await self._grant_snapshot(req, auth)
         if mcp_tools:
             req.mcp_findable, req.mcp_on = await self._chat_tools(mcp_tools, auth, req.session_id, req.skills)
             # A tool the mode hides is not found by the tool search either.

@@ -20,6 +20,18 @@ class HostTool(BaseModel):
     schema_sha256: str | None = Field(default=None, max_length=64)
     risk: str | None = Field(default=None, pattern=r"^(read|write|destructive)$")
     approval: str | None = Field(default=None, pattern=r"^(never|ask|always)$")
+    #: Where a call acts (sdk/38 §6, desktop 37 D4): the JSON pointer (RFC 6901) to the argument that names
+    #: the place, and the kind of place it is. A work grant covers a call only inside its places; a tool
+    #: without them is never covered by one.
+    target_argument: str | None = Field(default=None, max_length=256, pattern=r"^(/[^/]*)+$")
+    target_type: Literal["document", "folder", "site", "app", "desk"] | None = None
+
+    @model_validator(mode="after")
+    def _place_whole(self) -> HostTool:
+        if (self.target_argument is None) != (self.target_type is None):
+            msg = "A tool's place needs both the argument that names it and its kind."
+            raise ValueError(msg)
+        return self
 
 
 class AgentPii(BaseModel):

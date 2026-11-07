@@ -69,6 +69,19 @@ describe("agent definitions", () => {
     expect(definitionProblems(EMPTY_DEFINITION)).toEqual([]);
   });
 
+  it("keep a tool's place whole: argument and kind together, the argument a pointer", () => {
+    const withTool = (tool: object) => ({ ...EMPTY_DEFINITION, host_tool_contract: [{ name: "open", ...tool }] });
+    const place = { target_argument: " /path ", target_type: "document" as const };
+    expect(cleanDefinition(withTool(place)).host_tool_contract).toEqual([
+      { name: "open", target_argument: "/path", target_type: "document" },
+    ]);
+    expect(definitionProblems(withTool(place))).toEqual([]);
+    const key = "agents.definition.problem_place_incomplete";
+    expect(definitionProblems(withTool({ target_type: "folder" }))).toEqual([key]);
+    expect(definitionProblems(withTool({ target_argument: "/path" }))).toEqual([key]);
+    expect(definitionProblems(withTool({ target_argument: "path", target_type: "site" }))).toEqual([key]);
+  });
+
   it("hold the agent's default and highest tool mode: Ask up to Auto unless set (sdk/38 §5)", () => {
     expect(definitionOf({ ...VERSION, approvals: undefined } as unknown as AgentVersion).approvals).toEqual({
       default_level: "ask",

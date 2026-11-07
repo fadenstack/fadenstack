@@ -52,7 +52,8 @@ UTC_SETTINGS = UsageSettings(time_zone="UTC")
 
 def test_the_migrations_follow_the_last_one_and_leave_one_head() -> None:
     scripts = ScriptDirectory.from_config(Config(str(Path(__file__).parents[1] / "alembic.ini")))
-    assert scripts.get_heads() == ["4nsw3rsc"]
+    assert scripts.get_heads() == ["gr4nts"]
+    assert scripts.get_revision("gr4nts").down_revision == "4nsw3rsc"
     assert scripts.get_revision("4nsw3rsc").down_revision == "u5ag3ers"
     assert scripts.get_revision("u5ag3ers").down_revision == "u5ag3rfsd"
     assert scripts.get_revision("u5ag3rfsd").down_revision == "u5ag3l1m"

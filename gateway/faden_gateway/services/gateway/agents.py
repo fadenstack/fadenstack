@@ -127,6 +127,16 @@ def _tri_state(settings: Any, key: str) -> bool | None:
     return value if isinstance(value, bool) else None
 
 
+def _strings(value: Any) -> tuple[str, ...] | None:
+    """A stored list of names; anything but a list is unset (``None``)."""
+    return tuple(str(v) for v in value) if isinstance(value, list) else None
+
+
+def _minutes(value: Any) -> int | None:
+    """A stored number of minutes when it is a positive whole number; else unset."""
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else None
+
+
 @dataclass(frozen=True)
 class AgentProfile:
     """An agent and the version it serves."""
@@ -159,6 +169,13 @@ class AgentProfile:
     #: they may use. As stored; :meth:`levels` reads them.
     default_level: str = "ask"
     max_level: str = "auto"
+    #: The standing approvals its card may offer (``chat``, ``time``, ``grant``, ``always``); ``None``: any.
+    standing: tuple[str, ...] | None = None
+    #: The longest grant in minutes; ``None``: the tenant's (``grants.DEFAULT_LONGEST_MINUTES`` until it has
+    #: one).
+    max_grant_minutes: int | None = None
+    #: The classes a grant may cover, within ``read`` and ``write``; ``None``: both.
+    grant_classes: tuple[str, ...] | None = None
 
     def levels(self) -> tuple[tool_classes.ToolMode, tool_classes.ToolMode]:
         """The level conversations start in, and the highest.
@@ -212,6 +229,9 @@ class AgentProfile:
             restricted_by=tuple(row.get("restricted_by") or ()),
             default_level=str(approvals.get("default_level") or "ask"),
             max_level=str(approvals.get("max_level") or "auto"),
+            standing=_strings(approvals.get("standing")),
+            max_grant_minutes=_minutes(approvals.get("max_grant_minutes")),
+            grant_classes=_strings(approvals.get("grant_classes")),
         )
 
 

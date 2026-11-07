@@ -4435,6 +4435,7 @@
       "problem_duplicate_tools": "Zwei Host-Tools haben denselben Namen. Jeder Name darf nur einmal vorkommen.",
       "problem_never_risky": "Nie nachfragen gibt es nur für Tools der Klassen Lesen und Schreiben. Ändern Sie die Klasse oder die Freigabe des Tools.",
       "problem_default_above_max": "Der Tool-Modus, in dem Unterhaltungen beginnen, liegt über dem höchsten. Senken Sie den Start oder heben Sie den höchsten an.",
+      "problem_place_incomplete": "Der Ort eines Tools braucht das Argument (beginnend mit /) und seine Art.",
       "behaviour": "Verhalten",
       "instructions": "Anweisungen",
       "instructions_help": "Werden jedem Gespräch vorangestellt. Nutzer und das SDK sehen sie nie.",
@@ -4495,7 +4496,16 @@
       "approval_ask": "Nachfragen",
       "approval_always": "Immer nachfragen",
       "never_read_write": "Nur für Lesen und Schreiben",
-      "approval_help": "Immer nachfragen: fragt jedes Mal, und nichts, was die Person vorher erlaubt hat, beantwortet die Frage; für Tools, die über Personen entscheiden oder in der physischen Welt handeln. Nachfragen: fragt auch dort, wo der Tool-Modus das Tool ausführen würde; die Person kann es für den Chat oder immer erlauben. Nie nachfragen: Ein Tool der Klasse Lesen oder Schreiben läuft in Fragen und Automatisch ohne Nachfrage."
+      "approval_help": "Immer nachfragen: fragt jedes Mal, und nichts, was die Person vorher erlaubt hat, beantwortet die Frage; für Tools, die über Personen entscheiden oder in der physischen Welt handeln. Nachfragen: fragt auch dort, wo der Tool-Modus das Tool ausführen würde; die Person kann es für den Chat oder immer erlauben. Nie nachfragen: Ein Tool der Klasse Lesen oder Schreiben läuft in Fragen und Automatisch ohne Nachfrage.",
+      "place": "Ort",
+      "place_none": "Keiner",
+      "place_document": "Dokument",
+      "place_folder": "Ordner",
+      "place_site": "Website",
+      "place_app": "App",
+      "place_desk": "Schreibtisch",
+      "target_argument": "Argument",
+      "place_help": "Ort: das Argument (ein JSON-Pointer wie /path), das angibt, wo ein Aufruf handelt, und welche Art von Ort es ist. Eine Arbeitsfreigabe deckt die Aufrufe eines Tools nur an den Orten, die sie nennt; ein Tool ohne Ort fragt unter einer solchen Freigabe immer nach."
     },
     "versions": {
       "version": "Version",

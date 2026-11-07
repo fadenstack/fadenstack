@@ -681,9 +681,10 @@ class ApprovalDecided(_Event):
     decision: Literal["approved", "denied", "timeout"]
     #: How long the user took; none when nobody was asked.
     wait_ms: int | None = Field(default=None, ge=0)
-    #: What let an approved call through: the user for this call, this chat, always on the device, or the
-    #: app's bypass mode (development and trusted automation).
-    scope: Literal["once", "chat", "always", "bypass"] | None = None
+    #: What let an approved call through: the user for this call, this chat, always on the device, the
+    #: app's bypass mode (development and trusted automation), or a grant (``grant_id``, sdk/38 §6).
+    scope: Literal["once", "chat", "always", "bypass", "grant"] | None = None
+    grant_id: uuid.UUID | None = None
 
 
 class LocalMcpAttached(_Event):

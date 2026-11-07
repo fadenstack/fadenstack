@@ -98,6 +98,9 @@ function cleanTool(tool: HostTool): HostTool {
   const clean: HostTool = { name: tool.name.trim() };
   if (tool.risk) clean.risk = tool.risk;
   if (tool.approval) clean.approval = tool.approval;
+  const pointer = tool.target_argument?.trim();
+  if (pointer) clean.target_argument = pointer;
+  if (tool.target_type) clean.target_type = tool.target_type;
   if (tool.schema_sha256) clean.schema_sha256 = tool.schema_sha256;
   return clean;
 }
@@ -133,12 +136,20 @@ function stable(value: unknown): string {
 export const neverOnRiskyTool = (tool: HostTool) =>
   tool.approval === "never" && tool.risk !== "read" && tool.risk !== "write";
 
+/** A place needs both its argument (a JSON pointer, starting with "/") and its kind, or neither. */
+export const placeIncomplete = (tool: HostTool) => {
+  const pointer = tool.target_argument?.trim() ?? "";
+  if (!pointer && !tool.target_type) return false;
+  return !pointer || !pointer.startsWith("/") || !tool.target_type;
+};
+
 /** What is wrong with a definition, as translation keys (empty: it can be saved). */
 export function definitionProblems(definition: AgentDefinition): string[] {
   const names = definition.host_tool_contract.map((t) => t.name.trim()).filter(Boolean);
   const problems: string[] = [];
   if (new Set(names).size !== names.length) problems.push("agents.definition.problem_duplicate_tools");
   if (definition.host_tool_contract.some(neverOnRiskyTool)) problems.push("agents.definition.problem_never_risky");
+  if (definition.host_tool_contract.some(placeIncomplete)) problems.push("agents.definition.problem_place_incomplete");
   const { default_level, max_level } = approvalsOf(definition.approvals);
   if (TOOL_LEVELS.indexOf(default_level) > TOOL_LEVELS.indexOf(max_level)) {
     problems.push("agents.definition.problem_default_above_max");
