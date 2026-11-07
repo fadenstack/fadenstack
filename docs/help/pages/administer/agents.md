@@ -184,7 +184,19 @@ Each tool an application brings has a class, which the agent's version sets:
 
 People pick the tool mode in the panel, per conversation; every conversation starts in **Ask**. The
 application can make a class stricter, never looser. Your [tool rules](policies.md#tool-rules) apply to agents
-as well as chats. Two examples: the Outlook add-in never sends mail itself, it opens drafts for the person;
+as well as chats.
+
+Under **Host tools**, the version can also say how each tool asks (**Approval**):
+
+| Approval | What it does |
+|---|---|
+| **As the tool mode says** | The table above decides. |
+| **Always ask** | Asks every time; nothing the person allowed before, for the chat or always, answers it. Use it for tools that decide about people (GDPR Art. 22) or act on the physical world. |
+| **Ask** | Asks even where the tool mode would run the tool; the person may allow it for the chat or always. |
+| **Never ask** | A read or write tool runs without asking in **Ask** and **Auto**. A version where a destructive or unclassified tool has it is not published. |
+
+None of them shows a tool the tool mode hides. Until Fadenstack can mark tools that act on the physical world,
+such as a machine or a door, give them **Always ask**, or set an "Ask first" [tool rule](policies.md#tool-rules). Two examples: the Outlook add-in never sends mail itself, it opens drafts for the person;
 and the browser agent never reads or fills password fields, nor card fields the site marks as such.
 
 ## When an application brings new tools

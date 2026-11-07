@@ -97,6 +97,32 @@ def test_what_each_mode_does_with_each_class(mode: tc.ToolMode, expected: dict[t
         assert tc.decide(mode, tc.Classified("t", tool_class, "rule")) is decision
 
 
+@pytest.mark.parametrize(("mode", "tool_class", "approval", "expected"), [
+    (M.ASK, C.WRITE, "never", D.RUN),  # the author pre-approves what the mode would ask about
+    (M.ASK, C.READ, "never", D.RUN),
+    (M.ASK, C.DESTRUCTIVE, "never", D.ASK),  # never for a destructive or unclassified tool
+    (M.AUTO, C.UNKNOWN, "never", D.ASK),
+    (M.AUTO, C.WRITE, "ask", D.ASK),  # asks where the mode would run it
+    (M.ASK, C.READ, "ask", D.ASK),
+    (M.AUTO, C.READ, "always", D.ASK),
+    (M.AUTO, C.WRITE, None, D.RUN),  # unset: the table
+    (M.READ_ONLY, C.WRITE, "never", D.HIDDEN),  # none of them shows a hidden tool
+    (M.READ_ONLY, C.WRITE, "always", D.HIDDEN),
+    (M.OFF, C.READ, "ask", D.HIDDEN),
+])
+def test_the_authors_approval_goes_on_top_of_the_mode(
+    mode: tc.ToolMode, tool_class: tc.ToolClass, approval: str | None, expected: tc.Decision,
+) -> None:
+    """38 §4.3, D7: ``always`` and ``ask`` ask, ``never`` runs read and write tools from Ask upward."""
+    assert tc.decide(mode, tc.Classified("t", tool_class, "agent", approval=approval)) is expected
+
+
+def test_the_contract_says_each_tools_approval() -> None:
+    classifier = tc.Classifier(contract={"save": "write"}, approvals={"save": "never", "open_url": "always"})
+    assert (classifier.classify("save").approval, classifier.classify("open_url").approval) == ("never", "always")
+    assert classifier.classify("other").approval is None
+
+
 def test_an_unknown_tool_never_runs_unasked_and_open_world_is_not_acted_on() -> None:
     for mode in M:
         assert tc.decide(mode, tc.Classified("t", C.UNKNOWN, "none", open_world=True)) is not D.RUN

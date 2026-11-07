@@ -4430,6 +4430,7 @@
       "save_version": "Save as new version",
       "save_and_publish": "Save and publish",
       "problem_duplicate_tools": "Two host tools have the same name. Each name may appear once.",
+      "problem_never_risky": "Never ask is only for read and write tools. Change the tool's class or its approval.",
       "behaviour": "Behaviour",
       "instructions": "Instructions",
       "instructions_help": "Put before every conversation. Users and the SDK never see them.",
@@ -4482,9 +4483,11 @@
       "duplicate": "Already listed",
       "add": "Add tool",
       "approval_default": "As the tool mode says",
-      "approval_never": "No extra approval",
+      "approval_never": "Never ask",
       "approval_ask": "Ask",
-      "approval_always": "Always ask"
+      "approval_always": "Always ask",
+      "never_read_write": "Only for read and write tools",
+      "approval_help": "Always ask: asks every time, and nothing the person allowed before answers it; use it for tools that decide about people or act on the physical world. Ask: asks even where the tool mode would run the tool; the person may allow it for the chat or always. Never ask: a read or write tool runs without asking in Ask and Auto."
     },
     "versions": {
       "version": "Version",

@@ -4432,6 +4432,7 @@
       "save_version": "另存为新版本",
       "save_and_publish": "保存并发布",
       "problem_duplicate_tools": "两个宿主工具同名。每个名称只能出现一次。",
+      "problem_never_risky": "“从不询问”仅适用于读取和写入类工具。请更改该工具的类别或审批设置。",
       "behaviour": "行为",
       "instructions": "指令",
       "instructions_help": "置于每次对话之前。用户和 SDK 永远看不到。",
@@ -4484,9 +4485,11 @@
       "duplicate": "已在列表中",
       "add": "添加工具",
       "approval_default": "按工具模式",
-      "approval_never": "无额外审批",
+      "approval_never": "从不询问",
       "approval_ask": "询问",
-      "approval_always": "始终询问"
+      "approval_always": "始终询问",
+      "never_read_write": "仅适用于读取和写入",
+      "approval_help": "始终询问：每次都询问，此前用户的任何允许都不能代为回答；用于对人做出决定或在物理世界中执行操作的工具。询问：即使工具模式会直接运行该工具也会询问；用户可以允许本次聊天或始终允许。从不询问：读取或写入类工具在“询问”和“自动”模式下无需询问即可运行。"
     },
     "versions": {
       "version": "版本",

@@ -8,6 +8,7 @@ import {
   cleanDefinition,
   definitionOf,
   definitionProblems,
+  neverOnRiskyTool,
   parseAgentImport,
   piiModeSwitch,
   serverToolsMode,
@@ -66,6 +67,18 @@ describe("agent definitions", () => {
     const definition = { ...EMPTY_DEFINITION, host_tool_contract: [{ name: "a" }, { name: " a" }] };
     expect(definitionProblems(definition)).toEqual(["agents.definition.problem_duplicate_tools"]);
     expect(definitionProblems(EMPTY_DEFINITION)).toEqual([]);
+  });
+
+  it("refuse Never ask on a tool that is neither read nor write (sdk/38 D7)", () => {
+    const tools = (risk?: "read" | "write" | "destructive") => ({
+      ...EMPTY_DEFINITION,
+      host_tool_contract: [{ name: "update_page", approval: "never" as const, ...(risk ? { risk } : {}) }],
+    });
+    expect(definitionProblems(tools("read"))).toEqual([]);
+    expect(definitionProblems(tools("write"))).toEqual([]);
+    expect(definitionProblems(tools("destructive"))).toEqual(["agents.definition.problem_never_risky"]);
+    expect(definitionProblems(tools())).toEqual(["agents.definition.problem_never_risky"]);
+    expect(neverOnRiskyTool({ name: "x", risk: "destructive", approval: "always" })).toBe(false);
   });
 
   it("keep the SDKs' UI settings and the gateway tools in their own shapes", () => {

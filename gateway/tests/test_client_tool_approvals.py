@@ -211,6 +211,31 @@ async def test_every_floor_item_reaches_the_client_as_a_rule(
 
 
 @pytest.mark.anyio
+@pytest.mark.parametrize(("risk", "approval", "mode", "expected"), [
+    ("write", "never", "ask", []),  # pre-approved by the author: runs without asking
+    ("destructive", "never", "auto", [("destructive", False, "This tool needs your approval in this chat's tool mode.")]),
+    ("read", "ask", "auto", [("read", False, "This agent asks for your approval before it uses this tool.")]),
+    ("write", "always", "auto", [("write", True, "This agent asks for your approval every time it uses this tool.")]),
+], ids=["never-write", "never-destructive-ignored", "ask-read-in-auto", "always-write-in-auto"])
+async def test_the_contracts_approval_decides_what_the_client_is_told(
+    risk: str, approval: str, mode: str, expected: list[tuple[str, bool, str]],
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+    backend: _Backend,  # noqa: F811 - the fixture
+) -> None:
+    """38 §4.3: ``always`` is a floor item (``rule``), ``ask`` lets a standing approval answer, ``never`` runs."""
+    await _seed(db_session, provider=ProviderType.REMOTE_OPENAI, pii=None)
+    backend.put(_profile(host_tool_contract=({"name": "update_page", "risk": risk, "approval": approval},)))
+    fastapi_app.state.agent_directory.invalidate()
+    _Model(monkeypatch, _call("update_page", {"page": 3}))
+    update_page = {"type": "function", "function": {"name": "update_page", "parameters": {"type": "object"}}}
+    r = await client.post("/v1/agents/eplan-assistant/chat/completions", json={
+        "model": "x", "stream": True, "tools": [update_page], "messages": [{"role": "user", "content": "Fix page 3."}],
+    }, headers={"Authorization": f"Bearer {_agent_token()}", "X-Faden-Tool-Mode": mode, **EVENTS})
+    assert r.status_code == 200, r.text
+    assert [(m["toolClass"], m["rule"], m["message"]) for m in _marks(_faden(r.text))] == expected
+
+
+@pytest.mark.anyio
 @pytest.mark.parametrize(("by", "rule", "tool_class"), [("rule", True, "read"), ("mode", False, "write")])
 async def test_a_gateway_tool_that_waits_says_its_class_and_whether_a_rule_asks(
     by: str, rule: bool, tool_class: str, fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession,

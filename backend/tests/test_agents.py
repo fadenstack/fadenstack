@@ -186,6 +186,25 @@ async def test_versions_are_added_published_and_rolled_back(
     assert listed[1]["instructions"] == "Be brief."
 
 
+@pytest.mark.parametrize(("risk", "published"), [
+    ("read", True), ("write", True), ("destructive", False), (None, False),
+], ids=["read", "write", "destructive", "unclassified"])
+async def test_never_ask_is_published_only_for_read_and_write_tools(
+    risk: str | None, published: bool, signed_in: _As, client: AsyncClient, dbsession: AsyncSession,
+) -> None:
+    """sdk/38 D7. A draft may hold it (an admin may reclassify the tool first); publishing it may not."""
+    signed_in.user = await _user(dbsession, admin=True)
+    tool = {"name": "update_page", "approval": "never", **({"risk": risk} if risk else {})}
+    await _agent(client, slug="never-asks", publish=False, host_tool_contract=[tool])
+    r = await client.post("/api/agents/never-asks/versions/1/publish")
+    if published:
+        assert r.status_code == status.HTTP_200_OK, r.text
+    else:
+        assert r.status_code == status.HTTP_400_BAD_REQUEST, r.text
+        assert "only for read and write tools" in r.json()["detail"] and "update_page" in r.json()["detail"]
+        assert (await client.get("/api/agents/never-asks")).json()["published_version"] is None
+
+
 async def test_host_tool_names_are_unique(signed_in: _As, client: AsyncClient, dbsession: AsyncSession) -> None:
     signed_in.user = await _user(dbsession, admin=True)
     r = await client.post("/api/agents", json={

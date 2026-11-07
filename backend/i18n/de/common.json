@@ -4432,6 +4432,7 @@
       "save_version": "Als neue Version speichern",
       "save_and_publish": "Speichern und veröffentlichen",
       "problem_duplicate_tools": "Zwei Host-Tools haben denselben Namen. Jeder Name darf nur einmal vorkommen.",
+      "problem_never_risky": "Nie nachfragen gibt es nur für Tools der Klassen Lesen und Schreiben. Ändern Sie die Klasse oder die Freigabe des Tools.",
       "behaviour": "Verhalten",
       "instructions": "Anweisungen",
       "instructions_help": "Werden jedem Gespräch vorangestellt. Nutzer und das SDK sehen sie nie.",
@@ -4484,9 +4485,11 @@
       "duplicate": "Bereits aufgeführt",
       "add": "Tool hinzufügen",
       "approval_default": "Wie der Tool-Modus",
-      "approval_never": "Keine zusätzliche Freigabe",
+      "approval_never": "Nie nachfragen",
       "approval_ask": "Nachfragen",
-      "approval_always": "Immer nachfragen"
+      "approval_always": "Immer nachfragen",
+      "never_read_write": "Nur für Lesen und Schreiben",
+      "approval_help": "Immer nachfragen: fragt jedes Mal, und nichts, was die Person vorher erlaubt hat, beantwortet die Frage; für Tools, die über Personen entscheiden oder in der physischen Welt handeln. Nachfragen: fragt auch dort, wo der Tool-Modus das Tool ausführen würde; die Person kann es für den Chat oder immer erlauben. Nie nachfragen: Ein Tool der Klasse Lesen oder Schreiben läuft in Nachfragen und Auto ohne Nachfrage."
     },
     "versions": {
       "version": "Version",

@@ -194,7 +194,20 @@ Jedes Tool, das eine Anwendung mitbringt, hat eine Klasse, die die Version des A
 
 Benutzer wählen den Tool-Modus im Bereich des Agenten, pro Unterhaltung; jede Unterhaltung beginnt mit
 **Fragen**. Die Anwendung kann eine Klasse verschärfen, nie lockern. Ihre [Tool-Regeln](policies.md#tool-rules)
-gelten für Agenten ebenso wie für Chats. Zwei Beispiele: Das Outlook-Add-in sendet nie selbst E-Mails, es öffnet
+gelten für Agenten ebenso wie für Chats.
+
+Unter **Host-Tools** kann die Version außerdem festlegen, wie jedes Tool nachfragt (**Freigabe**):
+
+| Freigabe | Was sie bewirkt |
+|---|---|
+| **Wie der Tool-Modus** | Die Tabelle oben entscheidet. |
+| **Immer nachfragen** | Fragt jedes Mal; nichts, was die Person vorher erlaubt hat, für den Chat oder immer, beantwortet die Frage. Für Tools, die über Personen entscheiden (DSGVO Art. 22) oder in der physischen Welt handeln. |
+| **Nachfragen** | Fragt auch dort, wo der Tool-Modus das Tool ausführen würde; die Person kann es für den Chat oder immer erlauben. |
+| **Nie nachfragen** | Ein Tool der Klasse Lesen oder Schreiben läuft in **Fragen** und **Automatisch** ohne Nachfrage. Eine Version, in der ein zerstörendes oder nicht eingestuftes Tool diese Freigabe hat, wird nicht veröffentlicht. |
+
+Keine davon zeigt ein Tool, das der Tool-Modus ausblendet. Solange Fadenstack Tools, die in der physischen Welt
+handeln, etwa an einer Maschine oder einer Tür, noch nicht kennzeichnen kann, geben Sie ihnen **Immer nachfragen**
+oder legen eine [Tool-Regel](policies.md#tool-rules) **Erst nachfragen** an. Zwei Beispiele: Das Outlook-Add-in sendet nie selbst E-Mails, es öffnet
 Entwürfe für die Person; und der Browser-Agent liest oder füllt nie Passwortfelder oder Kartenfelder, die die
 Website als solche kennzeichnet.
 

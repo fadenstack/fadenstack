@@ -103,11 +103,16 @@ function stable(value: unknown): string {
   );
 }
 
+/** "Never ask" on a tool that is neither read nor write: the server does not publish it (sdk/38 D7). */
+export const neverOnRiskyTool = (tool: HostTool) =>
+  tool.approval === "never" && tool.risk !== "read" && tool.risk !== "write";
+
 /** What is wrong with a definition, as translation keys (empty: it can be saved). */
 export function definitionProblems(definition: AgentDefinition): string[] {
   const names = definition.host_tool_contract.map((t) => t.name.trim()).filter(Boolean);
   const problems: string[] = [];
   if (new Set(names).size !== names.length) problems.push("agents.definition.problem_duplicate_tools");
+  if (definition.host_tool_contract.some(neverOnRiskyTool)) problems.push("agents.definition.problem_never_risky");
   if (TOKEN_LIFETIMES.some((f) => (tokenLifetimeOf(definition, f) ?? MIN_TOKEN_LIFETIME_S) < MIN_TOKEN_LIFETIME_S)) {
     problems.push("agents.definition.problem_token_short");
   }

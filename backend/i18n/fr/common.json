@@ -4432,6 +4432,7 @@
       "save_version": "Enregistrer comme nouvelle version",
       "save_and_publish": "Enregistrer et publier",
       "problem_duplicate_tools": "Deux outils de l'hôte portent le même nom. Chaque nom ne peut apparaître qu'une fois.",
+      "problem_never_risky": "Ne jamais demander est réservé aux outils de lecture et d'écriture. Changez la classe ou l'approbation de l'outil.",
       "behaviour": "Comportement",
       "instructions": "Instructions",
       "instructions_help": "Placées avant chaque conversation. Les utilisateurs et le SDK ne les voient jamais.",
@@ -4484,9 +4485,11 @@
       "duplicate": "Déjà dans la liste",
       "add": "Ajouter un outil",
       "approval_default": "Selon le mode d'outils",
-      "approval_never": "Pas d'approbation supplémentaire",
+      "approval_never": "Ne jamais demander",
       "approval_ask": "Demander",
-      "approval_always": "Toujours demander"
+      "approval_always": "Toujours demander",
+      "never_read_write": "Seulement pour la lecture et l'écriture",
+      "approval_help": "Toujours demander : demande à chaque fois, et rien de ce que la personne a autorisé avant n'y répond ; pour les outils qui décident au sujet de personnes ou agissent dans le monde physique. Demander : demande même là où le mode d'outils exécuterait l'outil ; la personne peut l'autoriser pour le chat ou toujours. Ne jamais demander : un outil de lecture ou d'écriture s'exécute sans demander en Demander et Auto."
     },
     "versions": {
       "version": "Version",

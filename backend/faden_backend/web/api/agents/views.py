@@ -167,6 +167,27 @@ def _check_extensions(extensions: dict[str, Any]) -> None:
             ) from exc
 
 
+def _check_approvals(contract: list[dict[str, Any]]) -> None:
+    """Refuse ``approval: never`` on a tool that is not ``read`` or ``write`` (sdk/38 §4.3, D7).
+
+    ``never`` lets the author spare the person a question the chat's mode would ask. For a destructive or
+    unclassified tool that question is the person's to answer, so such a version is not served. Checked at
+    publish, not when a draft is saved: an admin may reclassify a tool on the Apps tab first.
+    """
+    wrong = [
+        str(t.get("name")) for t in contract
+        if t.get("approval") == "never" and t.get("risk") not in ("read", "write")
+    ]
+    if wrong:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "'Never ask' (approval: never) is only for read and write tools. Change the class or the "
+                "approval of: " + ", ".join(wrong)
+            ),
+        )
+
+
 def _version_fields(fields: AgentVersionFields) -> dict[str, Any]:
     _check_extensions(fields.extensions)
     data = fields.model_dump()
@@ -454,6 +475,7 @@ async def _publish(dao: AgentsDAO, audit: AuditDAO, user: User, agent: Agent, ve
             status_code=status.HTTP_409_CONFLICT, detail="Restore the agent before publishing.",
         )
     _check_extensions(version.extensions)
+    _check_approvals(version.host_tool_contract or [])
     if version.published_at is None:
         version.published_at = datetime.now(UTC)
     agent.published_version_id = version.id

@@ -1010,7 +1010,7 @@ class ToolModeCheck:
             outcome="block" if decision is tool_classes.Decision.HIDDEN else "approval_required",
             policy_id=f"tool_mode:{self.mode.value}:{tool.tool_class.value}",
             category="tool_mode",
-            message=tool_classes.reason(self.mode, decision),
+            message=tool_classes.reason(self.mode, decision, tool.approval),
             policy_name=f"Tool mode {self.mode.value}",
         )
 
@@ -2292,15 +2292,13 @@ class GatewayService:
                 session_id=req.session_id, groups=tuple(groups),
             ),
         )
-        contract = (
-            {str(t.get("name", "")): str(t.get("risk") or "") for t in req.agent.agent.host_tool_contract}
-            if req.agent is not None else None
-        )
+        tools = req.agent.agent.host_tool_contract if req.agent is not None else ()
         req.classifier = tool_classes.Classifier(
             rules=await tool_classes.class_rules.for_tenant(self.dao.session, auth.tenant_id),
             gateway_tools=frozenset(_GATEWAY_TOOLS),
-            contract=contract,
+            contract={str(t.get("name", "")): str(t.get("risk") or "") for t in tools} if req.agent else None,
             annotations=annotations,
+            approvals={str(t.get("name", "")): str(t["approval"]) for t in tools if t.get("approval")},
         )
         req.checks.append(ToolModeCheck(req.classifier, req.tool_mode.mode))
 
@@ -2406,7 +2404,7 @@ class GatewayService:
                 verdict.decision.message
                 if verdict
                 else (
-                    tool_classes.reason(req.tool_mode.mode, decision)
+                    tool_classes.reason(req.tool_mode.mode, decision, classified.approval)
                     if blocked or asks
                     else "Allowed by current tool policy."
                 )

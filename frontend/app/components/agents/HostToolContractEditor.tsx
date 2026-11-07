@@ -1,7 +1,9 @@
 /**
  * The host tool contract: the tools the host application may offer this agent,
  * each with its class. A tool outside the contract is refused; a tool without a
- * class is unclassified and always waits for the user's approval.
+ * class is unclassified and always waits for the user's approval. Its approval
+ * goes on top of the tool mode: "Always ask", "Ask", or "Never ask", which only a
+ * read or write tool may have (sdk/38 §4.3, D7).
  */
 import { useTranslation } from "react-i18next";
 
@@ -21,6 +23,8 @@ import DeleteIcon from "@mui/icons-material/Delete";
 
 import type { HostTool, ToolApproval, ToolRisk } from "~/api/agents";
 import { ToolClassChip } from "~/components/ToolClassChip";
+
+import { neverOnRiskyTool } from "./agentDefinition";
 
 const RISKS: ToolRisk[] = ["read", "write", "destructive"];
 const APPROVALS: ToolApproval[] = ["never", "ask", "always"];
@@ -108,6 +112,8 @@ export function HostToolContractEditor({ tools, onChange, readOnly = false }: Ho
                         size="small"
                         fullWidth
                         value={tool.approval ?? UNSET}
+                        error={neverOnRiskyTool(tool)}
+                        helperText={neverOnRiskyTool(tool) ? t("agents.contract.never_read_write") : undefined}
                         inputProps={{ "aria-label": t("agents.contract.approval") }}
                         onChange={(e) =>
                           update(index, { approval: (e.target.value || undefined) as ToolApproval | undefined })
@@ -115,7 +121,11 @@ export function HostToolContractEditor({ tools, onChange, readOnly = false }: Ho
                       >
                         <MenuItem value={UNSET}>{t("agents.contract.approval_default")}</MenuItem>
                         {APPROVALS.map((approval) => (
-                          <MenuItem key={approval} value={approval}>
+                          <MenuItem
+                            key={approval}
+                            value={approval}
+                            disabled={approval === "never" && tool.risk !== "read" && tool.risk !== "write"}
+                          >
                             {t(`agents.contract.approval_${approval}`)}
                           </MenuItem>
                         ))}
@@ -138,6 +148,11 @@ export function HostToolContractEditor({ tools, onChange, readOnly = false }: Ho
             })}
           </TableBody>
         </Table>
+      )}
+      {tools.length > 0 && (
+        <Typography variant="caption" color="text.secondary">
+          {t("agents.contract.approval_help")}
+        </Typography>
       )}
       {!readOnly && (
         <Button size="small" startIcon={<AddIcon />} sx={{ alignSelf: "flex-start" }} onClick={() => onChange([...tools, { name: "" }])}>
