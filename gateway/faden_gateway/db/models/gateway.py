@@ -1134,7 +1134,8 @@ class ToolRule(Base):
     """A tenant's rule for tools the gateway runs or a client offers.
 
     ``message`` is what the user is told; ``name`` is for admins and
-    auditors. The lowest ``priority`` that matches decides.
+    auditors. Of the rules that match, a deny wins, then ``approval_required``,
+    then ``allow``, whatever the ``priority``; it orders rules of one action.
     """
 
     __tablename__ = "llm_gateway_tool_rule"

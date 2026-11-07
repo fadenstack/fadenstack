@@ -317,9 +317,11 @@ async def test_a_refused_whole_answer_is_a_200_with_content_filter_the_openai_cl
 # -- tools ------------------------------------------------------------------------------------
 
 
-async def _rule(db: AsyncSession, pattern: str, action: str, message: str, *, tenant: str = "tenant-a") -> None:
+async def _rule(
+    db: AsyncSession, pattern: str, action: str, message: str, *, tenant: str = "tenant-a", priority: int = 10,
+) -> None:
     db.add(ToolRule(tenant_id=tenant, name=f"rule for {pattern}", tool_pattern=pattern, action=action,
-                    message=message, category="tool_rule", priority=10, enabled=True))
+                    message=message, category="tool_rule", priority=priority, enabled=True))
     await db.flush()
 
 
@@ -373,6 +375,81 @@ async def test_a_rule_in_another_tenant_does_not_apply(
         "model": ALIAS, "messages": [{"role": "user", "content": "When?"}],
     })
     assert r.json()["choices"][0]["message"]["content"] == "On 5 May." and len(knowledge.searches) == 1
+
+
+# -- rule precedence (38 D13, 39 F3): deny wins, then "Ask first", then allow ----------------------
+
+
+def _rules(*specs: tuple[str, str, str]) -> gov.ToolRuleCheck:
+    """Rules in priority order, each ``(pattern, action, message)``; their ids are r1, r2, ..."""
+    return gov.ToolRuleCheck([
+        gov.Rule(id=f"r{i}", name=f"rule {i}", pattern=pattern, action=action, message=message, category="tool_rule")
+        for i, (pattern, action, message) in enumerate(specs, 1)
+    ])
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("specs", "expected"),
+    [
+        ([("mcp.github.*", "allow", "GitHub is fine."), ("mcp.github.delete_repo", "deny", "Never delete repositories.")],
+         ("block", "r2", "Never delete repositories.")),
+        ([("mcp.github.*", "allow", "GitHub is fine."), ("mcp.github.delete_repo", "approval_required", "Ask first.")],
+         ("approval_required", "r2", "Ask first.")),
+        ([("mcp.github.*", "approval_required", "Ask for GitHub."), ("mcp.github.delete_repo", "deny", "Never.")],
+         ("block", "r2", "Never.")),
+        ([("mcp.github.delete_repo", "deny", "The first deny."), ("mcp.*", "deny", "The second deny.")],
+         ("block", "r1", "The first deny.")),
+        ([("mcp.github.*", "allow", "GitHub is fine."), ("mcp.slack.*", "deny", "No Slack.")],
+         None),
+    ],
+    ids=["deny-behind-allow", "ask-behind-allow", "deny-behind-ask", "same-action-by-priority", "only-an-allow-matches"],
+)
+async def test_a_deny_wins_then_ask_first_then_allow_whatever_the_priority(
+    specs: list[tuple[str, str, str]], expected: tuple[str, str, str] | None,
+) -> None:
+    ctx = gov.GovernanceContext(stage=gov.GovernanceStage.TOOL, tenant_id="t", user_id="u", agent_id=None,
+                                session_id=None, request_id="r", tool_id="mcp.github.delete_repo")
+    decision = await _rules(*specs).check(ctx)
+    assert (decision and (decision.outcome, decision.policy_id, decision.message)) == expected
+
+
+@pytest.mark.anyio
+async def test_a_deny_ordered_behind_an_allow_still_refuses_the_call(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await _setup(fastapi_app, db_session)
+    await _rule(db_session, "knowledge_*", "allow", "The knowledge base is open.", priority=10)
+    await _rule(db_session, "knowledge_search", "deny", "Searching is closed this week.", priority=200)
+    knowledge = _Knowledge(monkeypatch)
+    model = _Model(monkeypatch, _call("knowledge_search", {"query": "launch"}), _say("I could not search."))
+
+    r = await client.post("/v1/chat/completions", headers=_headers(**EVENTS), json={
+        "model": ALIAS, "stream": True, "messages": [{"role": "user", "content": "When is the launch?"}],
+    })
+    assert knowledge.searches == [], "not run"
+    assert "Searching is closed this week." in model.sent[1]["messages"][-1]["content"]
+    [denied] = [e for e in _faden(r.text) if e.get("name") == "faden.tool_denied"]
+    assert denied["value"]["message"] == "Searching is closed this week."
+
+
+@pytest.mark.anyio
+async def test_an_ask_first_ordered_behind_an_allow_still_asks(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await _setup(fastapi_app, db_session)
+    await _rule(db_session, "knowledge_*", "allow", "The knowledge base is open.", priority=10)
+    await _rule(db_session, "knowledge_search", "approval_required", "Searching needs your OK.", priority=200)
+    knowledge = _Knowledge(monkeypatch)
+    _Model(monkeypatch, _call("knowledge_search", {"query": "launch"}), _say("Done."))
+
+    ask = client.post("/v1/chat/completions", headers=_headers(**EVENTS), json={
+        "model": ALIAS, "stream": True, "messages": [{"role": "user", "content": "When is the launch?"}],
+    })
+    r, answered = await asyncio.gather(ask, _approve_when_asked(client, True))
+    assert answered == 200
+    [asked] = [e for e in _faden(r.text) if e.get("name") == "faden.approval_required"]
+    assert asked["value"]["message"] == "Searching needs your OK." and len(knowledge.searches) == 1
 
 
 async def _approve_when_asked(client: AsyncClient, approved: bool, token: str | None = None) -> int:

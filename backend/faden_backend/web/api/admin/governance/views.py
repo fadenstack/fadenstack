@@ -40,7 +40,8 @@ class ToolRuleIn(BaseModel):
     #: What the user is told.
     message: str = Field(min_length=1, max_length=2000)
     category: str = Field(default="tool_rule", max_length=64)
-    #: The lowest that matches decides; ``allow`` at a lower number makes an exception.
+    #: Orders rules of the same action (the first gives the message); a matching deny wins, then
+    #: "Ask first", then allow, whatever the priority, so an ``allow`` makes no exception.
     priority: int = Field(default=100, ge=0, le=100_000)
     enabled: bool = True
 

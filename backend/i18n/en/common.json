@@ -4620,7 +4620,8 @@
     "priority_help": "Lower is tried first; the first rule that matches decides.",
     "rules": {
       "title": "Tool rules",
-      "description": "Deny a tool, ask the user before it runs, or allow it, by name. They apply to every chat and every agent.",
+      "description": "Deny a tool, ask the user before it runs, or allow it, by name. They apply to every chat and every agent. When several rules match, Deny wins, then Ask first, then Allow, whatever the priority.",
+      "priority_help": "Orders rules with the same action: the first gives the message. Deny always wins over Ask first and Allow.",
       "add": "Add rule",
       "create_title": "New tool rule",
       "edit_title": "Edit tool rule",

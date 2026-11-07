@@ -183,8 +183,17 @@ class Rule:
     category: str
 
 
+#: Among the rules that match a tool, deny wins, then "Ask first", then allow.
+_RULE_ORDER = {"deny": 0, "approval_required": 1, "allow": 2}
+
+
 class ToolRuleCheck:
-    """The tenant's tool rules (``llm_gateway_tool_rule``); the first that matches decides."""
+    """The tenant's tool rules (``llm_gateway_tool_rule``): deny wins, then "Ask first", then allow.
+
+    The action decides, whatever the priority, so an ``allow`` never switches off a deny or an "Ask first"
+    that also matches (ASVS 5.0 V8.2.1: a tool the admin denied runs for nobody). Priority orders rules of
+    the same action: the first of them gives the message.
+    """
 
     name = "tool_rules"
     stages = frozenset({GovernanceStage.TOOL})
@@ -194,7 +203,8 @@ class ToolRuleCheck:
         self.rules = rules
 
     def match(self, tool_id: str) -> Rule | None:
-        return next((r for r in self.rules if fnmatch.fnmatchcase(tool_id, r.pattern)), None)
+        matching = (r for r in self.rules if fnmatch.fnmatchcase(tool_id, r.pattern))
+        return min(matching, key=lambda r: _RULE_ORDER.get(r.action, len(_RULE_ORDER)), default=None)
 
     async def check(self, ctx: GovernanceContext) -> GovernanceDecision | None:
         rule = self.match(ctx.tool_id or "")

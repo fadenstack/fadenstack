@@ -4622,7 +4622,8 @@
     "priority_help": "La más baja se prueba primero; decide la primera regla que coincida.",
     "rules": {
       "title": "Reglas de herramientas",
-      "description": "Prohibir una herramienta, preguntar al usuario antes de ejecutarla o permitirla, por nombre. Se aplican a cada chat y a cada agente.",
+      "description": "Prohibir una herramienta, preguntar al usuario antes de ejecutarla o permitirla, por nombre. Se aplican a cada chat y a cada agente. Si coinciden varias reglas, gana «Prohibir», luego «Preguntar antes» y luego «Permitir», sea cual sea la prioridad.",
+      "priority_help": "Ordena las reglas con la misma acción: la primera da el mensaje. «Prohibir» siempre gana a «Preguntar antes» y «Permitir».",
       "add": "Añadir regla",
       "create_title": "Nueva regla de herramienta",
       "edit_title": "Editar regla de herramienta",

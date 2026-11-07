@@ -183,11 +183,18 @@ found something, not a measurement of how much personal data was successfully re
    covers the tools an agent's app runs itself, such as the browser and Office agents' tools: the app asks every
    time, whatever the person allowed before, and an app that cannot ask is not offered the tool.
 4. Write the **Message to the user**: what people are told when the rule applies.
-5. Set the **Priority**. Lower is tried first, and the first rule that matches decides, so a rule with a
-   lower number can make an exception to a broader one.
+5. Set the **Priority**. It orders rules with the same action: when several of them match, the one with the
+   lowest number gives the message.
 6. Save it. Rules apply at once.
 
 Without rules, tools run as the tool mode says.
+
+### When several rules match {#when-several-rules-match}
+
+**Deny** wins, then **Ask first**, then **Allow**, whatever their priority. So an **Allow** rule cannot make an
+exception to a **Deny** or **Ask first** rule, and on its own it changes nothing: the tool mode still decides
+whether the tool asks. To leave some tools out of a **Deny** rule, make its pattern narrower: deny
+`mcp.github.delete_*` rather than `mcp.github.*`.
 
 ### Tool classes and tool modes
 

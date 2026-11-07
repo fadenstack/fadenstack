@@ -4622,7 +4622,8 @@
     "priority_help": "La plus basse est essayée en premier ; la première règle qui correspond décide.",
     "rules": {
       "title": "Règles d'outils",
-      "description": "Interdire un outil, demander à l'utilisateur avant son exécution ou l'autoriser, par nom. Elles s'appliquent à chaque chat et à chaque agent.",
+      "description": "Interdire un outil, demander à l'utilisateur avant son exécution ou l'autoriser, par nom. Elles s'appliquent à chaque chat et à chaque agent. Si plusieurs règles correspondent, « Interdire » l'emporte, puis « Demander d'abord », puis « Autoriser », quelle que soit la priorité.",
+      "priority_help": "Ordonne les règles de même action : la première donne le message. « Interdire » l'emporte toujours sur « Demander d'abord » et « Autoriser ».",
       "add": "Ajouter une règle",
       "create_title": "Nouvelle règle d'outil",
       "edit_title": "Modifier la règle d'outil",

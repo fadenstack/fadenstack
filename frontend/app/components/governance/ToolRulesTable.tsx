@@ -1,4 +1,4 @@
-/** Tool rules: deny a tool, ask before it runs, or allow it, by name; the lowest priority that matches decides. */
+/** Tool rules: deny a tool, ask before it runs, or allow it, by name; deny wins, then ask, then allow, whatever the priority. */
 import { useTranslation } from "react-i18next";
 
 import Chip, { type ChipProps } from "@mui/material/Chip";
@@ -82,7 +82,7 @@ function ToolRuleForm({ value, onChange }: RuleFormProps<ToolRuleFields>) {
         type="number"
         label={t("governance.priority")}
         value={value.priority}
-        helperText={t("governance.priority_help")}
+        helperText={t("governance.rules.priority_help")}
         slotProps={{ htmlInput: { min: 0, max: 100000 } }}
         onChange={(e) => set("priority", Number(e.target.value))}
       />

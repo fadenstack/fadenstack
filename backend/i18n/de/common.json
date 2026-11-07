@@ -4622,7 +4622,8 @@
     "priority_help": "Niedrigere zuerst; die erste passende Regel entscheidet.",
     "rules": {
       "title": "Tool-Regeln",
-      "description": "Ein Tool sperren, vor der Ausführung nachfragen oder es erlauben, nach Namen. Gilt für jeden Chat und jeden Agenten.",
+      "description": "Ein Tool sperren, vor der Ausführung nachfragen oder es erlauben, nach Namen. Gilt für jeden Chat und jeden Agenten. Passen mehrere Regeln, gewinnt „Sperren“, dann „Erst nachfragen“, dann „Erlauben“, unabhängig von der Priorität.",
+      "priority_help": "Ordnet Regeln mit derselben Aktion: Die erste liefert die Meldung. „Sperren“ gewinnt immer vor „Erst nachfragen“ und „Erlauben“.",
       "add": "Regel hinzufügen",
       "create_title": "Neue Tool-Regel",
       "edit_title": "Tool-Regel bearbeiten",

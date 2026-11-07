@@ -199,11 +199,18 @@ Die Erkennungsrate ist der Anteil der Prüfungen mit einem Fund, nicht der Antei
    der Office-Agenten: Die App fragt jedes Mal, egal was der Benutzer vorher erlaubt hat, und einer App, die nicht
    fragen kann, wird das Tool nicht angeboten.
 4. Schreiben Sie die **Nachricht an den Nutzer**: Das wird Benutzern mitgeteilt, wenn die Regel greift.
-5. Legen Sie die **Priorität** fest. Niedrigere Werte werden zuerst geprüft, und die erste passende Regel
-   entscheidet. So kann eine Regel mit einer niedrigeren Zahl eine Ausnahme von einer allgemeineren Regel bilden.
+5. Legen Sie die **Priorität** fest. Sie ordnet Regeln mit derselben Aktion: Passen mehrere davon, liefert die mit
+   der niedrigsten Zahl die Nachricht.
 6. Speichern Sie die Regel. Regeln greifen sofort.
 
 Ohne Regeln laufen Tools so, wie es der Tool-Modus vorgibt.
+
+### Wenn mehrere Regeln passen {#when-several-rules-match}
+
+**Sperren** gewinnt, dann **Erst nachfragen**, dann **Erlauben**, unabhängig von der Priorität. Eine Regel
+**Erlauben** kann deshalb keine Ausnahme von einer Regel **Sperren** oder **Erst nachfragen** bilden, und für sich
+allein ändert sie nichts: Ob das Tool nachfragt, entscheidet weiter der Tool-Modus. Um einige Tools von einer Regel
+**Sperren** auszunehmen, fassen Sie deren Muster enger: Sperren Sie `mcp.github.delete_*` statt `mcp.github.*`.
 
 ### Tool-Klassen und Tool-Modi {#tool-classes-and-tool-modes}
 

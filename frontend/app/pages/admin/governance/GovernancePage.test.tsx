@@ -82,6 +82,19 @@ describe("GovernancePage", () => {
     expect(api.toolRules.list).toHaveBeenCalledTimes(2);
   });
 
+  it("says on the rules tab and in the rule editor that a deny wins whatever the priority", async () => {
+    open("rules");
+    expect(await screen.findByText(/When several rules match, Deny wins, then Ask first, then Allow/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Add rule" }));
+    expect(within(await screen.findByRole("dialog")).getByText(/Deny always wins over Ask first and Allow/)).toBeInTheDocument();
+  });
+
+  it("keeps the first match for tool classes", async () => {
+    open("classes");
+    await userEvent.click(await screen.findByRole("button", { name: "Add class" }));
+    expect(within(await screen.findByRole("dialog")).getByText(/the first rule that matches decides/)).toBeInTheDocument();
+  });
+
   it("removes a rule after a confirmation", async () => {
     api.toolRules.remove.mockResolvedValue(undefined);
     open("rules");
