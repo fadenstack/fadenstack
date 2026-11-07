@@ -30,8 +30,16 @@ With the module on, the default policy:
 - protects requests to **cloud providers**; requests to your own machines' models are not scanned;
 - **redacts**: personal data is replaced, and the model never sees it;
 - **blocks** a request to a cloud provider when the filter cannot run;
-- reads English text, and looks for these types: `PERSON`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `CREDIT_CARD`,
-  `IBAN_CODE`, `IP_ADDRESS`, `US_SSN`, `LOCATION`, `NRP`, `MEDICAL_LICENSE`, `URL`.
+- reads English text and names no types of its own: it looks for the standard types the installed detector finds,
+  with that detector's thresholds. These are `PERSON`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `CREDIT_CARD`, `IBAN_CODE`,
+  `IP_ADDRESS`, `US_SSN`, `LOCATION`, `MEDICAL_LICENSE` and `URL`, and with the older `presidio-legacy` profile also
+  `NRP` (nationality, religion, political group), which the local detectors do not find. The policy form lists them
+  under **Entities** when none are picked.
+
+Before 0.6.0 the default named eleven types itself, `NRP` among them, with a threshold for the older profile. The
+local detectors refuse both, so with one installed every request to a cloud provider was refused. An install that
+still has that default as it was set up gets the new one when it starts; a default you changed stays as you saved
+it (see [Adopt an installed detector profile](#adopt-an-installed-detector-profile)).
 
 ### When the module is off {#when-the-module-is-off}
 
@@ -48,6 +56,12 @@ A policy needs the module to run. What happens without it depends on where the p
 Switching the module off therefore does not silently remove a policy you saved. Be aware that if you rely on the
 default policy and later switch the module off, requests to cloud providers are no longer masked: save a policy
 for your organisation if that must not happen.
+
+While that is the case, administrators see it at the top of every admin page, as an error that cannot be hidden:
+*"PII is off: requests to cloud models go out with personal data unmasked."* It appears once the module, on
+before, is off, a cloud model is enabled and no policy is saved for your organisation; and it goes when the module
+is on again (`faden module enable pii`), when no cloud model is enabled any more, or when the default policy no
+longer scans cloud models (then sending them unmasked is what you chose).
 
 ??? info "More about dates"
     Dates (`DATE_TIME`) are not on the list. Add them if you need dates of birth covered; plain numbers in a
@@ -91,7 +105,9 @@ override that should use it:
 
 1. Check that the installed profile is available. An unavailable-service notice does not confirm active protection.
 2. Select **Use installed profile defaults** under **Detection (Presidio)**. This selects the installed profile and
-   **Use profile thresholds**; it keeps your selected categories and outgoing-request choices.
+   **Use profile thresholds**, and removes the categories the installed detector does not find; it keeps your other
+   categories and outgoing-request choices. The form warns when a policy's threshold or a category does not fit the
+   installed detector: until it is adopted, requests the policy covers are refused.
 3. Choose **Language**. Remove categories shown as unavailable for that language, then add the categories you need
    under **Entities**. Adopting a profile does not automatically select every available category.
 4. Choose whether to protect cloud requests, local-model requests or both. Keep **If detection fails** at `block`
@@ -122,7 +138,7 @@ the service refuses unsupported coverage instead of silently ignoring that categ
     | **Outgoing requests**: **Protect requests to cloud providers**, **Protect requests to local models** | Which requests are scanned. |
     | **Mode** | `redact`: personal data is replaced with a placeholder such as `<PERSON>`, and the answer keeps it. `tokenize_reversible`: each value is replaced with a token such as `[PERSON_1]`, and put back in the answer the person sees. The model sees neither. |
     | **If detection fails** | `block`: the request is refused. `allow`: it is sent unscanned. `fallback_to_local`: it is sent unscanned to one of your own models under the same name, if there is one, and refused otherwise. |
-    | **Detection (Presidio)**: **Language**, **Score threshold**, **Entities** | The installed profile, language and categories to use. **Use profile thresholds** uses the installed profile's defaults. A manual higher threshold masks less. Choose only an advertised language and supported categories; otherwise the check fails and **If detection fails** decides. |
+    | **Detection (Presidio)**: **Language**, **Score threshold**, **Entities** | The installed profile, language and categories to use. **Use profile thresholds** uses the installed profile's defaults. A manual higher threshold masks less. **Entities** left empty: the standard types the installed detector finds. Choose only an advertised language and supported categories; otherwise the check fails and **If detection fails** decides. |
     | **Telemetry**: **Remove personal data from telemetry**, **Mode** | For request traces, which are off by default: whether a trace keeps the request with personal data removed (`sanitized`) or figures only (`metrics_only`). Without Enterprise, traces keep figures only anyway. |
 
 ### Chats and agents
@@ -163,15 +179,27 @@ found something, not a measurement of how much personal data was successfully re
 
 2. Give it a **Name** (for you) and a **Tool pattern**: a tool name, or a pattern with `*`, such as
    `mcp.github.*`, `knowledge_search` or `*`.
-3. Choose the **Action**: **Deny**, **Ask first** (the person approves each call) or **Allow**. A rule also
-   covers the tools an agent's app runs itself, such as the browser and Office agents' tools: the app asks every
-   time, whatever the person allowed before, and an app that cannot ask is not offered the tool.
+3. Choose the **Action**: **Deny** or **Ask first** (the person approves each call). A rule also covers the
+   tools an agent's app runs itself, such as the browser and Office agents' tools: the app asks every time,
+   whatever the person allowed before, and an app that cannot ask is not offered the tool.
 4. Write the **Message to the user**: what people are told when the rule applies.
-5. Set the **Priority**. Lower is tried first, and the first rule that matches decides, so a rule with a
-   lower number can make an exception to a broader one.
+5. Set the **Priority**. It orders rules with the same action: when several of them match, the one with the
+   lowest number gives the message.
 6. Save it. Rules apply at once.
 
 Without rules, tools run as the tool mode says.
+
+### When several rules match {#when-several-rules-match}
+
+**Deny** wins over **Ask first**, whatever their priority. To leave some tools out of a **Deny** rule, make its
+pattern narrower: deny `mcp.github.delete_*` rather than `mcp.github.*`. To let a tool run without asking, give
+it a tool class (see [Tool classes and tool modes](#tool-classes-and-tool-modes)).
+
+### Allow rules from earlier versions {#allow-rules}
+
+Earlier versions also offered **Allow**. It could not make an exception to a **Deny** or **Ask first** rule, and
+on its own it changed nothing, so new rules can no longer allow. Rules made with it are still listed, marked
+**No effect**: change them to **Deny** or **Ask first**, or delete them.
 
 ### Tool classes and tool modes
 
@@ -197,6 +225,8 @@ Fadenstack's own tools (the knowledge base search, the time, the tool search) ar
 
 ### Tool mode limits {#tool-mode-limits}
 
+<span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span>
+
 With Enterprise, **Agents → Governance → Tool mode limits** sets the most a chat's tool mode may be, for
 **Everyone**, **A team**, **An agent** or **A person**: choose who it is **For**, pick the team, agent or person,
 choose **At most** and select **Set limit**. Change a limit in its row, or remove it. Several limits can apply
@@ -218,6 +248,10 @@ person picks again; the limits are kept, and apply again once the licence is val
 stored: only a keyed fingerprint, so the same text refused twice shows the same value, and nobody can read it
 back.
 
+### Running grants {#running-grants}
+
+**Agents → Governance → Active grants** lists the grants that are running. A grant is what a person gives one agent on one of their devices, for a while: either one tool (**For a time**), or reading and writing in named places (**Working alongside**), so that what would otherwise ask runs without asking. It never covers destructive or unclassified tools, and never what an **Ask first** rule or a tool marked **Always ask** covers. Each row shows the person, the agent, what it covers, the time left and the number of calls used. **Revoke** ends one from the agent's next call; a call already running finishes. People can end their own in the agent's **Settings → Approvals**. A grant also ends at its time, and when the agent gets a new version.
+
 ## What people see when something is stopped
 
 | What happened | In the chat |
@@ -225,6 +259,7 @@ back.
 | A tool rule denied a tool | The tool line says **Not run**. The model is told, with the rule's message, and carries on without it. |
 | A tool needs approval | "… wants to run", with **Approve** and **Decline**. Without an answer within five minutes, the call is not run (**Expired**). |
 | The personal data filter could not run, and the policy blocks | The reply fails with "PII service unavailable and fail_action=block." Nothing was sent to the model. |
+| The policy does not fit the installed detector (a threshold for the older profile, or a category it does not find), and the policy blocks | The reply fails with "The PII policy does not fit the installed PII detector (…), so nothing was sent." Adopt the installed profile in the policy (see [above](#adopt-an-installed-detector-profile)). |
 | A policy you saved applies, but the PII module is not running, and the policy blocks | The reply fails with "A PII policy is set for this workspace, but the PII module is not running, so nothing was sent." |
 | A prompt was refused (content policies, <span class="fs-planned">Planned</span>) | The message is marked **Not sent**, with the policy's message or "This was stopped by your organisation's policy." Nothing is sent to a model or stored. |
 | An answer was refused (content policies, <span class="fs-planned">Planned</span>) | The answer stops and is marked **Answer withheld**. |

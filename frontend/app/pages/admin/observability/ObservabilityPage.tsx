@@ -162,8 +162,7 @@ export default function ObservabilityPage() {
   const errorTone = errorRate == null ? "default" : errorRate > 0.05 ? "error" : errorRate > 0.01 ? "warning" : "default";
   const models = (summary?.by_model ?? []).slice(0, 10);
   const topModelCost = Math.max(0, ...models.map((m) => Number(m.estimated_total_cost) || 0));
-  const users = (summary?.top_users ?? []).slice(0, 10);
-  const topUserRequests = Math.max(0, ...users.map((u) => u.total_requests));
+  // No ranking of people here (M11): usage per team, agent or model is on the Usage page, k-suppressed.
   const seriesStatus = { loading: seriesLoading, hasData: timeseries.length > 0 };
   const noSeries = !seriesLoading && timeseries.length === 0
     ? <WidgetEmpty message={t("observability.no_data")} />
@@ -293,26 +292,6 @@ export default function ObservabilityPage() {
           barWidth={96}
         />
       </WidgetCard>
-
-      {users.length > 0 && (
-        <Box sx={FULL_ROW}>
-          <WidgetCard title={t("observability.top_users")}>
-            <RankedBars
-              items={users.map((u) => ({
-                key: u.user_id,
-                label: u.user_id,
-                share: topUserRequests ? u.total_requests / topUserRequests : 0,
-                valueLabel: t("observability.top_user_value", {
-                  requests: fmtNum(u.total_requests),
-                  cost: fmtCost(u.estimated_total_cost),
-                }),
-                color: theme.palette.dashboard.residency.private,
-              }))}
-              barWidth={160}
-            />
-          </WidgetCard>
-        </Box>
-      )}
     </PanelGrid>
   );
 

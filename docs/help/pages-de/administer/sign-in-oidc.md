@@ -1,5 +1,8 @@
 # OpenID Connect {#openid-connect}
 
+<span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span>
+
+
 Verbinden Sie einen Identitätsanbieter, der OpenID Connect spricht, etwa Entra ID, Google Workspace, Okta oder
 Keycloak. Die Benutzer wählen auf der Anmeldeseite **Anmelden mit** und den Namen des Anbieters, melden sich
 dort an und kommen angemeldet zurück. Was für alle Anbieter gilt, steht unter

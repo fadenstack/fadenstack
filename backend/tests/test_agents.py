@@ -186,6 +186,74 @@ async def test_versions_are_added_published_and_rolled_back(
     assert listed[1]["instructions"] == "Be brief."
 
 
+@pytest.mark.parametrize(("risk", "published"), [
+    ("read", True), ("write", True), ("destructive", False), (None, False),
+], ids=["read", "write", "destructive", "unclassified"])
+async def test_never_ask_is_published_only_for_read_and_write_tools(
+    risk: str | None, published: bool, signed_in: _As, client: AsyncClient, dbsession: AsyncSession,
+) -> None:
+    """sdk/38 D7. A draft may hold it (an admin may reclassify the tool first); publishing it may not."""
+    signed_in.user = await _user(dbsession, admin=True)
+    tool = {"name": "update_page", "approval": "never", **({"risk": risk} if risk else {})}
+    await _agent(client, slug="never-asks", publish=False, host_tool_contract=[tool])
+    r = await client.post("/api/agents/never-asks/versions/1/publish")
+    if published:
+        assert r.status_code == status.HTTP_200_OK, r.text
+    else:
+        assert r.status_code == status.HTTP_400_BAD_REQUEST, r.text
+        assert "only for read and write tools" in r.json()["detail"] and "update_page" in r.json()["detail"]
+        assert (await client.get("/api/agents/never-asks")).json()["published_version"] is None
+
+
+async def test_a_version_says_its_default_and_highest_level(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession,
+) -> None:
+    """sdk/38 §5, D1, D2: in the version, as Ask up to Auto unless the author says otherwise."""
+    signed_in.user = await _user(dbsession, admin=True)
+    await _agent(client, slug="as-before")
+    stored = (await client.get("/api/agents/as-before/versions/1")).json()["approvals"]
+    assert (stored["default_level"], stored["max_level"], stored["standing"]) == ("ask", "auto", None)
+    await _agent(client, slug="researcher", approvals={"default_level": "read_only", "max_level": "ask"})
+    stored = (await client.get("/api/agents/researcher/versions/1")).json()["approvals"]
+    assert (stored["default_level"], stored["max_level"]) == ("read_only", "ask")
+
+
+@pytest.mark.parametrize("approvals", [
+    {"default_level": "auto", "max_level": "ask"},  # the default above the highest
+    {"default_level": "bypass", "max_level": "auto"},  # never Bypass
+    {"default_level": "ask", "max_level": "bypass"},  # no tenant can allow it yet
+    {"default_level": "ask", "max_level": "auto", "grant_classes": ["destructive"]},
+    {"default_level": "ask", "max_level": "auto", "unknown": 1},
+], ids=["default-above-max", "bypass-default", "bypass-max", "destructive-grant", "unknown-key"])
+async def test_a_version_with_impossible_levels_is_refused(
+    approvals: dict[str, Any], signed_in: _As, client: AsyncClient, dbsession: AsyncSession,
+) -> None:
+    signed_in.user = await _user(dbsession, admin=True)
+    r = await client.post("/api/agents", json={"slug": "odd-levels", "name": "x", "version": {"approvals": approvals}})
+    assert r.status_code == 422, r.text
+
+
+@pytest.mark.parametrize(("place", "status_code"), [
+    ({"target_argument": "/path", "target_type": "document"}, 201),
+    ({"target_argument": "/target/url", "target_type": "site"}, 201),
+    ({"target_argument": "/path"}, 422),  # a place needs both
+    ({"target_type": "folder"}, 422),
+    ({"target_argument": "path", "target_type": "document"}, 422),  # not a JSON pointer
+    ({"target_argument": "/path", "target_type": "planet"}, 422),
+], ids=["document", "site", "argument-alone", "type-alone", "not-a-pointer", "unknown-type"])
+async def test_a_host_tool_may_say_where_its_calls_act(
+    place: dict[str, str], status_code: int, signed_in: _As, client: AsyncClient, dbsession: AsyncSession,
+) -> None:
+    """sdk/38 §6, desktop 37 D4: the place a work grant is scoped by."""
+    signed_in.user = await _user(dbsession, admin=True)
+    tool = {"name": "insert_text", "risk": "write", **place}
+    r = await client.post("/api/agents", json={"slug": "placed", "name": "x", "version": {"host_tool_contract": [tool]}})
+    assert r.status_code == status_code, r.text
+    if status_code == 201:
+        [stored] = (await client.get("/api/agents/placed/versions/1")).json()["host_tool_contract"]
+        assert (stored["target_argument"], stored["target_type"]) == (place["target_argument"], place["target_type"])
+
+
 async def test_host_tool_names_are_unique(signed_in: _As, client: AsyncClient, dbsession: AsyncSession) -> None:
     signed_in.user = await _user(dbsession, admin=True)
     r = await client.post("/api/agents", json={

@@ -49,13 +49,14 @@ function failure(call: LlmCall): Finding | null {
   const params = { status, code: code || String(status), wait: formatDuration(call.latency_ms) };
   if (code === "upstream_refused") return { id: "upstream_refused", severity: "error", params };
   if (code === "upstream_authentication_failed") return { id: "provider_key", severity: "error", params };
-  if (code === "upstream_request_failed" || code === "upstream_address_refused")
+  if (code === "upstream_request_failed" || code === "upstream_address_refused" || code === "model_unreachable")
     return { id: "unreachable", severity: "error", params };
   if (code === "no_capacity") return { id: "no_capacity", severity: "error", params };
   if (code === "policy_blocked") return { id: "policy_blocked", severity: "error", params };
   if (code.startsWith("pii_")) return { id: "pii", severity: "error", params };
   if (MODEL_CODES.has(code)) return { id: "unknown_model", severity: "error", params };
   if (AUTH_CODES.has(code) || status === 401 || status === 403) return { id: "auth", severity: "error", params };
+  if (code === "budget_exceeded") return { id: "budget_exceeded", severity: "error", params };
   if (status === 429 || code === "resource_limit_reached") return { id: "rate_limited", severity: "error", params };
   if (code === "request_too_large" || status === 413) return { id: "too_large", severity: "error", params };
   if (status >= 500 && call.latency_ms >= LONG_WAIT_MS) return { id: "timeout", severity: "error", params };

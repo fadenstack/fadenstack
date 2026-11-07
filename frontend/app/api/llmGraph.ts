@@ -33,7 +33,7 @@ export interface TraceEvent {
   request_id: string;
   trace_id: string | null;
   tenant_id: string;
-  user_id: string;
+  user_id: string | null;
   model_alias: string | null;
   provider_instance_id: string | null;
   status: number;

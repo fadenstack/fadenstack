@@ -373,6 +373,11 @@ async def set_user_usage_group(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Unknown group id: {payload.usage_group_id}",
             )
+        if group.archived_at is not None and group.id != target_user.usage_group_id:
+            # An archived team is nobody's new home team (services/teams.py).
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail={"code": "team_archived"},
+            )
 
     target_user.usage_group_id = payload.usage_group_id
     await session.flush()

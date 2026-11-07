@@ -41,6 +41,26 @@ async def test_pii_options_list_only_languages_with_models(
 
 
 @pytest.mark.anyio
+async def test_pii_options_say_what_a_policy_naming_no_types_gets(
+    client: AsyncClient,
+    fastapi_app: FastAPI,
+) -> None:
+    """Per language, so the console can show it next to an empty list of types."""
+
+    standard = {"en": ["PERSON", "US_SSN"], "de": ["PERSON"]}
+
+    class _Service:
+        supported_languages = ("en", "de")
+
+        def default_entities(self, language: str) -> list[str]:
+            return standard[language]
+
+    fastapi_app.state.pii_service = _Service()
+    response = await client.get("/api/v1/pii/options")
+    assert response.json()["default_entities"] == standard
+
+
+@pytest.mark.anyio
 async def test_pii_options_without_service_offer_default_language_only(
     client: AsyncClient,
 ) -> None:

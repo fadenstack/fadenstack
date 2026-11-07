@@ -25,8 +25,8 @@ import { useAction } from "~/lib/useAction";
 import { useAsyncData } from "~/lib/useAsyncData";
 
 const HIDDEN_KEY = "faden.notices.hidden";
-/** The countdown moves once a day; an hour is soon enough to see it. */
-const REFRESH_MS = 60 * 60 * 1000;
+/** A notice can begin at any moment (PII switched off while cloud models are in use): seen within minutes. */
+const REFRESH_MS = 5 * 60 * 1000;
 
 function noticeId(notice: AdminNotice): string {
   return `${notice.code}:${JSON.stringify(notice.params)}`;
@@ -70,6 +70,10 @@ export function AdminNotices({ isSuperuser }: { isSuperuser: boolean }) {
     if (!i18n.exists(key, { count })) return t("notices.unknown", { code: notice.code });
     const params = { ...notice.params };
     if (typeof params.date === "string") params.date = fmtDay(params.date, i18n.language);
+    // A period (`day`, `week`, `month`) in the reader's words.
+    if (typeof params.period === "string" && i18n.exists(`budgets.period_noun.${params.period}`)) {
+      params.period = t(`budgets.period_noun.${params.period}`);
+    }
     return t(key, { ...params, count });
   }
 

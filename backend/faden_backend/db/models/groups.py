@@ -34,6 +34,21 @@ class Group(Base):
     # ID for it.
     source: Mapped[str | None] = mapped_column(String(80), nullable=True)
     external_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Where the team sits in the organisation, for usage and its reports: one parent, at most
+    # ``services/teams.py``'s ``MAX_LEVELS`` teams from the top down to it, no cycles (checked on every
+    # change). Rights do not flow down the tree: each team's roles are its own. Set by administrators, also
+    # for a team a provisioning source keeps (the tree is the organisation's; the source names the team and
+    # its members).
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("groups.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    #: A finance code the team's usage is booked to, as free text (exported with its usage).
+    cost_center: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    #: When the team ended: it keeps its history, takes no new members and is no one's new home team.
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

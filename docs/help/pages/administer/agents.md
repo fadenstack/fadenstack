@@ -53,10 +53,10 @@ The agent's page opens. Its list status is **Draft**, **Published** or **Retired
 
 | Tab | What it holds |
 |---|---|
-| **Definition** | The version people get: **Instructions**, **Model**, **Knowledge** (collections it may search), **Server tools** (**What a chat gets**, **Only these**, or **None**), **Local MCP servers**, **Host tools** (the application's tools and their classes), **Appearance** (greeting and suggested prompts) and **Privacy**. |
+| **Definition** | The version people get: **Instructions**, **Model**, **Knowledge** (collections it may search), **Server tools** (**What a chat gets**, **Only these**, or **None**), **Local MCP servers**, **Host tools** (the application's tools and their classes), **Approval levels** (the tool mode conversations start in, and the highest), **Appearance** (greeting and suggested prompts) and **Privacy**. |
 | **Versions** | Every version. **Publish** one, **Roll back** to an earlier one, see the **Changes**. |
-| **Access** | **Who may use it**, the **Excluded people** (Enterprise) and its **Maintainers** (with Enterprise: **Maintainers and auditors**). **Check someone's access** says whether a person may use the agent, and why. |
-| **Activity** | Usage over a time range (requests, errors, tokens, users, conversations: counts only, never content), what the applications reported (tools that ran, approvals), and the **Signed-in devices**. |
+| **Access** | **Who may use it**, the **Excluded people** <span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span> and its **Maintainers** (with Enterprise: **Maintainers and auditors** <span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span>). **Check someone's access** says whether a person may use the agent, and why. |
+| **Activity** | Usage over a time range (requests, errors, tokens, users, conversations: counts only, never content), shown only when at least five people used the agent in the range; the owner of a personal agent sees its figures all the same. What the applications reported (tools that ran, approvals), and the **Signed-in devices**. It names nobody but you. |
 | **Apps** | What the applications bring, compared with the agent's version (see [When an application brings new tools](#when-an-application-brings-new-tools)). |
 
 ??? info "More about server tools"
@@ -90,7 +90,7 @@ change. Publishing a version reaches everyone who uses the agent at their next r
 **Maintainers** change the agent, publish versions and decide who may use it, and can use it before it is
 published. They do this from **Agents** in the chat's user menu; they need no access to the console.
 
-With Enterprise, an agent can also have **Auditors**: choose **Add as** → **Auditor** before picking the
+<span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span> With Enterprise, an agent can also have **Auditors**: choose **Add as** → **Auditor** before picking the
 person, or change a member's role in the list, and select **Save**. Auditors see the agent's versions,
 members, settings and activity and change nothing; to use it, they need it granted like anyone else. Without
 a valid Enterprise licence they no longer see it.
@@ -104,7 +104,7 @@ checked whom (`agent.access.check`).
     performance needs the works council's agreement (BetrVG § 87(1) No. 6): agree the auditor role with it
     before you give it.
 
-With Enterprise, **Excluded people** may not use the agent, even through a team that may: pick the person,
+<span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span> With Enterprise, **Excluded people** may not use the agent, even through a team that may: pick the person,
 give a **Reason** and select **Exclude**. It takes effect in the applications at once and is recorded
 in the audit log. The person is told only that they are excluded; the reason is for the agent's maintainers
 and administrators. Maintainers and administrators always keep the agent and cannot be excluded.
@@ -187,10 +187,29 @@ Each tool an application brings has a class, which the agent's version sets:
 | **Destructive** | Always asks. |
 | **Unclassified** | Always asks. |
 
-People pick the tool mode in the panel, per conversation; every conversation starts in **Ask**. The
+People pick the tool mode in the panel, per conversation. Under **Approval levels** the version says where every
+conversation starts (**Starts in**, **Ask** unless you change it) and the highest mode people may pick
+(**At most**, **Auto** unless you change it); the start is never above the highest, and your organisation's limits
+narrow both. A research agent, for example, might start in **Read only** and go at most to **Ask**. The
 application can make a class stricter, never looser. Your [tool rules](policies.md#tool-rules) apply to agents
-as well as chats. Two examples: the Outlook add-in never sends mail itself, it opens drafts for the person;
+as well as chats.
+
+Under **Host tools**, the version can also say how each tool asks (**Approval**):
+
+| Approval | What it does |
+|---|---|
+| **As the tool mode says** | The table above decides. |
+| **Always ask** | Asks every time; nothing the person allowed before, for the chat or always, answers it. Use it for tools that decide about people (GDPR Art. 22) or act on the physical world. |
+| **Ask** | Asks even where the tool mode would run the tool; the person may allow it for the chat or always. |
+| **Never ask** | A read or write tool runs without asking in **Ask** and **Auto**. A version where a destructive or unclassified tool has it is not published. |
+
+None of them shows a tool the tool mode hides. Until Fadenstack can mark tools that act on the physical world,
+such as a machine or a door, give them **Always ask**, or set an "Ask first" [tool rule](policies.md#tool-rules). Two examples: the Outlook add-in never sends mail itself, it opens drafts for the person;
 and the browser agent never reads or fills password fields, nor card fields the site marks as such.
+
+Under **Place** a tool can say which of its arguments names where a call acts (a JSON pointer such as `/path`) and
+what kind of place it is: document, folder, website, app or desk. A grant for a stretch of work, which a person can
+give an agent for a while, covers the tool's calls only in the places it names. A tool without a place keeps asking.
 
 ## When an application brings new tools
 
@@ -242,7 +261,7 @@ on their **Agents** page.
     takes effect within ten minutes. These are **Agent sign-in lifetime (s)**, **Agent sign-in idle timeout (s)**
     and **Agent access token lifetime (s)** under **Settings → General**.
 
-    With Enterprise, an agent can have shorter ones: **Sign-in lifetimes** on its **Definition** tab, in
+    <span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span> With Enterprise, an agent can have shorter ones: **Sign-in lifetimes** on its **Definition** tab, in
     seconds, at least 60; an empty field keeps the tenant's. They come with the version you save and publish.
     Longer ones than the tenant's are refused, and lowering the tenant's setting later shortens the agent's too.
     Devices already signed in get the shorter lifetime when their sign-in is next renewed.

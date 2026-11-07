@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
-from collections.abc import Iterator
+from collections.abc import Awaitable, Callable, Iterator
 from typing import Any
 
 import pytest
@@ -17,7 +17,7 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from faden_gateway.db.models.gateway import ChatSession, ProviderType, ToolClassification
+from faden_gateway.db.models.gateway import ChatSession, ProviderType, ToolClassification, ToolRule
 from faden_gateway.services.extensions import registry
 from faden_gateway.services.gateway import governance as gov
 from faden_gateway.services.gateway import tool_classes as tc
@@ -68,6 +68,21 @@ async def _classify(db: AsyncSession, pattern: str, tool_class: str, priority: i
     await db.flush()
 
 
+async def _answer_when_asked(
+    client: AsyncClient, approved: bool, *, first: Callable[[], Awaitable[None]] | None = None,
+) -> int:
+    """Answer the call that waits for the user, after *first* (a change made while they were asked)."""
+    for _ in range(500):
+        if gov.approvals.waiting():
+            if first is not None:
+                await first()
+            approval = gov.approvals.waiting()[0]
+            return (await client.post(f"/v1/approvals/{approval}", headers=_headers(),
+                                      json={"approved": approved})).status_code
+        await asyncio.sleep(0.01)
+    raise AssertionError("nobody asked")
+
+
 # -- the table --------------------------------------------------------------------------
 
 
@@ -80,6 +95,32 @@ async def _classify(db: AsyncSession, pattern: str, tool_class: str, priority: i
 def test_what_each_mode_does_with_each_class(mode: tc.ToolMode, expected: dict[tc.ToolClass, tc.Decision]) -> None:
     for tool_class, decision in expected.items():
         assert tc.decide(mode, tc.Classified("t", tool_class, "rule")) is decision
+
+
+@pytest.mark.parametrize(("mode", "tool_class", "approval", "expected"), [
+    (M.ASK, C.WRITE, "never", D.RUN),  # the author pre-approves what the mode would ask about
+    (M.ASK, C.READ, "never", D.RUN),
+    (M.ASK, C.DESTRUCTIVE, "never", D.ASK),  # never for a destructive or unclassified tool
+    (M.AUTO, C.UNKNOWN, "never", D.ASK),
+    (M.AUTO, C.WRITE, "ask", D.ASK),  # asks where the mode would run it
+    (M.ASK, C.READ, "ask", D.ASK),
+    (M.AUTO, C.READ, "always", D.ASK),
+    (M.AUTO, C.WRITE, None, D.RUN),  # unset: the table
+    (M.READ_ONLY, C.WRITE, "never", D.HIDDEN),  # none of them shows a hidden tool
+    (M.READ_ONLY, C.WRITE, "always", D.HIDDEN),
+    (M.OFF, C.READ, "ask", D.HIDDEN),
+])
+def test_the_authors_approval_goes_on_top_of_the_mode(
+    mode: tc.ToolMode, tool_class: tc.ToolClass, approval: str | None, expected: tc.Decision,
+) -> None:
+    """38 §4.3, D7: ``always`` and ``ask`` ask, ``never`` runs read and write tools from Ask upward."""
+    assert tc.decide(mode, tc.Classified("t", tool_class, "agent", approval=approval)) is expected
+
+
+def test_the_contract_says_each_tools_approval() -> None:
+    classifier = tc.Classifier(contract={"save": "write"}, approvals={"save": "never", "open_url": "always"})
+    assert (classifier.classify("save").approval, classifier.classify("open_url").approval) == ("never", "always")
+    assert classifier.classify("other").approval is None
 
 
 def test_an_unknown_tool_never_runs_unasked_and_open_world_is_not_acted_on() -> None:
@@ -245,6 +286,79 @@ async def test_the_session_setting_and_a_ceiling_decide_the_mode(
     assert bad.status_code in (400, 422)
 
 
+# -- read again before a call runs (39 F2) ----------------------------------------------------------
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("stream", [False, True], ids=["whole", "streamed"])
+async def test_a_ceiling_lowered_between_rounds_holds_for_the_next_call(
+    stream: bool, fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await _setup(fastapi_app, db_session)
+    await _classify(db_session, "knowledge_search", "write")
+    knowledge = _Knowledge(monkeypatch)
+    model = _Model(monkeypatch, _call("knowledge_search", {"query": "a"}), _call("knowledge_search", {"query": "b"}),
+                   _say("Done."))
+
+    async def lowered_once_a_search_ran(_: tc.CeilingContext) -> str | None:
+        return "read_only" if knowledge.searches else None
+
+    registry.tool_mode_ceilings.append(lowered_once_a_search_ran)
+    r = await client.post("/v1/chat/completions", headers=_headers(**{"X-Faden-Tool-Mode": "auto"}), json={
+        "model": ALIAS, "stream": stream, "messages": [{"role": "user", "content": "When?"}]})
+    assert r.status_code == 200, r.text
+    assert [s["query"] for s in knowledge.searches] == ["a"], "the second round runs under the lowered ceiling"
+    assert "Only read-only tools are allowed in this chat." in model.sent[2]["messages"][-1]["content"]
+
+
+@pytest.mark.anyio
+async def test_an_ask_first_rule_added_while_the_mode_asked_refuses_the_approved_call(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await _setup(fastapi_app, db_session)
+    await _classify(db_session, "knowledge_search", "write")
+    knowledge = _Knowledge(monkeypatch)
+    model = _Model(monkeypatch, _call("knowledge_search", {"query": "launch"}), _say("Done."))
+
+    async def add_rule() -> None:
+        db_session.add(ToolRule(tenant_id="tenant-a", name="look twice", tool_pattern="knowledge_*",
+                                action="approval_required", message="Searching needs a second look.",
+                                category="tool_rule", priority=10, enabled=True))
+        await db_session.flush()
+
+    ask = client.post("/v1/chat/completions", headers=_headers(**EVENTS), json={
+        "model": ALIAS, "stream": True, "messages": [{"role": "user", "content": "When?"}]})
+    r, status = await asyncio.wait_for(asyncio.gather(ask, _answer_when_asked(client, True, first=add_rule)), 10)
+    assert status == 200 and knowledge.searches == [], "approved for the mode, not for the rule"
+    told = "The tool policy changed before this call ran: Searching needs a second look."
+    assert told in model.sent[1]["messages"][-1]["content"]
+    assert any(e.get("name") == "faden.tool_denied" and e["value"]["message"] == told for e in _faden(r.text))
+
+
+@pytest.mark.anyio
+async def test_an_approved_call_runs_when_only_the_mode_that_asks_moved(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await _setup(fastapi_app, db_session)
+    await _classify(db_session, "knowledge_search", "destructive")
+    knowledge = _Knowledge(monkeypatch)
+    _Model(monkeypatch, _call("knowledge_search", {"query": "launch"}), _say("Done."))
+    ceiling: list[str | None] = ["ask"]
+
+    async def held(_: tc.CeilingContext) -> str | None:
+        return ceiling[0]
+
+    async def lift() -> None:
+        ceiling[0] = None  # Auto now, where a destructive tool still asks: the user's answer stands
+
+    registry.tool_mode_ceilings.append(held)
+    ask = client.post("/v1/chat/completions", headers=_headers(**EVENTS, **{"X-Faden-Tool-Mode": "auto"}), json={
+        "model": ALIAS, "stream": True, "messages": [{"role": "user", "content": "When?"}]})
+    r, status = await asyncio.wait_for(asyncio.gather(ask, _answer_when_asked(client, True, first=lift)), 10)
+    assert status == 200 and len(knowledge.searches) == 1, r.text
+
+
 @pytest.mark.anyio
 async def test_an_agents_host_tools_are_classed_by_its_contract(
     fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
@@ -268,4 +382,60 @@ async def test_an_agents_host_tools_are_classed_by_its_contract(
     assert "read_page" in offered and "delete_page" not in offered, "its contract says which is which"
     profile = (await client.get("/v1/agents/eplan-assistant/profile",
                                 headers={"Authorization": f"Bearer {_agent_token()}"})).json()
-    assert profile["tool_modes"] == {"default": "ask", "ceiling": None, "open_world_enforced": False}
+    assert profile["tool_modes"] == {"default": "ask", "ceiling": None, "max": "auto", "open_world_enforced": False}
+
+
+# -- each agent's default and highest level (sdk/38 §5, D1, D2) -------------------------------------------
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(("levels", "ee_ceiling", "expected"), [
+    ({}, None, {"default": "ask", "ceiling": None, "max": "auto"}),  # as before: no new ceiling
+    ({"default_level": "auto", "max_level": "auto"}, None, {"default": "auto", "ceiling": None, "max": "auto"}),
+    ({"default_level": "read_only", "max_level": "ask"}, None, {"default": "read_only", "ceiling": "ask", "max": "ask"}),
+    ({"default_level": "auto", "max_level": "auto"}, "read_only",
+     {"default": "read_only", "ceiling": "read_only", "max": "auto"}),  # the narrowest applies
+    ({"default_level": "ask", "max_level": "bypass"}, None,
+     {"default": "read_only", "ceiling": "read_only", "max": "read_only"}),  # unknown: never wider
+], ids=["unset", "auto-agent", "research-agent", "ee-narrower", "unknown-max"])
+async def test_the_profile_says_the_agents_default_and_highest_level(
+    levels: dict[str, str], ee_ceiling: str | None, expected: dict[str, str | None],
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession,
+    backend: _Backend,  # noqa: F811 - the fixture
+) -> None:
+    await _seed(db_session, provider=ProviderType.REMOTE_OPENAI, pii=None)
+    backend.put(_profile(**levels))
+    fastapi_app.state.agent_directory.invalidate()
+    if ee_ceiling is not None:
+        async def ceiling(_: tc.CeilingContext) -> str:
+            return ee_ceiling
+
+        registry.tool_mode_ceilings.append(ceiling)
+    profile = (await client.get("/v1/agents/eplan-assistant/profile",
+                                headers={"Authorization": f"Bearer {_agent_token()}"})).json()
+    assert {k: profile["tool_modes"][k] for k in expected} == expected
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(("levels", "header", "asked"), [
+    ({"default_level": "auto", "max_level": "auto"}, None, False),  # starts in the agent's Auto
+    ({}, None, True),  # unset: Ask, as before
+    ({"default_level": "ask", "max_level": "ask"}, "auto", True),  # Auto asked for, Ask is the most
+], ids=["agent-default-auto", "unset-ask", "header-above-max"])
+async def test_an_agents_levels_decide_its_conversations_mode(
+    levels: dict[str, str], header: str | None, asked: bool,
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+    backend: _Backend,  # noqa: F811 - the fixture
+) -> None:
+    await _seed(db_session, provider=ProviderType.REMOTE_OPENAI, pii=None)
+    backend.put(_profile(host_tool_contract=({"name": "update_page", "risk": "write"},), **levels))
+    fastapi_app.state.agent_directory.invalidate()
+    _Model(monkeypatch, _call("update_page", {"page": 3}))
+    update_page = {"type": "function", "function": {"name": "update_page", "parameters": {"type": "object"}}}
+    headers = {"Authorization": f"Bearer {_agent_token()}", **EVENTS, **({"X-Faden-Tool-Mode": header} if header else {})}
+    r = await client.post("/v1/agents/eplan-assistant/chat/completions", json={
+        "model": "x", "stream": True, "tools": [update_page], "messages": [{"role": "user", "content": "Fix page 3."}],
+    }, headers=headers)
+    assert r.status_code == 200, r.text
+    marks = [e for e in _faden(r.text) if e.get("name") == "faden.approval_required"]
+    assert bool(marks) is asked

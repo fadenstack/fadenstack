@@ -9,6 +9,7 @@
  */
 import { json, query, requester, segment } from "./http";
 import { principalIds, type PrincipalOption, type PrincipalType } from "./principals";
+import type { ToolMode } from "./tools";
 
 const request = requester("/api/agents");
 
@@ -20,11 +21,18 @@ export type LocalMcpMode = "disable" | "allow";
 export type ToolRisk = "read" | "write" | "destructive";
 export type ToolApproval = "never" | "ask" | "always";
 
+/** What kind of place a tool's target argument names. */
+export type ToolPlaceType = "document" | "folder" | "site" | "app" | "desk";
+
 /** A tool the host application provides, as the agent expects it. */
 export interface HostTool {
   name: string;
   risk?: ToolRisk;
   approval?: ToolApproval;
+  /** JSON pointer (RFC 6901) to the call argument that says where the call acts, e.g. `/path`; with target_type. */
+  target_argument?: string;
+  /** What kind of place the target argument names; with target_argument. */
+  target_type?: ToolPlaceType;
   schema_sha256?: string;
 }
 
@@ -33,6 +41,19 @@ export interface HostTool {
 export interface AgentPii {
   /** Whether a conversation may switch the PII mode (redact, tokenize); null follows the tenant's setting. */
   allow_mode_override: boolean | null;
+}
+
+/**
+ * The agent's approval levels (sdk/38 §5): the tool mode its conversations start in, and the most they may use.
+ * The default is never above the highest; the tenant's ceilings narrow both.
+ */
+export interface AgentApprovals {
+  default_level: ToolMode;
+  max_level: ToolMode;
+  /** For grants (later); kept as stored. */
+  standing?: string[] | null;
+  max_grant_minutes?: number | null;
+  grant_classes?: string[] | null;
 }
 
 export interface AgentDefinition {
@@ -46,6 +67,7 @@ export interface AgentDefinition {
   /** What the SDKs show: `greeting`, `suggestions`. */
   ui: Record<string, unknown>;
   pii: AgentPii;
+  approvals: AgentApprovals;
   /** Enterprise settings; kept as they are. */
   extensions: Record<string, unknown>;
 }
@@ -99,15 +121,22 @@ export interface AccessExplanation {
   detail: string;
 }
 
+/**
+ * An agent's usage, without names. `suppressed`: fewer than `min_group_size` (k) people used it in the
+ * range (and not only the caller), so no figure is given; a day about fewer people is `suppressed` too,
+ * its figures null (M04).
+ */
 export interface AgentUsage {
-  requests: number;
-  errors: number;
-  prompt_tokens: number;
-  completion_tokens: number;
-  total_tokens: number;
-  users: number;
-  conversations: number;
-  by_day: { day: string; requests: number; total_tokens: number }[];
+  suppressed?: boolean;
+  min_group_size?: number;
+  requests: number | null;
+  errors: number | null;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
+  users: number | null;
+  conversations: number | null;
+  by_day: { day: string; requests: number | null; total_tokens: number | null; suppressed?: boolean }[];
 }
 
 /** What the SDKs reported -- names, counts, durations, never content. */
@@ -116,7 +145,8 @@ export type ClientEventType = "tool.executed" | "approval.decided" | "local_mcp.
 export interface ClientEvent {
   id: string;
   type: ClientEventType | string;
-  user_id: string;
+  /** Only the caller's own events name them; another person's name nobody (null). */
+  user_id: string | null;
   device_id: string | null;
   conversation_id: string | null;
   data: Record<string, unknown>;
@@ -149,7 +179,8 @@ export interface AppSeen {
   first_seen_at: string;
   last_seen_at: string;
   reports: number;
-  last_user_id: string;
+  /** Who reported it last, and their address: only when that was the caller; null otherwise. */
+  last_user_id: string | null;
   last_user_label: string | null;
   tools: string[];
   context: { id: string; title?: string; kind?: string }[];

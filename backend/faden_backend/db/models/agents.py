@@ -37,6 +37,9 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from faden_backend.db.base import Base
 
+#: An agent's approval levels without its own: conversations start in Ask and may go up to Auto, as before.
+DEFAULT_APPROVALS: dict[str, Any] = {"default_level": "ask", "max_level": "auto"}
+
 
 class AgentStatus(enum.StrEnum):
     """Where an agent is in its life."""
@@ -162,6 +165,13 @@ class AgentVersion(Base):
     #: ``allow_mode_override`` lets a conversation switch the egress mode (redact, tokenize);
     #: null (or absent) follows the tenant's setting on the PII policy page. The gateway reads it.
     pii: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}")
+    #: The agent's approval levels (sdk/38 §5): ``{default_level, max_level}``, and later what a grant may
+    #: cover (``standing``, ``max_grant_minutes``, ``grant_classes``). The level a conversation starts in and
+    #: the most it may use; the gateway narrows both by the tenant's ceilings.
+    approvals: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, default=lambda: dict(DEFAULT_APPROVALS),
+        server_default='{"default_level": "ask", "max_level": "auto"}',
+    )
     #: One key per Enterprise extension, validated by that extension.
     extensions: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     created_by: Mapped[uuid.UUID | None] = mapped_column(

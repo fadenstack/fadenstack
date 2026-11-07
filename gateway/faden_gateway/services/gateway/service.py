@@ -7,7 +7,7 @@ import mimetypes
 import re
 import time
 import uuid
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import PurePosixPath
@@ -24,7 +24,9 @@ from faden_gateway.db.models.gateway import (
     TurnStatus,
 )
 from faden_gateway.services.gateway.audit import AuditService
-from faden_gateway.services.gateway.usage_group import UsageGroupResolver
+from faden_gateway.services.gateway.usage_group import UsageGroupResolver, usage_team
+from faden_gateway.services.gateway import usage_hooks, usage_settings
+from faden_gateway.services.extensions import AdmissionContext
 from faden_gateway.services.gateway.auth import AuthContext
 from faden_gateway.services.gateway import (
     answer_variety,
@@ -41,6 +43,7 @@ from faden_gateway.services.gateway import (
 )
 from faden_gateway.services.extensions import registry as extension_registry
 from faden_gateway.services.gateway import governance as gov
+from faden_gateway.services.gateway import grants
 from faden_gateway.services.gateway import tool_classes
 from faden_gateway.services.gateway.errors import GatewayError
 from faden_gateway.services.gateway.agents import AgentRequest
@@ -50,7 +53,7 @@ from faden_gateway.services.gateway.observability import (
 )
 from faden_gateway.services.gateway.mcp_client import MCPClient
 from faden_gateway.services.gateway.mcp_tool_cache import MCP_TOOL_PREFIX, MCPToolCache
-from faden_gateway.services.gateway.pii_client import PIIClient
+from faden_gateway.services.gateway.pii_client import PIIClient, PIIPolicyMismatchError
 from faden_gateway.services.gateway.provenance_client import ProvenanceClient, SignedReceipt
 from faden_gateway.services.gateway.session_titles import title_from_message
 from faden_gateway.services.gateway.pii_policy import (
@@ -68,14 +71,18 @@ from faden_gateway.services.gateway.pii_restore import (
 )
 from faden_gateway.services.gateway.proxy import UpstreamProxy, UpstreamResult
 from faden_gateway.services.gateway.rag_lite_client import RagLiteClient
-from faden_gateway.services.gateway.ratelimit import RateLimiter
+from faden_gateway.services.gateway.ratelimit import Caps, CapRefusal, RateLimiter, Reservation
 from faden_gateway.services.gateway.routing import RouterService, RoutingDecision
 from faden_gateway.services.gateway.skills_client import ResolvedSkill, SkillsClient
 from faden_gateway.services.gateway.stream import StreamStats, wrap_sse_stream
 from faden_gateway.services.gateway.stream_buffer import StreamBuffer
 from faden_gateway.services.gateway.tool_stream import DONE, ToolCalls, sse, sse_events
 from faden_gateway.services.gateway.usage import (
-    estimate_input_tokens,
+    NO_USAGE,
+    Usage,
+    add_usage,
+    estimated_usage,
+    reserved_tokens,
     usage_from_payload,
 )
 from faden_gateway.services.gateway.file_store import FileStore
@@ -183,6 +190,8 @@ class GatewayResponse:
     provenance: tuple[str, ...] = ()
     #: The route answered without a mark, as an administrator allowed it (``text_marking``).
     unmarked: bool = False
+    #: The caps' ``x-ratelimit-*`` headers (``ratelimit.py``): every answer of a tenant with caps has them.
+    headers: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(slots=True, frozen=True)
@@ -198,6 +207,8 @@ class StreamingGatewayResponse:
     turn_id: str | None = None
     #: The route answers without a mark, as an administrator allowed it (``text_marking``).
     unmarked: bool = False
+    #: The caps' ``x-ratelimit-*`` headers (``ratelimit.py``): every answer of a tenant with caps has them.
+    headers: dict[str, str] = field(default_factory=dict)
 
 
 #: What each endpoint can be sent to: the kinds a route declares
@@ -355,6 +366,27 @@ _PII_MODULE_OFF_MESSAGE = (
     "A PII policy is set for this workspace, but the PII module is not running, so nothing was sent. "
     "An administrator can start the PII module, or switch the policy off if it is not needed."
 )
+
+
+_PII_POLICY_MISMATCH_MESSAGE = (
+    "The PII policy does not fit the installed PII detector ({code}), so nothing was sent. An "
+    "administrator can adapt it on the PII policy page (Use installed profile defaults), or leave the "
+    "entity types empty."
+)
+
+
+def _pii_blocked(exc: BaseException, unavailable: str) -> GatewayError:
+    """A failed PII scan's refusal under fail_action=block: the policy's own fault, else *unavailable*."""
+    if isinstance(exc, PIIPolicyMismatchError):
+        return GatewayError(
+            status_code=502,
+            message=_PII_POLICY_MISMATCH_MESSAGE.format(code=exc.code),
+            error_type="server_error",
+            code="pii_policy_mismatch",
+        )
+    return GatewayError(
+        status_code=502, message=unavailable, error_type="server_error", code="pii_service_unavailable",
+    )
 
 
 class PIIModuleOffError(RuntimeError):
@@ -844,13 +876,9 @@ def _mcp_server(name: str) -> str | None:
     return parts[1] if len(parts) >= 2 else None
 
 
-def _add_usage(total: dict[str, int], usage: Any) -> None:
-    """Add one round's token usage to the answer's."""
-    if not isinstance(usage, dict):
-        return
-    for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
-        if isinstance(usage.get(key), int):
-            total[key] = total.get(key, 0) + usage[key]
+def _add_usage(total: dict[str, Any], usage: Any) -> None:
+    """Add one round's token usage to the answer's, its cached and reasoning tokens too."""
+    add_usage(total, usage)
 
 
 def _insert_after_system(payload: dict[str, Any], message: dict[str, Any]) -> dict[str, Any]:
@@ -875,6 +903,50 @@ def _insert_before_question(payload: dict[str, Any], message: dict[str, Any]) ->
     if at is None:
         return _insert_after_system(payload, message)
     messages.insert(at, message)
+    return {**payload, "messages": messages}
+
+
+def _with_skills(payload: dict[str, Any], blocks: list[str]) -> dict[str, Any]:
+    """*payload* with a turn's skills, in their order, where ``session_skills_position`` puts them.
+
+    ``user``: in the last user message, before its text. A turn's skills change from one question to the
+    next. As system messages, a template that takes one system message, first (Qwen 3.5 and later), had
+    them merged into the first (``llm_adapter._system_first``), so a turn with other skills changed the
+    start of the prompt and vLLM computed the whole conversation again: 2.0 s instead of 0.6 s to the
+    first token at 4k tokens of history, 5.1 s instead of 0.7 s at 10k (the release server's 27B,
+    2026-10-31). In the last user message they change only what changes anyway; the message was saved
+    without them. ``tail`` and ``prefix``: as system messages, before the question or after the leading
+    system messages, for a template that takes them there; also without a user message to open.
+    """
+    position = settings.session_skills_position
+    if position == "user":
+        opened = _opened_with(payload, "\n\n".join(blocks))
+        if opened is not None:
+            return opened
+    insert = _insert_after_system if position == "prefix" else _insert_before_question
+    for block in blocks:  # each after the last: they keep their order
+        payload = insert(payload, {"role": "system", "content": block})
+    return payload
+
+
+def _opened_with(payload: dict[str, Any], text: str) -> dict[str, Any] | None:
+    """*payload* with *text* as the first part of its last user message; None without one.
+
+    A part of its own, not joined to the person's words: the PII scan reads a reply to "what is your
+    name?" as a name only when the part holds nothing else.
+    """
+    messages = list(payload.get("messages") or [])
+    at = next((i for i in range(len(messages) - 1, -1, -1) if messages[i].get("role") == "user"), None)
+    if at is None:
+        return None
+    content = messages[at].get("content")
+    if isinstance(content, str):
+        parts = [{"type": "text", "text": content}]
+    elif isinstance(content, list):
+        parts = list(content)
+    else:
+        return None
+    messages[at] = {**messages[at], "content": [{"type": "text", "text": text}, *parts]}
     return {**payload, "messages": messages}
 
 
@@ -923,6 +995,8 @@ class ToolModeCheck:
     name = "tool_mode"
     stages = frozenset({gov.GovernanceStage.TOOL})
     output_window_chars = 0
+    #: A mode that cannot be checked refuses the call; skipped, the call would run unasked (ASVS 5.0 V16.5.3).
+    fail_closed = True
 
     def __init__(self, classifier: tool_classes.Classifier, mode: tool_classes.ToolMode) -> None:
         self.classifier = classifier
@@ -937,9 +1011,44 @@ class ToolModeCheck:
             outcome="block" if decision is tool_classes.Decision.HIDDEN else "approval_required",
             policy_id=f"tool_mode:{self.mode.value}:{tool.tool_class.value}",
             category="tool_mode",
-            message=tool_classes.reason(self.mode, decision),
+            message=tool_classes.reason(self.mode, decision, tool.approval),
             policy_name=f"Tool mode {self.mode.value}",
         )
+
+
+#: Classes whose calls take an approval for themselves alone, never one that stands for the chat or always.
+_ONCE_ONLY_CLASSES = frozenset({
+    tool_classes.ToolClass.DESTRUCTIVE.value, tool_classes.ToolClass.UNKNOWN.value,
+})
+
+
+def _floor(req: _Prepared, name: str, verdict: gov.Verdict) -> bool:
+    """Whether a call that needs approval is a floor item: asked every time, whatever else stands (38 §4.3).
+
+    The client is told ``rule: true``, so an approval for the chat, one kept always, or the app's bypass never
+    answers it, and the gateway takes an approval for that call alone (``gov.refusal``). The items, all here:
+
+    - an admin's rule or a policy: any check but the chat's tool mode;
+    - a tool the agent's author marked ``approval: always``, which is also how an author marks a tool that
+      decides about people (GDPR Art. 22).
+
+    ``physical`` (desktop 16 F-10, L-12) and ``open_world`` in a tainted turn (intent IM-09, L-20) join here
+    when their packages build their markers. Until then, a tool that acts on the physical world needs
+    ``approval: always`` or an admin's "Ask first" rule.
+    """
+    if verdict.check != ToolModeCheck.name:
+        return True
+    return req.agent is not None and name in req.agent.agent.always_asked
+
+
+def _same_objection(answered: gov.Verdict, now: gov.Verdict) -> bool:
+    """Whether the objection the user answered still stands: the same check objects, in the same way.
+
+    For a rule or a policy, the same one; for the chat's tool mode, whichever mode asks now.
+    """
+    if answered.blocked != now.blocked or answered.check != now.check:
+        return False
+    return now.check == ToolModeCheck.name or answered.decision.policy_id == now.decision.policy_id
 
 
 class _AgentLogFields(TypedDict, total=False):
@@ -1065,7 +1174,12 @@ class _Prepared:
     unvaried_payload: dict[str, Any] | None = None
     #: How many answers a whole answer is asked for one by one (``answer_variety.split``); ``None``: as sent.
     split_choices: int | None = None
+    #: Whether what goes to the model ends in ``answer_variety``'s variation: its answer is stripped of it.
+    answer_varied: bool = False
     request_id: str | None = None
+    #: The gateway's own id for the request (never the client's ``x-request-id``): what the admission checks
+    #: key their reservations on, in ``AdmissionContext`` and ``UsageRecord`` alike.
+    reservation_id: str = field(default_factory=lambda: uuid.uuid4().hex)
     pii_scope: str = ""
     #: The media URLs the client sent, fetched by the gateway: (url, kind) -> data: URL (media_fetch.py).
     media: dict[tuple[str, str], str] = field(default_factory=dict)
@@ -1078,7 +1192,19 @@ class _Prepared:
     pii_policy_saved: bool = False
     session_id: str | None = None
     group_id: str | None = None  # the user's usage group, for attribution
+    #: The usage group's path at the time of use, root first (``usage_group.py``); empty without one.
+    group_path: tuple[str, ...] = ()
+    #: The usage group was looked up (it may be none): its row counts for the person's team.
+    team_booked: bool = False
     project_id: str | None = None  # the session's chat project, for attribution
+    #: What admission reserved against the tenant's token caps (``usage.reserved_tokens``).
+    estimated_tokens: int = 0
+    #: The caps and the admission checks let the request in.
+    admitted: bool = False
+    #: A cap or an admission check refused the request: its row says so (``refused``), whatever its code.
+    refused: bool = False
+    #: What the request holds on the tenant's caps until its real usage is known (``ratelimit.py``).
+    reservation: Reservation | None = None
     skills: list[ResolvedSkill] = field(default_factory=list)
     #: Skills the user asked for by name (the chat's skill picker).
     requested_skills: list[str] = field(default_factory=list)
@@ -1142,6 +1268,9 @@ class _Prepared:
     unmarked: bool = False
     #: The governance checks this request runs: EE's, and the tenant's tool rules.
     checks: list[Any] = field(default_factory=list)
+    #: The calls of this round a grant covered: call id -> the grant. Counted once; the check after a wait
+    #: reads it.
+    grant_covered: dict[str, uuid.UUID] = field(default_factory=dict)
     #: The user's messages this request stored in its session.
     user_message_ids: list[uuid.UUID] = field(default_factory=list)
     #: An output check refused the answer: the decision and the answer's HMAC.
@@ -1172,6 +1301,11 @@ class _Prepared:
             return "pii_fallback_to_local_succeeded"
         return None
 
+    @property
+    def caps_headers(self) -> dict[str, str]:
+        """The ``x-ratelimit-*`` headers of the request's answer: none for a tenant without caps."""
+        return dict(self.reservation.headers) if self.reservation is not None else {}
+
 
 class GatewayService:
     """Core shared pipeline for chat + embeddings + models."""
@@ -1194,7 +1328,7 @@ class GatewayService:
         mcp_tool_cache: MCPToolCache | None = None,
         skills_client: SkillsClient | None = None,
         tool_router: ToolRouter | None = None,
-        usage_groups: UsageGroupResolver[str] | None = None,
+        usage_groups: UsageGroupResolver[Any] | None = None,
         group_memberships: UsageGroupResolver[tuple[str, ...]] | None = None,
         provenance_client: ProvenanceClient | None = None,
     ) -> None:
@@ -1284,6 +1418,7 @@ class GatewayService:
         usage_prompt = None
         usage_completion = None
         usage_total = None
+        usage: Usage = NO_USAGE
         # ── Observability tracking ──────────────────────────────────────
         retry_count = 0
         finish_reason: str | None = None
@@ -1291,7 +1426,8 @@ class GatewayService:
             # Inside the try: a request refused here (rate limit, unknown
             # model) gets its audit row like any other; it got none.
             candidates = await self._admit(
-                auth=auth, payload=payload, policy=policy, endpoint=endpoint, model_alias=model_alias,
+                req, auth=auth, payload=payload, policy=policy, endpoint=endpoint, model_alias=model_alias,
+                request_id=request_id, session_id=session_id,
             )
             if rerank is not None:
                 candidates = _rerank_routes(model_alias, candidates)
@@ -1418,6 +1554,9 @@ class GatewayService:
                 result.payload if images is not None
                 else restore_payload(result.payload, req.token_mapping, req.client_tools)
             )
+            if req.answer_varied:
+                # Before the receipt: it covers the answer as the client gets it.
+                response_payload = answer_variety.strip_payload(response_payload)
             if req.faden_events and isinstance(response_payload, dict):
                 # Beside the OpenAI fields, which an OpenAI client reads as ever.
                 events = [*_pii_events(req), *req.faden_whole]
@@ -1472,9 +1611,11 @@ class GatewayService:
                 trace_id=req.trace_id,
                 provenance=receipts,
                 unmarked=req.unmarked,
+                headers=req.caps_headers,
             )
         except GatewayError as exc:
             exc.logged = True  # the finally below writes its row
+            exc.headers = {**req.caps_headers, **exc.headers}
             error_code = exc.code
             status_code = exc.status_code
             if req.trace_context is None:
@@ -1502,6 +1643,13 @@ class GatewayService:
             await self._release(req)
             if status_code >= 400:
                 await self._mark_turn(req, TurnStatus.FAILED.value)
+            metered, source = _metered(
+                usage, reached=req.decision is not None, status_code=status_code,
+                input_obj=_input_of(req.egress_payload or payload),
+                answer=_answer_text(result.payload) if result is not None and images is None else None,
+            )
+            await self._settle(req, metered)
+            await self._book_team(req, auth)
             await self.audit.log(
                 request_id=request_id,
                 trace_id=req.trace_id,
@@ -1513,9 +1661,11 @@ class GatewayService:
                 status_code=status_code,
                 latency_ms=int((time.perf_counter() - started) * 1000),
                 ttft_ms=None,
-                prompt_tokens=usage_prompt,
-                completion_tokens=usage_completion,
-                total_tokens=usage_total,
+                **_usage_fields(metered, source),
+                estimated_tokens=req.estimated_tokens if req.admitted else 0,
+                reservation_id=req.reservation_id,
+                admitted=req.admitted,
+                refused=req.refused,
                 error_code=error_code or req.fallback_error_code,
                 stream=False,
                 provider_name=(
@@ -1524,6 +1674,7 @@ class GatewayService:
                 ),
                 session_id=req.session_id or session_id,
                 group_id=req.group_id,
+                group_path=req.group_path,
                 project_id=req.project_id,
                 finish_reason=finish_reason,
                 retry_count=retry_count,
@@ -1711,7 +1862,8 @@ class GatewayService:
         pre_stream_error = "The request failed before the model answered."
         try:
             candidates = await self._admit(
-                auth=auth, payload=payload, policy=policy, endpoint=endpoint, model_alias=model_alias,
+                req, auth=auth, payload=payload, policy=policy, endpoint=endpoint, model_alias=model_alias,
+                request_id=request_id, session_id=session_id,
             )
             if background:
                 await self._check_turn_limits(auth, str(session_id))
@@ -1767,6 +1919,8 @@ class GatewayService:
                 # and the chat page -- which always streams -- showed
                 # "Hello [PERSON_1]".
                 restored = restore_sse(raw_stream, req.token_mapping, req.client_tools)
+                if req.answer_varied:
+                    restored = answer_variety.strip_sse(restored)
                 if req.faden_events and req.client_offered:
                     restored = self._screen_client_stream(req, restored, auth=auth, request_id=request_id)
                 wrapped_stream, stats = await wrap_sse_stream(
@@ -1823,6 +1977,7 @@ class GatewayService:
                     trace_id=req.trace_id,
                     turn_id=req.turn_id,
                     unmarked=req.unmarked,
+                    headers=req.caps_headers,
                 )
 
             async def _stream_with_finalize() -> AsyncIterator[bytes]:
@@ -1889,9 +2044,11 @@ class GatewayService:
                 trace_id=req.trace_id,
                 turn_id=req.turn_id,
                 unmarked=req.unmarked,
+                headers=req.caps_headers,
             )
         except GatewayError as exc:
             exc.logged = True  # the finally below writes its row
+            exc.headers = {**req.caps_headers, **exc.headers}
             pre_stream_status_code = exc.status_code
             pre_stream_error_code = exc.code
             pre_stream_error = exc.message
@@ -1934,6 +2091,9 @@ class GatewayService:
                         )
                     except Exception:
                         logger.warning("Failed to keep the failed reply", exc_info=True)
+                # It never reached the model: it used nothing of what it reserved.
+                await self._settle(req, NO_USAGE)
+                await self._book_team(req, auth)
                 await self.audit.log(
                     request_id=request_id,
                     trace_id=req.trace_id,
@@ -1948,6 +2108,10 @@ class GatewayService:
                     prompt_tokens=None,
                     completion_tokens=None,
                     total_tokens=None,
+                    estimated_tokens=req.estimated_tokens if req.admitted else 0,
+                    reservation_id=req.reservation_id,
+                    admitted=req.admitted,
+                    refused=req.refused,
                     error_code=pre_stream_error_code or req.fallback_error_code,
                     stream=True,
                     provider_name=(
@@ -1956,6 +2120,7 @@ class GatewayService:
                     ),
                     session_id=session_id,
                     group_id=req.group_id,
+                    group_path=req.group_path,
                     project_id=req.project_id,
                     finish_reason=None,
                     retry_count=0,
@@ -1972,19 +2137,117 @@ class GatewayService:
     # ------------------------------------------------------------------
 
     async def _admit(
-        self, *, auth: AuthContext, payload: dict[str, Any], policy: Any | None, endpoint: str, model_alias: str,
+        self,
+        req: _Prepared,
+        *,
+        auth: AuthContext,
+        payload: dict[str, Any],
+        policy: Any | None,
+        endpoint: str,
+        model_alias: str,
+        request_id: str,
+        session_id: str | None,
     ) -> list[Any]:
-        """Rate limits, then the routes for the model; raises when the request cannot go on."""
-        await _check_limits(
-            limiter=self.limiter,
-            tenant_id=auth.tenant_id,
-            payload=payload,
-            rpm_limit=policy.rpm_limit if policy else None,
-            tpm_limit=policy.tpm_limit if policy else None,
-        )
+        """The tenant's caps, the extensions' admission checks, then the routes; raises when it cannot go on.
+
+        The request reserves its estimate against the caps (``req.reservation``, settled with the real
+        usage once it is known: :meth:`_settle`). A refusal counts nothing: an extension's refusal gives
+        the caps' reservation back, the request with it.
+        """
+        req.estimated_tokens = reserved_tokens(payload, endpoint)
+        caps = Caps.of(policy)
+        if caps:
+            admitted = await self.limiter.admit(
+                tenant_id=auth.tenant_id, caps=caps, tokens=req.estimated_tokens,
+                zone=usage_settings.current().zone,
+            )
+            if isinstance(admitted, CapRefusal):
+                req.refused = True
+                raise admitted.error()
+            req.reservation = admitted
+        checks = extension_registry.admission_checks
+        if checks:  # none in core: no lookups for them either
+            context = await self._admission_context(
+                req, auth, model_alias=model_alias, endpoint=endpoint, request_id=request_id,
+                session_id=session_id,
+            )
+            refusal = await usage_hooks.first_refusal(checks, context)
+            if refusal is not None:
+                req.refused = True
+                if req.reservation is not None:
+                    await self.limiter.release(req.reservation)
+                raise usage_hooks.refused(refusal, req.caps_headers)
+        req.admitted = True
         candidates = await self.router.resolve_alias(alias=model_alias, tenant_id=auth.tenant_id)
         _check_kind(endpoint, model_alias, candidates)
         return candidates
+
+    async def _admission_context(
+        self, req: _Prepared, auth: AuthContext, *, model_alias: str, endpoint: str, request_id: str,
+        session_id: str | None,
+    ) -> AdmissionContext:
+        """The request as an admission check sees it: the person's team and its path, the chat's project."""
+        if self.usage_groups is not None:
+            self._book_on(req, await self.usage_groups.resolve(auth.user_id))
+        return AdmissionContext(
+            tenant_id=auth.tenant_id,
+            user_id=auth.user_id,
+            group_id=req.group_id,
+            project_id=await self._project_of(auth, session_id),
+            agent_id=req.agent.id if req.agent is not None else None,
+            model_alias=model_alias,
+            endpoint=endpoint,
+            request_id=request_id,
+            estimated_tokens=req.estimated_tokens,
+            group_path=req.group_path,
+            reservation_id=req.reservation_id,
+        )
+
+    async def _project_of(self, auth: AuthContext, session_id: str | None) -> str | None:
+        """The project the caller's chat *session_id* is in, if any."""
+        if not session_id or self.session_dao is None:
+            return None
+        try:
+            sid = uuid.UUID(session_id)
+        except ValueError:
+            return None
+        sess = await self.session_dao.get_session(
+            session_id=sid, tenant_id=auth.tenant_id, user_id=auth.user_id,
+        )
+        return str(sess.project_id) if sess is not None and sess.project_id else None
+
+    @staticmethod
+    def _book_on(req: _Prepared, value: Any) -> None:
+        """Book the request on the team the resolver answered (``UsageTeam``, or its id), with its path."""
+        team = usage_team(value)
+        req.group_id = team.group_id if team is not None else None
+        req.group_path = team.path if team is not None else ()
+        req.team_booked = True
+
+    async def _book_team(self, req: _Prepared, auth: AuthContext) -> None:
+        """Look the person's usage group up for a request whose row is about to be written without it.
+
+        A request refused before the lookups (a cap, an unmarked route, a missing model) counted as
+        unassigned, so its team never saw its refusals. The resolver is cached: mostly no round trip.
+        """
+        if req.team_booked or self.usage_groups is None:
+            return
+        try:
+            self._book_on(req, await self.usage_groups.resolve(auth.user_id))
+        except Exception:  # the row is written either way
+            logger.warning("Could not look up the usage group of a refused request", exc_info=True)
+
+    async def _settle(self, req: _Prepared, usage: Usage) -> None:
+        """Replace the request's reservation on the caps by its real input and output, once.
+
+        A request that did not reach a model (or reported nothing) used none.
+        """
+        if req.reservation is None or req.reservation.settled:
+            return
+        try:
+            await self.limiter.settle(req.reservation, usage.tokens)
+        except Exception:
+            logger.warning("Settling request %s on the caps failed", req.request_id, exc_info=True)
 
     # ------------------------------------------------------------------
     # Governance (services/gateway/governance.py)
@@ -2005,13 +2268,14 @@ class GatewayService:
         )
 
     async def _resolve_tool_mode(
-        self, req: _Prepared, auth: AuthContext, mcp_tools: list[dict[str, Any]] | None,
+        self, req: _Prepared, auth: AuthContext, annotations: Mapping[str, Mapping[str, Any]] | None,
     ) -> None:
         """The chat's tool mode (narrowed by any ceiling), what classifies its tools, and its check.
 
         The session's setting when it has one, else the ``X-Faden-Tool-Mode``
         header, else Ask; both given, the narrower. EE ceilings narrow it
-        further (``registry.tool_mode_ceilings``).
+        further (``registry.tool_mode_ceilings``). *annotations*: the MCP
+        tools' own, by qualified name.
         """
         header = tool_classes.parse_mode(req.tool_mode_header)
         chosen = header
@@ -2024,6 +2288,8 @@ class GatewayService:
         groups: tuple[str, ...] = ()
         if extension_registry.tool_mode_ceilings and self.group_memberships is not None:
             groups = await self.group_memberships.resolve(auth.user_id) or ()
+        # An agent's conversations start in its default level and go no higher than its highest (sdk/38 §5).
+        default, limit = req.agent.agent.levels() if req.agent is not None else (None, None)
         req.tool_mode = await tool_classes.effective(
             chosen, extension_registry.tool_mode_ceilings,
             tool_classes.CeilingContext(
@@ -2031,20 +2297,47 @@ class GatewayService:
                 agent_id=req.agent.agent.id if req.agent is not None else None,
                 session_id=req.session_id, groups=tuple(groups),
             ),
+            default=default, limit=limit,
         )
-        contract = (
-            {str(t.get("name", "")): str(t.get("risk") or "") for t in req.agent.agent.host_tool_contract}
-            if req.agent is not None else None
-        )
+        tools = req.agent.agent.host_tool_contract if req.agent is not None else ()
         req.classifier = tool_classes.Classifier(
             rules=await tool_classes.class_rules.for_tenant(self.dao.session, auth.tenant_id),
             gateway_tools=frozenset(_GATEWAY_TOOLS),
-            contract=contract,
-            annotations={
-                t.get("qualified_name", ""): t["annotations"] for t in mcp_tools or [] if t.get("annotations")
-            },
+            contract={str(t.get("name", "")): str(t.get("risk") or "") for t in tools} if req.agent else None,
+            annotations=annotations,
+            approvals={str(t.get("name", "")): str(t["approval"]) for t in tools if t.get("approval")},
         )
         req.checks.append(ToolModeCheck(req.classifier, req.tool_mode.mode))
+
+    async def _grant_snapshot(self, req: _Prepared, auth: AuthContext) -> None:
+        """``faden.grants`` before the answer when the device has live grants for the agent (sdk/40 A2.1).
+
+        The SDK replaces its copy with it, so a grant revoked elsewhere or spent leaves its marker. A device
+        without grants hears nothing, nor does a client that reads no events; a failed read sends nothing.
+        """
+        if not req.faden_events or req.agent is None or not req.agent.device_id:
+            return
+        profile = req.agent.agent
+        owner = grants.Owner(
+            tenant_id=auth.tenant_id, user_id=auth.user_id, agent_id=profile.id,
+            agent_version=profile.version, device_id=req.agent.device_id,
+        )
+        event = await grants.snapshot(self.dao.session.bind, owner)
+        if event is not None:
+            req.faden_leading.append(event)
+
+    async def _read_tool_policy(self, req: _Prepared, auth: AuthContext) -> None:
+        """The tool rules, the chat's tool mode and its ceilings, read again for the calls about to be run.
+
+        A request runs up to ``mcp_tool_loop_max_iterations`` tool rounds and may wait
+        ``governance_approval_timeout_s`` for the user, so what an admin or the user changed meanwhile -- a
+        rule turned to deny, a ceiling lowered, the chat set to Read only -- holds for the next call that
+        runs, not the next request (ASVS 5.0 V8.3.2). The connection goes back at once: the user may be asked
+        next, for minutes.
+        """
+        req.checks = await self._governance_checks(auth)
+        await self._resolve_tool_mode(req, auth, req.classifier.annotations if req.classifier else None)
+        await self._release_request_connection()
 
     def _hidden(self, req: _Prepared, name: str) -> bool:
         if req.tool_mode is None or req.classifier is None:
@@ -2081,12 +2374,85 @@ class GatewayService:
             checks.append(gov.ToolRuleCheck(rules))
         return checks
 
+    async def check_host_tool(
+        self,
+        *,
+        auth: AuthContext,
+        agent: AgentRequest,
+        name: str,
+        arguments: dict[str, Any],
+        mode: str,
+        request_id: str,
+    ) -> tuple[dict[str, Any], gov.Verdict | None]:
+        """Check a named device tool without a model call or native execution.
+
+        Uses the chat pipeline's mode/classification and governance checks. A
+        user command must be explicitly in a published host contract; an empty
+        contract is not authority for an arbitrary out-of-band command.
+        """
+        if not agent.agent.published or name not in agent.agent.host_tools:
+            return {
+                "decision": "deny",
+                "tool_class": "unknown",
+                "effective_tool_mode": "off",
+                "required_by_rule": False,
+                "message": "This command is not in the published host tool contract.",
+            }, None
+        req = _Prepared(payload={}, agent=agent, tool_mode_header=mode)
+        req.checks = await self._governance_checks(auth)
+        await self._resolve_tool_mode(req, auth, None)
+        ctx = self._context(
+            req,
+            auth,
+            request_id,
+            gov.GovernanceStage.TOOL,
+            tool_id=name,
+            arguments=arguments,
+        )
+        verdict = await gov.decide(req.checks, ctx)
+        assert req.classifier is not None and req.tool_mode is not None  # noqa: S101
+        classified = req.classifier.classify(name)
+        decision = tool_classes.decide(req.tool_mode.mode, classified)
+        blocked = decision is tool_classes.Decision.HIDDEN or bool(
+            verdict and verdict.blocked
+        )
+        asks = not blocked and (
+            decision is tool_classes.Decision.ASK or verdict is not None
+        )
+        return {
+            "decision": "deny" if blocked else "ask" if asks else "run",
+            "tool_class": classified.tool_class.value,
+            "effective_tool_mode": req.tool_mode.mode.value,
+            "required_by_rule": bool(verdict and _floor(req, name, verdict)),
+            "message": (
+                verdict.decision.message
+                if verdict
+                else (
+                    tool_classes.reason(req.tool_mode.mode, decision, classified.approval)
+                    if blocked or asks
+                    else "Allowed by current tool policy."
+                )
+            ),
+        }, verdict
+
     async def _check_input(
-        self, req: _Prepared, *, auth: AuthContext, session_id: str | None, request_id: str,
+        self,
+        req: _Prepared,
+        *,
+        auth: AuthContext,
+        session_id: str | None,
+        request_id: str,
     ) -> None:
         """Refuse the prompt before anything is stored; the turn stays as a notice, not text."""
         messages = req.payload.get("messages") or []
-        ctx = self._context(req, auth, request_id, gov.GovernanceStage.INPUT, session_id, messages=messages)
+        ctx = self._context(
+            req,
+            auth,
+            request_id,
+            gov.GovernanceStage.INPUT,
+            session_id,
+            messages=messages,
+        )
         verdict = await gov.decide(req.checks, ctx)
         if verdict is None:
             return
@@ -2145,8 +2511,15 @@ class GatewayService:
 
     async def _screen_calls(
         self, req: _Prepared, calls: list[dict[str, Any]], *, auth: AuthContext, request_id: str,
+        recheck: bool = False,
     ) -> dict[str, tuple[str, gov.Verdict]]:
-        """The gateway's calls a check objects to: call id -> (tool, verdict)."""
+        """The gateway's calls a check objects to: call id -> (tool, verdict).
+
+        A call a grant covers is not among them: it runs (:meth:`_covered`). *recheck*: the same round again,
+        after a wait; a grant is only read again then, never counted twice.
+        """
+        if not recheck:
+            req.grant_covered = {}
         if not any(gov.GovernanceStage.TOOL in c.stages for c in req.checks):
             return {}
         found: dict[str, tuple[str, gov.Verdict]] = {}
@@ -2158,9 +2531,54 @@ class GatewayService:
                 req, auth, request_id, gov.GovernanceStage.TOOL, tool_id=name, arguments=_tool_arguments(call),
             )
             verdict = await gov.decide(req.checks, ctx)
-            if verdict is not None:
-                found[call.get("id", "")] = (name, verdict)
+            if verdict is None or await self._covered(req, auth, call, name, verdict, recheck=recheck):
+                continue
+            found[call.get("id", "")] = (name, verdict)
         return found
+
+    async def _covered(
+        self, req: _Prepared, auth: AuthContext, call: dict[str, Any], name: str, verdict: gov.Verdict,
+        *, recheck: bool = False,
+    ) -> uuid.UUID | None:
+        """The grant that lets *call* run instead of asking, counted against its budget; ``None``: it asks.
+
+        Only a call that asks because of the chat's tool mode alone looks one up (sdk/38 §6): never a refused
+        call, never a floor item (an admin's rule, a policy, the author's ``approval: always``,
+        :func:`_floor`), and only on the agent's route from a device -- a grant is the device's. The class and
+        the place are checked in ``grants.in_scope``. After a wait (*recheck*) a covered call stays covered
+        while its grant is still active (ASVS 5.0 V8.3.2), and nothing new is looked up.
+        """
+        call_id = str(call.get("id") or "")
+        if recheck:
+            grant_id = req.grant_covered.get(call_id)
+            if grant_id is not None and await grants.still_usable(self.dao.session.bind, grant_id):
+                return grant_id
+            return None
+        if verdict.blocked or any(r.get("check") != ToolModeCheck.name for r in verdict.reasons):
+            return None
+        if req.agent is None or not req.agent.device_id or not call_id or _floor(req, name, verdict):
+            return None
+        profile = req.agent.agent
+        tool = req.classifier.classify(name) if req.classifier is not None else None
+        arguments = _tool_arguments(call)
+        entry = next((t for t in profile.host_tool_contract if t.get("name") == name), None)
+        grant_id = await grants.cover(
+            self.dao.session.bind,
+            grants.Owner(
+                tenant_id=auth.tenant_id, user_id=auth.user_id, agent_id=profile.id,
+                agent_version=profile.version, device_id=req.agent.device_id,
+                conversation_id=req.agent.conversation_id,
+            ),
+            grants.Call(
+                request_id=req.request_id or "", call_id=call_id, tool_id=name,
+                tool_class=tool.tool_class.value if tool is not None else "unknown",
+                approval=tool.approval if tool is not None else None,
+                place=grants.place_of(entry, arguments), arguments=arguments,
+            ),
+        )
+        if grant_id is not None:
+            req.grant_covered[call_id] = grant_id
+        return grant_id
 
     async def _ask_approvals(
         self, req: _Prepared, calls: list[dict[str, Any]], screened: dict[str, tuple[str, gov.Verdict]],
@@ -2169,7 +2587,9 @@ class GatewayService:
         """Ask the user about each call that needs approval, one at a time; answers go in *answered*.
 
         Only a stream to a client that reads events can ask; anywhere else the
-        call is refused, saying it needs approval.
+        call is refused, saying it needs approval. A destructive or
+        unclassified call, or one a rule asks about, takes an approval for
+        itself alone (``gov.refusal``); the answer's scope is recorded.
         """
         if not req.faden_events:
             return
@@ -2180,17 +2600,47 @@ class GatewayService:
             if verdict is None or verdict.blocked:
                 continue
             approval_id = uuid.uuid4().hex
+            tool_class, rule = self._class_of(req, name), _floor(req, name, verdict)
             yield faden_events.sse_event(gov.approval_event(
-                approval_id, call, name, verdict.decision.message, timeout,
-                tool_class=self._class_of(req, name), rule=verdict.check != ToolModeCheck.name,
+                approval_id, call, name, verdict.decision.message, timeout, tool_class=tool_class, rule=rule,
             ))
-            approved = await gov.approvals.wait(
+            answer = await gov.approvals.wait(
                 tenant_id=auth.tenant_id, user_id=auth.user_id, approval_id=approval_id, timeout=timeout,
+                once_only=rule or tool_class in _ONCE_ONLY_CLASSES,
             )
-            answered[call_id] = bool(approved)
+            answered[call_id] = bool(answer and answer.approved)
             ctx = self._context(req, auth, request_id, gov.GovernanceStage.TOOL, tool_id=name)
-            outcome = "approved" if approved else ("rejected" if approved is False else "expired")
-            await gov.record_on_own_session(self.dao.session.bind, ctx, verdict, text=None, outcome=outcome)
+            outcome = "expired" if answer is None else "approved" if answer.approved else "rejected"
+            await gov.record_on_own_session(
+                self.dao.session.bind, ctx, verdict, text=None, outcome=outcome,
+                answer_scope=answer.scope if answer else None,
+            )
+
+    async def _recheck_after_wait(
+        self, req: _Prepared, calls: list[dict[str, Any]], screened: dict[str, tuple[str, gov.Verdict]],
+        answered: dict[str, bool], *, auth: AuthContext, request_id: str,
+    ) -> frozenset[str]:
+        """After the user's answers, the round's calls checked again on the policy read now (39 F2).
+
+        The answers took up to ``governance_approval_timeout_s``. A call whose verdict is now stricter than
+        what the user answered -- refused now, or asking for another reason, such as an "Ask first" rule
+        added while the chat's mode asked -- does not run; its new objection goes in *screened*, and its id in
+        what this returns, so the refusal says the policy changed. A call that no longer needs approval runs;
+        one the user declined still does not.
+        """
+        await self._read_tool_policy(req, auth)
+        now = await self._screen_calls(req, calls, auth=auth, request_id=request_id, recheck=True)
+        changed: set[str] = set()
+        for call in calls:
+            call_id = call.get("id", "")
+            before, after = screened.get(call_id), now.get(call_id)
+            if after is None or answered.get(call_id) is False:
+                continue  # nothing objects now, or the user said no: it runs, or it does not, as answered
+            if before is not None and (before[1].blocked or _same_objection(before[1], after[1])):
+                continue  # refused already, or what the user answered still stands
+            screened[call_id] = after
+            changed.add(call_id)
+        return frozenset(changed)
 
     @staticmethod
     def _class_of(req: _Prepared, name: str) -> str:
@@ -2206,14 +2656,17 @@ class GatewayService:
         client. A call a rule refuses, or of a tool the mode hides, is
         ``faden.tool_denied``. A call a rule says needs approval, or that the
         tool mode asks about, is ``faden.approval_required`` without an
-        ``approvalId``: the client asks its user. ``rule`` says an admin's rule
-        (or a policy) asks -- the SDK then asks every time, whatever else it
+        ``approvalId``: the client asks its user. ``rule`` says the call is a
+        floor item (:func:`_floor`: an admin's rule, a policy, the author's
+        ``approval: always``) -- the SDK then asks every time, whatever else it
         allowed -- and ``toolClass`` is the class the gateway holds, which the
         SDK never takes looser than its own: with no contract it is unknown,
-        so the SDK asks. Refusals and rules are recorded.
+        so the SDK asks. Refusals and admins' rules and policies are recorded.
+        A call a grant covers is ``faden.grant_used``: counted here, the client runs it without asking.
         """
         if not req.faden_events or not req.checks:
             return []
+        req.grant_covered = {}
         events: list[dict[str, Any]] = []
         for call in calls:
             name = _tool_name(call)
@@ -2226,9 +2679,13 @@ class GatewayService:
             verdict = await gov.decide(req.checks, ctx)
             if verdict is None:
                 continue
-            rule = verdict.check != ToolModeCheck.name
+            grant_id = await self._covered(req, auth, call, name, verdict)
+            if grant_id is not None:
+                events.append(grants.used_event(call, name, grant_id))
+                continue
+            rule = _floor(req, name, verdict)
             decision_id = None
-            if verdict.blocked or rule:
+            if verdict.blocked or verdict.check != ToolModeCheck.name:
                 decision_id, _ = await gov.record_on_own_session(
                     self.dao.session.bind, ctx, verdict, text=None,
                 )
@@ -2276,23 +2733,28 @@ class GatewayService:
 
     async def _refused(
         self, req: _Prepared, call: dict[str, Any], name: str, verdict: gov.Verdict, answer: bool | None,
-        *, auth: AuthContext, request_id: str,
+        *, changed: bool = False, auth: AuthContext, request_id: str,
     ) -> str:
-        """Record a refused call and tell the client; what the model is told."""
+        """Record a refused call and tell the client; what the model is told.
+
+        *changed*: the policy turned against the call while the user was asked (:meth:`_recheck_after_wait`).
+        """
         message = verdict.decision.message
-        if not verdict.blocked:
+        if changed:
+            message = f"The tool policy changed before this call ran: {message}"
+        elif not verdict.blocked:
             message = (
                 f"{message} The user declined." if answer is False
                 else f"{message} It needs the user's approval, which could not be asked for here."
             )
         ctx = self._context(req, auth, request_id, gov.GovernanceStage.TOOL, tool_id=name)
         decision_id = None
-        if verdict.blocked or answer is None:
+        if verdict.blocked or answer is None or changed:
             decision_id, _ = await gov.record_on_own_session(self.dao.session.bind, ctx, verdict, text=None)
         event = gov.tool_denied_event(call, name, message, decision_id)
         if req.faden_events:
             req.faden_pending.append(event)
-        return gov.denied_result(name, message)
+        return gov.denied_result(name, message, unchecked=verdict.decision.category == gov.UNAVAILABLE)
 
     def _govern_output(
         self, req: _Prepared, stream: AsyncIterator[bytes], *, auth: AuthContext, request_id: str, model_alias: str,
@@ -2446,7 +2908,7 @@ class GatewayService:
             (payload, req.session_id, req.project_id),
             req.skills,
             mcp_tools,
-            req.group_id,
+            team,
             req.knowledge_to_search,
         ) = await _together(
             self._inject_session_context(
@@ -2472,18 +2934,17 @@ class GatewayService:
             # turns wait for nothing.
             self._knowledge_to_search(req, auth, payload, candidates) if chat else _value(None),
         )
-        insert_skill = (
-            _insert_before_question if settings.session_skills_position == "tail" else _insert_after_system
-        )
-        for skill in req.skills:  # each after the last: they keep their order
-            payload = insert_skill(payload, {
-                "role": "system",
-                "content": skill_files.skill_block(skill, as_tool=searchable),
-            })
+        self._book_on(req, team)
+        if req.skills:
+            blocks = [skill_files.skill_block(skill, as_tool=searchable) for skill in req.skills]
+            payload = _with_skills(payload, blocks)
         req.payload = payload
         if chat:
             # The session is resolved (and the user's): its tool mode applies.
-            await self._resolve_tool_mode(req, auth, mcp_tools)
+            await self._resolve_tool_mode(req, auth, {
+                t.get("qualified_name", ""): t["annotations"] for t in mcp_tools or [] if t.get("annotations")
+            })
+            await self._grant_snapshot(req, auth)
         if mcp_tools:
             req.mcp_findable, req.mcp_on = await self._chat_tools(mcp_tools, auth, req.session_id, req.skills)
             # A tool the mode hides is not found by the tool search either.
@@ -2594,6 +3055,8 @@ class GatewayService:
                     code="n_not_supported",
                 ) from exc
             egress = answer_variety.vary(egress, req.decision.candidate)
+            # vary gives the payload itself back where it adds nothing; a split request varies each answer.
+            req.answer_varied = req.split_choices is not None or egress is not req.unvaried_payload
         req.egress_payload = egress
         # The model call is next, and it lasts seconds.
         await self._release_request_connection()
@@ -2655,17 +3118,13 @@ class GatewayService:
             # A policy someone saved, with the PII module off, fails like a scan that errors:
             # fail_action decides. It used to send the payload unscanned, without a word.
             return await self._sanitize(req.payload, pii_policy, req), candidates
-        except Exception:
+        except Exception as exc:
             fail_action = pii_policy.egress.fail_action
             if fail_action == "block":
-                raise GatewayError(
-                    status_code=502,
-                    message=(
-                        _PII_MODULE_OFF_MESSAGE if self.pii_client is None
-                        else "PII service unavailable and fail_action=block."
-                    ),
-                    error_type="server_error",
-                    code="pii_service_unavailable",
+                raise _pii_blocked(
+                    exc,
+                    _PII_MODULE_OFF_MESSAGE if self.pii_client is None
+                    else "PII service unavailable and fail_action=block.",
                 ) from None
             if fail_action == "fallback_to_local" and any(_is_cloud(c) for c in candidates):
                 req.fallback_outcome = "fallback_to_local_attempted"
@@ -3331,14 +3790,19 @@ class GatewayService:
         again, at most ``mcp_tool_loop_max_iterations`` times. A round that
         asks for a tool the gateway cannot run -- one the client defined --
         goes back to the client as it is.
+
+        The answer's ``usage`` is that of every round, as a streamed answer's is: each round was
+        processed, and the last alone under-counted what the request used.
         """
         payload = req.egress_payload
         assert payload is not None  # noqa: S101
+        used: dict[str, Any] = {}
         for iteration in range(settings.mcp_tool_loop_max_iterations):
             choices = (result.payload or {}).get("choices") or []
             message = choices[0].get("message") if choices else None
             if not message or not message.get("tool_calls"):
                 break
+            await self._read_tool_policy(req, auth)
             answers = await self._run_tool_calls(
                 req, message["tool_calls"], iteration=iteration, auth=auth, request_id=request_id,
             )
@@ -3352,7 +3816,15 @@ class GatewayService:
                 req.faden_whole.extend([*starts, *self._take_faden_events(req, [turn, *answers])])
             payload = {**payload, "messages": [*payload["messages"], turn, *answers]}
             payload = await self._offering_found(req, payload)
+            _add_usage(used, (result.payload or {}).get("usage"))
             result = await self._complete(req, payload)
+        if used and isinstance(result.payload, dict):
+            _add_usage(used, result.payload.get("usage"))
+            result = UpstreamResult(
+                status_code=result.status_code,
+                payload={**result.payload, "usage": used},
+                headers=result.headers,
+            )
         return result
 
     async def _stream_tool_rounds(
@@ -3367,7 +3839,7 @@ class GatewayService:
         """
         payload = req.egress_payload
         assert payload is not None and req.decision is not None  # noqa: S101
-        usage: dict[str, int] = {}
+        usage: dict[str, Any] = {}
         head: dict[str, Any] = {}
         for iteration in range(settings.mcp_tool_loop_max_iterations + 1):
             raw = await self.adapter.completion(
@@ -3419,7 +3891,8 @@ class GatewayService:
                                 "finish_reason": None,
                             }]})
 
-            async for chunk in restore_sse(answer(), req.token_mapping):
+            said_out = restore_sse(answer(), req.token_mapping)
+            async for chunk in answer_variety.strip_sse(said_out) if req.answer_varied else said_out:
                 yield chunk
             if ended["failed"]:
                 yield sse(DONE)
@@ -3434,15 +3907,21 @@ class GatewayService:
                         yield faden_events.sse_event(start)
                 screened: dict[str, tuple[str, gov.Verdict]] = {}
                 answered: dict[str, bool] = {}
+                changed: frozenset[str] = frozenset()
                 if not any(_tool_name(c) in req.client_tools for c in calls.calls()):
+                    await self._read_tool_policy(req, auth)
                     screened = await self._screen_calls(req, calls.calls(), auth=auth, request_id=request_id)
                     async for asking in self._ask_approvals(
                         req, calls.calls(), screened, answered, auth=auth, request_id=request_id,
                     ):
                         yield asking
+                    if answered:
+                        changed = await self._recheck_after_wait(
+                            req, calls.calls(), screened, answered, auth=auth, request_id=request_id,
+                        )
                 answers = await self._run_tool_calls(
                     req, calls.calls(), iteration=iteration, auth=auth, request_id=request_id,
-                    screened=screened, answered=answered,
+                    screened=screened, answered=answered, changed=changed,
                 )
                 # The tool router reads the session's policy; the next round is
                 # another model call.
@@ -3458,8 +3937,10 @@ class GatewayService:
                     continue
             if calls:
                 # Tools the client defined: its to run, as in any streamed answer -- after what it must hear
-                # about them (a refusal, or the user's approval first).
+                # about them (a refusal, or the user's approval first), on the policy as it is now.
                 handed = calls.calls()
+                if iteration:
+                    await self._read_tool_policy(req, auth)
                 told = await self._client_call_events(req, handed, auth=auth, request_id=request_id)
                 for notice in told:
                     yield faden_events.sse_event(notice)
@@ -3548,12 +4029,14 @@ class GatewayService:
         request_id: str,
         screened: dict[str, tuple[str, gov.Verdict]] | None = None,
         answered: dict[str, bool] | None = None,
+        changed: frozenset[str] = frozenset(),
     ) -> list[dict[str, Any]] | None:
         """Run *calls*; the tool messages that answer them, PII-scanned.
 
         A call a check refuses is not run: the model is told why (*screened*,
         from :meth:`_screen_calls`; *answered*, what the user said about calls
-        that needed approval).
+        that needed approval; *changed*, the calls the policy turned against
+        while the user was asked).
 
         ``None`` when any of them is not the gateway's to run (a tool the
         client defined): the model's message then goes to the client as it
@@ -3579,9 +4062,10 @@ class GatewayService:
             row: dict[str, Any] = {"iteration": iteration, "tool_name": name, "mcp_server": None}
             objection = screened.get(call.get("id", ""))
             answer = answered.get(call.get("id", ""))
-            if objection is not None and (objection[1].blocked or answer is not True):
+            moved = call.get("id", "") in changed
+            if objection is not None and (objection[1].blocked or answer is not True or moved):
                 content = await self._refused(
-                    req, call, name, objection[1], answer, auth=auth, request_id=request_id,
+                    req, call, name, objection[1], answer, changed=moved, auth=auth, request_id=request_id,
                 )
                 is_error = True
                 row["denied"] = True
@@ -3707,15 +4191,12 @@ class GatewayService:
                 request_id=getattr(req, "request_id", None),
                 cache_scope=getattr(req, "pii_scope", ""),
             )
-        except Exception:
+        except Exception as exc:
             if req.pii_policy.egress.fail_action == "allow":
                 logger.warning("PII scan of tool results failed; fail_action=allow, sending them as they are")
                 return answers
-            raise GatewayError(
-                status_code=502,
-                message="PII service unavailable: tool results were not sent to the model.",
-                error_type="server_error",
-                code="pii_service_unavailable",
+            raise _pii_blocked(
+                exc, "PII service unavailable: tool results were not sent to the model.",
             ) from None
         if scanned.token_mapping:
             req.token_mapping = scanned.token_mapping
@@ -3884,6 +4365,13 @@ class GatewayService:
         _in_background(self._record_skills_usage(req.skills, auth, session_id=req.session_id))
         final_error_code = error_code or req.fallback_error_code
         latency_ms = int((time.perf_counter() - started) * 1000)
+        # The answer is whole, or as far as it went: what it used replaces what it reserved on the caps,
+        # once its row is written.
+        metered, source = _metered(
+            stats.usage if stats is not None else NO_USAGE, reached=req.decision is not None,
+            status_code=status_code, input_obj=_input_of(req.egress_payload or req.payload), answer=content,
+        )
+        await self._book_team(req, auth)
         try:
             await self._audit_on_own_session(
                 request_id=request_id,
@@ -3896,9 +4384,11 @@ class GatewayService:
                 status_code=status_code,
                 latency_ms=latency_ms,
                 ttft_ms=stats.ttft_ms if stats is not None else None,
-                prompt_tokens=stats.usage.prompt_tokens if stats is not None else None,
-                completion_tokens=stats.usage.completion_tokens if stats is not None else None,
-                total_tokens=stats.usage.total_tokens if stats is not None else None,
+                **_usage_fields(metered, source),
+                estimated_tokens=req.estimated_tokens if req.admitted else 0,
+                reservation_id=req.reservation_id,
+                admitted=req.admitted,
+                refused=req.refused,
                 error_code=final_error_code,
                 stream=True,
                 provider_name=(
@@ -3907,6 +4397,7 @@ class GatewayService:
                 ),
                 session_id=req.session_id or session_id,
                 group_id=req.group_id,
+                group_path=req.group_path,
                 project_id=req.project_id,
                 finish_reason=req.finish_reason,
                 retry_count=0,
@@ -3919,6 +4410,7 @@ class GatewayService:
             )
         except Exception:
             logger.warning("Failed to write the request log", exc_info=True)
+        await self._settle(req, metered)
         if req.trace_context is not None:
             try:
                 self.observability.finalize_stream(
@@ -4261,38 +4753,47 @@ def _require_model(payload: dict[str, Any]) -> str:
     return model
 
 
-async def _check_limits(
-    *,
-    limiter: RateLimiter,
-    tenant_id: str,
-    payload: dict[str, Any],
-    rpm_limit: int | None,
-    tpm_limit: int | None,
-) -> None:
-    rpm = await limiter.check_rpm(tenant_id=tenant_id, limit=rpm_limit)
-    if rpm and not rpm.allowed:
-        raise _rate_limited("Rate limit exceeded (RPM).", "rate_limit_rpm", rpm.retry_after_sec)
-    estimated_tokens = estimate_input_tokens(
-        payload.get("input") or payload.get("messages"),
-    )
-    tpm = await limiter.check_tpm(
-        tenant_id=tenant_id, tokens=estimated_tokens, limit=tpm_limit,
-    )
-    if tpm and not tpm.allowed:
-        raise _rate_limited("Rate limit exceeded (TPM).", "rate_limit_tpm", tpm.retry_after_sec)
+def _input_of(payload: dict[str, Any]) -> Any:
+    """What a request sends the model: its ``input`` or its ``messages``."""
+    return payload.get("input") or payload.get("messages")
 
 
-def _rate_limited(message: str, code: str, retry_after_sec: int) -> GatewayError:
-    """A 429 as OpenAI clients read it: ``rate_limit_error``, and when to retry.
+def _answer_text(payload: Any) -> str:
+    """A whole answer's text, for an estimate of its tokens when the model reported none."""
+    choices = (payload or {}).get("choices") if isinstance(payload, dict) else None
+    texts: list[str] = []
+    for choice in choices or []:
+        content = (choice.get("message") or {}).get("content") if isinstance(choice, dict) else None
+        if isinstance(content, str):
+            texts.append(content)
+        elif isinstance(content, list):
+            texts.extend(str(p.get("text", "")) for p in content if isinstance(p, dict))
+    return "".join(texts)
 
-    It said ``invalid_request_error`` with no ``Retry-After``, so clients that
-    back off on 429 guessed; the window's remaining seconds were computed and
-    dropped.
+
+def _metered(
+    usage: Usage, *, reached: bool, status_code: int, input_obj: Any, answer: str | None,
+) -> tuple[Usage, str | None]:
+    """The usage the log keeps for a request, and where it comes from (``usage_source``).
+
+    What the provider reported; for an answer the model gave without counts, the gateway's estimate
+    (four characters to a token); nothing for a request that was refused or did not reach a model.
     """
-    return GatewayError(
-        status_code=429,
-        message=message,
-        error_type="rate_limit_error",
-        code=code,
-        headers={"Retry-After": str(max(int(retry_after_sec), 1))},
-    )
+    if usage.reported:
+        return usage, "provider"
+    if reached and status_code < 400:
+        return estimated_usage(input_obj, answer), "estimated"
+    return usage, None
+
+
+def _usage_fields(usage: Usage, source: str | None) -> dict[str, Any]:
+    """The request log's token columns for *usage*."""
+    return {
+        "prompt_tokens": usage.prompt_tokens,
+        "completion_tokens": usage.completion_tokens,
+        "total_tokens": usage.total_tokens,
+        "cached_tokens": usage.cached_tokens,
+        "cache_write_tokens": usage.cache_write_tokens,
+        "reasoning_tokens": usage.reasoning_tokens,
+        "usage_source": source,
+    }

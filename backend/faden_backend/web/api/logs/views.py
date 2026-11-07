@@ -151,6 +151,11 @@ _LOGQL_TOKEN = re.compile(
     re.DOTALL,
 )
 _MATCHER_OPS = frozenset({"=", "!=", "=~", "!~"})
+#: What a label filter in the pipeline compares with: the matchers, and numbers', durations' and sizes'
+#: comparisons (``==``, ``>=`` and ``<=`` arrive as two tokens; the first is enough).
+_FILTER_OPS = _MATCHER_OPS | {">", "<"}
+#: Loki's own labels for a line its parser could not read (``| json | __error__=""``): no stream's.
+_PARSER_LABELS = frozenset({"__error__", "__error_details__"})
 
 
 class LokiUpstreamError(Exception):
@@ -205,13 +210,16 @@ def _enforce_label_name_allowed(name: str) -> None:
 
 
 def _extract_query_labels(query: str) -> set[str]:
-    """The label names the stream selectors (``{...}``) of *query* match on.
+    """The label names *query* selects or filters on.
 
-    Read token by token, so a ``}`` inside a value no longer ends the
-    selector: ``{app="}", secret=~".+"}`` matched on ``secret`` unseen. A
-    quoted name before an operator counts as a label too. Label filters in
-    the pipeline (``{app="x"} | secret="y"``) are not selectors and are not
-    covered: they only narrow the streams an allowed selector chose.
+    Its stream selectors' (``{...}``), read token by token, so a ``}`` inside
+    a value no longer ends the selector: ``{app="}", secret=~".+"}`` matched
+    on ``secret`` unseen; a quoted name before an operator counts as a label
+    too. And its pipeline's label filters (``{app="x"} | secret="y"``,
+    ``| status >= 500``): without them a reader could pick lines by a label
+    the allowlist keeps out of selectors. A name a parser or ``label_format``
+    gives (``| json a="b"``) counts as well. Line filters (``|= "a=b"``) and
+    ``by (...)`` name no label filtered on.
     """
     labels: set[str] = set()
     depth = 0
@@ -223,9 +231,13 @@ def _extract_query_labels(query: str) -> set[str]:
             depth += 1
         elif tok == "}":
             depth = max(depth - 1, 0)
-        elif depth and pending is not None and tok in _MATCHER_OPS:
+        elif (
+            pending is not None
+            and tok in (_MATCHER_OPS if depth else _FILTER_OPS)
+            and (depth or pending.lower() not in _PARSER_LABELS)
+        ):
             labels.add(pending.lower())
-        if depth and (tok[0].isalpha() or tok[0] == "_"):
+        if tok[0].isalpha() or tok[0] == "_":
             pending = tok
         elif depth and tok[0] in "\"`'" and len(tok) > 1:
             pending = tok[1:-1]

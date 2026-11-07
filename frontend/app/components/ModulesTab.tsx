@@ -32,6 +32,7 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import ArticleIcon from "@mui/icons-material/Article";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import MailOutlineIcon from "@mui/icons-material/MailOutline";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import StopIcon from "@mui/icons-material/Stop";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -40,6 +41,7 @@ import ContainerLogsDialog from "~/components/ContainerLogsDialog";
 import PiiPolicyForm from "~/components/PiiPolicyForm";
 import ProvenancePublicCheckSettings from "~/components/ProvenancePublicCheckSettings";
 import ProvenanceStatus from "~/components/ProvenanceStatus";
+import { isMailPageSettingKey } from "~/api/mailSettings";
 import { fetchPIIPolicyOptions, normalizePIIPolicy } from "~/api/pii";
 import { useServices } from "~/lib/ServicesContext";
 import { servicesApi, type ServiceInfo } from "~/api/services";
@@ -120,9 +122,14 @@ function isModuleEnableFlag(key: string): boolean {
   );
 }
 
+/**
+ * The settings a module's card shows. With the Mail page (`mailPage`), the mailer's card leaves the server,
+ * sender, links and recipients to it and keeps only the rest.
+ */
 function moduleSettingsFor(
   moduleName: string,
   schema: SystemSettingSchemaItem[],
+  mailPage = false,
 ): SystemSettingSchemaItem[] {
   if (moduleName === "pii") {
     return schema.filter(
@@ -131,7 +138,10 @@ function moduleSettingsFor(
   }
   if (moduleName === "mailer") {
     return schema.filter(
-      (item) => isMailerSettingKey(item.key) && !isModuleEnableFlag(item.key),
+      (item) =>
+        isMailerSettingKey(item.key) &&
+        !isModuleEnableFlag(item.key) &&
+        !(mailPage && isMailPageSettingKey(item.key)),
     );
   }
   if (moduleName === "mcp") {
@@ -173,8 +183,17 @@ function asInputValue(value: unknown): string {
 
 // ── Component ────────────────────────────────────────────────────────
 
-export default function ModulesTab() {
+export interface ModulesTabProps {
+  /**
+   * Opens Settings > Mail. Given while the server offers it: the mailer's card then links there instead of
+   * showing the mail server's settings one by one.
+   */
+  onOpenMail?: () => void;
+}
+
+export default function ModulesTab({ onOpenMail }: ModulesTabProps = {}) {
   const { t } = useTranslation();
+  const mailPage = !!onOpenMail;
   const { services, loading, error: loadError, refresh } = useServices();
   const [busy, setBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -300,6 +319,11 @@ export default function ModulesTab() {
       }
     }
     setSettingsValues((prev) => ({ ...prev, [key]: parsed }));
+  }
+
+  /** A setting's description, and for a protected one that changing it needs root mode. */
+  function describe(item: SystemSettingSchemaItem): string {
+    return item.protected ? `${item.description} ${t("settings.protected_help")}`.trim() : item.description;
   }
 
   async function saveSetting(
@@ -547,7 +571,28 @@ export default function ModulesTab() {
                 <ProvenanceStatus refreshKey={statusTick} />
               )}
 
-              {(moduleSettingsFor(svc.name, settingsSchema).length > 0 ||
+              {svc.name === "mailer" && onOpenMail && (
+                <Stack
+                  spacing={1}
+                  alignItems="flex-start"
+                  sx={{ mt: 1.5 }}
+                  data-testid="mailer-settings-moved"
+                >
+                  <Typography variant="body2" color="text.secondary">
+                    {t("modules_tab.mailer_moved")}
+                  </Typography>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<MailOutlineIcon />}
+                    onClick={onOpenMail}
+                  >
+                    {t("modules_tab.mailer_open")}
+                  </Button>
+                </Stack>
+              )}
+
+              {(moduleSettingsFor(svc.name, settingsSchema, mailPage).length > 0 ||
                 svc.name === "provenance") && (
                 <Accordion
                   disableGutters
@@ -589,7 +634,7 @@ export default function ModulesTab() {
                           <CircularProgress size={20} />
                         </Box>
                       ) : (
-                        moduleSettingsFor(svc.name, settingsSchema).map(
+                        moduleSettingsFor(svc.name, settingsSchema, mailPage).map(
                           (item) => {
                             if (
                               item.key === "faden_gateway.pii_default_policy"
@@ -672,7 +717,7 @@ export default function ModulesTab() {
                                           variant="caption"
                                           color="text.secondary"
                                         >
-                                          {item.description}
+                                          {describe(item)}
                                         </Typography>
                                       </Box>
                                     }
@@ -693,7 +738,7 @@ export default function ModulesTab() {
                                         item.type,
                                       )
                                     }
-                                    helperText={item.description}
+                                    helperText={describe(item)}
                                   >
                                     {(item.enum_values ?? []).map((v) => (
                                       <MenuItem key={v} value={v}>
@@ -723,7 +768,7 @@ export default function ModulesTab() {
                                         item.type,
                                       )
                                     }
-                                    helperText={item.description}
+                                    helperText={describe(item)}
                                   />
                                 )}
                                 <Button

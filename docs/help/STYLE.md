@@ -50,6 +50,10 @@ e-mail addresses, secrets) and on links to pages that do not exist.
 - **Admonitions** for what must not be missed: `!!! warning` for data loss or downtime, `!!! note` for limits.
   Use them sparingly.
 - **Planned features** carry `<span class="fs-planned">Planned</span>` and say only what they will do.
+- **Enterprise features** carry `<span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span>`
+  (German: `title="Erfordert Fadenstack Enterprise"`, the word Enterprise stays). A page that needs Enterprise has
+  it on its own line under the title; a section, on its own line under its heading (never in the heading: it
+  would change the heading's anchor); an item in a list or a table, after its name.
 - **Links** are relative to the page, to `.md` files: `[Clusters](../operate/clusters.md)`. Link a term to its
   page the first time it matters, not every time.
 - **Examples** use `https://ai.example.internal` for the server, `gpu-01`, `gpu-02` for machines,

@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator, model_validator
 
 from faden_backend.db.models.agents import AgentStatus, LocalMcpMode, PrincipalType
 
@@ -23,6 +23,18 @@ class HostTool(BaseModel):
     schema_sha256: str | None = Field(default=None, max_length=64)
     risk: str | None = Field(default=None, pattern=r"^(read|write|destructive)$")
     approval: str | None = Field(default=None, pattern=r"^(never|ask|always)$")
+    #: Where a call acts (sdk/38 §6, desktop 37 D4): the JSON pointer (RFC 6901) to the argument that names
+    #: the place, and the kind of place it is. A work grant covers a call only inside its places; a tool
+    #: without them is never covered by one.
+    target_argument: str | None = Field(default=None, max_length=256, pattern=r"^(/[^/]*)+$")
+    target_type: Literal["document", "folder", "site", "app", "desk"] | None = None
+
+    @model_validator(mode="after")
+    def _place_whole(self) -> HostTool:
+        if (self.target_argument is None) != (self.target_type is None):
+            msg = "A tool's place needs both the argument that names it and its kind."
+            raise ValueError(msg)
+        return self
 
 
 class AgentPii(BaseModel):
@@ -33,6 +45,38 @@ class AgentPii(BaseModel):
     #: Whether a conversation may switch the egress mode (redact, tokenize). Null follows the
     #: tenant's setting on the PII policy page; true or false decides for this agent.
     allow_mode_override: StrictBool | None = None
+
+
+#: The tool modes, from least to most (gateway ``tool_classes.ToolMode``). Bypass is no agent's level yet:
+#: only a tenant that allows it may give it, and no tenant can (sdk/38 D2, D3).
+ToolLevel = Literal["off", "read_only", "ask", "auto"]
+_LEVEL_ORDER = ("off", "read_only", "ask", "auto")
+
+
+class AgentApprovals(BaseModel):
+    """The agent's approval levels (sdk/38 §5, D1, D2): where its conversations start, and the most they use.
+
+    The author's statement of what the agent is safe for, part of its version. The tenant's ceilings narrow
+    both.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    default_level: ToolLevel = "ask"
+    max_level: ToolLevel = "auto"
+    #: Which standing approvals the agent's card may offer; ``None``: as the SDK offers today. From A2 on.
+    standing: list[Literal["chat", "time", "grant", "always"]] | None = None
+    #: The longest grant, in minutes; ``None``: the tenant's. Read from A2 on.
+    max_grant_minutes: int | None = Field(default=None, ge=15, le=1440)
+    #: The classes a grant may cover: never destructive or unclassified (sdk/38 §4.3). Read from A2 on.
+    grant_classes: list[Literal["read", "write"]] | None = None
+
+    @model_validator(mode="after")
+    def _default_within_max(self) -> AgentApprovals:
+        if _LEVEL_ORDER.index(self.default_level) > _LEVEL_ORDER.index(self.max_level):
+            msg = "The default level must not be above the highest level."
+            raise ValueError(msg)
+        return self
 
 
 class AgentVersionFields(BaseModel):
@@ -46,6 +90,7 @@ class AgentVersionFields(BaseModel):
     local_mcp_mode: LocalMcpMode = LocalMcpMode.DISABLE
     ui: dict[str, Any] = Field(default_factory=dict)
     pii: AgentPii = Field(default_factory=AgentPii)
+    approvals: AgentApprovals = Field(default_factory=AgentApprovals)
     extensions: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -168,15 +213,21 @@ class AccessDTO(BaseModel):
 
 
 class UsageDTO(BaseModel):
-    """Usage of one agent from the gateway's request log, without content."""
+    """Usage of one agent from the gateway's request log, without content and without names.
 
-    requests: int
-    errors: int
-    prompt_tokens: int
-    completion_tokens: int
-    total_tokens: int
-    users: int
-    conversations: int
+    ``suppressed``: fewer than ``min_group_size`` people used it in the range (and not only the caller), so
+    no figure is shown. A day of ``by_day`` about fewer people is ``suppressed`` too, its figures ``None``.
+    """
+
+    suppressed: bool = False
+    min_group_size: int
+    requests: int | None = None
+    errors: int | None = None
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    total_tokens: int | None = None
+    users: int | None = None
+    conversations: int | None = None
     by_day: list[dict[str, Any]]
 
 
@@ -331,7 +382,8 @@ class ClientEventDTO(BaseModel):
 
     id: uuid.UUID
     type: str
-    user_id: str
+    #: Only the caller's own; another person's events keep none.
+    user_id: str | None = None
     device_id: str | None
     conversation_id: str | None
     data: dict[str, Any]
@@ -363,8 +415,8 @@ class AppSeenDTO(BaseModel):
     first_seen_at: datetime
     last_seen_at: datetime
     reports: int
-    last_user_id: str
-    #: The e-mail address of who reported it last.
+    #: Who reported it last, and their address: only when that was the caller.
+    last_user_id: str | None = None
     last_user_label: str | None = None
     tools: list[str]
     context: list[dict[str, Any]]

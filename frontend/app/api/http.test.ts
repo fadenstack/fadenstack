@@ -24,6 +24,12 @@ describe("readError", () => {
     expect(error.status).toBe(400);
   });
 
+  it("keeps the detail as sent, for a caller that reads its fields", async () => {
+    const error = await readError(response(422, '{"detail": {"problems": [{"field": "host", "code": "required"}]}}'));
+    expect(error.detail).toEqual({ problems: [{ field: "host", code: "required" }] });
+    expect((await readError(response(400, "Bad gateway"))).detail).toBeUndefined();
+  });
+
   it("falls back to the status when there is no body", async () => {
     expect((await readError(response(502, ""))).message).toBe("502 Status");
   });

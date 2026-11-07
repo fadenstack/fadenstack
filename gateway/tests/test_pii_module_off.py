@@ -42,11 +42,12 @@ from faden_gateway.settings import settings
 TEST_JWT_SECRET = "test-secret-32-bytes-minimum-value"
 ALIAS = "qwen3-32b"
 
-#: What the backend seeds on every install (backend/web/lifespan.py, _CORE_DEFAULT_PII_POLICY).
+#: What the backend seeds on every install (backend/services/pii_default_policy.py): no types named, the
+#: detector's thresholds.
 SEEDED_DEFAULT: dict[str, Any] = {
     "telemetry": {"enabled": False, "mode": "sanitized", "store_raw": False},
     "egress": {"enabled_for_cloud": True, "enabled_for_local": False, "mode": "redact", "fail_action": "block"},
-    "presidio": {"language": "en", "threshold": 0.35, "entities": ["PERSON", "EMAIL_ADDRESS"]},
+    "presidio": {"language": "en", "threshold": 0.35, "threshold_mode": "profile", "entities": []},
 }
 
 

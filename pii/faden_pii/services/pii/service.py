@@ -40,7 +40,11 @@ _LOCAL_TOKEN = re.compile(r"\[\[fs:[A-Z][A-Z0-9_]*_\d+\]\]")
 
 log = logging.getLogger(__name__)
 
-# Default PII entity types Presidio should look for.
+# The standard entity types: what a check that names none looks for, as far as the
+# installed detector finds them (``default_entities``). A policy with no types of its
+# own gets these -- the default policy every install starts with too. Not DATE_TIME:
+# spaCy tags plain numbers as dates ("add 17 and 25" lost its 25, 2026-09-26); a
+# policy can still name it, and the extended profile adds it.
 DEFAULT_ENTITIES: list[str] = [
     "PERSON",
     "EMAIL_ADDRESS",
@@ -50,7 +54,6 @@ DEFAULT_ENTITIES: list[str] = [
     "IP_ADDRESS",
     "US_SSN",
     "LOCATION",
-    "DATE_TIME",
     "NRP",
     "MEDICAL_LICENSE",
     "URL",

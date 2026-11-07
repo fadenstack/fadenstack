@@ -82,12 +82,52 @@ def test_extract_labels_no_braces_empty() -> None:
         ('{app="x" # }\n, secret="y"}', {"app", "secret"}),  # a comment hides nothing
         ('{"secret"=~".+"}', {"secret"}),  # a quoted name
         ('sum by (pod) (rate({namespace!="kube", Container !~ "x"}[5m]))', {"namespace", "container"}),
-        ('{app="x"} |= "error" | json | level="warn"', {"app"}),  # pipeline label filters: not selectors
+        ('{app="x"} |= "error" | json | level="warn"', {"app", "level"}),  # a pipeline's label filter
         ('{app="x"} | line_format "{{.secret}}"', {"app"}),
     ],
 )
 def test_extract_labels_reads_values_and_names_as_loki_does(query: str, labels: set[str]) -> None:
     assert logs_views._extract_query_labels(query) == labels
+
+
+@pytest.mark.parametrize(
+    ("query", "labels"),
+    [
+        ('{app="x"} | secret="y"', {"app", "secret"}),
+        ('{app="x"} | json | secret=~".+"', {"app", "secret"}),
+        ('{app="x"} | logfmt | status >= 500 or Secret != ""', {"app", "status", "secret"}),
+        ('{app="x"} | duration>10s, secret<"b"', {"app", "duration", "secret"}),
+        ('{app="x"} | (secret="a" and level=="b")', {"app", "secret", "level"}),
+        ('{app="x"} | json secret="data.key"', {"app", "secret"}),  # a label the parser gives
+        ('{app="x"} | label_format secret="{{.app}}"', {"app", "secret"}),
+        ('{app="x"} | json | __error__=""', {"app"}),  # Loki's own, no stream's
+    ],
+)
+def test_extract_labels_reads_the_pipelines_label_filters(query: str, labels: set[str]) -> None:
+    assert logs_views._extract_query_labels(query) == labels
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        '{app="x"} |= "secret=y"',
+        '{app="x"} != "secret=y" |~ "a=b"',
+        '{app="x"} |= `secret="y"` or "z"',
+        'sum by (secret) (count_over_time({app="x"}[5m])) > 2',
+        '{app="x"} | json | line_format "{{.a}}"',
+    ],
+)
+def test_line_filters_and_grouping_name_no_label(query: str) -> None:
+    assert logs_views._extract_query_labels(query) == {"app"}
+
+
+def test_query_allowlist_refuses_a_pipeline_label_filter(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "logs_allowed_labels_raw", "app,level")
+    logs_views._enforce_query_allowlist('{app="x"} |= "boom" | json | level="error"')
+    with pytest.raises(HTTPException) as exc:
+        logs_views._enforce_query_allowlist('{app="x"} | json | secret="y"')
+    assert exc.value.status_code == 400
+    assert "secret" in str(exc.value.detail)
 
 
 @pytest.mark.parametrize(

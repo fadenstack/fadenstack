@@ -1,11 +1,12 @@
 import uuid
+from zoneinfo import ZoneInfo
 
 import pytest
 from redis.asyncio import ConnectionPool
 
 from faden_gateway.services.cache.redis import RedisCache
 from faden_gateway.services.gateway.lease import LeaseManager
-from faden_gateway.services.gateway.ratelimit import RateLimiter
+from faden_gateway.services.gateway.ratelimit import Caps, RateLimiter, Reservation
 
 
 @pytest.mark.anyio
@@ -36,14 +37,14 @@ async def test_lease_respects_max_concurrency(fake_redis_pool: ConnectionPool) -
 
 @pytest.mark.anyio
 async def test_rate_limiter_rpm_and_tpm(fake_redis_pool: ConnectionPool) -> None:
-    cache = RedisCache(fake_redis_pool)
-    limiter = RateLimiter(cache)
-    rpm_1 = await limiter.check_rpm(tenant_id="tenant-x", limit=1)
-    rpm_2 = await limiter.check_rpm(tenant_id="tenant-x", limit=1)
-    assert rpm_1 is not None and rpm_1.allowed
-    assert rpm_2 is not None and not rpm_2.allowed
+    limiter = RateLimiter(RedisCache(fake_redis_pool))
+    utc = ZoneInfo("UTC")
+    rpm_1 = await limiter.admit(tenant_id="tenant-x", caps=Caps(rpm=1), tokens=1, zone=utc)
+    rpm_2 = await limiter.admit(tenant_id="tenant-x", caps=Caps(rpm=1), tokens=1, zone=utc)
+    assert isinstance(rpm_1, Reservation)
+    assert not isinstance(rpm_2, Reservation) and rpm_2.kind == "rpm"
 
-    tpm_1 = await limiter.check_tpm(tenant_id="tenant-y", tokens=3, limit=5)
-    tpm_2 = await limiter.check_tpm(tenant_id="tenant-y", tokens=3, limit=5)
-    assert tpm_1 is not None and tpm_1.allowed
-    assert tpm_2 is not None and not tpm_2.allowed
+    tpm_1 = await limiter.admit(tenant_id="tenant-y", caps=Caps(tpm=5), tokens=3, zone=utc)
+    tpm_2 = await limiter.admit(tenant_id="tenant-y", caps=Caps(tpm=5), tokens=3, zone=utc)
+    assert isinstance(tpm_1, Reservation)
+    assert not isinstance(tpm_2, Reservation) and tpm_2.kind == "tpm"

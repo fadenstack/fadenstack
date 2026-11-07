@@ -341,9 +341,19 @@
       "title": "Kosten-Dashboard",
       "description": "Kosten, Nutzung und Geschwindigkeit der Anfragen, die das Gateway bedient hat. Die Kosten sind Schätzungen aus den von Ihnen gesetzten Preisen; sie wirken sich nicht auf Abrechnungen aus.",
       "action_overview": "Ausgaben, Anfragen, Tokens, Latenz und Fehler über 7 bis 90 Tage",
-      "action_requests": "Anfragen durchsehen, nach Modell oder Person filtern und eine öffnen, um ihre Pipeline zu sehen",
+      "action_requests": "Anfragen durchsehen, nach Modell filtern und eine öffnen, um ihre Pipeline zu sehen",
       "action_pricing": "Die Preise pro Million Tokens festlegen",
       "action_export": "Die Daten als CSV exportieren"
+    },
+    "usage": {
+      "title": "Nutzung",
+      "description": "Was die Instanz von den Modellen genutzt hat, nach Nutzungsgruppe, Agent, Modell und Anbieter. Jede Zahl umfasst mindestens so viele Personen wie die Mindestgruppengröße; nichts nennt eine einzelne Person oder bringt Personen in eine Rangfolge.",
+      "action_totals": "Anfragen, Tokens und geschätzte Kosten über 7 Tage bis 12 Monate, pro Stunde, Tag oder Monat",
+      "action_groups": "Nach Nutzungsgruppe, Agent, Modell oder Anbieter gruppieren; Gruppen unter der Mindestgruppengröße zählen in einer Zeile „Weniger als … Personen“",
+      "action_small": "Ein Hinweis warnt, wenn weniger Personen als die Mindestgruppengröße die Instanz nutzen: Ihre Summen gelten dann als personenbezogene Daten",
+      "action_people": "Nutzungsprüfer sehen bei eingeschalteter personenbezogener Auswertung die Zahlen pro Person nach Angabe einer Begründung; jede Einsicht wird protokolliert",
+      "action_settings": "Einstellungen → Nutzung und Datenschutz legt die Mindestgruppengröße, die Aufbewahrungsfristen, die Limits und die personenbezogene Auswertung fest",
+      "action_tree": "Teams als Baum: ein Team zu seinen Unterteams öffnen, wie erfasst oder in der heutigen Struktur"
     },
     "logs": {
       "title": "Logs & Audit",
@@ -362,7 +372,7 @@
       "title": "LLM-Aufrufe",
       "description": "Jeder Aufruf über das Gateway: den fehlerhaften finden, sehen warum, und sehen, wohin Aufrufe geroutet werden.",
       "action_find": "Liste nach Zeit, Modell, Ergebnis oder einer beliebigen ID eingrenzen; auf Fehler klicken für nur fehlgeschlagene",
-      "action_inspect": "Einen Aufruf öffnen: Diagnose, Zeitverlauf, Unterhaltung und alle erfassten Felder; j und k wechseln zwischen Aufrufen",
+      "action_inspect": "Einen Aufruf öffnen: Diagnose, Zeitverlauf, zugehörige Aufrufe und erfasste Felder, nie, wer ihn gesendet hat; j und k wechseln zwischen Aufrufen",
       "action_routing": "Sehen, welche Anbieter jedes Modell bedient haben, mit Fehlern und p95-Latenz",
       "action_live": "Neue Aufrufe kommen alle paar Sekunden; zum Lesen pausieren und den Link eines Aufrufs zum Teilen kopieren"
     },
@@ -476,7 +486,8 @@
       "title": "Gruppen",
       "description": "Eine Gruppe gibt ihren Mitgliedern Rollen und fasst ihre Nutzung in Berichten zusammen.",
       "action_create": "Eine Gruppe mit ihren Rollen anlegen",
-      "action_members": "Mitglieder hinzufügen oder entfernen"
+      "action_members": "Mitglieder hinzufügen oder entfernen",
+      "action_tree": "Eine Gruppe unter eine andere stellen, ihr eine Kostenstelle geben oder eine beendete archivieren"
     },
     "api_tokens": {
       "title": "API-Tokens",
@@ -626,10 +637,18 @@
     },
     "settings": {
       "title": "Einstellungen",
-      "description": "Einstellungen für das ganze System, in drei Reitern.",
+      "description": "Einstellungen für das ganze System, in vier Reitern.",
       "action_general": "Allgemein: jede Systemeinstellung, durchsuchbar, und das Hugging-Face-Token",
       "action_modules": "Module: optionale Module ein- oder ausschalten, mit ihren Einstellungen",
+      "action_usage": "Nutzung und Datenschutz: wer Nutzungszahlen sieht, wie lange sie aufbewahrt werden, die Limits der Instanz und die Konfigurationsbeschreibung",
       "action_appearance": "Darstellung: die Akzentfarbe"
+    },
+    "settings_mail": {
+      "title": "Mail",
+      "description": "Wie dieser Server Mail verschickt (Passwort-Zurücksetzungen, Codes, Warnungen für Administratoren): über den Mailserver Ihrer Organisation.",
+      "action_server": "Mailserver und Anmeldung: ein Passwort, Microsoft 365 oder ein Relay ohne Anmeldung",
+      "action_test": "Eine Testmail mit dem Formular senden, wie es ist, dann speichern",
+      "action_state": "Mail-Status: ob Mail hinausgeht, wie viele warten und der letzte Fehler in Worten"
     },
     "profile": {
       "title": "Mein Profil",
@@ -654,6 +673,16 @@
       "action_verdict": "Das Ergebnis lesen und was jede Ebene gefunden hat: Wasserzeichen, signierte Herkunftsangaben, Metadaten, Belege und Nachweise",
       "action_download": "Das Ergebnis signiert als JSON-Datei herunterladen",
       "action_public": "Bilder und Dateien unter Einstellungen > Module > Herkunftsnachweis auch Personen ohne Konto anbieten"
+    },
+    "budgets": {
+      "title": "Budgets",
+      "description": "Limits für Tokens oder Geld pro Tag, Woche oder Monat für die Organisation, Teams, Agenten und, wenn eingeschaltet, einzelne Personen; mit Benachrichtigungen, einer Prognose und der Verrechnung.",
+      "action_list": "Jedes Budget zeigt, wie viel in diesem Zeitraum genutzt ist, wann es bei diesem Verbrauch aufgebraucht ist, und seine Warnungen",
+      "action_create": "Neues Budget: Wählen Sie, wofür es gilt (ein Team aus dem Baum), Tokens oder Geld, den Betrag, den Zeitraum und den Modus",
+      "action_modes": "Hart lehnt ab, sobald es aufgebraucht ist; Weich benachrichtigt nur; Schatten zählt, was es abgelehnt hätte",
+      "action_tree": "Eine Anfrage braucht Platz in jedem Budget, das gilt; das Budget eines Teams darf nicht größer sein als das darüber",
+      "action_chargeback": "Verrechnung: ein Monat je Team oder Kostenstelle, als interne Schätzung, mit CSV-Download",
+      "action_settings": "Einstellungen: Budgets für einzelne Personen (Root-Modus) und Nutzungsgruppen aus Kostenstellen"
     }
   }
 }

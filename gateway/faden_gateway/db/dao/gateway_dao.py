@@ -171,6 +171,32 @@ class GatewayDAO:
         )
         return result.scalar_one_or_none()
 
+    async def alias_unreachable(self, *, alias: str, tenant_id: str) -> bool:
+        """Whether *alias* is one the tenant may use, with enabled providers, none of them healthy.
+
+        What :meth:`resolve_candidates` finding nothing means then: the model is there, its servers are
+        down -- not that the tenant may not use it. Asked only after that, and only for an alias the tenant
+        may use, so it tells a tenant nothing about models it is not allowed.
+        """
+        policy = await self.get_tenant_policy(tenant_id)
+        if policy and policy.allowed_model_aliases and alias not in policy.allowed_model_aliases:
+            return False
+        query = (
+            select(LLMProviderInstance.id)
+            .join(LLMPoolMembership, LLMPoolMembership.provider_instance_id == LLMProviderInstance.id)
+            .join(LLMModelAlias, LLMModelAlias.alias == LLMPoolMembership.model_alias)
+            .where(
+                LLMModelAlias.alias == alias,
+                LLMModelAlias.enabled.is_(True),
+                LLMPoolMembership.enabled.is_(True),
+                LLMProviderInstance.enabled.is_(True),
+            )
+            .limit(1)
+        )
+        if policy and policy.allowed_provider_types:
+            query = query.where(LLMProviderInstance.type.in_(policy.allowed_provider_types))
+        return (await self.session.execute(query)).first() is not None
+
     async def resolve_candidates(
         self,
         *,
@@ -261,8 +287,12 @@ class GatewayDAO:
         completion_tokens: int | None,
         total_tokens: int | None,
         error_code: str | None,
+        refused: bool | None = None,
         stream: bool | None = None,
         cached_tokens: int | None = None,
+        cache_write_tokens: int | None = None,
+        reasoning_tokens: int | None = None,
+        usage_source: str | None = None,
         estimated_input_cost: object | None = None,
         estimated_output_cost: object | None = None,
         estimated_total_cost: object | None = None,
@@ -277,6 +307,7 @@ class GatewayDAO:
         mcp_tool_call_count: int | None = None,
         mcp_tool_loop_iterations: int | None = None,
         group_id: str | None = None,
+        group_path: list[str] | None = None,
         project_id: str | None = None,
         agent_id: str | None = None,
         device_id: str | None = None,
@@ -299,8 +330,12 @@ class GatewayDAO:
             completion_tokens=completion_tokens,
             total_tokens=total_tokens,
             error_code=error_code,
+            refused=refused,
             stream=stream,
             cached_tokens=cached_tokens,
+            cache_write_tokens=cache_write_tokens,
+            reasoning_tokens=reasoning_tokens,
+            usage_source=usage_source,
             estimated_input_cost=estimated_input_cost,
             estimated_output_cost=estimated_output_cost,
             estimated_total_cost=estimated_total_cost,
@@ -315,6 +350,7 @@ class GatewayDAO:
             mcp_tool_call_count=mcp_tool_call_count,
             mcp_tool_loop_iterations=mcp_tool_loop_iterations,
             group_id=group_id,
+            group_path=group_path,
             project_id=project_id,
             agent_id=agent_id,
             device_id=device_id,

@@ -428,8 +428,9 @@ function AppsTable({ apps, loading }: { apps: AppSeen[]; loading: boolean }) {
       key: "who",
       label: t("agents.apps.reported_by"),
       minWidth: 180,
-      searchValue: (a) => a.last_user_label ?? a.last_user_id,
-      render: (a) => a.last_user_label ?? a.last_user_id,
+      // Named only when it was the viewer; anyone else is not named (null).
+      searchValue: (a) => a.last_user_label ?? a.last_user_id ?? "",
+      render: (a) => a.last_user_label ?? a.last_user_id ?? t("agents.activity.user_hidden"),
     },
     {
       key: "context",

@@ -398,6 +398,11 @@ async def lifespan_setup(
 
     await _load_jwt_secret_from_backend_db()
     await load_system_settings_from_backend_db()
+    # The usage time zone (the tokens-per-day cap's calendar day) and retention; read again at each
+    # run of the usage rollup job.
+    from faden_gateway.services.gateway import usage_settings  # noqa: PLC0415
+
+    usage_settings.remember(await usage_settings.read())
     # Who each user's usage is attributed to, and which groups they are in (for
     # the skills shared with those); one cached lookup per user, off the hot path.
     app.state.usage_group_resolver, app.state.group_membership_resolver = (
@@ -476,6 +481,16 @@ async def lifespan_setup(
     turn_sweep_task = asyncio.create_task(_turn_sweep_loop(app), name="turn_sweep")
     # Chats people deleted are erased after the retention (features/admin-guardrails.md, phase 5).
     purge_task = asyncio.create_task(_purge_loop(app), name="purge_deleted_chats")
+    # Usage summed per hour and day from the request log, and purged after its retention (M09, M10).
+    from faden_gateway.services.gateway.usage_rollup import rollup_loop  # noqa: PLC0415
+
+    usage_rollup_task = (
+        asyncio.create_task(
+            rollup_loop(app.state.db_engine, interval_sec=settings.usage_rollup_interval_sec),
+            name="usage_rollup",
+        )
+        if settings.usage_rollup_interval_sec > 0 else None
+    )
     # The machines' mutual TLS: the gateway's certificate and the machine CAs,
     # read from the backend every minute (services/gateway/upstream_tls.py).
     from faden_gateway.services.gateway import upstream_tls  # noqa: PLC0415
@@ -497,6 +512,8 @@ async def lifespan_setup(
     pricing_task.cancel()
     turn_sweep_task.cancel()
     purge_task.cancel()
+    if usage_rollup_task is not None:
+        usage_rollup_task.cancel()
     machine_tls_task.cancel()
     if not broker.is_worker_process:
         await broker.shutdown()

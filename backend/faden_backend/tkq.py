@@ -2,6 +2,7 @@ import taskiq_fastapi
 from taskiq import AsyncBroker, InMemoryBroker
 from taskiq_aio_pika import AioPikaBroker
 
+from faden_backend.services.system_settings.runtime_sync import FollowSettingsTask
 from faden_backend.settings import settings
 
 broker: AsyncBroker = AioPikaBroker(
@@ -20,6 +21,9 @@ broker: AsyncBroker = AioPikaBroker(
 
 if settings.environment.lower() == "pytest":
     broker = InMemoryBroker()
+
+# Before each task: the settings changes saved since, in any process (services/system_settings/runtime_sync).
+broker.add_middlewares(FollowSettingsTask())
 
 taskiq_fastapi.init(
     broker,

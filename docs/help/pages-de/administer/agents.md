@@ -56,10 +56,10 @@ Die Seite des Agenten öffnet sich. Sein Status in der Liste ist **Entwurf**, **
 
 | Reiter | Was er enthält |
 |---|---|
-| **Definition** | Die Version, die Benutzer erhalten: **Anweisungen**, **Modell**, **Wissen** (Sammlungen, die er durchsuchen darf), **Server-Tools** (**Wie im Chat**, **Nur diese** oder **Keine**), **Lokale MCP-Server**, **Host-Tools** (die Tools der Anwendung und ihre Klassen), **Darstellung** (Begrüßung und vorgeschlagene Prompts) und **Datenschutz**. |
+| **Definition** | Die Version, die Benutzer erhalten: **Anweisungen**, **Modell**, **Wissen** (Sammlungen, die er durchsuchen darf), **Server-Tools** (**Wie im Chat**, **Nur diese** oder **Keine**), **Lokale MCP-Server**, **Host-Tools** (die Tools der Anwendung und ihre Klassen), **Freigabestufen** (der Tool-Modus, in dem Unterhaltungen beginnen, und der höchste), **Darstellung** (Begrüßung und vorgeschlagene Prompts) und **Datenschutz**. |
 | **Versionen** | Jede Version. Mit **Veröffentlichen** eine Version veröffentlichen, mit **Zurücksetzen** zu einer früheren zurückkehren, unter **Änderungen** die Unterschiede sehen. |
-| **Zugriff** | **Wer ihn nutzen darf**, die Liste **Ausgeschlossene Personen** (Enterprise) und seine **Betreuer** (mit Enterprise: **Betreuer und Prüfer**). **Zugriff prüfen** zeigt, ob eine Person den Agenten nutzen darf, und warum. |
-| **Aktivität** | Nutzung über einen Zeitraum (Anfragen, Fehler, Tokens, Benutzer, Unterhaltungen: nur Zahlen, nie Inhalte), was die Anwendungen gemeldet haben (ausgeführte Tools, Zustimmungen) und **Angemeldete Geräte**. |
+| **Zugriff** | **Wer ihn nutzen darf**, die Liste **Ausgeschlossene Personen** <span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span> und seine **Betreuer** (mit Enterprise: **Betreuer und Prüfer** <span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span>). **Zugriff prüfen** zeigt, ob eine Person den Agenten nutzen darf, und warum. |
+| **Aktivität** | Nutzung über einen Zeitraum (Anfragen, Fehler, Tokens, Benutzer, Unterhaltungen: nur Zahlen, nie Inhalte), nur, wenn mindestens fünf Personen den Agenten im Zeitraum genutzt haben; der Eigentümer eines persönlichen Agenten sieht dessen Zahlen trotzdem. Was die Anwendungen gemeldet haben (ausgeführte Tools, Zustimmungen) und **Angemeldete Geräte**. Der Reiter nennt niemanden außer Ihnen selbst. |
 | **Apps** | Was die Anwendungen mitbringen, verglichen mit der Version des Agenten (siehe [Wenn eine Anwendung neue Tools mitbringt](#when-an-application-brings-new-tools)). |
 
 ??? info "Mehr zu Server-Tools"
@@ -96,7 +96,7 @@ nutzen, bei ihrer nächsten Anfrage.
 schon vor der Veröffentlichung nutzen. Das tun sie über **Agenten** im Benutzermenü des Chats; Zugriff auf die
 Konsole brauchen sie nicht.
 
-Mit Enterprise kann ein Agent auch **Prüfer** haben: Wählen Sie **Hinzufügen als** → **Prüfer**, bevor Sie
+<span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span> Mit Enterprise kann ein Agent auch **Prüfer** haben: Wählen Sie **Hinzufügen als** → **Prüfer**, bevor Sie
 die Person auswählen, oder ändern Sie die Rolle eines Mitglieds in der Liste, und wählen Sie **Speichern**.
 Prüfer sehen die Versionen, Mitglieder, Einstellungen und Aktivität des Agenten und ändern nichts; nutzen
 können sie ihn nur, wenn er ihnen wie allen anderen freigegeben ist. Ohne gültige Enterprise-Lizenz sehen sie
@@ -111,7 +111,7 @@ im Audit-Protokoll festgehalten, mit wer wen geprüft hat (`agent.access.check`)
     Leistung der Beschäftigten überwachen kann, braucht die Zustimmung des Betriebsrats (BetrVG § 87 Abs. 1
     Nr. 6): Vereinbaren Sie die Prüferrolle mit ihm, bevor Sie sie vergeben.
 
-Mit Enterprise dürfen **Ausgeschlossene Personen** den Agenten nicht nutzen, auch nicht über ein Team, das ihn
+<span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span> Mit Enterprise dürfen **Ausgeschlossene Personen** den Agenten nicht nutzen, auch nicht über ein Team, das ihn
 nutzen darf: Wählen Sie die Person, geben Sie eine **Begründung** an und wählen Sie **Ausschließen**. Das wirkt
 in den Anwendungen sofort und wird im Audit-Protokoll festgehalten. Die Person erfährt nur,
 dass sie ausgeschlossen ist; die Begründung ist für die Betreuer und Administratoren des Agenten. Betreuer und
@@ -198,11 +198,32 @@ Jedes Tool, das eine Anwendung mitbringt, hat eine Klasse, die die Version des A
 | **Zerstörend** | Fragt immer nach. |
 | **Nicht eingestuft** | Fragt immer nach. |
 
-Benutzer wählen den Tool-Modus im Bereich des Agenten, pro Unterhaltung; jede Unterhaltung beginnt mit
-**Fragen**. Die Anwendung kann eine Klasse verschärfen, nie lockern. Ihre [Tool-Regeln](policies.md#tool-rules)
-gelten für Agenten ebenso wie für Chats. Zwei Beispiele: Das Outlook-Add-in sendet nie selbst E-Mails, es öffnet
+Benutzer wählen den Tool-Modus im Bereich des Agenten, pro Unterhaltung. Unter **Freigabestufen** legt die Version
+fest, wo jede Unterhaltung beginnt (**Beginnt in**, **Fragen**, solange Sie nichts ändern) und welchen Modus Benutzer
+höchstens wählen können (**Höchstens**, **Automatisch**, solange Sie nichts ändern); der Start liegt nie über dem
+höchsten, und die Grenzen Ihrer Organisation schränken beide ein. Ein Recherche-Agent etwa kann in **Nur lesen**
+beginnen und höchstens **Fragen** erlauben. Die Anwendung kann eine Klasse verschärfen, nie lockern. Ihre [Tool-Regeln](policies.md#tool-rules)
+gelten für Agenten ebenso wie für Chats.
+
+Unter **Host-Tools** kann die Version außerdem festlegen, wie jedes Tool nachfragt (**Freigabe**):
+
+| Freigabe | Was sie bewirkt |
+|---|---|
+| **Wie der Tool-Modus** | Die Tabelle oben entscheidet. |
+| **Immer nachfragen** | Fragt jedes Mal; nichts, was die Person vorher erlaubt hat, für den Chat oder immer, beantwortet die Frage. Für Tools, die über Personen entscheiden (DSGVO Art. 22) oder in der physischen Welt handeln. |
+| **Nachfragen** | Fragt auch dort, wo der Tool-Modus das Tool ausführen würde; die Person kann es für den Chat oder immer erlauben. |
+| **Nie nachfragen** | Ein Tool der Klasse Lesen oder Schreiben läuft in **Fragen** und **Automatisch** ohne Nachfrage. Eine Version, in der ein zerstörendes oder nicht eingestuftes Tool diese Freigabe hat, wird nicht veröffentlicht. |
+
+Keine davon zeigt ein Tool, das der Tool-Modus ausblendet. Solange Fadenstack Tools, die in der physischen Welt
+handeln, etwa an einer Maschine oder einer Tür, noch nicht kennzeichnen kann, geben Sie ihnen **Immer nachfragen**
+oder legen eine [Tool-Regel](policies.md#tool-rules) **Erst nachfragen** an. Zwei Beispiele: Das Outlook-Add-in sendet nie selbst E-Mails, es öffnet
 Entwürfe für die Person; und der Browser-Agent liest oder füllt nie Passwortfelder oder Kartenfelder, die die
 Website als solche kennzeichnet.
+
+Unter **Ort** kann ein Tool angeben, welches seiner Argumente nennt, wo ein Aufruf handelt (ein JSON-Pointer wie
+`/path`), und welche Art von Ort es ist: Dokument, Ordner, Website, App oder Schreibtisch. Eine Arbeitsfreigabe, die
+eine Person einem Agenten für eine Weile geben kann, deckt die Aufrufe des Tools nur an den Orten, die sie nennt. Ein
+Tool ohne Ort fragt weiterhin nach.
 
 ## Wenn eine Anwendung neue Tools mitbringt {#when-an-application-brings-new-tools}
 
@@ -255,7 +276,7 @@ der Konsole oder auf ihrer Seite **Agenten**.
     Zugriffs wirkt innerhalb von zehn Minuten. Diese Werte sind **Agent sign-in lifetime (s)**,
     **Agent sign-in idle timeout (s)** und **Agent access token lifetime (s)** unter **Einstellungen → Allgemein**.
 
-    Mit Enterprise kann ein Agent kürzere haben: **Gültigkeit der Anmeldung** auf seinem Reiter **Definition**,
+    <span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span> Mit Enterprise kann ein Agent kürzere haben: **Gültigkeit der Anmeldung** auf seinem Reiter **Definition**,
     in Sekunden, mindestens 60; ein leeres Feld behält den Wert des Mandanten. Sie gelten mit der Version, die
     Sie speichern und veröffentlichen. Längere als die des Mandanten werden abgelehnt, und wird der Wert des
     Mandanten später gesenkt, verkürzt das auch die des Agenten. Bereits angemeldete Geräte erhalten die kürzere

@@ -19,6 +19,15 @@ from faden_backend.db.models.rbac import (
 #: signs in can check; a custom role has it when it is given.
 CONTENT_CHECK = {"provenance": ["check"]}
 
+#: Usage figures of teams, agents, models and providers, each of at least k people (``/api/admin/usage``).
+USAGE_READ = {"usage": ["read"]}
+#: The usage of named people other than oneself (``/api/admin/usage/people``), while person-level reporting is
+#: on. Only the role ``usage_auditor`` has it, and nobody has that role at install; superuser status does not
+#: give it, so it is checked by the role grant itself, never through ``require_permission`` (GDPR Art. 25(2),
+#: 32(4); M06).
+USAGE_PEOPLE_AUDIT = ("usage.people", "audit")
+USAGE_AUDITOR_ROLE = "usage_auditor"
+
 # Default roles and their permission scopes
 _DEFAULT_ROLES: dict[str, dict[str, list[str]]] = {
     "admin": {
@@ -82,6 +91,7 @@ _DEFAULT_ROLES: dict[str, dict[str, list[str]]] = {
         "pii.session": ["read", "strengthen", "weaken"],
         "skills": ["read", "create", "share", "publish", "manage"],
         "agents": ["read", "create", "manage", "delete"],
+        **USAGE_READ,
         **CONTENT_CHECK,
     },
     "operator": {
@@ -194,6 +204,16 @@ _DEFAULT_ROLES: dict[str, dict[str, list[str]]] = {
     # (features/admin-guardrails.md 2.6, 2.7).
     "auditor": {
         "audit": ["read", "export"],
+        # The aggregate usage figures, as a data protection officer or works council reads them (S05); never
+        # the usage of named people.
+        **USAGE_READ,
+        **CONTENT_CHECK,
+    },
+    # The usage of named people, and the aggregates the Usage page opens with; assigned to nobody at install
+    # (M06). A holder who is no administrator reaches the per-person view through that page.
+    USAGE_AUDITOR_ROLE: {
+        USAGE_PEOPLE_AUDIT[0]: [USAGE_PEOPLE_AUDIT[1]],
+        **USAGE_READ,
         **CONTENT_CHECK,
     },
     "default_user": {

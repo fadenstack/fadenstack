@@ -32,8 +32,17 @@ Bei eingeschaltetem Modul gilt diese Standardrichtlinie:
 - Sie schützt Anfragen an **Cloud-Provider**; Anfragen an die Modelle Ihrer eigenen Maschinen werden nicht geprüft.
 - Sie **schwärzt**: Personenbezogene Daten werden ersetzt, und das Modell sieht sie nie.
 - Sie **blockiert** eine Anfrage an einen Cloud-Provider, wenn der Filter nicht laufen kann.
-- Sie liest englischen Text und sucht nach diesen Typen: `PERSON`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `CREDIT_CARD`,
-  `IBAN_CODE`, `IP_ADDRESS`, `US_SSN`, `LOCATION`, `NRP`, `MEDICAL_LICENSE`, `URL`.
+- Sie liest englischen Text und nennt keine eigenen Typen: Sie sucht nach den Standardtypen, die die installierte
+  Erkennung findet, mit deren Schwellenwerten. Das sind `PERSON`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `CREDIT_CARD`,
+  `IBAN_CODE`, `IP_ADDRESS`, `US_SSN`, `LOCATION`, `MEDICAL_LICENSE` und `URL`, mit dem älteren Profil
+  `presidio-legacy` außerdem `NRP` (Nationalität, Religion, politische Gruppe), das die lokalen Erkennungen nicht
+  finden. Das Richtlinienformular zeigt sie unter **Entitäten**, solange keine gewählt sind.
+
+Vor 0.6.0 nannte die Standardrichtlinie selbst elf Typen, darunter `NRP`, mit einem Schwellenwert für das ältere
+Profil. Die lokalen Erkennungen lehnen beides ab; mit einer davon wurde deshalb jede Anfrage an einen Cloud-Provider
+abgelehnt. Eine Installation, die diese Standardrichtlinie noch so hat, wie sie eingerichtet wurde, erhält beim Start
+die neue; eine Standardrichtlinie, die Sie geändert haben, bleibt, wie Sie sie gespeichert haben (siehe
+[Ein installiertes Erkennungsprofil übernehmen](#adopt-an-installed-detector-profile)).
 
 ### Wenn das Modul aus ist {#when-the-module-is-off}
 
@@ -52,6 +61,13 @@ Eine Richtlinie braucht das Modul, um zu laufen. Was ohne es geschieht, hängt d
 Das Ausschalten des Moduls entfernt eine gespeicherte Richtlinie also nicht stillschweigend. Beachten Sie: Wer sich
 auf die Standardrichtlinie verlässt und das Modul später ausschaltet, dessen Anfragen an Cloud-Provider werden
 nicht mehr maskiert. Speichern Sie eine Richtlinie für Ihre Organisation, wenn das nicht passieren darf.
+
+Solange das so ist, sehen Administratoren es oben auf jeder Verwaltungsseite, als Fehler, der sich nicht
+ausblenden lässt: *„PII ist aus: Anfragen an Cloud-Modelle gehen mit unmaskierten personenbezogenen Daten
+hinaus.“* Der Hinweis erscheint, sobald das zuvor eingeschaltete Modul aus ist, ein Cloud-Modell aktiviert ist und
+keine Richtlinie für Ihre Organisation gespeichert ist; er verschwindet, wenn das Modul wieder an ist
+(`faden module enable pii`), kein Cloud-Modell mehr aktiviert ist oder die Standardrichtlinie Cloud-Modelle nicht
+mehr prüft (dann ist das unmaskierte Senden Ihre Entscheidung).
 
 ??? info "Mehr zu Datumsangaben"
     Datumsangaben (`DATE_TIME`) stehen nicht auf der Liste. Fügen Sie sie hinzu, wenn auch Geburtsdaten erfasst
@@ -96,7 +112,7 @@ Eine **Mandantenrichtlinie** ersetzt die Standardrichtlinie für einen Mandanten
     | **Ausgehende Anfragen**: **Anfragen an Cloud-Anbieter schützen**, **Anfragen an lokale Modelle schützen** | Welche Anfragen geprüft werden. |
     | **Modus** | `redact`: Personenbezogene Daten werden durch einen Platzhalter wie `<PERSON>` ersetzt, und die Antwort behält ihn. `tokenize_reversible`: Jeder Wert wird durch ein Token wie `[PERSON_1]` ersetzt und in der Antwort, die der Benutzer sieht, wieder eingesetzt. Das Modell sieht die Daten in keinem der beiden Fälle. |
     | **Wenn die Erkennung fehlschlägt** | `block`: Die Anfrage wird abgelehnt. `allow`: Sie wird ungeprüft gesendet. `fallback_to_local`: Sie wird ungeprüft an eines Ihrer eigenen Modelle mit demselben Namen gesendet, falls es eines gibt, und sonst abgelehnt. |
-    | **Erkennung (Presidio)**: **Sprache**, **Schwellenwert**, **Entitäten** | Das installierte Profil, die Sprache und die Kategorien. **Schwellenwerte des Profils verwenden** übernimmt die Vorgaben des Profils. Ein höherer manueller Schwellenwert maskiert weniger. Wählen Sie nur angebotene Sprachen und verfügbare Kategorien; andernfalls schlägt die Prüfung fehl und **Wenn die Erkennung fehlschlägt** entscheidet. |
+    | **Erkennung (Presidio)**: **Sprache**, **Schwellenwert**, **Entitäten** | Das installierte Profil, die Sprache und die Kategorien. **Schwellenwerte des Profils verwenden** übernimmt die Vorgaben des Profils. Ein höherer manueller Schwellenwert maskiert weniger. **Entitäten** leer gelassen: die Standardtypen, die die installierte Erkennung findet. Wählen Sie nur angebotene Sprachen und verfügbare Kategorien; andernfalls schlägt die Prüfung fehl und **Wenn die Erkennung fehlschlägt** entscheidet. |
     | **Telemetrie**: **Personenbezogene Daten aus der Telemetrie entfernen**, **Modus** | Für Aufzeichnungen von Anfragen (Traces), die standardmäßig ausgeschaltet sind: ob ein Trace die Anfrage ohne personenbezogene Daten enthält (`sanitized`) oder nur Kennzahlen (`metrics_only`). Ohne Enterprise enthalten Traces ohnehin nur Kennzahlen. |
 
 ### Ein installiertes Erkennungsprofil übernehmen {#adopt-an-installed-detector-profile}
@@ -110,8 +126,11 @@ Mandanten-Overrides, die das Profil verwenden sollen:
 1. Prüfen Sie, ob das installierte Profil verfügbar ist. Eine Meldung über einen nicht verfügbaren Dienst bestätigt
    keinen aktiven Schutz.
 2. Wählen Sie unter **Erkennung (Presidio)** die Schaltfläche **Standardwerte des installierten Profils verwenden**.
-   Dadurch werden das installierte Profil und **Schwellenwerte des Profils verwenden** gewählt. Ihre Kategorien und
-   Einstellungen für ausgehende Anfragen bleiben erhalten.
+   Dadurch werden das installierte Profil und **Schwellenwerte des Profils verwenden** gewählt, und Kategorien, die
+   die installierte Erkennung nicht findet, werden entfernt. Ihre übrigen Kategorien und Einstellungen für ausgehende
+   Anfragen bleiben erhalten. Das Formular warnt, wenn der Schwellenwert oder eine Kategorie einer Richtlinie nicht zur
+   installierten Erkennung passt: Bis das Profil übernommen ist, werden die Anfragen, die die Richtlinie erfasst,
+   abgelehnt.
 3. Wählen Sie **Sprache**. Entfernen Sie Kategorien, die dafür nicht verfügbar sind, und ergänzen Sie unter
    **Entitäten** die benötigten Kategorien. Das Übernehmen des Profils wählt nicht automatisch alle Kategorien aus.
 4. Wählen Sie den Schutz für Cloud-Anfragen, lokale Modelle oder beides. Lassen Sie **Wenn die Erkennung fehlschlägt**
@@ -175,16 +194,30 @@ Die Erkennungsrate ist der Anteil der Prüfungen mit einem Fund, nicht der Antei
 
 2. Geben Sie unter **Name** eine Bezeichnung (für Sie) und unter **Tool-Muster** einen Tool-Namen oder ein
    Muster mit `*` ein, z. B. `mcp.github.*`, `knowledge_search` oder `*`.
-3. Wählen Sie die **Aktion**: **Sperren**, **Erst nachfragen** (der Benutzer gibt jeden Aufruf frei) oder **Erlauben**.
+3. Wählen Sie die **Aktion**: **Sperren** oder **Erst nachfragen** (der Benutzer gibt jeden Aufruf frei).
    Eine Regel gilt auch für die Tools, die die App eines Agenten selbst ausführt, etwa die Tools des Browser- und
    der Office-Agenten: Die App fragt jedes Mal, egal was der Benutzer vorher erlaubt hat, und einer App, die nicht
    fragen kann, wird das Tool nicht angeboten.
 4. Schreiben Sie die **Nachricht an den Nutzer**: Das wird Benutzern mitgeteilt, wenn die Regel greift.
-5. Legen Sie die **Priorität** fest. Niedrigere Werte werden zuerst geprüft, und die erste passende Regel
-   entscheidet. So kann eine Regel mit einer niedrigeren Zahl eine Ausnahme von einer allgemeineren Regel bilden.
+5. Legen Sie die **Priorität** fest. Sie ordnet Regeln mit derselben Aktion: Passen mehrere davon, liefert die mit
+   der niedrigsten Zahl die Nachricht.
 6. Speichern Sie die Regel. Regeln greifen sofort.
 
 Ohne Regeln laufen Tools so, wie es der Tool-Modus vorgibt.
+
+### Wenn mehrere Regeln passen {#when-several-rules-match}
+
+**Sperren** gewinnt vor **Erst nachfragen**, unabhängig von der Priorität. Um einige Tools von einer Regel
+**Sperren** auszunehmen, fassen Sie deren Muster enger: Sperren Sie `mcp.github.delete_*` statt `mcp.github.*`.
+Soll ein Tool ohne Nachfrage laufen, geben Sie ihm eine Tool-Klasse (siehe
+[Tool-Klassen und Tool-Modi](#tool-classes-and-tool-modes)).
+
+### Regeln „Erlauben“ aus früheren Versionen {#allow-rules}
+
+Frühere Versionen boten auch **Erlauben** an. Es konnte keine Ausnahme von einer Regel **Sperren** oder **Erst
+nachfragen** bilden und änderte für sich allein nichts; neue Regeln können deshalb nicht mehr erlauben. Damit
+angelegte Regeln stehen weiter in der Liste, markiert mit **Ohne Wirkung**: Ändern Sie sie auf **Sperren** oder
+**Erst nachfragen**, oder löschen Sie sie.
 
 ### Tool-Klassen und Tool-Modi {#tool-classes-and-tool-modes}
 
@@ -211,6 +244,8 @@ Die eigenen Tools von Fadenstack (die Suche in der Wissensdatenbank, die Uhrzeit
 
 ### Grenzen für den Tool-Modus {#tool-mode-limits}
 
+<span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span>
+
 Mit Enterprise legt **Agenten → Governance → Grenzen für den Tool-Modus** den höchsten Tool-Modus fest, den ein
 Chat haben darf, für **Alle**, **Ein Team**, **Einen Agenten** oder **Eine Person**: Wählen Sie unter **Für**, für
 wen, wählen Sie das Team, den Agenten oder die Person, dann **Höchstens**, und wählen Sie **Grenze setzen**.
@@ -234,6 +269,10 @@ Lizenz gültig ist.
 abgelehnte Text selbst wird nie gespeichert, nur ein mit einem Schlüssel gebildeter Fingerabdruck: Derselbe Text,
 zweimal abgelehnt, zeigt denselben Wert, und niemand kann den Text daraus zurückgewinnen.
 
+### Laufende Freigaben auf Zeit {#running-grants}
+
+**Agenten → Governance → Freigaben auf Zeit** listet die Freigaben auf Zeit auf, die gerade laufen. Eine solche Freigabe erteilt ein Benutzer einem Agenten auf einem seiner Geräte für eine begrenzte Zeit: entweder für ein einzelnes Tool (**Für eine Zeit**) oder zum Lesen und Schreiben an benannten Orten (**Gemeinsam arbeiten**), sodass läuft, was sonst nachfragen würde. Sie gilt nie für zerstörende oder nicht klassifizierte Tools und nie für das, was eine Regel **Erst nachfragen** oder ein als **Immer nachfragen** markiertes Tool abdeckt. Jede Zeile zeigt die Person, den Agenten, was die Freigabe abdeckt, die Restzeit und die Zahl der genutzten Aufrufe. **Widerrufen** beendet eine Freigabe ab dem nächsten Aufruf des Agenten; ein Aufruf, der bereits läuft, läuft noch zu Ende. Benutzer können ihre eigenen in den **Einstellungen → Freigaben** des Agenten beenden. Eine Freigabe endet außerdem mit ihrer Zeit und sobald der Agent eine neue Version erhält.
+
 ## Was Benutzer sehen, wenn etwas gestoppt wird {#what-people-see-when-something-is-stopped}
 
 | Was geschehen ist | Im Chat |
@@ -242,6 +281,7 @@ zweimal abgelehnt, zeigt denselben Wert, und niemand kann den Text daraus zurüc
 | Ein Tool braucht eine Freigabe | „… möchte ausgeführt werden“, mit **Zulassen** und **Ablehnen**. Kommt innerhalb von fünf Minuten keine Antwort, wird der Aufruf nicht ausgeführt (**Abgelaufen**). |
 | Eine gespeicherte Richtlinie gilt, aber das PII-Modul läuft nicht, und die Richtlinie blockiert | Die Antwort schlägt fehl mit „A PII policy is set for this workspace, but the PII module is not running, so nothing was sent.“ |
 | Der Filter für personenbezogene Daten konnte nicht laufen, und die Richtlinie blockiert | Die Antwort schlägt fehl mit „PII service unavailable and fail_action=block.“ An das Modell wurde nichts gesendet. |
+| Die Richtlinie passt nicht zur installierten Erkennung (ein Schwellenwert für das ältere Profil oder eine Kategorie, die sie nicht findet), und die Richtlinie blockiert | Die Antwort schlägt fehl mit „The PII policy does not fit the installed PII detector (…), so nothing was sent.“ Übernehmen Sie das installierte Profil in der Richtlinie (siehe [oben](#adopt-an-installed-detector-profile)). |
 | Eine Eingabe wurde abgelehnt (Inhaltsrichtlinien, <span class="fs-planned">Geplant</span>) | Die Nachricht wird als **Nicht gesendet** markiert, mit der Nachricht der Richtlinie oder „Dies wurde durch eine Richtlinie Ihrer Organisation gestoppt.“ Nichts wird an ein Modell gesendet oder gespeichert. |
 | Eine Antwort wurde abgelehnt (Inhaltsrichtlinien, <span class="fs-planned">Geplant</span>) | Die Antwort bricht ab und wird als **Antwort zurückgehalten** markiert. |
 

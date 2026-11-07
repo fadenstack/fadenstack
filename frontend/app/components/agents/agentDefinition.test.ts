@@ -9,6 +9,7 @@ import {
   definitionOf,
   definitionProblems,
   maxRunningSessionsOf,
+  neverOnRiskyTool,
   parseAgentImport,
   piiModeSwitch,
   serverToolsMode,
@@ -68,6 +69,48 @@ describe("agent definitions", () => {
     const definition = { ...EMPTY_DEFINITION, host_tool_contract: [{ name: "a" }, { name: " a" }] };
     expect(definitionProblems(definition)).toEqual(["agents.definition.problem_duplicate_tools"]);
     expect(definitionProblems(EMPTY_DEFINITION)).toEqual([]);
+  });
+
+  it("keep a tool's place whole: argument and kind together, the argument a pointer", () => {
+    const withTool = (tool: object) => ({ ...EMPTY_DEFINITION, host_tool_contract: [{ name: "open", ...tool }] });
+    const place = { target_argument: " /path ", target_type: "document" as const };
+    expect(cleanDefinition(withTool(place)).host_tool_contract).toEqual([
+      { name: "open", target_argument: "/path", target_type: "document" },
+    ]);
+    expect(definitionProblems(withTool(place))).toEqual([]);
+    const key = "agents.definition.problem_place_incomplete";
+    expect(definitionProblems(withTool({ target_type: "folder" }))).toEqual([key]);
+    expect(definitionProblems(withTool({ target_argument: "/path" }))).toEqual([key]);
+    expect(definitionProblems(withTool({ target_argument: "path", target_type: "site" }))).toEqual([key]);
+  });
+
+  it("hold the agent's default and highest tool mode: Ask up to Auto unless set (sdk/38 §5)", () => {
+    expect(definitionOf({ ...VERSION, approvals: undefined } as unknown as AgentVersion).approvals).toEqual({
+      default_level: "ask",
+      max_level: "auto",
+    });
+    const odd = { ...VERSION, approvals: { default_level: "bypass", max_level: "auto", standing: null } };
+    expect(definitionOf(odd as unknown as AgentVersion).approvals).toEqual({ default_level: "ask", max_level: "auto" });
+    const above = { ...EMPTY_DEFINITION, approvals: { default_level: "auto" as const, max_level: "ask" as const } };
+    expect(definitionProblems(above)).toEqual(["agents.definition.problem_default_above_max"]);
+    const research = { ...EMPTY_DEFINITION, approvals: { default_level: "read_only" as const, max_level: "ask" as const } };
+    expect(definitionProblems(research)).toEqual([]);
+    expect(changedFields(EMPTY_DEFINITION, research)).toEqual(["approvals"]);
+    expect(parseAgentImport('{"approvals": {"default_level": "read_only", "max_level": "ask"}}').definition.approvals).toEqual(
+      research.approvals,
+    );
+  });
+
+  it("refuse Never ask on a tool that is neither read nor write (sdk/38 D7)", () => {
+    const tools = (risk?: "read" | "write" | "destructive") => ({
+      ...EMPTY_DEFINITION,
+      host_tool_contract: [{ name: "update_page", approval: "never" as const, ...(risk ? { risk } : {}) }],
+    });
+    expect(definitionProblems(tools("read"))).toEqual([]);
+    expect(definitionProblems(tools("write"))).toEqual([]);
+    expect(definitionProblems(tools("destructive"))).toEqual(["agents.definition.problem_never_risky"]);
+    expect(definitionProblems(tools())).toEqual(["agents.definition.problem_never_risky"]);
+    expect(neverOnRiskyTool({ name: "x", risk: "destructive", approval: "always" })).toBe(false);
   });
 
   it("keep the SDKs' UI settings and the gateway tools in their own shapes", () => {

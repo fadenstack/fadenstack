@@ -4,13 +4,14 @@ from pathlib import Path
 
 import sentry_sdk
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 
 from faden_gateway.log import configure_logging
-from faden_gateway.services.gateway.errors import GatewayError, error_from
+from faden_gateway.services.gateway.errors import GatewayError, error_from, unreadable_request
 from faden_gateway.settings import settings
 from faden_gateway.web.api.router import api_router, public_router
 from faden_gateway.web.lifespan import lifespan_setup
@@ -56,6 +57,11 @@ def get_app() -> FastAPI:
     async def gateway_error_handler(request: Request, exc: GatewayError) -> Response:
         del request
         return error_from(exc)
+
+    @app.exception_handler(RequestValidationError)
+    async def unreadable_request_handler(request: Request, exc: RequestValidationError) -> Response:
+        del request
+        return unreadable_request(exc)
 
     # Main router for the API.
     app.include_router(router=api_router, prefix="/api")

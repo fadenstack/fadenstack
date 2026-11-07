@@ -14,6 +14,7 @@ import { hasFeature } from "~/api/about";
 import { TOOL_MODE_CEILINGS } from "~/api/toolCeilings";
 import { PageHeader } from "~/components/dashboard/kit";
 import { DecisionsTable } from "~/components/governance/DecisionsTable";
+import { GrantsTable } from "~/components/governance/GrantsTable";
 import { ToolCeilingsTable } from "~/components/governance/ToolCeilingsTable";
 import { ToolClassesTable } from "~/components/governance/ToolClassesTable";
 import { ToolRulesTable } from "~/components/governance/ToolRulesTable";
@@ -25,6 +26,7 @@ const TABS = {
   classes: ToolClassesTable,
   limits: ToolCeilingsTable,
   decisions: DecisionsTable,
+  grants: GrantsTable,
 } as const;
 type GovernanceTab = keyof typeof TABS;
 const ALL_TABS = Object.keys(TABS) as GovernanceTab[];

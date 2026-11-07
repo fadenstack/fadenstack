@@ -341,9 +341,19 @@
       "title": "Panel de Costos",
       "description": "Costo, uso y velocidad de las solicitudes que atendió el gateway. Los costos son estimaciones a partir de los precios que usted define; no afectan a la facturación.",
       "action_overview": "Gasto, solicitudes, tokens, latencia y errores de 7 a 90 días",
-      "action_requests": "Explorar las solicitudes, filtrar por modelo o usuario, y abrir una para ver su pipeline",
+      "action_requests": "Explorar las solicitudes, filtrar por modelo y abrir una para ver su pipeline",
       "action_pricing": "Definir los precios por millón de tokens",
       "action_export": "Exportar los datos en CSV"
+    },
+    "usage": {
+      "title": "Uso",
+      "description": "Lo que la instancia usó de los modelos, por grupo de uso, agente, modelo y proveedor. Cada cifra abarca al menos el tamaño mínimo de grupo; nada nombra ni clasifica a una sola persona.",
+      "action_totals": "Solicitudes, tokens y coste estimado de 7 días a 12 meses, por hora, día o mes",
+      "action_groups": "Agrupar por grupo de uso, agente, modelo o proveedor; los grupos por debajo del tamaño mínimo cuentan en una fila, \"Menos de ... personas\"",
+      "action_small": "Un aviso advierte cuando menos personas que el tamaño mínimo de grupo usan la instancia: sus totales cuentan entonces como datos personales",
+      "action_people": "Los auditores de uso, con el informe por persona activado, ven cifras por persona tras indicar un motivo; cada consulta se registra",
+      "action_settings": "Configuración → Uso y privacidad fija el tamaño mínimo de grupo, los plazos de conservación, los límites y el informe por persona",
+      "action_tree": "Equipos en árbol: abra un equipo para ver sus subequipos, tal como se registró o en la estructura actual"
     },
     "logs": {
       "title": "Logs y auditoría",
@@ -362,7 +372,7 @@
       "title": "Llamadas LLM",
       "description": "Cada llamada a través del gateway: encuentre la que falló, vea por qué y vea a dónde se enrutan las llamadas.",
       "action_find": "Acote la lista por hora, modelo, resultado o cualquier id; pulse Errores para ver solo los fallos",
-      "action_inspect": "Abra una llamada para ver su diagnóstico, cronología, conversación y todos los campos registrados; j y k pasan de una a otra",
+      "action_inspect": "Abra una llamada para ver su diagnóstico, cronología, llamadas relacionadas y campos registrados, nunca quién la envió; j y k pasan de una a otra",
       "action_routing": "Vea qué proveedores atendieron cada modelo, con errores y latencia p95",
       "action_live": "Las llamadas nuevas llegan cada pocos segundos; pause para leer y copie el enlace de una llamada para compartirla"
     },
@@ -476,7 +486,8 @@
       "title": "Grupos",
       "description": "Un grupo da roles a sus miembros y agrupa su uso en los informes.",
       "action_create": "Crear un grupo con sus roles",
-      "action_members": "Añadir o quitar miembros"
+      "action_members": "Añadir o quitar miembros",
+      "action_tree": "Colocar un grupo por debajo de otro, darle un centro de coste o archivar uno que terminó"
     },
     "api_tokens": {
       "title": "Tokens de API",
@@ -626,10 +637,18 @@
     },
     "settings": {
       "title": "Configuración",
-      "description": "La configuración de todo el sistema, en tres pestañas.",
+      "description": "Ajustes de todo el sistema, en cuatro pestañas.",
       "action_general": "General: todos los ajustes del sistema, con búsqueda, y el token de Hugging Face",
       "action_modules": "Módulos: activar o desactivar los módulos opcionales, con sus ajustes",
+      "action_usage": "Uso y privacidad: quién ve las cifras de uso, cuánto tiempo se conservan, los límites de la instancia y la declaración de configuración",
       "action_appearance": "Apariencia: el color de acento"
+    },
+    "settings_mail": {
+      "title": "Correo",
+      "description": "Cómo envía este servidor el correo (restablecimientos de contraseña, códigos, alertas para administradores) a través del servidor de correo de su organización.",
+      "action_server": "Servidor de correo e inicio de sesión: una contraseña, Microsoft 365 o un relay sin inicio de sesión",
+      "action_test": "Enviar un correo de prueba con el formulario tal como está, y luego guardar",
+      "action_state": "Estado del correo: si sale el correo, cuántos esperan y el último fallo en palabras"
     },
     "profile": {
       "title": "Mi Perfil",
@@ -654,6 +673,16 @@
       "action_verdict": "Lea el veredicto y lo que encontró cada capa: marca de agua, credenciales de contenido, metadatos, recibos y registros",
       "action_download": "Descargue el resultado firmado, como archivo JSON",
       "action_public": "Ofrezca la comprobación de imágenes y archivos a personas sin cuenta en Configuración > Módulos > Procedencia"
+    },
+    "budgets": {
+      "title": "Presupuestos",
+      "description": "Límites de tokens o de dinero por día, semana o mes para la organización, los equipos, los agentes y, una vez activados, personas individuales; con avisos, una previsión y la imputación de costes.",
+      "action_list": "Cada presupuesto muestra cuánto se ha usado en este periodo, cuándo se agota a este ritmo y sus advertencias",
+      "action_create": "Nuevo presupuesto: elija a qué se aplica (un equipo del árbol), tokens o dinero, el importe, el periodo y el modo",
+      "action_modes": "Estricto rechaza al agotarse; Flexible solo avisa; Simulación cuenta lo que habría rechazado",
+      "action_tree": "Una solicitud necesita margen en cada presupuesto que se aplica; el presupuesto de un equipo no puede superar al de arriba",
+      "action_chargeback": "Imputación de costes: un mes por equipo o centro de coste, como estimación interna, con descarga CSV",
+      "action_settings": "Configuración: presupuestos para personas individuales (modo root) y grupos de uso a partir de centros de coste"
     }
   }
 }

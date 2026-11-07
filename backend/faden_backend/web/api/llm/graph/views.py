@@ -91,11 +91,9 @@ def _call_filters(
     q: str | None = Query(None, max_length=256),
     model_alias: str | None = Query(None, max_length=256),
     outcome: Literal["ok", "error"] | None = Query(None),
-    user_id: str | None = Query(None, max_length=128),
-    agent_id: str | None = Query(None, max_length=64),
-    session: str | None = Query(None, max_length=128),
     min_latency_ms: int | None = Query(None, ge=0),
 ) -> CallFilters:
+    """The explorer's filters; none by agent, session or conversation (``services/llm/calls_service.py``)."""
     end = end or datetime.now(tz=UTC)
     start = start or end - CALLS_DEFAULT_WINDOW
     if start >= end:
@@ -103,8 +101,7 @@ def _call_filters(
     if end - start > CALLS_MAX_RANGE:
         raise HTTPException(status_code=400, detail="The time range cannot exceed 90 days")
     return CallFilters(
-        start=start, end=end, q=q, model_alias=model_alias, outcome=outcome,
-        user_id=user_id, agent_id=agent_id, session=session, min_latency_ms=min_latency_ms,
+        start=start, end=end, q=q, model_alias=model_alias, outcome=outcome, min_latency_ms=min_latency_ms,
     )
 
 

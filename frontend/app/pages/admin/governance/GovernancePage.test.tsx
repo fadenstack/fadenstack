@@ -44,6 +44,18 @@ const RULE: ToolRule = {
   enabled: true,
   created_at: null,
   updated_at: null,
+  no_effect: false,
+};
+
+/** A rule made before allow was taken out. */
+const OLD_ALLOW: ToolRule = {
+  ...RULE,
+  id: "r-old",
+  name: "GitHub is fine",
+  tool_pattern: "mcp.github.*",
+  action: "allow",
+  message: "GitHub tools may run.",
+  no_effect: true,
 };
 
 const open = (tab: string) =>
@@ -80,6 +92,57 @@ describe("GovernancePage", () => {
       ),
     );
     expect(api.toolRules.list).toHaveBeenCalledTimes(2);
+  });
+
+  it("says on the rules tab and in the rule editor that a deny wins whatever the priority", async () => {
+    open("rules");
+    expect(await screen.findByText(/When several rules match, Deny wins over Ask first, whatever the priority/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Add rule" }));
+    expect(within(await screen.findByRole("dialog")).getByText(/Deny always wins over Ask first\./)).toBeInTheDocument();
+  });
+
+  it("makes rules that deny or ask first, and no allow rules", async () => {
+    open("rules");
+    await userEvent.click(await screen.findByRole("button", { name: "Add rule" }));
+    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("combobox", { name: "Action" }));
+    const options = await screen.findAllByRole("option");
+    expect(options.map((o) => o.textContent)).toEqual(["Deny", "Ask first"]);
+  });
+
+  it("lists an older allow rule as having no effect, and saves it only as a deny or ask first", async () => {
+    api.toolRules.list.mockResolvedValue([RULE, OLD_ALLOW]);
+    api.toolRules.update.mockResolvedValue({ ...OLD_ALLOW, action: "approval_required", no_effect: false });
+    open("rules");
+
+    const row = (await screen.findByText("mcp.github.*")).closest("tr")!;
+    expect(within(row).getByText("Allow")).toBeInTheDocument();
+    expect(within(row).getByText("No effect")).toBeInTheDocument();
+    const denyRow = screen.getByText("mcp.github.delete_*").closest("tr")!;
+    expect(within(denyRow).queryByText("No effect")).not.toBeInTheDocument();
+
+    await userEvent.click(within(row).getByRole("button", { name: "Edit" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/Allow is gone: it changed nothing/)).toBeInTheDocument();
+    const save = within(dialog).getByRole("button", { name: "Save" });
+    expect(save).toBeDisabled();
+
+    await userEvent.click(within(dialog).getByRole("combobox", { name: "Action" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Ask first" }));
+    expect(within(dialog).queryByText(/Allow is gone/)).not.toBeInTheDocument();
+    await userEvent.click(save);
+
+    await waitFor(() =>
+      expect(api.toolRules.update).toHaveBeenCalledWith(
+        "r-old",
+        expect.objectContaining({ tool_pattern: "mcp.github.*", action: "approval_required" }),
+      ),
+    );
+  });
+
+  it("keeps the first match for tool classes", async () => {
+    open("classes");
+    await userEvent.click(await screen.findByRole("button", { name: "Add class" }));
+    expect(within(await screen.findByRole("dialog")).getByText(/the first rule that matches decides/)).toBeInTheDocument();
   });
 
   it("removes a rule after a confirmation", async () => {

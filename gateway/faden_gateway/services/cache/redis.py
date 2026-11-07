@@ -67,7 +67,8 @@ class RedisCache:
     ) -> str:
         async with Redis(connection_pool=self._pool) as redis:
             result = await cast(Any, redis.eval(script, num_keys, *args))
-            return str(result)
+            # A script's string reply comes as bytes: its text, not "b'...'" (the caps' script answers so).
+            return result.decode() if isinstance(result, bytes) else str(result)
 
     # ── lifecycle ─────────────────────────────────────────────
 

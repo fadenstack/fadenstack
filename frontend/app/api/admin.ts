@@ -867,6 +867,12 @@ export interface Group {
   member_count: number;
   /** Who keeps the team: absent or null, an administrator; `provider:<key>`, that sign-in provider. */
   source?: string | null;
+  /** The team above it; null for a top team (one parent; a path has at most six teams). */
+  parent_id?: string | null;
+  /** A finance code, free text up to 64 characters. */
+  cost_center?: string | null;
+  /** When the team was archived (it keeps its history; no new members; not a home team); null while active. */
+  archived_at?: string | null;
 }
 
 /** The provider that keeps a team (`provider:<key>` → `<key>`), or null for an administrator's. */

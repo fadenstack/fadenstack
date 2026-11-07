@@ -127,4 +127,15 @@ describe("AgentAppsPanel", () => {
     show(appsReviewFixture({ apps: [APP], tools: [toolReviewFixture("read_range", { status: "same", in_contract: true })] }));
     expect(screen.getByText("Version 1 has everything the apps bring.")).toBeInTheDocument();
   });
+
+  it("names who reported an app only when it was the viewer", () => {
+    show(
+      appsReviewFixture({
+        apps: [APP, appSeenFixture({ name: "Word add-in", last_user_id: null, last_user_label: null })],
+        tools: [toolReviewFixture("read_range", { status: "same", in_contract: true })],
+      }),
+    );
+    expect(screen.getByText("jane@plant.example")).toBeInTheDocument();
+    expect(screen.getByText("Not shown")).toBeInTheDocument();
+  });
 });

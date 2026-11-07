@@ -30,7 +30,7 @@ Fadenstack bewahrt Ihre Chats auf, bis sie gelöscht werden. Siehe [Löschen](#d
 |---|---|
 | Sie | Ihre Chats, Projekte, Dateien und Skills |
 | Kolleginnen und Kollegen | Keinen Ihrer Chats und keine Ihrer Dateien. Skills, die Sie mit ihnen teilen. Die Wissensdatenbank der Organisation teilen sich alle |
-| Administratoren, in der Konsole | Dass ein Chat, ein Projekt oder eine Datei existiert (wer, wann), nicht Titel, Namen oder Inhalt. Größen und Typen Ihrer Dateien. Ihre Nutzung. Welche Tools liefen und die Art eines Fehlers, nicht die Antwort des Tools. Wie oft personenbezogene Daten gefunden wurden, nicht die Daten selbst. Jeden Skill, auch private. Was sie sich in der Konsole ansehen, wird im Audit-Protokoll festgehalten |
+| Administratoren, in der Konsole | Dass ein Chat, ein Projekt oder eine Datei existiert (wer, wann), nicht Titel, Namen oder Inhalt. Größen und Typen Ihrer Dateien. Die Nutzung in Summen für Gruppen, nie Ihre allein; die Anfragen, die sie ansehen, nennen nicht, wer sie gesendet hat (siehe [Ihre Nutzung](#your-usage)). Welche Tools liefen und die Art eines Fehlers, nicht die Antwort des Tools. Wie oft personenbezogene Daten gefunden wurden, nicht die Daten selbst. Jeden Skill, auch private. Was sie sich in der Konsole ansehen, wird im Audit-Protokoll festgehalten |
 
 Die Konsole zeigt Administratoren Ihre Unterhaltungen nicht. Die Personen, die den Server betreiben, haben jedoch den Schlüssel, mit dem die Chats verschlüsselt sind. Nutzen Sie den Chat deshalb wie die E-Mail Ihrer Organisation: privat gegenüber Kolleginnen und Kollegen, aber innerhalb der IT Ihrer Organisation.
 
@@ -80,6 +80,18 @@ Ihr Administrator kann neben den eigenen Modellen Ihrer Organisation auch Modell
 
 Die Modellliste zeigt nicht immer, wo ein Modell läuft. Wenn das für das, was Sie schreiben, wichtig ist, fragen Sie Ihren Administrator, oder wählen Sie ein Modell, von dem Sie wissen, dass es innerhalb Ihrer Organisation läuft. Siehe [Externe Provider](../administer/providers.md).
 
+## Ihre Nutzung {#your-usage}
+
+**Meine Nutzung**, im Menü hinter Ihrer Konto-Schaltfläche, zeigt, wie viel Sie genutzt haben: Ihre Tokens und geschätzten Kosten nach Tag oder Monat, nach Modell, Agent und Projekt, und die Limits, die für alle gelten. Unter **Ihre Daten** liefern **Als JSON herunterladen** und **Als CSV herunterladen** Ihre Daten: Ihre täglichen Zahlen, Ihre Einträge zu Anfragen (Zeit, Modell, Tokens, Kosten, Ergebnis; nie, was Sie geschrieben haben) und wann jemand Ihre Zahlen angesehen hat und warum.
+
+- **Sie** sehen Ihre eigenen Zahlen.
+- **Administratoren** sehen Summen für Gruppen von mindestens fünf Personen, nie Ihre Zahlen allein. Gehen sie einer fehlgeschlagenen Anfrage nach, zeigt deren Eintrag nicht, wer sie gesendet hat.
+- **Hat Ihre Organisation die personenbezogene Auswertung eingeschaltet**, steht das unter **Meine Nutzung**. Dann dürfen einige benannte Personen Ihre Zahlen ansehen, nach Tag oder nach Monat, jedes Mal mit Begründung. **Meine Nutzung** zeigt, wie oft das geschah; Ihr Download zeigt Datum und Grund jeder Einsicht, nicht, wer hineingesehen hat.
+
+Ihre Zahlen werden so lange aufbewahrt, wie **Meine Nutzung** angibt (90 Tage, wenn Ihre Organisation nichts anderes gewählt hat), und mit Ihrem Konto gelöscht. Ihre Organisation verwendet sie für Kosten und Kapazität, nicht, um Ihre Arbeit zu beurteilen; hat sie Datenschutzhinweise für Beschäftigte, verlinkt **Meine Nutzung** darauf. Siehe [Nutzung und Datenschutz](../administer/usage-privacy.md).
+
+Hält ein Limit eine Anfrage an, nennt die Meldung das Limit, etwa das Tageslimit der Instanz für Tokens. Fragen Sie Ihren Administrator, wenn Sie mehr brauchen.
+
 ## Tools und die Wissensdatenbank {#tools-and-the-knowledge-base}
 
 - Ein Tool, das Ihr Administrator angebunden hat, erhält, was das Modell ihm übergibt, oft einen Suchbegriff oder Text aus Ihrer Unterhaltung. Ihr Administrator legt pro Dienst fest, wie personenbezogene Daten in diesen Aufrufen behandelt werden. Siehe [Tools im Chat](tools.md).
@@ -105,7 +117,7 @@ solcher Link teilt der Website mit, wo er angeklickt wurde (z. B. `ref=console-a
 Organisation oder diesen Server, öffnet sich in einem neuen Tab und gibt die Adresse der Seite, von der Sie kommen,
 nicht weiter. Gesendet wird nur etwas, wenn Sie einen anklicken.
 
-Mit Enterprise können Administratoren die Links der Konsole entfernen (die Anmeldeseite, **Über Fadenstack**,
+<span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span> Mit Enterprise können Administratoren die Links der Konsole entfernen (die Anmeldeseite, **Über Fadenstack**,
 die Versionshinweise unter **Updates**): **Einstellungen → Erscheinungsbild → Show links to fadenstack.com**.
 
 ## Wenn es nicht funktioniert {#when-it-does-not-work}

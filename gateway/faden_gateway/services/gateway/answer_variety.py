@@ -18,6 +18,10 @@ untouched; only the last message changes, so vLLM's prefix cache holds up to it.
 - :func:`split` says how many answers a whole answer with ``n`` above 1 is asked for one by one, each with
   its own variation (:func:`merged` joins them); a streamed one is refused (``StreamedChoicesError``):
   its choices would share one stream and one receipt.
+- :func:`strip_payload` and :func:`strip_sse` take the variation out of the answer again: asked to repeat a
+  message word for word, a model repeats it too (the 27B on the release server, 2026-10-31), and the person
+  would carry invisible characters into whatever they paste the answer into. Before the receipt is signed,
+  so it covers the answer the client gets.
 
 Only for a route whose runtime watermarks the answer and that is not asked to decode greedily
 (``text_receipts.watermarks``): any other answers as it always did.
@@ -25,15 +29,21 @@ Only for a route whose runtime watermarks the answer and that is not asked to de
 
 from __future__ import annotations
 
+import json
 import random
+import re
 import secrets
+from collections.abc import AsyncIterator
 from typing import Any
 
 from faden_gateway.services.gateway import text_receipts
+from faden_gateway.services.gateway.usage import add_usage
 
-#: Word joiner and zero-width space: invisible, never in what the model said back (measured), and not the
-#: Unicode marker's own characters (U+FEFF and the variation selectors).
+#: Word joiner and zero-width space: invisible, and not the Unicode marker's own characters (U+FEFF and the
+#: variation selectors). A model may say them back (:func:`strip_payload`).
 _INVISIBLE = ("\u2060", "\u200b")
+#: The variation said back: two or more of its characters in a row. One alone may be the answer's own.
+_SAID_BACK = re.compile("[" + "".join(_INVISIBLE) + "]{2,}")
 #: How many of them: 64 variations, one of which repeats a request's by chance once in 64.
 _LENGTH = 6
 #: The roles whose message the variation may end: the client's turn, or a tool's answer to the model.
@@ -126,6 +136,128 @@ def one_of(payload: dict[str, Any], candidate: Any, index: int) -> dict[str, Any
     return vary({**payload, "n": 1}, candidate, index=index)
 
 
+def strip_text(text: str) -> str:
+    """*text* without the variation said back: runs of two or more of its characters."""
+    return _SAID_BACK.sub("", text) if text else text
+
+
+#: What a model writes that the person reads: the answer and a reasoning model's thinking.
+_FIELDS = ("content", "reasoning_content")
+
+
+def _strip_content(content: Any) -> Any:
+    if isinstance(content, str):
+        return strip_text(content)
+    if isinstance(content, list):
+        return [
+            {**part, "text": strip_text(part["text"])}
+            if isinstance(part, dict) and isinstance(part.get("text"), str) else part
+            for part in content
+        ]
+    return content
+
+
+def strip_payload(payload: Any) -> Any:
+    """A whole answer (every choice) without the variation said back."""
+    if not isinstance(payload, dict) or not isinstance(payload.get("choices"), list):
+        return payload
+    choices = []
+    for choice in payload["choices"]:
+        message = choice.get("message") if isinstance(choice, dict) else None
+        if isinstance(message, dict):
+            message = {**message, **{f: _strip_content(message[f]) for f in _FIELDS if f in message}}
+            choices.append({**choice, "message": message})
+        else:
+            choices.append(choice)
+    return {**payload, "choices": choices}
+
+
+class _Trail:
+    """One choice's streamed text whose end may be the start of a run: held until the run ends."""
+
+    def __init__(self) -> None:
+        self.pending = ""
+
+    def feed(self, text: str) -> str:
+        text = self.pending + text
+        end = len(text)
+        while end and text[end - 1] in _INVISIBLE:
+            end -= 1
+        ready, self.pending = text[:end], text[end:]
+        return strip_text(ready)
+
+    def flush(self) -> str:
+        rest, self.pending = self.pending, ""
+        return strip_text(rest)
+
+
+async def strip_sse(stream: AsyncIterator[bytes]) -> AsyncIterator[bytes]:
+    """A streamed answer (SSE) without the variation said back, also when it arrives split over events.
+
+    Events pass as they are, except for ``choices[].delta`` content and thinking; what is held goes out with
+    the event that ends its choice, or before ``[DONE]``.
+    """
+    trails: dict[tuple[int, str], _Trail] = {}
+    last: dict[str, Any] = {}
+    buffer = b""
+    async for chunk in stream:
+        buffer += chunk
+        while b"\n\n" in buffer:
+            event, buffer = buffer.split(b"\n\n", 1)
+            for out in _strip_event(event, trails, last):
+                yield out
+    if buffer.strip():
+        for out in _strip_event(buffer, trails, last):
+            yield out
+    for out in _held(trails, last):  # a stream that ended without [DONE]
+        yield out
+
+
+def _strip_event(event: bytes, trails: dict[tuple[int, str], _Trail], last: dict[str, Any]) -> list[bytes]:
+    text = event.decode("utf-8", errors="replace").strip()
+    if not text.startswith("data:"):
+        return [event + b"\n\n"]
+    data = text[len("data:"):].strip()
+    if data == "[DONE]":
+        return [*_held(trails, last), b"data: [DONE]\n\n"]
+    try:
+        body = json.loads(data)
+    except json.JSONDecodeError:
+        return [event + b"\n\n"]
+    if not isinstance(body, dict) or not isinstance(body.get("choices"), list):
+        return [event + b"\n\n"]
+    last.update({k: body[k] for k in ("id", "object", "created", "model") if k in body})
+    for choice in body["choices"]:
+        if isinstance(choice, dict):
+            _strip_choice(choice, trails)
+    return [f"data: {json.dumps(body)}\n\n".encode()]
+
+
+def _strip_choice(choice: dict[str, Any], trails: dict[tuple[int, str], _Trail]) -> None:
+    """One streamed choice's text and thinking, in place; what is held goes with the event that ends it."""
+    delta = choice.get("delta")
+    for field in _FIELDS:
+        trail = trails.setdefault((choice.get("index", 0), field), _Trail())
+        if isinstance(delta, dict) and isinstance(delta.get(field), str):
+            delta[field] = trail.feed(delta[field])
+        if choice.get("finish_reason") is not None and trail.pending:
+            if not isinstance(delta, dict):
+                delta = choice["delta"] = {}
+            delta[field] = (delta.get(field) or "") + trail.flush()
+
+
+def _held(trails: dict[tuple[int, str], _Trail], last: dict[str, Any]) -> list[bytes]:
+    """An event carrying what is still held, for each choice and field (single characters only by then)."""
+    out = []
+    for (index, field), trail in trails.items():
+        if trail.pending:
+            rest = trail.flush()
+            if rest:
+                choice = {"index": index, "delta": {field: rest}, "finish_reason": None}
+                out.append(f"data: {json.dumps({**last, 'choices': [choice]})}\n\n".encode())
+    return out
+
+
 def merged(payloads: list[dict[str, Any]]) -> dict[str, Any]:
     """The answers of a split request as one: their choices in order, their usage added up.
 
@@ -136,11 +268,10 @@ def merged(payloads: list[dict[str, Any]]) -> dict[str, Any]:
     for index, payload in enumerate(payloads):
         choice = (payload.get("choices") or [{}])[0]
         choices.append({**choice, "index": index})
-    usage: dict[str, int] = {}
+    usage: dict[str, Any] = {}
     for payload in payloads:
-        for key, value in (payload.get("usage") or {}).items():
-            if isinstance(value, int) and not isinstance(value, bool):
-                usage[key] = usage.get(key, 0) + value
+        # The cached and reasoning tokens in the ``*_details`` objects too.
+        add_usage(usage, payload.get("usage"))
     out = {**first, "choices": choices}
     if usage:
         out["usage"] = {**(first.get("usage") or {}), **usage}

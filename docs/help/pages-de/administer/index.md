@@ -57,8 +57,8 @@ Schritt; **Ausblenden** entfernt die Liste vom Dashboard. Sie bleibt unter **Hil
    Modell erreichen, und welche Tools ohne Rückfrage laufen dürfen: siehe
    [Richtlinien und personenbezogene Daten](policies.md).
 
-Danach zeigt Ihnen das [Dashboard](dashboard.md), was Aufmerksamkeit braucht, und [Nutzung und Kosten](usage.md)
-zeigt, wie viel genutzt wird und von wem. [Was mit einer Anfrage geschieht](requests.md) erklärt in einfachen
+Danach zeigt Ihnen das [Dashboard](dashboard.md), was Aufmerksamkeit braucht, und [Nutzung und Limits](usage.md)
+zeigt, wie viel genutzt wird, nach Team, Agent und Modell. [Was mit einer Anfrage geschieht](requests.md) erklärt in einfachen
 Worten, was Fadenstack mit jeder Nachricht macht, die Benutzer senden.
 
 ## Module {#modules}

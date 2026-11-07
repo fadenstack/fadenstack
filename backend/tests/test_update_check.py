@@ -235,6 +235,22 @@ async def test_each_core_container_is_measured_against_the_release() -> None:
     assert parts["faden-pii"].status == "stopped"
 
 
+async def test_the_pii_image_variant_is_read_as_its_release() -> None:
+    """``0.5.1-cpu`` (tag and label) is release 0.5.1: the Updates page said "unknown" for it."""
+    docker = _Docker(
+        [
+            _container("faden-pii", "ghcr.io/fadenstack/pii:0.4.1-cpu", "sha256:p"),
+            _container("faden-pii-worker", "registry.local/pii:0.4.0-gpu", "sha256:w"),
+            _container("faden-backend", "ghcr.io/fadenstack/backend:0.4.1-rocm", "sha256:b"),
+        ],
+        {"sha256:p": {versions.VERSION_LABEL: "0.4.1-cpu"}},
+    )
+    parts = {p.name: p for p in await versions.services(docker, "0.4.1")}
+    assert (parts["faden-pii"].running, parts["faden-pii"].status) == ("0.4.1", "current")
+    assert (parts["faden-pii-worker"].running, parts["faden-pii-worker"].status) == ("0.4.0", "mismatch")
+    assert parts["faden-backend"].status == "unknown", "only the image variants' suffix is taken off"
+
+
 class _Facts:
     def __init__(self, session: AsyncSession, docker: Any = None) -> None:
         self.now = NOW

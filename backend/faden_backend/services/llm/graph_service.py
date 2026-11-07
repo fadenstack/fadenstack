@@ -334,7 +334,7 @@ class LLMGraphService:
                     request_id=row["request_id"],
                     trace_id=row["trace_id"],
                     tenant_id=row["tenant_id"],
-                    user_id=row["user_id"],
+                    user_id=None,  # nobody is named in the trace (as in services/llm/calls_service.py)
                     model_alias=row["model_alias"],
                     provider_instance_id=(
                         str(row["provider_instance_id"]) if row["provider_instance_id"] is not None else None

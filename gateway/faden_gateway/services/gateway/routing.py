@@ -41,8 +41,24 @@ class RouterService:
     async def resolve_alias(
         self, *, alias: str, tenant_id: str,
     ) -> list[RoutedInstance]:
-        """Fetch route candidates or raise 404 if alias not available."""
+        """Fetch route candidates; 503 when the alias is there but its servers are down, else 404.
+
+        The 503 was a 404 "not available for this tenant" too, which reads as a question of access when
+        the tenant may use the model and its only provider is unreachable (the release VM, 2026-10-31).
+        """
         candidates = await self.dao.resolve_candidates(alias=alias, tenant_id=tenant_id)
+        if not candidates and await self.dao.alias_unreachable(alias=alias, tenant_id=tenant_id):
+            raise GatewayError(
+                status_code=503,
+                message=(
+                    f"The model '{alias}' is not reachable right now: none of its servers answers. "
+                    "Try again in a moment; an administrator sees which under Models."
+                ),
+                error_type="server_error",
+                code="model_unreachable",
+                param="model",
+                headers={"Retry-After": "30"},
+            )
         if not candidates:
             raise GatewayError(
                 status_code=404,

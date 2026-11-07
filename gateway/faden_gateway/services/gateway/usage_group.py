@@ -10,6 +10,14 @@ rather than failing the request.
 
 The same cache answers which groups a user is in, for the skills a chat may
 use: a skill shared with a group reaches its members (``memberships``).
+
+With the team comes its path, as it is at the time of use: its ancestors from
+the root down to the team itself. Usage is booked on it (the request log, the
+rollups), so a report shows usage as it was booked after a reorganisation, as
+Google Cloud's billing export records project ancestry at the time of usage.
+Teams form a tree once the backend has ``groups.parent_id``; until then a
+team's path is the team alone. Whether it has is asked again every few
+minutes until it has: the backend may be upgraded while the gateway runs.
 """
 
 from __future__ import annotations
@@ -18,6 +26,7 @@ import asyncio
 import logging
 import time
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 
 import asyncpg
@@ -33,6 +42,44 @@ Close = Callable[[], Awaitable[None]]
 
 _SQL = 'SELECT usage_group_id::text FROM "user" WHERE id = $1::uuid'
 _MEMBERSHIPS_SQL = "SELECT group_id::text FROM user_groups WHERE user_id = $1::uuid ORDER BY 1"
+#: Whether teams form a tree yet (the backend adds ``groups.parent_id``).
+_TREE_SQL = (
+    "SELECT EXISTS (SELECT 1 FROM information_schema.columns "
+    "WHERE table_schema = current_schema() AND table_name = 'groups' AND column_name = 'parent_id')"
+)
+#: How long "teams form no tree yet" is believed before it is asked again; "they do" is kept for good.
+TREE_RECHECK_SEC = 300.0
+#: The most levels a team's path holds, the team itself included.
+PATH_LEVELS = 6
+#: A team's path, root first: up its parents, at most ``PATH_LEVELS`` levels, stopping at a cycle (a team
+#: met twice). A team that is gone has no row: its path is the team alone. $2: ``PATH_LEVELS``.
+_PATH_SQL = """
+WITH RECURSIVE up(id, parent_id, depth, path) AS (
+    SELECT g.id, g.parent_id, 1, ARRAY[g.id] FROM groups g WHERE g.id = $1::uuid
+    UNION ALL
+    SELECT p.id, p.parent_id, up.depth + 1, ARRAY[p.id] || up.path
+    FROM up JOIN groups p ON p.id = up.parent_id
+    WHERE up.depth < $2::int AND p.id <> ALL(up.path)
+)
+SELECT path::text[] FROM up ORDER BY depth DESC LIMIT 1
+"""
+
+
+@dataclass(frozen=True, slots=True)
+class UsageTeam:
+    """The team a person's usage is booked on, and its path from the root down to it."""
+
+    group_id: str
+    path: tuple[str, ...]
+
+
+def usage_team(value: Any) -> UsageTeam | None:
+    """*value* as a ``UsageTeam``: a resolver may also answer with the team's id alone."""
+    if isinstance(value, UsageTeam):
+        return value
+    if isinstance(value, str) and value:
+        return UsageTeam(group_id=value, path=(value,))
+    return None
 
 
 class UsageGroupResolver(Generic[V]):
@@ -119,16 +166,46 @@ class UsageGroupResolver(Generic[V]):
 class BackendUserGroups:
     """``fetch`` over a small asyncpg pool on the backend database."""
 
-    def __init__(self, dsn: str, *, max_size: int = 2, timeout_sec: float = 2.0) -> None:
+    def __init__(
+        self,
+        dsn: str,
+        *,
+        max_size: int = 2,
+        timeout_sec: float = 2.0,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
         self._dsn = dsn
         self._max_size = max_size
         self._timeout = timeout_sec
+        self._clock = clock
         self._pool: asyncpg.Pool | None = None
         self._lock = asyncio.Lock()
+        #: Whether ``groups.parent_id`` exists: once it does, for good; until then asked again after
+        #: ``TREE_RECHECK_SEC`` (``_checked_at``: when it was last asked).
+        self._tree = False
+        self._checked_at: float | None = None
 
-    async def __call__(self, user_id: str) -> str | None:
+    async def __call__(self, user_id: str) -> UsageTeam | None:
+        """The user's usage team and its path; ``None`` without one."""
         pool = await self._get_pool()
-        return await pool.fetchval(_SQL, user_id, timeout=self._timeout)
+        group_id = await pool.fetchval(_SQL, user_id, timeout=self._timeout)
+        if not group_id:
+            return None
+        path = None
+        if await self._has_tree(pool):
+            path = await pool.fetchval(_PATH_SQL, group_id, PATH_LEVELS, timeout=self._timeout)
+        return UsageTeam(group_id=group_id, path=tuple(path) if path else (group_id,))
+
+    async def _has_tree(self, pool: asyncpg.Pool) -> bool:
+        """Whether teams form a tree: a yes is kept, a no believed for ``TREE_RECHECK_SEC``."""
+        if self._tree:
+            return True
+        now = self._clock()
+        if self._checked_at is not None and now - self._checked_at < TREE_RECHECK_SEC:
+            return False
+        self._tree = bool(await pool.fetchval(_TREE_SQL, timeout=self._timeout))
+        self._checked_at = now
+        return self._tree
 
     async def memberships(self, user_id: str) -> tuple[str, ...]:
         """The ids of the groups *user_id* is in."""
@@ -156,8 +233,8 @@ class BackendUserGroups:
 
 def build_user_resolvers(
     settings: object,
-) -> tuple[UsageGroupResolver[str] | None, UsageGroupResolver[tuple[str, ...]] | None]:
-    """``(usage group, group memberships)`` resolvers over the backend database.
+) -> tuple[UsageGroupResolver[UsageTeam] | None, UsageGroupResolver[tuple[str, ...]] | None]:
+    """``(usage team, group memberships)`` resolvers over the backend database.
 
     Both ``None`` when no backend database is configured. They share one small
     pool; closing the first closes it.
@@ -170,7 +247,7 @@ def build_user_resolvers(
         f"@{settings.db_host}:{settings.db_port}/{backend_db}"  # type: ignore[attr-defined]
     )
     fetch = BackendUserGroups(dsn)
-    usage: UsageGroupResolver[str] = UsageGroupResolver(fetch, close=fetch.close)
+    usage: UsageGroupResolver[UsageTeam] = UsageGroupResolver(fetch, close=fetch.close)
     # A minute, not five: being taken out of a group takes away the skills
     # shared with it, and that should not wait long.
     groups: UsageGroupResolver[tuple[str, ...]] = UsageGroupResolver(

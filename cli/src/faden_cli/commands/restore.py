@@ -32,7 +32,7 @@ from faden_cli.core.compose import (
 )
 from faden_cli.core.console import console, error, info, success, warning
 from faden_cli.core.settings import FadenConfig, load_config
-from faden_cli.commands.deploy import _sync_postgres_password
+from faden_cli.commands.deploy import _regenerate_rmq_definitions, _sync_postgres_password
 
 
 @click.command("restore")
@@ -154,10 +154,10 @@ def _restore_cmd(
     # however this ends. nginx holds none of the volumes a restore writes (it mounts the install's nginx/
     # and tls/ directories, read-only), so it can run through it.
     with maintenance.during(Path(str(ctx.project_dir)), reason="restore"):
-        result = _restore(ctx, cfg, source, db_only=db_only, skip_env=skip_env)
+        result, started = _restore(ctx, cfg, source, db_only=db_only, skip_env=skip_env)
 
     console.print()
-    success("Restore complete.")
+    _report_start(started)
     from faden_cli.core.backend_tool import record_event  # noqa: PLC0415
 
     record_event(
@@ -175,6 +175,20 @@ def _restore_cmd(
         console.print(f"  Volumes: {', '.join(result.volumes_restored)}")
     if result.tls_restored:
         console.print(f"  Certificate material: {len(result.tls_restored)} file(s); the machines still trust it")
+    if started != 0:
+        sys.exit(1)
+
+
+def _report_start(started: int) -> None:
+    """Whether everything came back: *started* is the exit code of starting it all again.
+
+    The data is back either way; `faden status` names what did not start. It used to say "Restore complete."
+    """
+    if started == 0:
+        success("Restore complete.")
+        return
+    error(f"The backup is restored, but not every service started (docker compose up exited with {started}).")
+    error("  See which with `faden status`, and why with `faden logs <service>`.")
 
 
 #: The front door, which keeps running (and serving the maintenance page) while everything else is restored.
@@ -183,8 +197,11 @@ _FRONT = "nginx"
 
 def _restore(
     ctx: ComposeContext, cfg: FadenConfig, backup_path: Path, *, db_only: bool, skip_env: bool
-) -> RestoreResult:
-    """Stop everything but nginx, restore, and start everything again; exits when the restore fails."""
+) -> tuple[RestoreResult, int]:
+    """Stop everything but nginx, restore, and start everything again; exits when the restore fails.
+
+    Returns what was restored and the exit code of starting everything again (0: all started).
+    """
     console.print("\n[bold cyan]Stopping application services…[/bold cyan]")
     names = service_names(ctx)
     # Stopped, not taken down: nginx is left alone, and the containers keep their volumes and networks.
@@ -214,6 +231,14 @@ def _restore(
             warning(note)
         info("Syncing Postgres password with restored .env…")
         _sync_postgres_password(ctx, env_path)
+        # RabbitMQ makes its users from definitions.json on every start; the services log in with the
+        # passwords in .env. The file still held those of the .env the restore replaced: RabbitMQ refused
+        # the backend and the gateway (ACCESS_REFUSED), and the install did not come back. `faden upgrade`
+        # writes it the same way.
+        from faden_cli.core.env_gen import read_env_file  # noqa: PLC0415
+
+        _regenerate_rmq_definitions(Path(str(ctx.project_dir)), read_env_file(env_path), cfg.profiles)
+        success("RabbitMQ users written from the restored .env.")
     # The provenance signer of a .env from before the module, or issued by an authority the restore replaced.
     if (result.env_restored or result.tls_restored) and ctx.env_file and ctx.project_dir:
         from faden_cli.core.provenance_keys import ensure_step as provenance_keys_step  # noqa: PLC0415
@@ -222,9 +247,9 @@ def _restore(
 
     # ── Restart all services ──────────────────────────────────
     console.print("\n[bold cyan]Restarting all services…[/bold cyan]")
-    compose_up(ctx, detach=True, wait=True, timeout=120)
+    started = compose_up(ctx, detach=True, wait=True, timeout=120)
     # nginx read the certificate and picked plain HTTP or HTTPS when it started; a restored one is
     # only served after it starts again.
     if result.tls_restored and _FRONT in names:
         compose_restart(ctx, services=[_FRONT])
-    return result
+    return result, started

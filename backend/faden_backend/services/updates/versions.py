@@ -10,6 +10,7 @@ flavor's default.
 from __future__ import annotations
 
 import logging
+import re
 import socket
 import tomllib
 from dataclasses import asdict, dataclass
@@ -74,13 +75,25 @@ class Part:
         return asdict(self)
 
 
+#: A variant's suffix after the release, in the tag and the version label alike: the PII image's
+#: ``0.5.1-cpu`` and ``0.5.1-gpu``. Read as the release, it showed "unknown" on the Updates page.
+_VARIANT = re.compile(r"-(?:cpu|gpu)$")
+
+
+def _release(text: str | None) -> str | None:
+    """The release *text* (a tag or a version label) names, a variant's suffix taken off; else ``None``."""
+    if not text:
+        return None
+    release = _VARIANT.sub("", text)
+    return release if release_feed.parse_version(release) is not None else None
+
+
 def _tag_version(image: str) -> str | None:
     """The version in an image reference's tag (``ghcr.io/fadenstack/gateway:0.4.1``)."""
     name = image.rsplit("@", 1)[0]
     if ":" not in name.rsplit("/", 1)[-1]:
         return None
-    tag = name.rsplit(":", 1)[1]
-    return tag if release_feed.parse_version(tag) is not None else None
+    return _release(name.rsplit(":", 1)[1])
 
 
 async def _own_project(docker: Any) -> str | None:
@@ -113,8 +126,7 @@ async def services(docker: Any, expected: str) -> list[Part]:
             except Exception:  # an image removed under its container
                 labels_by_image[image_id] = {}
         image_labels = labels_by_image[image_id]
-        label = image_labels.get(VERSION_LABEL)
-        running = label if release_feed.parse_version(label) else _tag_version(str(c.get("Image") or ""))
+        running = _release(image_labels.get(VERSION_LABEL)) or _tag_version(str(c.get("Image") or ""))
         if c.get("State") != "running":
             status = "stopped"
         elif running is None:

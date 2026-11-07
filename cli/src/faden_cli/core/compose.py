@@ -346,11 +346,49 @@ def stop_inactive_modules(ctx: ComposeContext) -> list[tuple[str, list[str]]]:
     return sorted(cleaned.items())
 
 
+#: Services that start only when their profile is asked for, which ``faden`` never does, by the profile. An
+#: earlier release started them with a module: up to 0.4.x ``faden-pii-worker`` was in profile ``pii``, since
+#: 0.5.0 it is in ``pii-tasks``. Compose leaves a container of a service whose profile is off alone, so after
+#: an upgrade from 0.4.x the old worker kept running on its 0.4.x image, through every restart and
+#: ``faden down``.
+ON_REQUEST_SERVICES: dict[str, str] = {"faden-pii-worker": "pii-tasks"}
+
+
+def stop_unrequested_services(ctx: ComposeContext) -> list[str]:
+    """Stop and remove the containers of :data:`ON_REQUEST_SERVICES` whose profile is off; their names.
+
+    Volumes stay. Like :func:`stop_inactive_modules`, a failure is said and not fatal.
+    """
+    from dataclasses import replace  # noqa: PLC0415
+
+    wanted = [name for name, profile in ON_REQUEST_SERVICES.items() if profile not in set(ctx.profiles)]
+    if not wanted:
+        return []
+    everything = replace(ctx, profiles=["*"])
+    present = {row.service: row.name for row in ps(everything) if row.service in wanted}
+    if not present:
+        return []
+    names = sorted(present)
+    failed = stop(everything, services=names)
+    failed = failed or _run(everything.base_cmd() + ["rm", "-f", *names], stream=True).returncode
+    if failed:
+        containers = " ".join(sorted(present.values()))
+        warning(f"Containers this release no longer runs could not be stopped and removed: {containers}. "
+                f"Run `faden up` again, or remove them with `docker rm -f {containers}`.")
+        return []
+    return sorted(name or service for service, name in present.items())
+
+
 def report_inactive_modules(ctx: ComposeContext) -> None:
-    """Run :func:`stop_inactive_modules` and print one line per module it stopped."""
+    """Run :func:`stop_inactive_modules` and print one line per module it stopped.
+
+    Then :func:`stop_unrequested_services`, with a line of its own: those containers are an earlier release's.
+    """
     for module, containers in stop_inactive_modules(ctx):
         label = module.upper() if len(module) <= 3 else module.capitalize()
         info(f"{label} is switched off: stopped and removed {', '.join(containers)} (their data is kept).")
+    for container in stop_unrequested_services(ctx):
+        info(f"Stopped and removed {container}: an earlier release started it, this one does not.")
 
 
 def down(

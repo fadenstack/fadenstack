@@ -37,10 +37,10 @@ async def search_hf_models(
         from huggingface_hub import HfApi  # noqa: PLC0415
 
         api = HfApi()
-        hits = list(api.list_models(search=q, limit=limit, sort="downloads", direction=-1))
+        hits = list(api.list_models(search=q, limit=limit, sort="downloads"))
         return [
             HFModelHit(
-                id=m.modelId,
+                id=m.id,
                 downloads=getattr(m, "downloads", 0) or 0,
                 likes=getattr(m, "likes", 0) or 0,
                 pipeline_tag=getattr(m, "pipeline_tag", None),

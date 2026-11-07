@@ -513,6 +513,8 @@ async def change_members(
         wanted = await _people_of(session, source, replace)
     else:
         wanted = (current | await _people_of(session, source, add)) - set(remove)
+    if group.archived_at is not None:
+        wanted &= current  # an archived team takes nobody new (services/teams.py); leaving it still works
     added, removed = sorted(wanted - current), sorted(current - wanted)
     if added:
         await session.execute(
@@ -558,14 +560,18 @@ async def sync_memberships(
     """
     wanted: set[uuid.UUID] = set()
     ids = list(group_ids)
+    archived: set[uuid.UUID] = set()
     if ids:
-        wanted = set(await session.scalars(select(Group.id).where(Group.id.in_(ids))))
+        found = (await session.execute(select(Group.id, Group.archived_at).where(Group.id.in_(ids)))).all()
+        wanted = {group_id for group_id, _ in found}
+        # An archived team takes nobody new (services/teams.py): kept memberships in it stay.
+        archived = {group_id for group_id, archived_at in found if archived_at is not None}
     rows = (await session.execute(
         select(UserGroup.group_id, UserGroup.source).where(UserGroup.user_id == user.id),
     )).all()
     kept = {group_id for group_id, row_source in rows if row_source == source}
     member_of = {group_id for group_id, _ in rows}
-    added = sorted(wanted - member_of)
+    added = sorted(wanted - member_of - archived)
     removed = sorted(kept - wanted) if remove else []
     if added:
         await session.execute(

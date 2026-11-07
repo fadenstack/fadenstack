@@ -1,5 +1,8 @@
 # Sign-in providers
 
+<span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span>
+
+
 People sign in with the account they already have at your organisation: through an identity provider that
 speaks OpenID Connect or SAML, or with their name and password from your directory (LDAP, Active Directory).
 They get a Fadenstack account the first time they do, with the roles and groups you choose.

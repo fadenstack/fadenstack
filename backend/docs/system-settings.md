@@ -27,3 +27,14 @@ Core behavior:
 - `live_reload`: no apply job.
 - `service_restart` / `stack_recreate`: create `system_apply_job` + `system_apply_job_event`.
 - Job status endpoint: `GET /api/admin/system/apply/{job_id}`.
+
+## Every process
+
+Each backend process (every uvicorn worker, the taskiq worker) holds the runtime settings in its own
+`settings` object. Triggers on `system_setting_value` and `system_setting_secret` move a one-row count,
+`system_settings_epoch`, in the change's own transaction (`faden_backend/db/settings_epoch.py`). A process
+reads the count before each request, each task and each background pass; when it moved, the process loads
+every registered runtime key again, values and secrets, including those extensions register. A missing or
+blank stored value gives the key back the value it had before the process first loaded the settings (the
+environment's or the code's default). A change therefore reaches every process with its next request,
+whichever process saved it and however it was written (`services/system_settings/runtime_sync.py`).

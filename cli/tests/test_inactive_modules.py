@@ -1,4 +1,8 @@
-"""A module that is switched off has its containers stopped and removed (data kept) by ``faden up``."""
+"""A module that is switched off has its containers stopped and removed (data kept) by ``faden up``.
+
+So has a service that starts only on request when it was not asked for: the PII worker an install from 0.4.x
+still ran on its 0.4.x image (its profile is ``pii-tasks`` since 0.5.0, ``pii`` before).
+"""
 
 from __future__ import annotations
 
@@ -18,7 +22,7 @@ SERVICES = {
     "postgres": {},
     "backend": {},
     "faden-pii": {"profiles": ["pii"]},
-    "faden-pii-worker": {"profiles": ["pii"]},
+    "faden-pii-worker": {"profiles": ["pii-tasks"]},
     "faden-mcp": {"profiles": ["mcp"]},
     "faden-base": {"profiles": ["_build"]},
 }
@@ -56,17 +60,17 @@ def fake(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_a_disabled_module_is_stopped_and_removed(fake) -> None:
-    f = fake(["postgres", "backend", "faden-pii", "faden-pii-worker"])
+    f = fake(["postgres", "backend", "faden-pii", "faden-mcp"])
     done = compose.stop_inactive_modules(ComposeContext(profiles=[]))
-    assert done == [("pii", ["faden-pii", "faden-pii-worker"])]
+    assert done == [("mcp", ["faden-mcp"]), ("pii", ["faden-pii"])]
     stop, rm = f.calls[-2], f.calls[-1]
-    assert stop[-3:] == ["stop", "faden-pii", "faden-pii-worker"]
-    assert rm[-4:] == ["rm", "-f", "faden-pii", "faden-pii-worker"]
+    assert stop[-3:] == ["stop", "faden-mcp", "faden-pii"]
+    assert rm[-4:] == ["rm", "-f", "faden-mcp", "faden-pii"]
     assert all(w not in c for c in f.calls for w in ("down", "-v", "--volumes"))
 
 
 def test_an_enabled_module_is_left_running(fake) -> None:
-    f = fake(["postgres", "faden-pii", "faden-pii-worker", "faden-mcp"])
+    f = fake(["postgres", "faden-pii", "faden-mcp"])
     done = compose.stop_inactive_modules(ComposeContext(profiles=["pii"]))
     assert done == [("mcp", ["faden-mcp"])]
     assert "faden-pii" not in f.calls[-1] and "faden-pii" not in f.calls[-2]
@@ -96,10 +100,12 @@ def test_up_reports_each_stopped_module(monkeypatch: pytest.MonkeyPatch, tmp_pat
     monkeypatch.setattr(up_command, "build_context_from_config", lambda _c: ctx)
     monkeypatch.setattr(up_command, "compose_up", lambda *_a, **_k: 0)
     monkeypatch.setattr("faden_cli.core.backup.keep_company_files", lambda *_a, **_k: None)
-    monkeypatch.setattr(compose, "stop_inactive_modules", lambda _c: [("pii", ["faden-pii", "faden-pii-worker"])])
+    monkeypatch.setattr(compose, "stop_inactive_modules", lambda _c: [("pii", ["faden-pii"])])
+    monkeypatch.setattr(compose, "stop_unrequested_services", lambda _c: ["faden-pii-worker"])
     result = CliRunner().invoke(up_command.up_cmd, [])
     assert result.exit_code == 0, result.output
-    assert "PII is switched off: stopped and removed faden-pii, faden-pii-worker" in result.output
+    assert "PII is switched off: stopped and removed faden-pii" in result.output
+    assert "Stopped and removed faden-pii-worker: an earlier release" in result.output
 
 
 def test_up_with_named_services_does_not_stop_modules(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -129,3 +135,25 @@ def test_a_failed_stop_is_said_not_swallowed(fake, monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(compose, "warning", said.append)
     assert compose.stop_inactive_modules(ComposeContext(profiles=[])) == []
     assert len(said) == 1 and "faden-pii" in said[0] and "docker rm -f faden-pii" in said[0]
+
+
+def test_the_old_pii_worker_is_removed_also_with_pii_on(fake) -> None:
+    """What an install from 0.4.x still ran: the worker, outside every profile `faden` switches on."""
+    f = fake(["postgres", "faden-pii", "faden-pii-worker"])
+    assert compose.stop_unrequested_services(ComposeContext(profiles=["pii"])) == ["faden-pii-worker"]
+    stop, rm = f.calls[-2], f.calls[-1]
+    assert stop[-2:] == ["stop", "faden-pii-worker"]
+    assert rm[-3:] == ["rm", "-f", "faden-pii-worker"]
+    assert all("faden-pii" not in c for c in (stop, rm)), "the PII service itself keeps running"
+
+
+def test_a_service_asked_for_stays(fake) -> None:
+    f = fake(["faden-pii", "faden-pii-worker"])
+    assert compose.stop_unrequested_services(ComposeContext(profiles=["pii", "pii-tasks"])) == []
+    assert f.calls == [], "nothing to look up when every on-request service was asked for"
+
+
+def test_no_old_worker_means_one_lookup(fake) -> None:
+    f = fake(["postgres", "faden-pii"])
+    assert compose.stop_unrequested_services(ComposeContext(profiles=["pii"])) == []
+    assert f.verbs() == ["ps"]

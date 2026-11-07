@@ -15,6 +15,8 @@ from typing import Any
 import httpx
 import openai
 import pytest
+from fakeredis import FakeServer
+from fakeredis.aioredis import FakeRedis
 from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy import select
@@ -27,11 +29,14 @@ from faden_gateway.db.models.gateway import (
     PolicyDecisionRecord,
     ProviderType,
     TenantLLMPolicy,
+    ToolClassification,
     ToolRule,
 )
 from faden_gateway.services.extensions import load_plugin, registry
 from faden_gateway.services.gateway import governance as gov
+from faden_gateway.services.gateway import tool_classes
 from faden_gateway.services.gateway.llm_adapter import LLMAdapter
+from faden_gateway.services.gateway.service import ToolModeCheck
 from faden_gateway.settings import settings
 from tests.test_gateway_knowledge_tools import (
     CAN_CALL_TOOLS,
@@ -74,9 +79,11 @@ class _Policy:
 def _clean() -> Iterator[None]:
     saved = list(registry.governance_checks)
     gov.tool_rules.invalidate()
+    tool_classes.class_rules.invalidate()
     yield
     registry.governance_checks[:] = saved
     gov.tool_rules.invalidate()
+    tool_classes.class_rules.invalidate()
 
 
 def _headers(token: str | None = None, **extra: str) -> dict[str, str]:
@@ -317,9 +324,11 @@ async def test_a_refused_whole_answer_is_a_200_with_content_filter_the_openai_cl
 # -- tools ------------------------------------------------------------------------------------
 
 
-async def _rule(db: AsyncSession, pattern: str, action: str, message: str, *, tenant: str = "tenant-a") -> None:
+async def _rule(
+    db: AsyncSession, pattern: str, action: str, message: str, *, tenant: str = "tenant-a", priority: int = 10,
+) -> None:
     db.add(ToolRule(tenant_id=tenant, name=f"rule for {pattern}", tool_pattern=pattern, action=action,
-                    message=message, category="tool_rule", priority=10, enabled=True))
+                    message=message, category="tool_rule", priority=priority, enabled=True))
     await db.flush()
 
 
@@ -373,6 +382,81 @@ async def test_a_rule_in_another_tenant_does_not_apply(
         "model": ALIAS, "messages": [{"role": "user", "content": "When?"}],
     })
     assert r.json()["choices"][0]["message"]["content"] == "On 5 May." and len(knowledge.searches) == 1
+
+
+# -- rule precedence (38 D13, 39 F3): deny wins, then "Ask first", then allow ----------------------
+
+
+def _rules(*specs: tuple[str, str, str]) -> gov.ToolRuleCheck:
+    """Rules in priority order, each ``(pattern, action, message)``; their ids are r1, r2, ..."""
+    return gov.ToolRuleCheck([
+        gov.Rule(id=f"r{i}", name=f"rule {i}", pattern=pattern, action=action, message=message, category="tool_rule")
+        for i, (pattern, action, message) in enumerate(specs, 1)
+    ])
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("specs", "expected"),
+    [
+        ([("mcp.github.*", "allow", "GitHub is fine."), ("mcp.github.delete_repo", "deny", "Never delete repositories.")],
+         ("block", "r2", "Never delete repositories.")),
+        ([("mcp.github.*", "allow", "GitHub is fine."), ("mcp.github.delete_repo", "approval_required", "Ask first.")],
+         ("approval_required", "r2", "Ask first.")),
+        ([("mcp.github.*", "approval_required", "Ask for GitHub."), ("mcp.github.delete_repo", "deny", "Never.")],
+         ("block", "r2", "Never.")),
+        ([("mcp.github.delete_repo", "deny", "The first deny."), ("mcp.*", "deny", "The second deny.")],
+         ("block", "r1", "The first deny.")),
+        ([("mcp.github.*", "allow", "GitHub is fine."), ("mcp.slack.*", "deny", "No Slack.")],
+         None),
+    ],
+    ids=["deny-behind-allow", "ask-behind-allow", "deny-behind-ask", "same-action-by-priority", "only-an-allow-matches"],
+)
+async def test_a_deny_wins_then_ask_first_then_allow_whatever_the_priority(
+    specs: list[tuple[str, str, str]], expected: tuple[str, str, str] | None,
+) -> None:
+    ctx = gov.GovernanceContext(stage=gov.GovernanceStage.TOOL, tenant_id="t", user_id="u", agent_id=None,
+                                session_id=None, request_id="r", tool_id="mcp.github.delete_repo")
+    decision = await _rules(*specs).check(ctx)
+    assert (decision and (decision.outcome, decision.policy_id, decision.message)) == expected
+
+
+@pytest.mark.anyio
+async def test_a_deny_ordered_behind_an_allow_still_refuses_the_call(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await _setup(fastapi_app, db_session)
+    await _rule(db_session, "knowledge_*", "allow", "The knowledge base is open.", priority=10)
+    await _rule(db_session, "knowledge_search", "deny", "Searching is closed this week.", priority=200)
+    knowledge = _Knowledge(monkeypatch)
+    model = _Model(monkeypatch, _call("knowledge_search", {"query": "launch"}), _say("I could not search."))
+
+    r = await client.post("/v1/chat/completions", headers=_headers(**EVENTS), json={
+        "model": ALIAS, "stream": True, "messages": [{"role": "user", "content": "When is the launch?"}],
+    })
+    assert knowledge.searches == [], "not run"
+    assert "Searching is closed this week." in model.sent[1]["messages"][-1]["content"]
+    [denied] = [e for e in _faden(r.text) if e.get("name") == "faden.tool_denied"]
+    assert denied["value"]["message"] == "Searching is closed this week."
+
+
+@pytest.mark.anyio
+async def test_an_ask_first_ordered_behind_an_allow_still_asks(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await _setup(fastapi_app, db_session)
+    await _rule(db_session, "knowledge_*", "allow", "The knowledge base is open.", priority=10)
+    await _rule(db_session, "knowledge_search", "approval_required", "Searching needs your OK.", priority=200)
+    knowledge = _Knowledge(monkeypatch)
+    _Model(monkeypatch, _call("knowledge_search", {"query": "launch"}), _say("Done."))
+
+    ask = client.post("/v1/chat/completions", headers=_headers(**EVENTS), json={
+        "model": ALIAS, "stream": True, "messages": [{"role": "user", "content": "When is the launch?"}],
+    })
+    r, answered = await asyncio.gather(ask, _approve_when_asked(client, True))
+    assert answered == 200
+    [asked] = [e for e in _faden(r.text) if e.get("name") == "faden.approval_required"]
+    assert asked["value"]["message"] == "Searching needs your OK." and len(knowledge.searches) == 1
 
 
 async def _approve_when_asked(client: AsyncClient, approved: bool, token: str | None = None) -> int:
@@ -431,7 +515,200 @@ async def test_only_the_user_who_waits_can_answer_and_a_client_that_cannot_ask_i
     stranger = await client.post("/v1/approvals/a1", headers=_headers(_other_tenant_token()), json={"approved": True})
     assert stranger.status_code == 404
     assert (await client.post("/v1/approvals/a1", headers=_headers(), json={"approved": False})).status_code == 200
-    assert await waiting is False
+    assert await waiting == gov.Answer(approved=False)
+
+
+# -- the policy read again before a call runs (39 F2) --------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_a_rule_turned_to_deny_while_the_user_was_asked_refuses_the_approved_call(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await _setup(fastapi_app, db_session)
+    await _rule(db_session, "knowledge_search", "approval_required", "Searching needs your OK.")
+    knowledge = _Knowledge(monkeypatch)
+    model = _Model(monkeypatch, _call("knowledge_search", {"query": "launch"}), _say("I could not search."))
+
+    async def deny_then_approve() -> int:
+        while not gov.approvals.waiting():
+            await asyncio.sleep(0.01)
+        rule = (await db_session.execute(select(ToolRule))).scalar_one()
+        rule.action, rule.message = "deny", "Searching is closed now."
+        await db_session.flush()
+        return await _approve_when_asked(client, True)
+
+    ask = client.post("/v1/chat/completions", headers=_headers(**EVENTS), json={
+        "model": ALIAS, "stream": True, "messages": [{"role": "user", "content": "When is the launch?"}],
+    })
+    r, answered = await asyncio.wait_for(asyncio.gather(ask, deny_then_approve()), 10)
+    assert answered == 200 and knowledge.searches == [], "approved, then denied before it ran"
+    changed = "The tool policy changed before this call ran: Searching is closed now."
+    assert changed in model.sent[1]["messages"][-1]["content"]
+    [denied] = [e for e in _faden(r.text) if e.get("name") == "faden.tool_denied"]
+    assert denied["value"]["message"] == changed
+    assert {(d.outcome, d.message) for d in await _decisions(db_session)} == {
+        ("approved", "Searching needs your OK."), ("block", "Searching is closed now."),
+    }
+
+
+# -- answers name their scope (38 §6; 39 F1, F6) ----------------------------------------------------
+
+
+_TAKEN, _ONCE_ONLY, _SCOPE_REQUIRED = None, gov.Answered.ONCE_ONLY, gov.Answered.SCOPE_REQUIRED
+
+
+@pytest.mark.parametrize(("once_only", "scope", "require_scope", "expected"), [
+    # A read or write call the chat's mode asks about: any scope, or none.
+    *[(False, scope, setting, _TAKEN) for scope in (None, "once", "chat", "always") for setting in (False, True)],
+    # A destructive or unclassified call, or one a rule asks about: once only.
+    (True, "once", False, _TAKEN), (True, "once", True, _TAKEN),
+    (True, "chat", False, _ONCE_ONLY), (True, "chat", True, _ONCE_ONLY),
+    (True, "always", False, _ONCE_ONLY), (True, "always", True, _ONCE_ONLY),
+    (True, None, False, _TAKEN),  # an older client, while the setting is off
+    (True, None, True, _SCOPE_REQUIRED),
+])
+def test_which_answers_the_gateway_takes(
+    once_only: bool, scope: str | None, require_scope: bool, expected: gov.Answered | None,
+) -> None:
+    assert gov.refusal(once_only=once_only, approved=True, scope=scope, require_scope=require_scope) is expected
+    assert gov.refusal(once_only=once_only, approved=False, scope=scope, require_scope=require_scope) is None, (
+        "a no is always taken"
+    )
+
+
+async def _make(db: AsyncSession, kind: str) -> None:
+    """``knowledge_search`` (a gateway tool: read) made to wait, as *kind*."""
+    if kind == "rule":
+        await _rule(db, "knowledge_search", "approval_required", "Searching needs your OK.")
+    else:  # "annotations" without any: unclassified
+        tool_class = "annotations" if kind == "unknown" else kind
+        db.add(ToolClassification(tenant_id="tenant-a", tool_pattern="knowledge_search", tool_class=tool_class))
+        await db.flush()
+
+
+async def _post_answers(client: AsyncClient, *bodies: dict[str, Any]) -> list[httpx.Response]:
+    """Once a call waits: post *bodies* to it in turn, until one is taken."""
+    while not gov.approvals.waiting():
+        await asyncio.sleep(0.01)
+    approval_id = gov.approvals.waiting()[0]
+    sent: list[httpx.Response] = []
+    for body in bodies:
+        sent.append(await client.post(f"/v1/approvals/{approval_id}", headers=_headers(), json=body))
+        if sent[-1].status_code == 200:
+            break
+    return sent
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("kind", ["write", "destructive", "unknown", "rule"])
+async def test_a_waiting_call_takes_the_scopes_its_class_allows_and_the_scope_is_recorded(
+    kind: str, fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    once_only = kind != "write"  # a write tool the chat's mode asks about takes any scope
+    await _setup(fastapi_app, db_session)
+    await _make(db_session, kind)
+    knowledge = _Knowledge(monkeypatch)
+    _Model(monkeypatch, _call("knowledge_search", {"query": "launch"}), _say("Done."))
+
+    ask = client.post("/v1/chat/completions", headers=_headers(**EVENTS), json={
+        "model": ALIAS, "stream": True, "messages": [{"role": "user", "content": "When?"}],
+    })
+    r, sent = await asyncio.wait_for(asyncio.gather(ask, _post_answers(
+        client, {"approved": True, "scope": "always"}, {"approved": True, "scope": "once"},
+    )), 10)
+    if once_only:
+        assert [s.status_code for s in sent] == [409, 200], "refused for always; the call waited on for once"
+        assert sent[0].json()["error"]["code"] == "approval_once_only"
+    else:
+        assert [s.status_code for s in sent] == [200]
+    assert len(knowledge.searches) == 1, r.text
+    [approved] = [d for d in await _decisions(db_session) if d.outcome == "approved"]
+    assert approved.answer_scope == ("once" if once_only else "always")
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("require_scope", [False, True], ids=["setting-off", "setting-on"])
+async def test_an_answer_without_a_scope_is_refused_only_with_the_setting_on(
+    require_scope: bool, fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "approvals_require_answer_scope", require_scope)
+    await _setup(fastapi_app, db_session)
+    await _make(db_session, "destructive")
+    knowledge = _Knowledge(monkeypatch)
+    _Model(monkeypatch, _call("knowledge_search", {"query": "launch"}), _say("Done."))
+
+    ask = client.post("/v1/chat/completions", headers=_headers(**EVENTS), json={
+        "model": ALIAS, "stream": True, "messages": [{"role": "user", "content": "When?"}],
+    })
+    r, sent = await asyncio.wait_for(asyncio.gather(ask, _post_answers(
+        client, {"approved": True}, {"approved": True, "scope": "once"},
+    )), 10)
+    if require_scope:
+        assert [s.status_code for s in sent] == [409, 200]
+        assert sent[0].json()["error"]["code"] == "approval_scope_required"
+    else:
+        assert [s.status_code for s in sent] == [200], "an older client's answer, as before"
+    assert len(knowledge.searches) == 1, r.text
+
+
+@pytest.mark.anyio
+async def test_an_answer_on_another_worker_is_held_to_the_same_scope() -> None:
+    server = FakeServer()
+    waiting_worker, answering_worker = gov.Approvals(), gov.Approvals()
+    redis = FakeRedis(server=server)
+    waiting_worker.use(redis)
+    answering_worker.use(FakeRedis(server=server))
+    waiting = asyncio.create_task(waiting_worker.wait(
+        tenant_id="tenant-a", user_id="user-1", approval_id="a1", timeout=5, once_only=True,
+    ))
+    for _ in range(500):
+        if (await redis.pubsub_numsub("faden:approval:a1"))[0][1]:
+            break
+        await asyncio.sleep(0.01)
+
+    async def answer(**kw: Any) -> gov.Answered:
+        return await answering_worker.answer(
+            tenant_id="tenant-a", user_id="user-1", approval_id="a1", approved=True, **kw,
+        )
+
+    assert await answer(scope="always") is gov.Answered.ONCE_ONLY
+    assert await answer(scope=None, require_scope=True) is gov.Answered.SCOPE_REQUIRED
+    assert await answer(scope="once") is gov.Answered.TAKEN
+    assert await asyncio.wait_for(waiting, 5) == gov.Answer(approved=True, scope="once")
+
+
+# -- core's tool checks fail closed (38 §4.3; 39 F5) --------------------------------------------------
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("failing", ["tool_rules", "tool_mode"])
+async def test_a_core_tool_check_that_fails_stops_the_call_and_says_the_check_failed(
+    failing: str, fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await _setup(fastapi_app, db_session)
+    await _rule(db_session, "nothing_*", "deny", "Not this.")  # with a rule, the tenant's rules are checked
+
+    async def broken(self: Any, ctx: gov.GovernanceContext) -> gov.GovernanceDecision | None:
+        raise RuntimeError("the check broke")
+
+    monkeypatch.setattr(gov.ToolRuleCheck if failing == "tool_rules" else ToolModeCheck, "check", broken)
+    knowledge = _Knowledge(monkeypatch)
+    model = _Model(monkeypatch, _call("knowledge_search", {"query": "launch"}), _say("I could not search."))
+
+    r = await client.post("/v1/chat/completions", headers=_headers(**EVENTS), json={
+        "model": ALIAS, "stream": True, "messages": [{"role": "user", "content": "When is the launch?"}],
+    })
+    assert knowledge.searches == [], "a check that could not run is no yes"
+    failed = "A check failed, so this tool call did not run. Try again shortly."
+    told = model.sent[1]["messages"][-1]["content"]
+    assert f"Tool 'knowledge_search' did not run: {failed}" in told and "not allowed" not in told
+    [denied] = [e for e in _faden(r.text) if e.get("name") == "faden.tool_denied"]
+    assert denied["value"]["message"] == failed
+    [decision] = await _decisions(db_session)
+    assert (decision.outcome, decision.category, decision.check) == ("block", gov.UNAVAILABLE, failing)
 
 
 # -- errors, limits, the plugin -------------------------------------------------------------------
@@ -476,19 +753,7 @@ async def test_a_rate_limit_says_when_to_retry_and_is_logged(
     policy.rpm_limit = 1
     await db_session.flush()
     _Model(monkeypatch, _say("One."), _say("Two."))
-
-    class _Counter:
-        def __init__(self) -> None:
-            self.n = 0
-
-        async def incr(self, key: str, amount: int, *, ttl_sec: int) -> int:
-            self.n += amount if key.startswith("ratelimit:rpm") else 0
-            return self.n
-
-    from faden_gateway.services.gateway.ratelimit import RateLimiter  # noqa: PLC0415
-
-    counter = _Counter()
-    monkeypatch.setattr(RateLimiter, "__init__", lambda self, cache: setattr(self, "cache", counter))
+    # The caps count in the app's (fake) Redis, with their Lua script.
     body = {"model": ALIAS, "messages": [{"role": "user", "content": "hi"}]}
     assert (await client.post("/v1/chat/completions", headers=_headers(), json=body)).status_code == 200
     r = await client.post("/v1/chat/completions", headers=_headers(), json=body)

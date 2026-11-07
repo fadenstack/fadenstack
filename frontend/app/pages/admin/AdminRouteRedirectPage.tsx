@@ -1,17 +1,24 @@
+/**
+ * `/admin`: a superuser lands on the dashboard; someone a permission lets onto some console pages (the
+ * Usage page for `usage:read`) on the first of them; anyone else on the chat; not signed in, on sign-in.
+ */
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router";
-import { auth } from "~/api/auth";
+
+import { accessKeys, adminUsers } from "~/api/admin";
+import { consolePages } from "~/lib/adminConstants";
 
 export default function AdminRouteRedirectPage() {
   const [target, setTarget] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    auth
-      .me()
-      .then((user) => {
+    adminUsers
+      .meAccess()
+      .then((access) => {
         if (cancelled) return;
-        setTarget(user.is_superuser ? "/admin/dashboard" : "/chat");
+        const pages = consolePages(access.is_superuser, accessKeys(access));
+        setTarget(pages === null ? "/admin/dashboard" : (pages[0] ?? "/chat"));
       })
       .catch(() => {
         if (cancelled) return;

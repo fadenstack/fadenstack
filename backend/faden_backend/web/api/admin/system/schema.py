@@ -41,6 +41,9 @@ class SettingsSchemaItemDTO(BaseModel):
     service_targets: list[str]
     protected: bool
     enum_values: list[str]
+    #: The range of a number setting, both ends included; ``None``: open on that side.
+    min_value: int | None = None
+    max_value: int | None = None
 
 
 class SettingsValuesResponse(BaseModel):

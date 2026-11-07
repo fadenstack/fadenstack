@@ -15,7 +15,7 @@ from collections.abc import Callable
 from types import SimpleNamespace
 from typing import Any
 
-import httpx
+import httpx2
 import pytest
 
 from faden_mcp.services.transport import streamable_http
@@ -46,21 +46,21 @@ def _adapter(headers: dict[str, str] | None = None) -> StreamableHTTPMCPServer:
 
 def _upstream(
     monkeypatch: pytest.MonkeyPatch,
-    handler: Callable[[httpx.Request], Any],
-) -> list[httpx.Request]:
+    handler: Callable[[httpx2.Request], Any],
+) -> list[httpx2.Request]:
     """Answer the adapter's HTTP requests with *handler*; keep what it sent."""
-    seen: list[httpx.Request] = []
-    real = httpx.AsyncClient
+    seen: list[httpx2.Request] = []
+    real = httpx2.AsyncClient
 
-    async def answer(request: httpx.Request) -> httpx.Response:
+    async def answer(request: httpx2.Request) -> httpx2.Response:
         seen.append(request)
         result = handler(request)
         return await result if asyncio.iscoroutine(result) else result
 
-    def client(**kwargs: Any) -> httpx.AsyncClient:
-        return real(transport=httpx.MockTransport(answer), **kwargs)
+    def client(**kwargs: Any) -> httpx2.AsyncClient:
+        return real(transport=httpx2.MockTransport(answer), **kwargs)
 
-    monkeypatch.setattr(streamable_http.httpx, "AsyncClient", client)
+    monkeypatch.setattr(streamable_http.httpx2, "AsyncClient", client)
     return seen
 
 
@@ -69,7 +69,7 @@ async def test_an_upstream_401_says_to_add_credentials(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """GitHub without a token: the 401 and what to do about it."""
-    _upstream(monkeypatch, lambda _request: httpx.Response(401))
+    _upstream(monkeypatch, lambda _request: httpx2.Response(401))
     with pytest.raises(MCPConnectError, match=r"401 Unauthorized.*Bearer"):
         await _adapter().connect()
 
@@ -79,7 +79,7 @@ async def test_the_configured_headers_reach_the_server(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A header set on the server goes out with the request."""
-    seen = _upstream(monkeypatch, lambda _request: httpx.Response(401))
+    seen = _upstream(monkeypatch, lambda _request: httpx2.Response(401))
     with pytest.raises(MCPConnectError):
         await _adapter({"Authorization": "Bearer t0ken"}).connect()
     assert seen[0].headers["authorization"] == "Bearer t0ken"
@@ -90,7 +90,7 @@ async def test_a_wrong_path_points_at_the_endpoint(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A 404 names the paths MCP endpoints usually have."""
-    _upstream(monkeypatch, lambda _request: httpx.Response(404))
+    _upstream(monkeypatch, lambda _request: httpx2.Response(404))
     with pytest.raises(MCPConnectError, match=r"/mcp"):
         await _adapter().connect()
 
@@ -101,8 +101,8 @@ async def test_a_server_that_cannot_be_reached_says_so(
 ) -> None:
     """A refused connection is reported as one."""
 
-    def refuse(request: httpx.Request) -> httpx.Response:
-        raise httpx.ConnectError("Connection refused", request=request)
+    def refuse(request: httpx2.Request) -> httpx2.Response:
+        raise httpx2.ConnectError("Connection refused", request=request)
 
     _upstream(monkeypatch, refuse)
     with pytest.raises(MCPConnectError, match=r"Cannot reach .*Connection refused"):
@@ -116,10 +116,10 @@ async def test_a_cancellation_from_outside_stays_a_cancellation(
     """Shutting down mid-connect must not turn into an error to report."""
     reached = asyncio.Event()
 
-    async def hang(_request: httpx.Request) -> httpx.Response:
+    async def hang(_request: httpx2.Request) -> httpx2.Response:
         reached.set()
         await asyncio.Event().wait()
-        return httpx.Response(200)
+        return httpx2.Response(200)
 
     _upstream(monkeypatch, hang)
     task = asyncio.create_task(_adapter().connect())
@@ -139,9 +139,9 @@ async def test_a_cancellation_from_outside_stays_a_cancellation(
 )
 def test_each_status_says_something_useful(status: int, says: str) -> None:
     """Every status names itself; the common ones say what to change."""
-    request = httpx.Request("POST", URL)
-    response = httpx.Response(status, request=request)
-    error = httpx.HTTPStatusError("x", request=request, response=response)
+    request = httpx2.Request("POST", URL)
+    response = httpx2.Response(status, request=request)
+    error = httpx2.HTTPStatusError("x", request=request, response=response)
     assert says in describe_failure(error, URL)
 
 
@@ -172,12 +172,12 @@ async def test_the_connection_test_says_why_as_refresh_does(
             raise self.failure
 
     monkeypatch.setattr(views, "MCPDao", _Dao)
-    request = httpx.Request("POST", URL)
-    unauthorized = httpx.Response(401, request=request)
+    request = httpx2.Request("POST", URL)
+    unauthorized = httpx2.Response(401, request=request)
     refused = "x is a cloud metadata address"
     for failure, says in (
         (
-            httpx.HTTPStatusError("x", request=request, response=unauthorized),
+            httpx2.HTTPStatusError("x", request=request, response=unauthorized),
             f"{URL} answered 401 Unauthorized: it needs credentials.",
         ),
         (MCPConnectError(refused), refused),

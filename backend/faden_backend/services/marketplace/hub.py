@@ -195,7 +195,8 @@ def _is_network_error(exc: BaseException) -> bool:
     text = str(exc).lower()
     return (
         isinstance(exc, (ConnectionError, TimeoutError, OSError))
-        or name in {"ConnectionError", "ConnectTimeout", "ReadTimeout", "ProxyError", "SSLError", "OfflineModeIsEnabled"}
+        or name in {"ConnectionError", "ConnectTimeout", "ReadTimeout", "ProxyError", "SSLError", "OfflineModeIsEnabled",
+                    "ConnectError", "ReadError", "WriteError", "PoolTimeout", "WriteTimeout", "RemoteProtocolError"}
         or "offline" in text or "failed to resolve" in text or "max retries" in text
     )
 

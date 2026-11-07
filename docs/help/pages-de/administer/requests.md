@@ -62,7 +62,7 @@ an den Benutzer gestreamt; maskierte Werte werden dabei wieder eingesetzt, wo di
 
 | Aufzeichnung | Was sie enthält |
 |---|---|
-| Das Anfrageprotokoll | Wer gefragt hat, welches Modell und wo es lief, wie viele Tokens, wie lange es gedauert hat, die geschätzten Kosten und das Ergebnis, und welche Version welches Skills verwendet wurde. Nicht den Text. Siehe [Nutzung und Kosten](usage.md). |
+| Das Anfrageprotokoll | Wer gefragt hat, welches Modell und wo es lief, wie viele Tokens, wie lange es gedauert hat, die geschätzten Kosten und das Ergebnis, und welche Version welches Skills verwendet wurde. Nicht den Text. Siehe [Nutzung und Limits](usage.md). |
 | Der Chat | Die Unterhaltung selbst, gespeichert mit dem Chat des Benutzers auf dem Server und dort verschlüsselt. Agenten speichern ihre Unterhaltungen auf dem Computer des Benutzers. |
 | Das Audit-Protokoll | Wer in der Konsole was geändert hat. |
 | Governance-Entscheidungen | Was eine Regel abgelehnt oder nach Rückfrage durchgelassen hat. Nie den abgelehnten Text. |

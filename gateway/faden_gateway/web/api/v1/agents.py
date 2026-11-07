@@ -22,6 +22,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 import re
+import uuid
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
@@ -33,7 +34,8 @@ from starlette import status
 from faden_gateway.db.dao.gateway_dao import GatewayDAO
 from faden_gateway.db.models.gateway import AgentClientEvent
 from faden_gateway.services.extensions import registry
-from faden_gateway.services.gateway import agent_manifests, tool_classes
+from faden_gateway.services.gateway import agent_manifests, grants, tool_classes
+from faden_gateway.services.gateway import governance as gov
 from faden_gateway.services.gateway.agents import (
     AgentLookupError,
     AgentProfile,
@@ -51,6 +53,7 @@ from faden_gateway.services.gateway.auth import (
     sign_in_ended_before,
 )
 from faden_gateway.services.gateway.errors import GatewayError, error_from, error_response, validation_message
+from faden_gateway.services.gateway.host_policy import principal, stamp
 from faden_gateway.services.gateway.mcp_client import MCPUnavailableError
 from faden_gateway.services.gateway.mcp_tool_cache import MCP_TOOL_PREFIX
 from faden_gateway.services.gateway.pii_policy import VALID_EGRESS_MODES, mode_switch_allowed
@@ -399,9 +402,11 @@ async def agent_profile(
     resolver = getattr(request.app.state, "group_membership_resolver", None)
     if registry.tool_mode_ceilings and resolver is not None:
         groups = tuple(await resolver.resolve(auth.user_id) or ())
-    top = await tool_classes.ceiling(registry.tool_mode_ceilings, tool_classes.CeilingContext(
+    default, highest = profile.levels()
+    ceiling = await tool_classes.ceiling(registry.tool_mode_ceilings, tool_classes.CeilingContext(
         tenant_id=auth.tenant_id, user_id=auth.user_id, agent_id=profile.id, groups=groups,
     ))
+    top = tool_classes.limited(ceiling, highest)
     return {
         "object": "agent.profile",
         "id": profile.id,
@@ -424,12 +429,23 @@ async def agent_profile(
             # unless an Enterprise lock says otherwise (in ``extensions``).
             "developer_mode": agent.developer_mode,
         },
-        # Sessions start in "ask"; the SDK sends its session's mode
-        # (X-Faden-Tool-Mode), never wider than the ceiling (EE).
+        # Sessions start in the agent's default level (sdk/38 §5); the SDK sends its session's mode
+        # (X-Faden-Tool-Mode), never wider than the ceiling: the narrowest of the agent's highest level
+        # (``max``) and the EE ceilings. An agent that goes up to Auto adds no ceiling.
         "tool_modes": {
-            "default": tool_classes.DEFAULT_MODE,
+            "default": tool_classes.narrowest(default, top).value,
             "ceiling": top.value if top else None,
+            "max": highest.value,
             "open_world_enforced": tool_classes.OPEN_WORLD_ENFORCED,
+        },
+        # What the agent's approval card may offer (sdk/38 §5, §7): its standing approvals (``None``: any),
+        # the longest grant and the classes a grant may cover. The gateway applies them again to each grant.
+        "approvals": {
+            "standing": list(profile.standing) if profile.standing is not None else None,
+            "longest_grant_minutes": profile.max_grant_minutes or grants.DEFAULT_LONGEST_MINUTES,
+            "grant_classes": [
+                c for c in grants.GRANT_CLASSES if profile.grant_classes is None or c in profile.grant_classes
+            ],
         },
         # Whether the conversation's own PII mode (X-Faden-PII-Mode) is applied: the agent's
         # setting, or the tenant's when the agent has none.
@@ -448,7 +464,145 @@ async def agent_profile(
         "required_client_modules": registry.client_modules(profile.extensions),
         "edition": registry.edition,
         "features": sorted(registry.features),
+        "principal": principal(auth, agent),
     }
+
+
+class HostToolCheck(BaseModel):
+    """An explicit device command, never an arbitrary gateway tool execution."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    tool_mode: Literal["off", "read_only", "ask", "auto"]
+    origin: Literal["user_command", "user_history"] = "user_command"
+    phase: Literal["prepare", "dispatch"] = "prepare"
+    schema_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    prepared_profile: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    prepared_arguments: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    prepared_decision: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+
+
+@router.post("/v1/agents/{agent}/tools/check", response_model=None)
+async def agent_host_tool_check(
+    request: Request,
+    caller: Annotated[tuple[AuthContext, AgentRequest], Depends(agent_request)],
+    service: Annotated[GatewayService, Depends(get_gateway_service)],
+    dao: Annotated[GatewayDAO, Depends()],
+) -> Response:
+    """Current central policy for one user command; no model/tool execution.
+
+    This is not a signed grant or a substitute for native permissions. Clients
+    recheck after approval, compare all three preparation stamps and stop on
+    change. Normal profile/access/rule cache boundaries still apply.
+    """
+    auth, agent = caller
+    raw = await request.body()
+    if len(raw) > 524288:
+        raise GatewayError(
+            status_code=413,
+            message="The command is too large.",
+            code="command_too_large",
+        )
+    try:
+        check = HostToolCheck.model_validate_json(raw)
+        arguments_stamp = stamp(check.arguments)
+    except (ValidationError, ValueError, RecursionError) as exc:
+        raise GatewayError(
+            status_code=400,
+            message="Invalid host command check.",
+            code="invalid_host_command",
+        ) from exc
+    profile_stamp = stamp(
+        {
+            "version": agent.agent.version,
+            "contract": agent.agent.host_tool_contract,
+            "instructions": agent.agent.instructions_sha256,
+            "principal": principal(auth, agent),
+        },
+    )
+    row = next(
+        (t for t in agent.agent.host_tool_contract if t.get("name") == check.name), {},
+    )
+    if row and not row.get("schema_sha256"):
+        raise GatewayError(
+            status_code=409,
+            message="Publish a pinned schema before enabling direct host commands.",
+            code="host_schema_required",
+        )
+    if row.get("schema_sha256") and row["schema_sha256"] != check.schema_sha256:
+        raise GatewayError(
+            status_code=409,
+            message="This tool schema has changed.",
+            code="host_schema_changed",
+        )
+    request_id = str(getattr(request.state, "request_id", None) or uuid.uuid4())
+    result, verdict = await service.check_host_tool(
+        auth=auth,
+        agent=agent,
+        name=check.name,
+        arguments=check.arguments,
+        mode=check.tool_mode,
+        request_id=request_id,
+    )
+    decision_stamp = stamp(result)
+    if check.phase == "dispatch" and (
+        check.prepared_profile != profile_stamp
+        or check.prepared_arguments != arguments_stamp
+        or check.prepared_decision != decision_stamp
+    ):
+        raise GatewayError(
+            status_code=409,
+            message="The command or its policy changed. Review it again.",
+            code="host_command_changed",
+        )
+    decision_id = None
+    if verdict is not None:
+        decision_id, _ = await gov.record(
+            dao.session,
+            gov.GovernanceContext(
+                stage=gov.GovernanceStage.TOOL,
+                tenant_id=auth.tenant_id,
+                user_id=auth.user_id,
+                agent_id=agent.id,
+                session_id=agent.conversation_id,
+                request_id=request_id,
+                tool_id=check.name,
+                arguments=check.arguments,
+            ),
+            verdict,
+            text=None,
+        )
+    dao.session.add(
+        AgentClientEvent(
+            tenant_id=auth.tenant_id,
+            agent_id=agent.id,
+            user_id=auth.user_id,
+            device_id=agent.device_id,
+            conversation_id=agent.conversation_id,
+            type="host_tool.checked",
+            data={
+                "tool": check.name,
+                "phase": check.phase,
+                "origin": check.origin,
+                "decision": result["decision"],
+                "tool_class": result["tool_class"],
+            },
+        ),
+    )
+    await dao.session.commit()
+    return JSONResponse(
+        {
+            **result,
+            "profile_stamp": profile_stamp,
+            "arguments_stamp": arguments_stamp,
+            "decision_stamp": decision_stamp,
+            "decision_id": str(decision_id) if decision_id else None,
+            "principal": principal(auth, agent),
+        },
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.get("/v1/agents/{agent}/models")
@@ -625,9 +779,10 @@ class ApprovalDecided(_Event):
     decision: Literal["approved", "denied", "timeout"]
     #: How long the user took; none when nobody was asked.
     wait_ms: int | None = Field(default=None, ge=0)
-    #: What let an approved call through: the user for this call, this chat, always on the device, or the
-    #: app's bypass mode (development and trusted automation).
-    scope: Literal["once", "chat", "always", "bypass"] | None = None
+    #: What let an approved call through: the user for this call, this chat, always on the device, the
+    #: app's bypass mode (development and trusted automation), or a grant (``grant_id``, sdk/38 §6).
+    scope: Literal["once", "chat", "always", "bypass", "grant"] | None = None
+    grant_id: uuid.UUID | None = None
     #: What started the call: the model, the user, or a UI module (``module:<plugin>``).
     trigger: str | None = Field(default=None, pattern=_TRIGGER_PATTERN)
 

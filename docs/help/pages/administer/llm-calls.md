@@ -37,8 +37,8 @@ Select the arrow in front of a request to see its rounds.
 
 1. Pick a time range at the top: **15m** to **30d**.
 2. Narrow the list: **All models** for one model, **Errors** or **Succeeded** for the outcome, or type in the
-   search box. The search finds a call by its request, trace, session, conversation, user or agent id, and by
-   part of a model name or error code.
+   search box. The search finds a call by its request or trace id, and by part of a model name, endpoint or error
+   code. It finds no call by person, session, conversation, device or agent.
 3. Sort by **Time**, **Duration** or **Tokens** with the column headers.
 
 **Live** brings in new calls every few seconds while you look at the first page; select it again to pause.
@@ -60,12 +60,13 @@ the `j` and `k` keys, to go to the next or the previous one, and `Esc` to close 
 - **Timeline** (**This round** in a request): where this call's time went, the wait for the first token and the
   writing, and the tools the gateway ran for it.
 - **Governance**: what a policy decided about the call, if one did.
-- **Conversation**: the other calls of the same conversation, in order.
+- **Conversation** or **Trace**: the other calls that belong with this one, in order, when there are any.
 
 ![The Request timeline of an agent's request: nine rounds, each followed by the approval and the tool run the model asked for](../images/administer/llm-calls-request-timeline.png)
 
-**Details** lists every recorded field, with a button to filter the list by the call's model, user or
-conversation. **JSON** shows the record as it is, to copy into a bug report.
+**Details** lists the call's recorded fields, without the person and without the session, conversation, device
+or project it belongs to, with a button to filter the list by the call's model. **JSON** shows the record as the
+page has it, to copy into a bug report.
 
 ??? info "Where the app's tools come from"
     An agent's tools run in its app, on the person's computer, not on the server. The app reports which tools
@@ -110,13 +111,18 @@ the way it went.
 For each call the gateway keeps who sent it, which model answered and where, the timings, the tokens, the
 outcome and the estimated cost; for an agent, also its conversation and request. The text of the request and
 of the answer is not kept, and neither is what a tool read or wrote. The figures here are the same as on
-[Usage and costs](usage.md).
+[Usage and limits](usage.md).
+
+This page never shows who sent a call, and does not find calls by person. It shows no session, conversation,
+device or project id either, and finds no call by them or by agent: each would lead to one person. One person's
+usage is shown only in the person-level view on **Usage**, to a usage auditor, with a reason, and recorded (see
+[Usage and privacy](usage-privacy.md#looking-at-one-persons-figures)).
 
 ## When it does not work
 
 | You see | What to do |
 |---|---|
-| **No calls match** | Nothing in the time range matches the filters. Pick a longer range or select **Clear filters**. |
+| **No calls match** | Nothing in the time range matches the filters. Pick a longer range, choose **All models** and **All**, or empty the search box. |
 | An agent's request shows rounds, but no tools | The model asked for tools, but the app did not report running any: an app without tool reports, or reports still on their way. The rounds still show. |
 | The provider shows as **Instance …** | The provider that served the call was removed since. |
-| **Est. cost** shows "—" | The models used have no price. Set one (see [Usage and costs](usage.md#set-prices)). |
+| **Est. cost** shows "—" | The models used have no price. Set one (see [Usage and limits](usage.md#set-prices)). |

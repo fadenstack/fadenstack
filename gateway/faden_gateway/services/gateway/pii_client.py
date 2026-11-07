@@ -42,6 +42,31 @@ def _entity_types(report: Any) -> dict[str, int]:
     return counts
 
 
+#: The PII service's refusals of the policy itself (422): the detector installed cannot apply it as written --
+#: a threshold on another engine's scale, a type it does not find, an invalid threshold. A retry cannot help.
+POLICY_REFUSALS = frozenset({"pii_profile_required", "pii_unsupported_profile", "pii_invalid_threshold"})
+
+
+class PIIPolicyMismatchError(RuntimeError):
+    """The PII service refused the policy: it does not fit the installed detector."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
+
+
+def _policy_refusal(resp: httpx.Response) -> str | None:
+    """The PII service's refusal code when *resp* refuses the policy; ``None`` otherwise."""
+    if resp.status_code != 422:
+        return None
+    try:
+        detail = resp.json().get("detail")
+    except ValueError:
+        return None
+    code = detail.get("code") if isinstance(detail, dict) else None
+    return code if code in POLICY_REFUSALS else None
+
+
 class PIIClient:
     """Async client wrapping PII service HTTP endpoints."""
 
@@ -113,6 +138,9 @@ class PIIClient:
                     timeout=10.0,
                     headers=headers,
                 )
+            refused = _policy_refusal(resp)
+            if refused:
+                raise PIIPolicyMismatchError(refused)
             resp.raise_for_status()
             data = resp.json()
             _validate_response(data, effective_mode)
@@ -130,6 +158,9 @@ class PIIClient:
                 token_mapping=data.get("token_mapping"),
                 entity_types=_entity_types(data.get("pii_report")),
             )
+        except PIIPolicyMismatchError as exc:
+            logger.warning("The PII service refused the policy (%s): it does not fit the detector", exc.code)
+            raise
         except Exception:
             # HTTP/validation exceptions can contain response bodies. Never log PII.
             logger.warning("PII sanitize call failed")

@@ -172,6 +172,12 @@ const withoutLicenceNotice = (p) =>
     }
   });
 
+/** The notices at the top of admin pages (a purge date, a licence) are that install's state, not the page's. */
+const withoutNotices = (p) =>
+  p.evaluate(() => {
+    for (const el of document.querySelectorAll('[data-testid^="admin-notice-"]')) el.style.display = "none";
+  });
+
 const asHttpsInstall = (p) =>
   p.evaluate((warning) => {
     for (const alert of document.querySelectorAll(".MuiAlert-root")) {
@@ -194,6 +200,70 @@ const SHOTS = [
   // Administer
   { name: "administer/dashboard", path: "/admin/dashboard" },
   { name: "administer/users", path: "/admin/users" },
+  {
+    // The swap names the server; its port is the install's own: the usual one, unsaved, and back to the top.
+    name: "administer/mail", path: "/admin/settings?tab=mail", wait: 3000,
+    act: async (p) => {
+      await withoutLicenceNotice(p);
+      await p.getByLabel(K("mail.server.port"), { exact: true }).fill("587");
+      await p.evaluate(() => {
+        document.activeElement?.blur();
+        for (const el of document.querySelectorAll("*")) if (el.scrollTop > 0) el.scrollTop = 0;
+      });
+    },
+  },
+  // Usage: taken from an install with an example organisation (fadenstack-dev release/bed/seed_pictures.py).
+  {
+    // The last 7 days (the example organisation's figures start two weeks back), the teams opened.
+    name: "administer/usage", path: "/admin/usage", wait: 4000, viewport: { width: 1440, height: 1300 },
+    act: async (p) => {
+      await withoutNotices(p);
+      await p.getByRole("button", { name: L("7 days"), exact: true }).first().click();
+      await settle(p, 2000);
+      await p.getByRole("button", { name: L("Open all"), exact: true }).first().click();
+    },
+  },
+  {
+    name: "administer/usage-mine", path: "/usage", wait: 4000, viewport: { width: 1440, height: 1100 },
+    act: async (p) => p.getByRole("button", { name: L("7 days"), exact: true }).first().click(),
+  },
+  { name: "administer/usage-privacy", path: "/admin/settings?tab=usage", wait: 3000, act: withoutNotices },
+  // Budgets (Enterprise): taken from an Enterprise install with the example organisation and four budgets
+  // (fadenstack-dev release/ee-kit/usage/seed_budget_pictures.py).
+  {
+    name: "administer/budgets", path: "/admin/budgets", wait: 3000, viewport: { width: 1440, height: 1480 },
+    act: async (p) => {
+      await withoutNotices(p);
+      await withoutLicenceNotice(p);
+    },
+  },
+  {
+    // Filled in as the steps describe, never created.
+    name: "administer/budgets-new", path: "/admin/budgets", wait: 3000, viewport: { width: 1440, height: 1400 },
+    act: async (p) => {
+      await p.getByRole("button", { name: K("budgets.new"), exact: true }).first().click();
+      const dialog = p.getByRole("dialog");
+      await dialog.getByLabel(K("budgets.dialog.name"), { exact: true }).fill(L("Sales per month"));
+      await dialog.getByRole("combobox", { name: K("budgets.dialog.scope") }).click();
+      await p.getByRole("option", { name: K("budgets.scope.team"), exact: true }).click();
+      // The second field named so: "Applies to" now reads "Team" too.
+      await dialog.getByRole("combobox", { name: K("budgets.dialog.team") }).last().click();
+      await p.getByRole("option", { name: "Sales", exact: true }).click();
+      await dialog.getByLabel(K("budgets.dialog.amount"), { exact: true }).fill("1000000");
+    },
+    clip: (p) => p.locator(".MuiDialog-paper"),
+  },
+  {
+    // This month's report: the example organisation's usage is this month's.
+    name: "administer/budgets-chargeback", path: "/admin/budgets?tab=chargeback", wait: 3000,
+    viewport: { width: 1440, height: 1000 },
+    act: async (p) => {
+      await withoutNotices(p);
+      await withoutLicenceNotice(p);
+      await p.getByRole("combobox", { name: K("budgets.chargeback.month") }).click();
+      await p.getByRole("option").first().click();
+    },
+  },
   { name: "administer/roles", path: "/admin/roles", wait: 5000 },
   { name: "administer/marketplace", path: "/admin/marketplace" },
   { name: "administer/deployments", path: "/admin/deployments" },
@@ -207,7 +277,7 @@ const SHOTS = [
   { name: "administer/skills", path: "/admin/skills", wait: 5000 },
   { name: "administer/agents", path: "/admin/agents" },
   { name: "administer/pii-policies", path: "/admin/pii/policies" },
-  { name: "administer/governance", path: "/admin/governance" },
+  { name: "administer/governance", path: "/admin/governance", act: withoutNotices },
   { name: "administer/data-residency", path: "/admin/security-map" },
   { name: "administer/observability", path: "/admin/observability" },
   // Operate

@@ -26,6 +26,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from faden_gateway.db.base import Base
 from faden_gateway.db.crypto import EncryptedJSON, EncryptedText
+from faden_gateway.db.models.usage import GROUP_PATH
 
 
 class ProviderType(enum.StrEnum):
@@ -311,6 +312,9 @@ class TenantLLMPolicy(Base):
     )
     rpm_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
     tpm_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: Tokens (input and output) the tenant may use in a calendar day of the usage time zone
+    #: (``usage.time_zone``); NULL: no cap (services/gateway/ratelimit.py).
+    tokens_per_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # ----- PII policy (nullable = feature disabled) -----
     pii_config: Mapped[dict[str, Any] | None] = mapped_column(
@@ -344,6 +348,11 @@ class TenantLLMPolicy(Base):
     )
 
 
+#: ``LLMGatewayRequestLog.usage_source``: the provider reported the tokens, the gateway counted them, or
+#: estimated them.
+USAGE_SOURCES = ("provider", "counted", "estimated")
+
+
 class LLMGatewayRequestLog(Base):
     """Audit log for routed gateway requests."""
 
@@ -372,6 +381,9 @@ class LLMGatewayRequestLog(Base):
     completion_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     total_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     error_code: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    #: A cap of the tenant's or an extension's admission check refused the request (whatever its error code
+    #: says); NULL on rows written before the gateway recorded it.
+    refused: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     # Cost estimate columns (populated at write time by PricingService)
     estimated_input_cost: Mapped[float | None] = mapped_column(
         Numeric(18, 10), nullable=True,
@@ -393,7 +405,17 @@ class LLMGatewayRequestLog(Base):
     cost_estimate_status: Mapped[str | None] = mapped_column(
         String(16), nullable=True,
     )
+    # The counting rules of the OpenTelemetry GenAI conventions: the input includes what was read from and
+    # written to the provider's prompt cache, the output includes the model's reasoning.
+    #: Of the input, read from the provider's prompt cache (``prompt_tokens_details.cached_tokens``).
     cached_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: Of the input, written to the provider's prompt cache (Anthropic's ``cache_creation_input_tokens``).
+    cache_write_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: Of the output, the model's reasoning (``completion_tokens_details.reasoning_tokens``).
+    reasoning_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: Where the token counts come from (``USAGE_SOURCES``): the provider reported them, the gateway counted
+    #: them, or estimated them (a model that reported none); NULL with no tokens (refused, failed early).
+    usage_source: Mapped[str | None] = mapped_column(String(16), nullable=True)
     stream: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     # Pipeline observability columns
     session_id: Mapped[str | None] = mapped_column(
@@ -402,6 +424,9 @@ class LLMGatewayRequestLog(Base):
     # Who the usage is attributed to beyond the user: the usage group the
     # backend stores on the user, and the chat project the session is in.
     group_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    #: The usage group's path at request time: its ancestors from the root down to it
+    #: (services/gateway/usage_group.py), so usage stays booked where it was after a reorganisation.
+    group_path: Mapped[list[str] | None] = mapped_column(GROUP_PATH, nullable=True)
     project_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     # A request of an agent (``/v1/agents/{agent}/...``): the agent, the device
     # signed in to it, and the conversation and turn the SDK names -- the
@@ -1075,8 +1100,11 @@ class PolicyDecisionRecord(Base):
     request_id: Mapped[str] = mapped_column(String(128), nullable=False)
     #: ``input``, ``output`` or ``tool``.
     stage: Mapped[str] = mapped_column(String(16), nullable=False)
-    #: ``block``, ``approval_required``, ``approved`` or ``rejected``.
+    #: ``block``, ``approval_required``, ``approved``, ``rejected`` or ``expired``.
     outcome: Mapped[str] = mapped_column(String(32), nullable=False)
+    #: What the user's answer to a waiting call said it covers: ``once``, ``chat`` or ``always``; ``None``
+    #: without an answer, or from a client that does not say.
+    answer_scope: Mapped[str | None] = mapped_column(String(16), nullable=True)
     policy_id: Mapped[str] = mapped_column(String(128), nullable=False)
     #: The policy's name: for auditors, never shown to the user.
     policy_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
@@ -1105,11 +1133,97 @@ class GovernanceKey(Base):
     )
 
 
+class ApprovalGrant(Base):
+    """A grant: the person lets one agent on one device run what would ask, for a while (sdk/38 §6).
+
+    ``time`` covers one tool; ``work`` the classes ``read`` and ``write`` in named places. Only a call that would
+    ask is covered, never past the floor, never a destructive or unclassified tool (``services/gateway/grants.py``).
+    ``calls_used`` counts in one conditional update with the database's clock; ``status`` is ``active``,
+    ``paused`` or ``revoked`` -- a grant past ``expires_at`` is expired whatever its status says.
+    """
+
+    __tablename__ = "approval_grant"
+    __table_args__ = (Index("ix_approval_grant_owner", "tenant_id", "user_id", "agent_id", "device_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    #: ``time`` or ``work`` (``plan`` and ``bypass`` come later).
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    tenant_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    user_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    agent_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    agent_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: The agent token's device: only it uses, pauses and resumes the grant.
+    device_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    #: The conversation it is bound to; ``None``: any conversation of the agent on the device (``time`` only).
+    conversation_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    #: ``{tools: [...]}`` for ``time``; ``{classes: [...], targets: [{type, identifiers, actions}]}`` for ``work``.
+    scope: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    max_calls: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    calls_used: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="active", server_default="active")
+    paused_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: ``person``, ``admin`` or ``agent`` (the device ended it).
+    revoked_by: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    #: What allowed it (the agent's version and the limits applied), what is recorded, what the person saw.
+    policy_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    evidence_level: Mapped[str] = mapped_column(String(16), nullable=False, default="decisions")
+    shown_text_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+class ApprovalGrantCall(Base):
+    """A call a grant covered, counted against its budget: the evidence of the stretch of work (L-60, L-61).
+
+    ``arguments`` only for ``work`` grants, as the gateway holds them after its PII masking; the place and the
+    arguments are encrypted at rest (a path or an address can name a person). Every covered call has a row, even
+    one whose request and call ids came before: the request id may be the client's, so it is no key.
+    """
+
+    __tablename__ = "approval_grant_call"
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    grant_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("approval_grant.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
+    request_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    call_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    tool_id: Mapped[str] = mapped_column(String(256), nullable=False)
+    #: The place the call acted on, when its tool names one.
+    target: Mapped[str | None] = mapped_column(EncryptedText("grant-evidence"), nullable=True)
+    arguments: Mapped[dict[str, Any] | None] = mapped_column(EncryptedJSON("grant-evidence"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class ApprovalGrantChange(Base):
+    """An extension of a running grant: the time and the places it added, and what the card showed (sdk/40 A2.2).
+
+    A grant grows in place, never past its longest span counted from ``issued_at`` (owner, 2026-11-07); each change
+    is kept beside the grant. The places are encrypted at rest, as the calls' are.
+    """
+
+    __tablename__ = "approval_grant_change"
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    grant_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("approval_grant.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
+    #: How far the end moved, in seconds (after the cap); 0 when only places were added.
+    added_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    added_targets: Mapped[list[Any] | None] = mapped_column(EncryptedJSON("grant-evidence"), nullable=True)
+    expires_before: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_after: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    shown_text_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
 class ToolRule(Base):
     """A tenant's rule for tools the gateway runs or a client offers.
 
     ``message`` is what the user is told; ``name`` is for admins and
-    auditors. The lowest ``priority`` that matches decides.
+    auditors. Of the rules that match, a deny wins, then ``approval_required``,
+    then ``allow``, whatever the ``priority``; it orders rules of one action.
     """
 
     __tablename__ = "llm_gateway_tool_rule"
@@ -1119,7 +1233,8 @@ class ToolRule(Base):
     name: Mapped[str] = mapped_column(String(256), nullable=False)
     #: A glob over tool names: ``mcp_github__*``, ``knowledge_search``, ``*``.
     tool_pattern: Mapped[str] = mapped_column(String(256), nullable=False)
-    #: ``deny``, ``approval_required`` or ``allow``.
+    #: ``deny`` or ``approval_required``. Older rows may say ``allow``, which changes nothing; the
+    #: admin API takes no new one.
     action: Mapped[str] = mapped_column(String(32), nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
     category: Mapped[str] = mapped_column(String(64), nullable=False, default="tool_rule")

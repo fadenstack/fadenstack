@@ -26,6 +26,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from faden_backend.db.models.containers import AuditResult
 from faden_backend.services.audit import chain
+from faden_backend.services.system_settings.registry import registry_by_key, validate_value
+from faden_backend.services.usage import config as usage_config
 from faden_backend.settings import settings
 
 
@@ -143,8 +145,32 @@ async def grant_admin(args: argparse.Namespace) -> dict[str, Any]:
     return {"ok": True, "user_id": user_id, "already": already}
 
 
-#: Settings the CLI may read and write (``faden deploy`` and ``faden upgrade`` ask for these).
-_CLI_SETTINGS = {"chat.deleted_retention_days": int}
+#: Settings the CLI may read and write (``faden deploy`` and ``faden upgrade`` ask for these): the chat's
+#: retention, and the usage settings (deploy writes the host's time zone into ``usage.time_zone``) but the
+#: person-level switch, which changes only in the console in Root Mode, so that turning it on is always a
+#: named person's recorded act (M02, M08 of the usage compliance report).
+_CLI_SETTINGS = frozenset({
+    "chat.deleted_retention_days",
+    *(f"usage.{name}" for name in usage_config.NAMES if name != "person_reporting"),
+})
+
+
+def _cli_value(key: str, raw: str) -> tuple[object, str | None]:
+    """*raw* as the setting's value, or the reason it is not one (checked as the console checks it)."""
+    defn = registry_by_key()[key]
+    if defn.type == "int":
+        try:
+            value: object = int(raw)
+        except ValueError:
+            return None, f"{key} takes a whole number."
+        if key == "chat.deleted_retention_days" and isinstance(value, int) and value < 0:
+            return None, f"{key} cannot be negative."
+    else:
+        value = raw
+    try:
+        return validate_value(defn, value), None
+    except ValueError as exc:
+        return None, str(exc)
 
 
 async def get_setting(args: argparse.Namespace) -> dict[str, Any]:
@@ -162,15 +188,11 @@ async def set_setting(args: argparse.Namespace) -> dict[str, Any]:
     """Store a console setting from the CLI; recorded."""
     from faden_backend.db.dao.system_settings_dao import SystemSettingsDAO  # noqa: PLC0415
 
-    kind = _CLI_SETTINGS.get(args.key)
-    if kind is None:
+    if args.key not in _CLI_SETTINGS:
         return {"ok": False, "error": f"The CLI does not set {args.key}."}
-    try:
-        value = kind(args.value)
-    except ValueError:
-        return {"ok": False, "error": f"{args.key} takes a whole number."}
-    if isinstance(value, int) and value < 0:
-        return {"ok": False, "error": f"{args.key} cannot be negative."}
+    value, problem = _cli_value(args.key, args.value)
+    if problem is not None:
+        return {"ok": False, "error": problem}
     factory = _factory()
     async with factory() as session:
         await SystemSettingsDAO(session).upsert_value(args.key, {"value": value}, None)

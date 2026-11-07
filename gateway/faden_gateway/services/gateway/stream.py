@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from faden_gateway.services.gateway.usage import Usage, usage_from_payload
+from faden_gateway.services.gateway.usage import NO_USAGE, Usage, usage_from_payload
 
 
 @dataclass(slots=True)
@@ -14,7 +14,7 @@ class StreamStats:
     """Collected streaming stats."""
 
     ttft_ms: int | None = None
-    usage: Usage = field(default_factory=lambda: Usage(None, None, None))
+    usage: Usage = field(default_factory=lambda: NO_USAGE)
     #: The error an event carried in place of the answer, when one did: the
     #: upstream refused, and the client got that event with a 200.
     error: str | None = None
@@ -80,6 +80,7 @@ def _extract_usage_from_chunk(chunk: bytes, stats: StreamStats) -> None:
         if isinstance(parsed, dict) and parsed.get("error") and not parsed.get("choices"):
             error = parsed["error"]
             stats.error = str(error.get("message") if isinstance(error, dict) else error)[:500]
+        # The last event that carries usage holds the answer's (with its cached and reasoning tokens).
         usage = usage_from_payload(parsed)
-        if usage.total_tokens is not None:
+        if usage.reported:
             stats.usage = usage

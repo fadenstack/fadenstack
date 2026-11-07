@@ -25,11 +25,26 @@ def _default_workers() -> int:
     workers: in every run of 10-15 bursts of 8 requests, some bursts lost 2-7
     requests outright (no response in 60 s); one worker lost none. An async
     service loses nothing by running one worker in dev, and Linux deployments,
-    where sharing a socket works, keep the CPU-based default.
+    where sharing a socket works, keep the CPU-based default, up to eight: with
+    50 people each calling back to back, a covered tool call answers in p99
+    26-29 ms over eight workers and 94 ms over four (sdk/40 "Load from Linux",
+    owner 2026-11-07).
     """
     if sys.platform == "win32":
         return 1
-    return min(_CPU_COUNT, 4)
+    return min(_CPU_COUNT, 8)
+
+
+def _default_overflow(workers: int) -> int:
+    """The connections each worker opens on demand beyond its 5 kept ones.
+
+    Ten up to four workers (SQLAlchemy's default), three beyond: eight workers
+    then open at most 8 x (5 + 3) = 64, about what four opened before (60), so
+    the pools still fit the 100 a Postgres accepts by default beside the other
+    services. Three is measured: 8 workers of 5 + 3 answer in p99 25-29 ms;
+    of 3 + 5, whose extra connections open and close on every burst, 65-85 ms.
+    """
+    return 10 if workers <= 4 else 3
 
 TEMP_DIR = Path(gettempdir())
 
@@ -76,9 +91,10 @@ class Settings(BaseSettings):
     # its own pool, and all of them share one Postgres (max_connections 100
     # by default). Sized from the CPU count, one gateway worker on a
     # 64-thread host could open 384 connections and locked every other
-    # service out (2026-09-25). 5 kept + 10 on demand is SQLAlchemy's default.
+    # service out (2026-09-25). 5 kept + 10 on demand is SQLAlchemy's default;
+    # beyond four workers each opens 3 on demand (``_default_overflow``).
     db_pool_size: int = 5
-    db_max_overflow: int = 10
+    db_max_overflow: int = _default_overflow(_default_workers())
     db_url_override: str | None = None
     # PostgreSQL TLS — disable | prefer | require | verify-ca | verify-full
     db_ssl_mode: str = "disable"
@@ -214,6 +230,10 @@ class Settings(BaseSettings):
     #: How long a tool call that needs approval waits for the user (streamed
     #: answers to clients that asked for events); then it is refused.
     governance_approval_timeout_s: int = 300
+    #: Refuse an approval that names no scope for a call that takes ``once`` only (destructive, unclassified,
+    #: or asked for by a rule). One that names a scope is always checked; this is for clients that send none,
+    #: and stays off until every agent in use sends scopes.
+    approvals_require_answer_scope: bool = False
 
     # Optional module: Skills registry
     skills_service_url: str | None = None
@@ -257,18 +277,25 @@ class Settings(BaseSettings):
     #: Days a chat its person deleted is kept before it is erased; the console's setting
     #: (``chat.deleted_retention_days``) wins when set. `faden deploy` asks for it.
     chat_deleted_retention_days: int = 30
+    #: The usage time zone when the console's setting (``usage.time_zone``) has no value: an IANA name.
+    #: Calendar days of the tokens-per-day cap and of the daily usage rollups are days of this zone.
+    usage_time_zone: str = "UTC"
+    #: How often the usage rollup job runs (services/gateway/usage_rollup.py); 0 switches it off.
+    usage_rollup_interval_sec: int = 300
     session_max_recent_messages: int = 20
     session_token_budget: int = 4096
     session_summary_threshold: int = 10
     session_summarizer_model: str | None = None
     session_fact_extraction_enabled: bool = False
     session_fact_extraction_model: str | None = None
-    # Where the skills resolved for a turn go: after the history, just before
-    # the question ("tail"), or before the history ("prefix"). They are
-    # resolved per turn from the question, so in the prefix a different set
-    # moved everything after it, and vLLM's prefix cache recomputed the
-    # history.
-    session_skills_position: Literal["prefix", "tail"] = "tail"
+    # Where the skills resolved for a turn go: in the question's own message,
+    # before its text ("user"); or as system messages after the history, just
+    # before the question ("tail"), or before the history ("prefix"). They
+    # are resolved per turn from the question, so wherever a different set
+    # sits early in the prompt, vLLM's prefix cache recomputes everything
+    # after it -- in "tail" too on a template that takes one system message,
+    # first (Qwen 3.5 and later), which moves them up.
+    session_skills_position: Literal["user", "prefix", "tail"] = "user"
     # A tool result replayed with the history is cut to this many characters:
     # a turn's tool exchange is kept with its reply, and one GitHub response
     # can be tens of kilobytes.

@@ -2,7 +2,8 @@
  * Settings > Modules: the provenance module shows what its engine says, and
  * switching it off asks for an acknowledgement of what is lost (EU AI Act
  * Art. 50(2)) before the request goes out with `confirm: true`. Other modules
- * keep the plain confirmation.
+ * keep the plain confirmation. With the Mail page, the mailer's card links
+ * there instead of showing the mail server's settings one by one.
  */
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -10,7 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as provenance from "~/api/provenance";
 import { servicesApi, type ServiceInfo } from "~/api/services";
-import { systemSettingsApi } from "~/api/systemSettings";
+import { systemSettingsApi, type SystemSettingSchemaItem } from "~/api/systemSettings";
 import { useServices } from "~/lib/ServicesContext";
 
 import ModulesTab from "./ModulesTab";
@@ -179,6 +180,81 @@ describe("ModulesTab: provenance", () => {
     await userEvent.click(within(dialog).getByTestId("module-confirm-action"));
 
     expect(await screen.findByText(/confirm it \(send confirm: true\)/)).toBeInTheDocument();
+  });
+});
+
+describe("ModulesTab: mailer", () => {
+  const MAILER: ServiceInfo = {
+    name: "mailer",
+    display_name: "Mailer",
+    description: "Mail.",
+    configured: true,
+    enabled: true,
+    status: "healthy",
+    module_type: "container",
+    containers: [{ name: "faden-mailer", state: "running" }],
+    disable_warning: null,
+  };
+
+  const setting = (key: string, label: string): SystemSettingSchemaItem => ({
+    key, type: "string", category: "notifications", group: "smtp", label, description: "", is_secret: false,
+    default: "", apply_scope: "live_reload", service_targets: [], protected: false, enum_values: [],
+  });
+
+  beforeEach(() => {
+    services.mockReturnValue({
+      services: [MAILER],
+      loading: false,
+      error: null,
+      isModuleEnabled: () => true,
+      getModule: () => MAILER,
+      refresh,
+    });
+    vi.spyOn(systemSettingsApi, "schema").mockResolvedValue([
+      setting("faden_mailer.smtp.host", "SMTP Host"),
+      setting("faden_mailer.admin_recipients", "Admin Alert Recipients"),
+      setting("faden_mailer.alert_cooldown_minutes", "Alert Cooldown"),
+    ]);
+  });
+
+  it("links to Settings > Mail instead of the mail server's raw fields, keeping the rest and start/stop", async () => {
+    const openMail = vi.fn();
+    render(<ModulesTab onOpenMail={openMail} />);
+
+    const moved = await screen.findByTestId("mailer-settings-moved");
+    expect(moved).toHaveTextContent("are set under Settings → Mail");
+    await userEvent.click(within(moved).getByRole("button", { name: "Open mail settings" }));
+    expect(openMail).toHaveBeenCalledTimes(1);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Module settings" }));
+    expect(await screen.findByRole("textbox", { name: "Alert Cooldown" })).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "SMTP Host" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Admin Alert Recipients" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Stop" })).toBeEnabled();
+  });
+
+  it("says that changing a protected setting needs root mode", async () => {
+    vi.spyOn(systemSettingsApi, "schema").mockResolvedValue([
+      { ...setting("faden_mailer.service_url", "Mail Service URL"), description: "Where the mail service runs.",
+        protected: true },
+      { ...setting("faden_mailer.alert_cooldown_minutes", "Alert Cooldown"), description: "Minutes between alerts." },
+    ]);
+    render(<ModulesTab onOpenMail={() => {}} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Module settings" }));
+    expect(await screen.findByRole("textbox", { name: "Mail Service URL" })).toHaveAccessibleDescription(
+      "Where the mail service runs. Changing it needs root mode: switch it on in the top bar.",
+    );
+    expect(screen.getByRole("textbox", { name: "Alert Cooldown" })).toHaveAccessibleDescription("Minutes between alerts.");
+  });
+
+  it("shows the raw fields where the server offers no Mail page", async () => {
+    render(<ModulesTab />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Module settings" }));
+    expect(await screen.findByRole("textbox", { name: "SMTP Host" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Admin Alert Recipients" })).toBeInTheDocument();
+    expect(screen.queryByTestId("mailer-settings-moved")).not.toBeInTheDocument();
   });
 });
 

@@ -25,7 +25,8 @@ someone's access.
     | `default_user` | The chat: chats, projects and attachments, in the chat and through the API, their own skills (create and share), and reading the knowledge base's collections that are open to them. Every new account gets it unless you pick other roles. |
     | `viewer` | Reading the state of models, clusters, machines, containers and logs, through the API. |
     | `operator` | What `viewer` gives, and running models through the API: creating, changing, scaling, stopping and starting clusters and deployments. Not deleting. |
-    | `admin` | Every permission, including deleting, making a skill visible to the whole organisation (`skills:publish`), administering every skill (`skills:manage`), and creating and deleting agents (`agents:create`, `agents:delete`). |
+    | `admin` | Every permission but one, including deleting, making a skill visible to the whole organisation (`skills:publish`), administering every skill (`skills:manage`), creating and deleting agents (`agents:create`, `agents:delete`), and the usage figures for groups (`usage:read`). Not the one that `usage_auditor` gives. |
+    | `usage_auditor` | Looking at one person's usage figures while person-level reporting is on, and downloading one person's usage data for an access request, with a reason each time (`usage.people:audit`); and the usage figures for groups (`usage:read`), so the role alone opens **Observability → Usage**. Nobody holds it at installation, and being a superuser does not give it. See [Usage and privacy](usage-privacy.md#looking-at-one-persons-figures). |
     | `rag_manager`, `rag_editor`, `rag_viewer` | Managing or editing the knowledge base (`rag_manager`, `rag_editor`: they see every collection and set who reads each), or reading it (`rag_viewer`). |
 
 !!! note
@@ -98,7 +99,7 @@ A group gathers people, for three things:
 - **Roles.** A group's roles apply to all its members, on top of their own.
 - **Sharing.** Skills and agents can be shared with a group (see [Skills](skills.md) and [Agents](agents.md)).
 - **Usage.** A person's **Usage group** is the group their requests are counted towards (see
-  [Usage and costs](usage.md)). It is set per person, on **Users**.
+  [Usage and limits](usage.md)). It is set per person, on **Users**.
 
 To make one: open **Access Control → Groups**, select **Create Group**, name it and tick its roles under
 **Assign Roles**, save it, then select **Manage Members** and **Add Members**.
@@ -106,6 +107,29 @@ To make one: open **Access Control → Groups**, select **Create Group**, name i
 Removing someone from a group takes away the group's roles, and the skills shared with the group stop
 reaching their chats at once. Joining or leaving a group signs the person out, as any change of their
 rights does (see [Sign-ins and API tokens](#sign-ins-and-api-tokens)).
+
+### Teams in a tree
+
+Groups can form a tree, as your organisation does: departments, their teams, and teams within those. The tree
+decides where usage is counted (see [Usage and limits](usage.md#teams-on-the-usage-page)); it gives nobody any
+rights.
+
+1. Open **Access Control → Groups** and edit the group.
+2. Pick its **Parent**. The list offers only groups that keep the tree a tree, and shows each one's level.
+3. Enter its **Cost centre**, if your finance department uses one (free text).
+4. Save. The list on **Groups** shows the tree.
+
+- **One parent per group**, and at most six levels from the top group down. A group cannot be placed under one
+  of its own sub-groups.
+- **A person's usage group is their home team**, at any level, set here in Fadenstack on **Users**. Their usage
+  counts toward it and toward every group above it.
+- **Roles do not flow down the tree.** A group's roles reach its own members, not the members of its sub-groups.
+- **Deleting a group** moves its sub-groups up to its parent.
+- **Archive** a group that has ended: it keeps its history in the usage figures, but cannot be anyone's usage
+  group or get new members, and is no longer offered where people pick a group. The list hides archived groups
+  until you switch **Show 2 archived groups** (with their number) on; **Bring back** makes one active again.
+- **A group a sign-in provider keeps** (see [Provisioning](sign-in-provisioning.md)) can still get a parent and a
+  cost centre: the tree is your organisation's, the provider names the group and its members.
 
 ## Developer mode
 
@@ -211,8 +235,9 @@ server; `faden chats orphans` lists it and `faden chats orphans --erase` erases 
 Two rights are about trust rather than work, and each can be given, taken back and handed over:
 
 - An **administrator** (superuser) may do everything in the console.
-- An **auditor** (the built-in role `auditor`) reads the audit log and changes nothing. Administrators read it
-  too; viewers and operators do not, because it holds e-mail and IP addresses.
+- An **auditor** (the built-in role `auditor`) reads the audit log and the usage figures for groups
+  (**Observability → Usage**), and changes nothing. Administrators read them too; viewers and operators do not,
+  because the audit log holds e-mail and IP addresses.
 
 To change them, start **Root Mode** first, then open **Access Control → Users** and select **Rights** (the
 shield icon) in the person's row:

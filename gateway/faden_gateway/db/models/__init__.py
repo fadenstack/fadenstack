@@ -11,6 +11,13 @@ from faden_gateway.db.models.gateway import (
     ProviderType,
     TenantLLMPolicy,
 )
+from faden_gateway.db.models.usage import (
+    UsageDaily,
+    UsageDailyPerson,
+    UsageErased,
+    UsageHourly,
+    UsageRollupState,
+)
 
 __all__ = [
     "LLMGatewayRequestLog",
@@ -22,6 +29,11 @@ __all__ = [
     "ProviderHealthStatus",
     "ProviderType",
     "TenantLLMPolicy",
+    "UsageDaily",
+    "UsageDailyPerson",
+    "UsageErased",
+    "UsageHourly",
+    "UsageRollupState",
 ]
 
 

@@ -13,6 +13,8 @@ export class ApiError extends Error {
     message: string,
     readonly status: number,
     readonly code?: string,
+    /** The answer's `detail` as the server sent it, for a caller that reads its fields (e.g. problems per field). */
+    readonly detail?: unknown,
   ) {
     super(message);
     this.name = "ApiError";
@@ -39,12 +41,15 @@ function errorFields(body: { detail?: Detail; error?: { message?: string; code?:
 export async function readError(res: Response): Promise<ApiError> {
   const text = await res.text().catch(() => "");
   let parsed: { message?: string; code?: string } = {};
+  let detail: unknown;
   try {
-    parsed = errorFields(JSON.parse(text));
+    const body = JSON.parse(text);
+    parsed = errorFields(body);
+    detail = body && typeof body === "object" ? (body as { detail?: unknown }).detail : undefined;
   } catch {
     // not JSON: the text is the message
   }
-  return new ApiError(parsed.message || text || `${res.status} ${res.statusText}`, res.status, parsed.code);
+  return new ApiError(parsed.message || text || `${res.status} ${res.statusText}`, res.status, parsed.code, detail);
 }
 
 /** The message of anything a request may throw. */
