@@ -994,6 +994,8 @@ class ToolModeCheck:
     name = "tool_mode"
     stages = frozenset({gov.GovernanceStage.TOOL})
     output_window_chars = 0
+    #: A mode that cannot be checked refuses the call; skipped, the call would run unasked (ASVS 5.0 V16.5.3).
+    fail_closed = True
 
     def __init__(self, classifier: tool_classes.Classifier, mode: tool_classes.ToolMode) -> None:
         self.classifier = classifier
@@ -1017,6 +1019,25 @@ class ToolModeCheck:
 _ONCE_ONLY_CLASSES = frozenset({
     tool_classes.ToolClass.DESTRUCTIVE.value, tool_classes.ToolClass.UNKNOWN.value,
 })
+
+
+def _floor(req: _Prepared, name: str, verdict: gov.Verdict) -> bool:
+    """Whether a call that needs approval is a floor item: asked every time, whatever else stands (38 §4.3).
+
+    The client is told ``rule: true``, so an approval for the chat, one kept always, or the app's bypass never
+    answers it, and the gateway takes an approval for that call alone (``gov.refusal``). The items, all here:
+
+    - an admin's rule or a policy: any check but the chat's tool mode;
+    - a tool the agent's author marked ``approval: always``, which is also how an author marks a tool that
+      decides about people (GDPR Art. 22).
+
+    ``physical`` (desktop 16 F-10, L-12) and ``open_world`` in a tainted turn (intent IM-09, L-20) join here
+    when their packages build their markers. Until then, a tool that acts on the physical world needs
+    ``approval: always`` or an admin's "Ask first" rule.
+    """
+    if verdict.check != ToolModeCheck.name:
+        return True
+    return req.agent is not None and name in req.agent.agent.always_asked
 
 
 def _same_objection(answered: gov.Verdict, now: gov.Verdict) -> bool:
@@ -2380,7 +2401,7 @@ class GatewayService:
             "decision": "deny" if blocked else "ask" if asks else "run",
             "tool_class": classified.tool_class.value,
             "effective_tool_mode": req.tool_mode.mode.value,
-            "required_by_rule": bool(verdict and verdict.check != ToolModeCheck.name),
+            "required_by_rule": bool(verdict and _floor(req, name, verdict)),
             "message": (
                 verdict.decision.message
                 if verdict
@@ -2505,7 +2526,7 @@ class GatewayService:
             if verdict is None or verdict.blocked:
                 continue
             approval_id = uuid.uuid4().hex
-            tool_class, rule = self._class_of(req, name), verdict.check != ToolModeCheck.name
+            tool_class, rule = self._class_of(req, name), _floor(req, name, verdict)
             yield faden_events.sse_event(gov.approval_event(
                 approval_id, call, name, verdict.decision.message, timeout, tool_class=tool_class, rule=rule,
             ))
@@ -2561,11 +2582,12 @@ class GatewayService:
         client. A call a rule refuses, or of a tool the mode hides, is
         ``faden.tool_denied``. A call a rule says needs approval, or that the
         tool mode asks about, is ``faden.approval_required`` without an
-        ``approvalId``: the client asks its user. ``rule`` says an admin's rule
-        (or a policy) asks -- the SDK then asks every time, whatever else it
+        ``approvalId``: the client asks its user. ``rule`` says the call is a
+        floor item (:func:`_floor`: an admin's rule, a policy, the author's
+        ``approval: always``) -- the SDK then asks every time, whatever else it
         allowed -- and ``toolClass`` is the class the gateway holds, which the
         SDK never takes looser than its own: with no contract it is unknown,
-        so the SDK asks. Refusals and rules are recorded.
+        so the SDK asks. Refusals and admins' rules and policies are recorded.
         """
         if not req.faden_events or not req.checks:
             return []
@@ -2581,9 +2603,9 @@ class GatewayService:
             verdict = await gov.decide(req.checks, ctx)
             if verdict is None:
                 continue
-            rule = verdict.check != ToolModeCheck.name
+            rule = _floor(req, name, verdict)
             decision_id = None
-            if verdict.blocked or rule:
+            if verdict.blocked or verdict.check != ToolModeCheck.name:
                 decision_id, _ = await gov.record_on_own_session(
                     self.dao.session.bind, ctx, verdict, text=None,
                 )
@@ -2652,7 +2674,7 @@ class GatewayService:
         event = gov.tool_denied_event(call, name, message, decision_id)
         if req.faden_events:
             req.faden_pending.append(event)
-        return gov.denied_result(name, message)
+        return gov.denied_result(name, message, unchecked=verdict.decision.category == gov.UNAVAILABLE)
 
     def _govern_output(
         self, req: _Prepared, stream: AsyncIterator[bytes], *, auth: AuthContext, request_id: str, model_alias: str,

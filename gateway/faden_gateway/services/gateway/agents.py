@@ -161,6 +161,13 @@ class AgentProfile:
         """The names of the tools the host application may declare."""
         return frozenset(str(t.get("name", "")) for t in self.host_tool_contract)
 
+    @property
+    def always_asked(self) -> frozenset[str]:
+        """The tools the agent's author marked ``approval: always``: asked about every time, a floor item."""
+        return frozenset(
+            str(t.get("name", "")) for t in self.host_tool_contract if t.get("approval") == "always"
+        )
+
     @classmethod
     def from_row(cls, row: Any) -> AgentProfile:
         instructions = row["instructions"] or ""

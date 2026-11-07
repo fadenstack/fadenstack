@@ -36,6 +36,7 @@ from faden_gateway.services.extensions import load_plugin, registry
 from faden_gateway.services.gateway import governance as gov
 from faden_gateway.services.gateway import tool_classes
 from faden_gateway.services.gateway.llm_adapter import LLMAdapter
+from faden_gateway.services.gateway.service import ToolModeCheck
 from faden_gateway.settings import settings
 from tests.test_gateway_knowledge_tools import (
     CAN_CALL_TOOLS,
@@ -676,6 +677,38 @@ async def test_an_answer_on_another_worker_is_held_to_the_same_scope() -> None:
     assert await answer(scope=None, require_scope=True) is gov.Answered.SCOPE_REQUIRED
     assert await answer(scope="once") is gov.Answered.TAKEN
     assert await asyncio.wait_for(waiting, 5) == gov.Answer(approved=True, scope="once")
+
+
+# -- core's tool checks fail closed (38 §4.3; 39 F5) --------------------------------------------------
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("failing", ["tool_rules", "tool_mode"])
+async def test_a_core_tool_check_that_fails_stops_the_call_and_says_the_check_failed(
+    failing: str, fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await _setup(fastapi_app, db_session)
+    await _rule(db_session, "nothing_*", "deny", "Not this.")  # with a rule, the tenant's rules are checked
+
+    async def broken(self: Any, ctx: gov.GovernanceContext) -> gov.GovernanceDecision | None:
+        raise RuntimeError("the check broke")
+
+    monkeypatch.setattr(gov.ToolRuleCheck if failing == "tool_rules" else ToolModeCheck, "check", broken)
+    knowledge = _Knowledge(monkeypatch)
+    model = _Model(monkeypatch, _call("knowledge_search", {"query": "launch"}), _say("I could not search."))
+
+    r = await client.post("/v1/chat/completions", headers=_headers(**EVENTS), json={
+        "model": ALIAS, "stream": True, "messages": [{"role": "user", "content": "When is the launch?"}],
+    })
+    assert knowledge.searches == [], "a check that could not run is no yes"
+    failed = "A check failed, so this tool call did not run. Try again shortly."
+    told = model.sent[1]["messages"][-1]["content"]
+    assert f"Tool 'knowledge_search' did not run: {failed}" in told and "not allowed" not in told
+    [denied] = [e for e in _faden(r.text) if e.get("name") == "faden.tool_denied"]
+    assert denied["value"]["message"] == failed
+    [decision] = await _decisions(db_session)
+    assert (decision.outcome, decision.category, decision.check) == ("block", gov.UNAVAILABLE, failing)
 
 
 # -- errors, limits, the plugin -------------------------------------------------------------------

@@ -114,6 +114,23 @@ async def test_restrictive_mode_never_authorizes_history_mutation(
 
 
 @pytest.mark.anyio
+@pytest.mark.parametrize(("approval", "floor"), [(None, False), ("always", True)])
+async def test_a_tool_its_author_marks_always_is_reported_as_a_floor_item(
+    approval: str | None, floor: bool, client: AsyncClient, db_session: AsyncSession, backend: _Backend,
+) -> None:
+    await configure(db_session, backend)
+    tool = {"name": "nc_actions_undo", "risk": "write", "schema_sha256": SCHEMA}
+    if approval is not None:
+        tool["approval"] = approval
+    backend.put(_profile(host_tool_contract=(tool,)))
+    result = await client.post(
+        "/v1/agents/eplan-assistant/tools/check", headers=_headers(), json=command(tool_mode="ask"),
+    )
+    assert result.status_code == 200, result.text
+    assert (result.json()["decision"], result.json()["required_by_rule"]) == ("ask", floor)
+
+
+@pytest.mark.anyio
 async def test_current_central_deny_rule_is_used(
     client: AsyncClient, db_session: AsyncSession, backend: _Backend,
 ) -> None:

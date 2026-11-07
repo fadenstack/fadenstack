@@ -22,6 +22,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_gateway.db.models.gateway import AgentClientEvent, ProviderType
+from faden_gateway.services.extensions import registry
 from faden_gateway.services.gateway import faden_events
 from faden_gateway.services.gateway import governance as gov
 from faden_gateway.services.gateway import tool_classes as tc
@@ -164,6 +165,49 @@ async def test_an_agent_without_a_contract_has_its_tools_asked_about(
     }, headers={"Authorization": f"Bearer {_agent_token()}", **EVENTS})
     assert r.status_code == 200, r.text
     assert [(m["toolClass"], m["rule"]) for m in _marks(_faden(r.text))] == expected
+
+
+class _AskingPolicy:
+    """A policy, as EE would register one, that asks about every tool call."""
+
+    name = "asking_policy"
+    stages = frozenset({gov.GovernanceStage.TOOL})
+    output_window_chars = 0
+
+    async def check(self, ctx: gov.GovernanceContext) -> gov.GovernanceDecision | None:
+        return gov.GovernanceDecision(
+            outcome="approval_required", policy_id="p-ask", category="review", message="This needs a second look.",
+        )
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(("item", "rule"), [
+    ("mode", False), ("admin-rule", True), ("policy", True), ("approval-always", True),
+])
+async def test_every_floor_item_reaches_the_client_as_a_rule(
+    item: str, rule: bool, fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch, backend: _Backend,  # noqa: F811 - the fixture
+) -> None:
+    """38 §4.3: the SDK asks every time, whatever stands, only for ``rule: true``; the chat's mode is no floor."""
+    await _seed(db_session, provider=ProviderType.REMOTE_OPENAI, pii=None)
+    contract = {"name": "update_page", "risk": "write"}
+    if item == "approval-always":
+        contract["approval"] = "always"
+    backend.put(_profile(host_tool_contract=(contract,)))
+    fastapi_app.state.agent_directory.invalidate()
+    if item == "admin-rule":
+        await _rule(db_session, "update_page", "approval_required", "Page changes need your OK.")
+    if item == "policy":
+        monkeypatch.setattr(registry, "governance_checks", [*registry.governance_checks, _AskingPolicy()])
+    _Model(monkeypatch, _call("update_page", {"page": 3}))
+    update_page = {"type": "function", "function": {"name": "update_page", "parameters": {"type": "object"}}}
+
+    r = await client.post("/v1/agents/eplan-assistant/chat/completions", json={
+        "model": "x", "stream": True, "tools": [update_page], "messages": [{"role": "user", "content": "Fix page 3."}],
+    }, headers={"Authorization": f"Bearer {_agent_token()}", **EVENTS})
+    assert r.status_code == 200, r.text
+    [mark] = _marks(_faden(r.text))
+    assert (mark["toolClass"], mark["rule"]) == ("write", rule)
 
 
 @pytest.mark.anyio

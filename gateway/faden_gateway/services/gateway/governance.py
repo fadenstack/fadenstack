@@ -124,13 +124,22 @@ class Verdict:
 
 _RANK = {"block": 2, "approval_required": 1}
 
+#: The category of the objection a ``fail_closed`` check makes when it fails: nothing was decided.
+UNAVAILABLE = "unavailable"
+#: What the user is told then: the check failed -- not that a rule refused.
+_CHECK_FAILED = {
+    GovernanceStage.TOOL: "A check failed, so this tool call did not run. Try again shortly.",
+}
+_COULD_NOT_CHECK = "This could not be checked right now; try again shortly."
+
 
 async def decide(checks: Sequence[GovernanceCheck], ctx: GovernanceContext) -> Verdict | None:
     """Run every check for *ctx*'s stage; the most restrictive objection, or ``None``.
 
     A check that fails is skipped (logged), unless it says ``fail_closed``: a
     broken content policy should not stop every chat, unless its owner says
-    it must.
+    it must. Core's tool checks do (ASVS 5.0 V16.5.3: no fail-open). The
+    objection a failed check makes is :data:`UNAVAILABLE` and says so.
     """
     ours = [c for c in checks if ctx.stage in c.stages]
     if not ours:
@@ -142,8 +151,8 @@ async def decide(checks: Sequence[GovernanceCheck], ctx: GovernanceContext) -> V
             logger.error("Governance check %s failed at %s", check.name, ctx.stage, exc_info=result)
             if getattr(check, "fail_closed", False):
                 found.append((GovernanceDecision(
-                    outcome="block", policy_id=f"{check.name}:unavailable", category="unavailable",
-                    message="This could not be checked right now; try again shortly.",
+                    outcome="block", policy_id=f"{check.name}:{UNAVAILABLE}", category=UNAVAILABLE,
+                    message=_CHECK_FAILED.get(ctx.stage, _COULD_NOT_CHECK),
                 ), check.name))
             continue
         if result is not None:
@@ -199,6 +208,8 @@ class ToolRuleCheck:
     name = "tool_rules"
     stages = frozenset({GovernanceStage.TOOL})
     output_window_chars = 0
+    #: A rule that cannot be checked refuses the call (ASVS 5.0 V16.5.3): its "Ask first" is a floor item.
+    fail_closed = True
 
     def __init__(self, rules: Sequence[Rule]) -> None:
         self.rules = rules
@@ -466,8 +477,10 @@ def client_approval_event(
     }}
 
 
-def denied_result(name: str, message: str) -> str:
-    """What the model is told about a refused call."""
+def denied_result(name: str, message: str, *, unchecked: bool = False) -> str:
+    """What the model is told about a refused call; *unchecked*: a check failed, nothing refused it."""
+    if unchecked:
+        return f"Tool '{name}' did not run: {message}"
     return f"Tool '{name}' is not allowed here: {message}"
 
 
