@@ -8,6 +8,8 @@
   agent or signed in anywhere. It holds from the next call on; a call already running finishes.
 - ``POST /v1/agents/{agent}/grants/{id}/pause`` and ``.../resume``: only the grant's device; the clock runs
   on.
+- ``POST /v1/agents/{agent}/grants/{id}/extend``: more time or places, from the grant's device, in place and
+  never past the longest grant from when it was issued.
 
 A grant is the device's: only the agent's route with a device sign-in (the agent token's ``did``) makes,
 lists, pauses and resumes one. The gateway checks and counts every covered call itself
@@ -214,3 +216,49 @@ async def resume_grant(
     auth, agent, device_id = _device(caller)
     grant = await grants.resume(dao.session, _grant_id(grant_id), _owner(auth, agent, device_id))
     return await _answer(dao, grant)
+
+
+class GrantExtension(BaseModel):
+    """What the person added on the card the agent showed to extend a running grant: only the difference."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    #: Moves the end this much later, at most to the grant's longest span from when it was issued.
+    minutes: int = Field(default=0, ge=0, le=1440)
+    #: Places a stretch of work gains, for the classes it already covers.
+    targets: list[GrantTarget] = Field(default_factory=list, max_length=20)
+    shown_text_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+
+
+@router.post("/v1/agents/{agent}/grants/{grant_id}/extend", response_model=None)
+async def extend_grant(
+    grant_id: str,
+    body: GrantExtension,
+    caller: Annotated[tuple[AuthContext, AgentRequest], Depends(agent_request)],
+    dao: Annotated[GatewayDAO, Depends()],
+) -> JSONResponse:
+    """Extend a running grant of this device in place; ``narrowed`` says when the longest span cut the time.
+
+    Owner, 2026-11-07: the grant's whole span stays within the longest grant from when it was issued; past
+    that a new grant needs the full card again. Each extension is recorded with what the card showed.
+    """
+    auth, agent, device_id = _device(caller)
+    if not body.minutes and not body.targets:
+        raise GatewayError(
+            status_code=422, code="grant_scope_invalid", message="Say what the extension adds.",
+        )
+    try:
+        grant, cut = await grants.extend(
+            dao.session, _grant_id(grant_id), _owner(auth, agent, device_id), minutes=body.minutes,
+            targets=[t.model_dump() for t in body.targets],
+            longest_minutes=agent.agent.max_grant_minutes or grants.DEFAULT_LONGEST_MINUTES,
+            shown_text_hash=body.shown_text_sha256,
+        )
+    except grants.RefusedError as exc:
+        raise GatewayError(status_code=422, code=exc.code, message=str(exc)) from exc
+    if grant is None:
+        raise _not_found()
+    now = await grants.server_now(dao.session)
+    return JSONResponse({
+        "object": "agent.grant", **grants.as_dict(grant, now), "server_now": now.isoformat(), "narrowed": cut,
+    })

@@ -1196,6 +1196,28 @@ class ApprovalGrantCall(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
+class ApprovalGrantChange(Base):
+    """An extension of a running grant: the time and the places it added, and what the card showed (sdk/40 A2.2).
+
+    A grant grows in place, never past its longest span counted from ``issued_at`` (owner, 2026-11-07); each change
+    is kept beside the grant. The places are encrypted at rest, as the calls' are.
+    """
+
+    __tablename__ = "approval_grant_change"
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    grant_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("approval_grant.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
+    #: How far the end moved, in seconds (after the cap); 0 when only places were added.
+    added_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    added_targets: Mapped[list[Any] | None] = mapped_column(EncryptedJSON("grant-evidence"), nullable=True)
+    expires_before: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_after: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    shown_text_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
 class ToolRule(Base):
     """A tenant's rule for tools the gateway runs or a client offers.
 

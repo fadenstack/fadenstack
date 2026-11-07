@@ -26,7 +26,7 @@ from urllib.parse import urlsplit
 from sqlalchemy import Integer, String, bindparam, func, insert, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncSession
 
-from faden_gateway.db.models.gateway import ApprovalGrant, ApprovalGrantCall
+from faden_gateway.db.models.gateway import ApprovalGrant, ApprovalGrantCall, ApprovalGrantChange
 
 logger = logging.getLogger(__name__)
 
@@ -484,6 +484,83 @@ async def resume(session: AsyncSession, grant_id: uuid.UUID, owner: Owner) -> Ap
         session, grant_id,
         _device_owned(owner) & (ApprovalGrant.status == "paused") & (ApprovalGrant.expires_at > _clock()),
         {"status": "active", "paused_at": None},
+    )
+
+
+async def extend(
+    session: AsyncSession, grant_id: uuid.UUID, owner: Owner, *, minutes: int,
+    targets: Sequence[Mapping[str, Any]], longest_minutes: int, shown_text_hash: str | None = None,
+) -> tuple[ApprovalGrant | None, list[str]]:
+    """Add time and places to a running grant of the owner's device, in place; the grant and what was cut.
+
+    The grant grows, never past ``issued_at`` plus the longest grant (owner, 2026-11-07: every grant ends,
+    D5); the places hold only the classes it already covers, so an extension never widens what it lets the
+    agent do. Each extension is kept with what the card showed (``approval_grant_change``). ``None``: no such
+    running grant. Raises :class:`RefusedError` when nothing can be added. Committed.
+    """
+    try:
+        grant = (await session.execute(
+            select(ApprovalGrant).where(
+                ApprovalGrant.id == grant_id, _owned(owner), ApprovalGrant.status.in_(("active", "paused")),
+                ApprovalGrant.expires_at > _clock(),
+            ).with_for_update(),
+        )).scalar_one_or_none()
+        if grant is None:
+            await session.rollback()
+            return None, []
+        added = _added_places(grant, targets)
+        cap = grant.issued_at + timedelta(minutes=longest_minutes)
+        wanted = grant.expires_at + timedelta(minutes=minutes)
+        end = max(grant.expires_at, min(wanted, cap))
+        seconds = int((end - grant.expires_at).total_seconds())
+        if seconds <= 0 and not added:
+            raise RefusedError(
+                "grant_at_longest",
+                "The grant is as long as it may be; a new grant needs the full card again.",
+            )
+        before = grant.expires_at
+        if added:
+            grant.scope = {**grant.scope, "targets": [*grant.scope.get("targets", []), *added]}
+        grant.expires_at = end
+        session.add(ApprovalGrantChange(
+            id=uuid.uuid4(), grant_id=grant.id, added_seconds=seconds, added_targets=added or None,
+            expires_before=before, expires_after=end, shown_text_hash=shown_text_hash, created_at=_clock(),
+        ))
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        raise
+    return grant, ["minutes"] if minutes and wanted > cap else []
+
+
+def _added_places(grant: ApprovalGrant, targets: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """The places an extension adds: only to a stretch of work, only for the classes it covers, none twice."""
+    if not targets:
+        return []
+    if grant.kind != "work":
+        raise RefusedError("grant_scope_invalid", "Only a grant for a stretch of work has places.")
+    classes = list((grant.scope or {}).get("classes") or ())
+    known = list((grant.scope or {}).get("targets") or ())
+    added: list[dict[str, Any]] = []
+    for t in targets:
+        place = {
+            "type": t["type"], "identifiers": list(t["identifiers"]),
+            "actions": [a for a in (t.get("actions") or classes) if a in classes],
+        }
+        if place["actions"] and not any(_holds(k, place, classes) for k in (*known, *added)):
+            added.append(place)
+    if not added:
+        raise RefusedError(
+            "grant_scope_invalid", "The places add nothing: the grant has them, or not for what it covers.",
+        )
+    return added
+
+
+def _holds(known: Mapping[str, Any], place: Mapping[str, Any], classes: Sequence[str]) -> bool:
+    """Whether a place the grant has already allows all *place* asks for: the same place, those actions."""
+    return (
+        known.get("type") == place["type"] and list(known.get("identifiers") or ()) == place["identifiers"]
+        and set(place["actions"]) <= set(known.get("actions") or classes)
     )
 
 

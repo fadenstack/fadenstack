@@ -863,6 +863,18 @@ async def test_the_profile_carries_what_the_sdk_caches_not_the_instructions(
     assert profile["edition"] == "community" and "agents" in profile["features"]
     assert profile["user"] == {"language": None}
     assert profile["skills"] is False, "no Skills module here: the SDK shows no skill picker"
+    assert profile["approvals"] == {"standing": None, "longest_grant_minutes": 120, "grant_classes": ["read", "write"]}
+
+
+@pytest.mark.anyio
+async def test_the_profile_says_what_the_agents_approval_card_may_offer(
+    client: AsyncClient, fastapi_app: FastAPI, backend: _Backend,
+) -> None:
+    """sdk/38 §7: only the standing approvals the agent allows, grants no longer than its longest, its classes."""
+    backend.put(_profile(standing=("chat", "time"), max_grant_minutes=30, grant_classes=("read",)))
+    fastapi_app.state.agent_directory.invalidate()
+    r = await client.get("/v1/agents/eplan-assistant/profile", headers=_headers())
+    assert r.json()["approvals"] == {"standing": ["chat", "time"], "longest_grant_minutes": 30, "grant_classes": ["read"]}
 
 
 # -- the skills its person may pick -------------------------------------------------------------

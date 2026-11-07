@@ -13,7 +13,7 @@ import os
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from faden_gateway.db.models.gateway import (
     ApprovalGrant,
     ApprovalGrantCall,
+    ApprovalGrantChange,
     LLMModelAlias,
     LLMPoolMembership,
     LLMProviderInstance,
@@ -316,6 +317,60 @@ async def test_a_lookup_that_fails_covers_nothing() -> None:
         await broken.dispose()
 
 
+async def _extend(engine: AsyncEngine, grant_id: uuid.UUID, owner: grants.Owner = OWNER, **fields: Any) -> Any:
+    async with AsyncSession(engine, expire_on_commit=False) as session:
+        return await grants.extend(session, grant_id, owner, **{"minutes": 0, "targets": [], "longest_minutes": 120,
+                                                                 **fields})
+
+
+@needs_postgres
+@pytest.mark.anyio
+async def test_a_grant_is_extended_in_place_never_past_its_longest_span_from_its_start(engine: AsyncEngine) -> None:
+    """Owner, 2026-11-07: in place, capped at the longest grant counted from when it was issued."""
+    grant = await _issue(engine, replace(TIME, minutes=100))
+    longer, cut = await _extend(engine, grant.id, minutes=10, shown_text_hash="a" * 64)
+    assert (longer.expires_at - grant.expires_at, cut) == (timedelta(minutes=10), [])
+    capped, cut = await _extend(engine, grant.id, minutes=30)
+    assert (capped.expires_at - grant.issued_at, cut) == (timedelta(minutes=120), ["minutes"])
+    with pytest.raises(grants.RefusedError) as refused:
+        await _extend(engine, grant.id, minutes=30)
+    assert refused.value.code == "grant_at_longest", "past the cap a new grant needs the full card"
+    with pytest.raises(grants.RefusedError):
+        await _extend(engine, grant.id, targets=[{"type": "document", "identifiers": ["/a"], "actions": None}])
+    async with AsyncSession(engine) as session:
+        changes = (await session.execute(
+            select(ApprovalGrantChange).order_by(ApprovalGrantChange.created_at),
+        )).scalars().all()
+    assert [(c.added_seconds, c.shown_text_hash) for c in changes] == [(600, "a" * 64), (600, None)]
+    assert changes[1].expires_after - changes[0].expires_before == timedelta(minutes=20)
+
+
+@needs_postgres
+@pytest.mark.anyio
+async def test_a_stretch_of_work_gains_places_only_for_what_it_covers(engine: AsyncEngine) -> None:
+    grant = await _issue(engine, grants.Granted("work", {**WORK, "classes": ["write"]}, 30, None, "v3/120m"))
+    elsewhere = replace(_call_of("write", place=("document", "/other.docx")), call_id="c2")
+    assert await grants.cover(engine, OWNER, elsewhere) is None
+    wider, _ = await _extend(engine, grant.id, targets=[
+        {"type": "document", "identifiers": ["/other.docx"], "actions": ["read", "write"]},
+        {"type": "document", "identifiers": ["/plan.docx"], "actions": None},
+    ])
+    assert wider.scope["targets"][-1] == {"type": "document", "identifiers": ["/other.docx"], "actions": ["write"]}
+    assert wider.expires_at == grant.expires_at, "a place alone leaves the end where it was"
+    assert await grants.cover(engine, OWNER, elsewhere) == grant.id
+    with pytest.raises(grants.RefusedError):
+        await _extend(engine, grant.id, targets=[{"type": "site", "identifiers": ["a.example"], "actions": ["read"]}])
+
+
+@needs_postgres
+@pytest.mark.anyio
+async def test_only_the_grants_device_extends_a_running_grant(engine: AsyncEngine) -> None:
+    grant = await _issue(engine)
+    assert await _extend(engine, grant.id, replace(OWNER, device_id="device-8"), minutes=10) == (None, [])
+    await _sql(engine, "UPDATE approval_grant SET expires_at = now() - interval '1 second' WHERE id = :id", id=grant.id)
+    assert await _extend(engine, grant.id, minutes=10) == (None, []), "an ended grant is not extended"
+
+
 # -- the API and the coverage table, end to end on Postgres ------------------------------------
 
 
@@ -450,6 +505,24 @@ async def test_an_agent_that_offers_no_grants_gets_none(
     fastapi_app.state.agent_directory.invalidate()
     r = await client.post(GRANTS, headers=_auth(), json={"kind": "time", "tools": ["update_page"], "minutes": 30})
     assert (r.status_code, r.json()["error"]["code"]) == (403, "grant_not_offered")
+
+
+@pytest.mark.anyio
+async def test_a_grant_is_extended_from_its_device_and_says_what_the_cap_cut(
+    client: AsyncClient, fastapi_app: FastAPI, backend: _Backend,  # noqa: F811 - the fixture
+) -> None:
+    backend.put(_profile(max_grant_minutes=60))
+    fastapi_app.state.agent_directory.invalidate()
+    made = await _grant(client, minutes=30)
+    r = await client.post(f"{GRANTS}/{made['id']}/extend", headers=_auth(), json={"minutes": 60})
+    assert (r.status_code, r.json()["narrowed"]) == (200, ["minutes"])
+    assert 3590 <= r.json()["remaining_s"] <= 3600, "60 minutes from its start, the agent's longest"
+    again = await client.post(f"{GRANTS}/{made['id']}/extend", headers=_auth(), json={"minutes": 5})
+    assert (again.status_code, again.json()["error"]["code"]) == (422, "grant_at_longest")
+    nothing = await client.post(f"{GRANTS}/{made['id']}/extend", headers=_auth(), json={})
+    assert nothing.status_code == 422
+    other = await client.post(f"{GRANTS}/{made['id']}/extend", headers=_auth(did="device-8"), json={"minutes": 5})
+    assert other.status_code == 404
 
 
 async def _chat(

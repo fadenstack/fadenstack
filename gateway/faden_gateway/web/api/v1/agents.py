@@ -34,7 +34,7 @@ from starlette import status
 from faden_gateway.db.dao.gateway_dao import GatewayDAO
 from faden_gateway.db.models.gateway import AgentClientEvent
 from faden_gateway.services.extensions import registry
-from faden_gateway.services.gateway import agent_manifests, tool_classes
+from faden_gateway.services.gateway import agent_manifests, grants, tool_classes
 from faden_gateway.services.gateway import governance as gov
 from faden_gateway.services.gateway.agents import (
     AgentLookupError,
@@ -403,6 +403,15 @@ async def agent_profile(
             "ceiling": top.value if top else None,
             "max": highest.value,
             "open_world_enforced": tool_classes.OPEN_WORLD_ENFORCED,
+        },
+        # What the agent's approval card may offer (sdk/38 §5, §7): its standing approvals (``None``: any),
+        # the longest grant and the classes a grant may cover. The gateway applies them again to each grant.
+        "approvals": {
+            "standing": list(profile.standing) if profile.standing is not None else None,
+            "longest_grant_minutes": profile.max_grant_minutes or grants.DEFAULT_LONGEST_MINUTES,
+            "grant_classes": [
+                c for c in grants.GRANT_CLASSES if profile.grant_classes is None or c in profile.grant_classes
+            ],
         },
         # Whether the conversation's own PII mode (X-Faden-PII-Mode) is applied: the agent's
         # setting, or the tenant's when the agent has none.
