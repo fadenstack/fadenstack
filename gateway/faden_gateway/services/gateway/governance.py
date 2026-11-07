@@ -192,7 +192,8 @@ class ToolRuleCheck:
 
     The action decides, whatever the priority, so an ``allow`` never switches off a deny or an "Ask first"
     that also matches (ASVS 5.0 V8.2.1: a tool the admin denied runs for nobody). Priority orders rules of
-    the same action: the first of them gives the message.
+    the same action: the first of them gives the message. An ``allow`` is only on older rules (the admin
+    API takes no new one) and changes nothing.
     """
 
     name = "tool_rules"

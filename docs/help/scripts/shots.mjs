@@ -277,7 +277,7 @@ const SHOTS = [
   { name: "administer/skills", path: "/admin/skills", wait: 5000 },
   { name: "administer/agents", path: "/admin/agents" },
   { name: "administer/pii-policies", path: "/admin/pii/policies" },
-  { name: "administer/governance", path: "/admin/governance" },
+  { name: "administer/governance", path: "/admin/governance", act: withoutNotices },
   { name: "administer/data-residency", path: "/admin/security-map" },
   { name: "administer/observability", path: "/admin/observability" },
   // Operate

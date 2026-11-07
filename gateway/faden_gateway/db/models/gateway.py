@@ -1145,7 +1145,8 @@ class ToolRule(Base):
     name: Mapped[str] = mapped_column(String(256), nullable=False)
     #: A glob over tool names: ``mcp_github__*``, ``knowledge_search``, ``*``.
     tool_pattern: Mapped[str] = mapped_column(String(256), nullable=False)
-    #: ``deny``, ``approval_required`` or ``allow``.
+    #: ``deny`` or ``approval_required``. Older rows may say ``allow``, which changes nothing; the
+    #: admin API takes no new one.
     action: Mapped[str] = mapped_column(String(32), nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
     category: Mapped[str] = mapped_column(String(64), nullable=False, default="tool_rule")

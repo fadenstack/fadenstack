@@ -17,7 +17,7 @@ from datetime import datetime
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import text
 from starlette import status
 
@@ -36,14 +36,27 @@ class ToolRuleIn(BaseModel):
     name: str = Field(min_length=1, max_length=256)
     #: A glob over tool names: ``mcp_github__*``, ``knowledge_search``, ``*``.
     tool_pattern: str = Field(min_length=1, max_length=256)
-    action: Literal["deny", "approval_required", "allow"]
+    #: No ``allow``: a matching deny or "Ask first" wins over it, so it would change nothing. Rules made
+    #: with it before are still listed, as ``no_effect``.
+    action: Literal["deny", "approval_required"]
     #: What the user is told.
     message: str = Field(min_length=1, max_length=2000)
     category: str = Field(default="tool_rule", max_length=64)
-    #: Orders rules of the same action (the first gives the message); a matching deny wins, then
-    #: "Ask first", then allow, whatever the priority, so an ``allow`` makes no exception.
+    #: Orders rules of the same action (the first gives the message); a matching deny wins over
+    #: "Ask first", whatever the priority.
     priority: int = Field(default=100, ge=0, le=100_000)
     enabled: bool = True
+
+    @field_validator("action", mode="before")
+    @classmethod
+    def _no_allow(cls, action: object) -> object:
+        if action == "allow":
+            msg = (
+                'An allow rule would change nothing: a deny or "Ask first" that matches wins over it. '
+                "To let a tool run without asking, classify it for the tool modes."
+            )
+            raise ValueError(msg)
+        return action
 
 
 def _gateway(request: Request) -> Any:
@@ -69,9 +82,16 @@ def _rule(row: Any) -> dict[str, Any]:
     return out
 
 
+def _tool_rule(row: Any) -> dict[str, Any]:
+    out = _rule(row)
+    #: An allow rule made before they were refused: it changes nothing.
+    out["no_effect"] = out["action"] == "allow"
+    return out
+
+
 @router.get("/tool-rules", name="governance_tool_rules")
 async def list_tool_rules(request: Request, _admin: Admin, tenant_id: str = "default") -> dict[str, Any]:
-    """The tenant's rules, in the order they are tried."""
+    """The tenant's rules, by priority; an old ``allow`` rule is marked ``no_effect``."""
     async with _gateway(request)() as db:
         rows = await db.execute(
             text(
@@ -80,7 +100,7 @@ async def list_tool_rules(request: Request, _admin: Admin, tenant_id: str = "def
             ),
             {"tenant_id": tenant_id},
         )
-        return {"data": [_rule(r) for r in rows]}
+        return {"data": [_tool_rule(r) for r in rows]}
 
 
 @router.post("/tool-rules", name="governance_tool_rule_create", status_code=status.HTTP_201_CREATED)
@@ -97,7 +117,7 @@ async def create_tool_rule(body: ToolRuleIn, request: Request, _admin: Admin) ->
             {"id": uuid.uuid4(), **body.model_dump()},
         )).one()
         await db.commit()
-        return _rule(row)
+        return _tool_rule(row)
 
 
 @router.put("/tool-rules/{rule_id}", name="governance_tool_rule_update")
@@ -118,7 +138,7 @@ async def update_tool_rule(
         if row is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such rule.")
         await db.commit()
-        return _rule(row)
+        return _tool_rule(row)
 
 
 @router.delete(

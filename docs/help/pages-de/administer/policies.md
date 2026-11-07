@@ -194,7 +194,7 @@ Die Erkennungsrate ist der Anteil der Prüfungen mit einem Fund, nicht der Antei
 
 2. Geben Sie unter **Name** eine Bezeichnung (für Sie) und unter **Tool-Muster** einen Tool-Namen oder ein
    Muster mit `*` ein, z. B. `mcp.github.*`, `knowledge_search` oder `*`.
-3. Wählen Sie die **Aktion**: **Sperren**, **Erst nachfragen** (der Benutzer gibt jeden Aufruf frei) oder **Erlauben**.
+3. Wählen Sie die **Aktion**: **Sperren** oder **Erst nachfragen** (der Benutzer gibt jeden Aufruf frei).
    Eine Regel gilt auch für die Tools, die die App eines Agenten selbst ausführt, etwa die Tools des Browser- und
    der Office-Agenten: Die App fragt jedes Mal, egal was der Benutzer vorher erlaubt hat, und einer App, die nicht
    fragen kann, wird das Tool nicht angeboten.
@@ -207,10 +207,17 @@ Ohne Regeln laufen Tools so, wie es der Tool-Modus vorgibt.
 
 ### Wenn mehrere Regeln passen {#when-several-rules-match}
 
-**Sperren** gewinnt, dann **Erst nachfragen**, dann **Erlauben**, unabhängig von der Priorität. Eine Regel
-**Erlauben** kann deshalb keine Ausnahme von einer Regel **Sperren** oder **Erst nachfragen** bilden, und für sich
-allein ändert sie nichts: Ob das Tool nachfragt, entscheidet weiter der Tool-Modus. Um einige Tools von einer Regel
+**Sperren** gewinnt vor **Erst nachfragen**, unabhängig von der Priorität. Um einige Tools von einer Regel
 **Sperren** auszunehmen, fassen Sie deren Muster enger: Sperren Sie `mcp.github.delete_*` statt `mcp.github.*`.
+Soll ein Tool ohne Nachfrage laufen, geben Sie ihm eine Tool-Klasse (siehe
+[Tool-Klassen und Tool-Modi](#tool-classes-and-tool-modes)).
+
+### Regeln „Erlauben“ aus früheren Versionen {#allow-rules}
+
+Frühere Versionen boten auch **Erlauben** an. Es konnte keine Ausnahme von einer Regel **Sperren** oder **Erst
+nachfragen** bilden und änderte für sich allein nichts; neue Regeln können deshalb nicht mehr erlauben. Damit
+angelegte Regeln stehen weiter in der Liste, markiert mit **Ohne Wirkung**: Ändern Sie sie auf **Sperren** oder
+**Erst nachfragen**, oder löschen Sie sie.
 
 ### Tool-Klassen und Tool-Modi {#tool-classes-and-tool-modes}
 

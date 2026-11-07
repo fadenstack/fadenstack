@@ -4620,8 +4620,8 @@
     "priority_help": "Lower is tried first; the first rule that matches decides.",
     "rules": {
       "title": "Tool rules",
-      "description": "Deny a tool, ask the user before it runs, or allow it, by name. They apply to every chat and every agent. When several rules match, Deny wins, then Ask first, then Allow, whatever the priority.",
-      "priority_help": "Orders rules with the same action: the first gives the message. Deny always wins over Ask first and Allow.",
+      "description": "Deny a tool or ask the user before it runs, by name. They apply to every chat and every agent. When several rules match, Deny wins over Ask first, whatever the priority.",
+      "priority_help": "Orders rules with the same action: the first gives the message. Deny always wins over Ask first.",
       "add": "Add rule",
       "create_title": "New tool rule",
       "edit_title": "Edit tool rule",
@@ -4638,7 +4638,9 @@
       "message_help": "What the user is told when the rule applies.",
       "category": "Category",
       "enabled": "Enabled",
-      "off": "Off"
+      "off": "Off",
+      "no_effect": "No effect",
+      "allow_gone": "Allow is gone: it changed nothing, because a Deny or Ask first that matches wins. Change this rule to Deny or Ask first, or delete it. To let a tool run without asking, give it a tool class."
     },
     "classes": {
       "title": "Tool classes",

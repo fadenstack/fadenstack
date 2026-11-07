@@ -179,9 +179,9 @@ found something, not a measurement of how much personal data was successfully re
 
 2. Give it a **Name** (for you) and a **Tool pattern**: a tool name, or a pattern with `*`, such as
    `mcp.github.*`, `knowledge_search` or `*`.
-3. Choose the **Action**: **Deny**, **Ask first** (the person approves each call) or **Allow**. A rule also
-   covers the tools an agent's app runs itself, such as the browser and Office agents' tools: the app asks every
-   time, whatever the person allowed before, and an app that cannot ask is not offered the tool.
+3. Choose the **Action**: **Deny** or **Ask first** (the person approves each call). A rule also covers the
+   tools an agent's app runs itself, such as the browser and Office agents' tools: the app asks every time,
+   whatever the person allowed before, and an app that cannot ask is not offered the tool.
 4. Write the **Message to the user**: what people are told when the rule applies.
 5. Set the **Priority**. It orders rules with the same action: when several of them match, the one with the
    lowest number gives the message.
@@ -191,10 +191,15 @@ Without rules, tools run as the tool mode says.
 
 ### When several rules match {#when-several-rules-match}
 
-**Deny** wins, then **Ask first**, then **Allow**, whatever their priority. So an **Allow** rule cannot make an
-exception to a **Deny** or **Ask first** rule, and on its own it changes nothing: the tool mode still decides
-whether the tool asks. To leave some tools out of a **Deny** rule, make its pattern narrower: deny
-`mcp.github.delete_*` rather than `mcp.github.*`.
+**Deny** wins over **Ask first**, whatever their priority. To leave some tools out of a **Deny** rule, make its
+pattern narrower: deny `mcp.github.delete_*` rather than `mcp.github.*`. To let a tool run without asking, give
+it a tool class (see [Tool classes and tool modes](#tool-classes-and-tool-modes)).
+
+### Allow rules from earlier versions {#allow-rules}
+
+Earlier versions also offered **Allow**. It could not make an exception to a **Deny** or **Ask first** rule, and
+on its own it changed nothing, so new rules can no longer allow. Rules made with it are still listed, marked
+**No effect**: change them to **Deny** or **Ask first**, or delete them.
 
 ### Tool classes and tool modes
 

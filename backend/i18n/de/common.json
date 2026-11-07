@@ -4622,8 +4622,8 @@
     "priority_help": "Niedrigere zuerst; die erste passende Regel entscheidet.",
     "rules": {
       "title": "Tool-Regeln",
-      "description": "Ein Tool sperren, vor der Ausführung nachfragen oder es erlauben, nach Namen. Gilt für jeden Chat und jeden Agenten. Passen mehrere Regeln, gewinnt „Sperren“, dann „Erst nachfragen“, dann „Erlauben“, unabhängig von der Priorität.",
-      "priority_help": "Ordnet Regeln mit derselben Aktion: Die erste liefert die Meldung. „Sperren“ gewinnt immer vor „Erst nachfragen“ und „Erlauben“.",
+      "description": "Ein Tool sperren oder vor der Ausführung nachfragen, nach Namen. Gilt für jeden Chat und jeden Agenten. Passen mehrere Regeln, gewinnt „Sperren“ vor „Erst nachfragen“, unabhängig von der Priorität.",
+      "priority_help": "Ordnet Regeln mit derselben Aktion: Die erste liefert die Meldung. „Sperren“ gewinnt immer vor „Erst nachfragen“.",
       "add": "Regel hinzufügen",
       "create_title": "Neue Tool-Regel",
       "edit_title": "Tool-Regel bearbeiten",
@@ -4640,7 +4640,9 @@
       "message_help": "Was der Nutzer erfährt, wenn die Regel greift.",
       "category": "Kategorie",
       "enabled": "Aktiv",
-      "off": "Aus"
+      "off": "Aus",
+      "no_effect": "Ohne Wirkung",
+      "allow_gone": "„Erlauben“ gibt es nicht mehr: Es änderte nichts, weil ein passendes „Sperren“ oder „Erst nachfragen“ gewinnt. Ändern Sie die Regel auf „Sperren“ oder „Erst nachfragen“, oder löschen Sie sie. Soll ein Tool ohne Nachfrage laufen, geben Sie ihm eine Tool-Klasse."
     },
     "classes": {
       "title": "Tool-Klassen",

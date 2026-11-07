@@ -1,11 +1,17 @@
-/** Tool rules: deny a tool, ask before it runs, or allow it, by name; deny wins, then ask, then allow, whatever the priority. */
+/**
+ * Tool rules: deny a tool or ask before it runs, by name; deny wins over ask whatever the priority.
+ * Older allow rules are listed as having no effect, and can be changed or deleted.
+ */
 import { useTranslation } from "react-i18next";
 
+import Alert from "@mui/material/Alert";
 import Chip, { type ChipProps } from "@mui/material/Chip";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import MenuItem from "@mui/material/MenuItem";
+import Stack from "@mui/material/Stack";
 import Switch from "@mui/material/Switch";
 import TextField from "@mui/material/TextField";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 
 import { governanceApi, type ToolRule, type ToolRuleAction, type ToolRuleFields } from "~/api/governance";
@@ -13,11 +19,13 @@ import type { ColumnDef } from "~/components/DataTable";
 
 import { PatternRulesTable, type RuleFormProps } from "./PatternRulesTable";
 
-const ACTIONS: ToolRuleAction[] = ["deny", "approval_required", "allow"];
+/** What a rule can be made with. */
+const ACTIONS: ToolRuleAction[] = ["deny", "approval_required"];
+const ACTION_ORDER: Record<ToolRuleAction, number> = { deny: 0, approval_required: 1, allow: 2 };
 const ACTION_COLOR: Record<ToolRuleAction, ChipProps["color"]> = {
   deny: "error",
   approval_required: "warning",
-  allow: "success",
+  allow: "default",
 };
 
 const BLANK: ToolRuleFields = {
@@ -40,7 +48,8 @@ const fieldsOf = ({ name, tool_pattern, action, message, category, priority, ena
   enabled,
 });
 
-const valid = (f: ToolRuleFields) => Boolean(f.name.trim() && f.tool_pattern.trim() && f.message.trim());
+const valid = (f: ToolRuleFields) =>
+  f.action !== "allow" && Boolean(f.name.trim() && f.tool_pattern.trim() && f.message.trim());
 
 export function ToolRuleActionChip({ action }: { action: ToolRuleAction }) {
   const { t } = useTranslation();
@@ -50,8 +59,10 @@ export function ToolRuleActionChip({ action }: { action: ToolRuleAction }) {
 function ToolRuleForm({ value, onChange }: RuleFormProps<ToolRuleFields>) {
   const { t } = useTranslation();
   const set = <K extends keyof ToolRuleFields>(key: K, v: ToolRuleFields[K]) => onChange({ ...value, [key]: v });
+  const allow = value.action === "allow";
   return (
     <>
+      {allow && <Alert severity="warning">{t("governance.rules.allow_gone")}</Alert>}
       <TextField label={t("governance.rules.name")} value={value.name} required autoFocus onChange={(e) => set("name", e.target.value)} />
       <TextField
         label={t("governance.pattern")}
@@ -61,7 +72,13 @@ function ToolRuleForm({ value, onChange }: RuleFormProps<ToolRuleFields>) {
         slotProps={{ htmlInput: { style: { fontFamily: "monospace" } } }}
         onChange={(e) => set("tool_pattern", e.target.value)}
       />
-      <TextField select label={t("governance.rules.action_label")} value={value.action} onChange={(e) => set("action", e.target.value as ToolRuleAction)}>
+      <TextField
+        select
+        label={t("governance.rules.action_label")}
+        value={allow ? "" : value.action}
+        error={allow}
+        onChange={(e) => set("action", e.target.value as ToolRuleAction)}
+      >
         {ACTIONS.map((a) => (
           <MenuItem key={a} value={a}>
             {t(`governance.rules.action.${a}`)}
@@ -101,8 +118,17 @@ export function ToolRulesTable() {
       key: "action",
       label: t("governance.rules.action_label"),
       sortable: true,
-      sortValue: (r) => ACTIONS.indexOf(r.action),
-      render: (r) => <ToolRuleActionChip action={r.action} />,
+      sortValue: (r) => ACTION_ORDER[r.action],
+      render: (r) => (
+        <Stack direction="row" spacing={0.5} useFlexGap flexWrap="wrap">
+          <ToolRuleActionChip action={r.action} />
+          {r.no_effect && (
+            <Tooltip title={t("governance.rules.allow_gone")}>
+              <Chip size="small" variant="outlined" label={t("governance.rules.no_effect")} />
+            </Tooltip>
+          )}
+        </Stack>
+      ),
       minWidth: 130,
     },
     {
@@ -111,7 +137,7 @@ export function ToolRulesTable() {
       searchValue: (r) => `${r.name} ${r.message}`,
       render: (r) => (
         <>
-          <Typography variant="body2" fontWeight={600} sx={{ opacity: r.enabled ? 1 : 0.5 }}>
+          <Typography variant="body2" fontWeight={600} sx={{ opacity: r.enabled && !r.no_effect ? 1 : 0.5 }}>
             {r.name}
           </Typography>
           <Typography variant="caption" color="text.secondary">

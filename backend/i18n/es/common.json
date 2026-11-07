@@ -4622,8 +4622,8 @@
     "priority_help": "La más baja se prueba primero; decide la primera regla que coincida.",
     "rules": {
       "title": "Reglas de herramientas",
-      "description": "Prohibir una herramienta, preguntar al usuario antes de ejecutarla o permitirla, por nombre. Se aplican a cada chat y a cada agente. Si coinciden varias reglas, gana «Prohibir», luego «Preguntar antes» y luego «Permitir», sea cual sea la prioridad.",
-      "priority_help": "Ordena las reglas con la misma acción: la primera da el mensaje. «Prohibir» siempre gana a «Preguntar antes» y «Permitir».",
+      "description": "Prohibir una herramienta o preguntar al usuario antes de ejecutarla, por nombre. Se aplican a cada chat y a cada agente. Si coinciden varias reglas, «Prohibir» gana a «Preguntar antes», sea cual sea la prioridad.",
+      "priority_help": "Ordena las reglas con la misma acción: la primera da el mensaje. «Prohibir» siempre gana a «Preguntar antes».",
       "add": "Añadir regla",
       "create_title": "Nueva regla de herramienta",
       "edit_title": "Editar regla de herramienta",
@@ -4640,7 +4640,9 @@
       "message_help": "Lo que se le dice al usuario cuando se aplica la regla.",
       "category": "Categoría",
       "enabled": "Activa",
-      "off": "Desactivada"
+      "off": "Desactivada",
+      "no_effect": "Sin efecto",
+      "allow_gone": "«Permitir» ya no existe: no cambiaba nada, porque gana un «Prohibir» o «Preguntar antes» que coincida. Cambie esta regla a «Prohibir» o «Preguntar antes», o elimínela. Para que una herramienta se ejecute sin preguntar, asígnele una clase de herramienta."
     },
     "classes": {
       "title": "Clases de herramientas",

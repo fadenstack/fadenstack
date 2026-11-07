@@ -1,6 +1,6 @@
 /**
- * Governance for administrators (`/api/admin/governance`): tool rules (deny,
- * ask, allow by tool name), tool classes (what a tool does, which the tool
+ * Governance for administrators (`/api/admin/governance`): tool rules (deny
+ * or ask, by tool name), tool classes (what a tool does, which the tool
  * modes act on), and the decisions the checks made. The gateway reads rules
  * at most 30 s old. See docs/help/pages/administer/policies.md.
  */
@@ -8,6 +8,7 @@ import { json, query, requester, segment } from "./http";
 
 const request = requester("/api/admin/governance");
 
+/** `allow` is only on older rules: it changes nothing, and the server takes no new one. */
 export type ToolRuleAction = "deny" | "approval_required" | "allow";
 /** `annotations`: trust what these tools' MCP server says about them. */
 export type ToolClassValue = "read" | "write" | "destructive" | "annotations";
@@ -29,12 +30,16 @@ export interface ToolRuleFields {
   /** What the user is told. */
   message: string;
   category: string;
-  /** The lowest that matches decides. */
+  /** Orders rules of the same action; a deny wins over ask whatever the priority. */
   priority: number;
   enabled: boolean;
 }
 
-export type ToolRule = ToolRuleFields & Stored;
+export type ToolRule = ToolRuleFields &
+  Stored & {
+    /** An older `allow` rule: it changes nothing. */
+    no_effect: boolean;
+  };
 
 export interface ToolClassFields {
   tool_pattern: string;
