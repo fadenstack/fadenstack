@@ -78,6 +78,36 @@ export interface DecisionFilter {
   limit?: number;
 }
 
+/** Reads and writes in named places: what a "working alongside" grant allows. */
+export interface GrantTarget {
+  type: string;
+  identifiers: string[];
+  actions?: string[];
+}
+
+/**
+ * A person let one agent on one of their devices run, for a while, what
+ * would otherwise ask: one tool (`time`) or reads and writes in named places
+ * (`work`). An administrator may end one; it holds from the agent's next call.
+ */
+export interface Grant {
+  id: string;
+  kind: "time" | "work";
+  status: "active" | "paused";
+  user_id: string;
+  agent_id: string;
+  agent_version: string | null;
+  device_id: string | null;
+  conversation_id: string | null;
+  scope: { tools?: string[]; classes?: string[]; targets?: GrantTarget[] };
+  issued_at: string;
+  expires_at: string;
+  paused_at: string | null;
+  max_calls: number | null;
+  calls_used: number;
+  remaining_s: number;
+}
+
 /** List, create, change and remove one kind of ordered pattern rule. */
 export interface RuleApi<Fields, Rule extends Fields & Stored> {
   list: () => Promise<Rule[]>;
@@ -100,4 +130,6 @@ export const governanceApi = {
   toolClasses: ruleApi<ToolClassFields, ToolClassRule>("/tool-classes"),
   decisions: async (filter: DecisionFilter = {}) =>
     (await request<{ data: PolicyDecision[] }>(`/decisions${query({ limit: 200, ...filter })}`)).data,
+  grants: async () => (await request<{ data: Grant[] }>(`/grants${query({ tenant_id: "default" })}`)).data,
+  revokeGrant: (id: string) => request<void>(`/grants/${segment(id)}`, json("DELETE")),
 };

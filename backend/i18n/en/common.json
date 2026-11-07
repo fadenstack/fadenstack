@@ -4631,6 +4631,7 @@
       "rules": "Tool rules",
       "classes": "Tool classes",
       "decisions": "Decisions",
+      "grants": "Active grants",
       "limits": "Tool mode limits"
     },
     "pattern": "Tool pattern",
@@ -4708,6 +4709,37 @@
         "rejected": "Rejected",
         "expired": "Expired"
       }
+    },
+    "grants": {
+      "title": "Active grants",
+      "empty": "No grants are running.",
+      "user": "Person",
+      "agent": "Agent",
+      "kind": "Kind",
+      "kind_value": {
+        "time": "For a time",
+        "work": "Working alongside"
+      },
+      "what": "What",
+      "classes_value": {
+        "read": "Read",
+        "write": "Write"
+      },
+      "left": "Time left",
+      "minutes_left_one": "{{count}} minute left",
+      "minutes_left_other": "{{count}} minutes left",
+      "paused": "Paused",
+      "calls": "Calls",
+      "started": "Started",
+      "device": "Device",
+      "conversation": "Conversation",
+      "version": "Agent version",
+      "expires": "Ends",
+      "id": "Grant",
+      "revoke": "Revoke",
+      "revoke_title": "Revoke this grant?",
+      "revoke_body": "{{user}} let {{agent}} do this without asking. Revoking it makes the agent ask again from its next call; a call already running finishes.",
+      "gone": "This grant had already ended."
     },
     "limits": {
       "intro": "The most a chat's tool mode may be. Several can apply to one chat (everyone's, the person's teams', the agent's, the person's own): the narrowest wins, and the chat says it is capped. Changes apply within 30 seconds.",

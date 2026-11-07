@@ -4633,6 +4633,7 @@
       "rules": "Règles d'outils",
       "classes": "Classes d'outils",
       "decisions": "Décisions",
+      "grants": "Autorisations actives",
       "limits": "Limites du mode des outils"
     },
     "pattern": "Motif d'outil",
@@ -4710,6 +4711,37 @@
         "rejected": "Refusé",
         "expired": "Expiré"
       }
+    },
+    "grants": {
+      "title": "Autorisations actives",
+      "empty": "Aucune autorisation en cours.",
+      "user": "Personne",
+      "agent": "Agent",
+      "kind": "Type",
+      "kind_value": {
+        "time": "Pour un temps",
+        "work": "Travail en commun"
+      },
+      "what": "Quoi",
+      "classes_value": {
+        "read": "Lecture",
+        "write": "Écriture"
+      },
+      "left": "Temps restant",
+      "minutes_left_one": "{{count}} minute restante",
+      "minutes_left_other": "{{count}} minutes restantes",
+      "paused": "En pause",
+      "calls": "Appels",
+      "started": "Début",
+      "device": "Appareil",
+      "conversation": "Conversation",
+      "version": "Version de l'agent",
+      "expires": "Fin",
+      "id": "Autorisation",
+      "revoke": "Révoquer",
+      "revoke_title": "Révoquer cette autorisation ?",
+      "revoke_body": "{{user}} a permis à {{agent}} de le faire sans demander. Une fois révoquée, l'agent demande de nouveau dès son prochain appel ; un appel déjà en cours se termine.",
+      "gone": "Cette autorisation était déjà terminée."
     },
     "limits": {
       "intro": "Le mode des outils le plus large qu'un chat peut avoir. Plusieurs limites peuvent s'appliquer à un chat (celle de tous, celles des équipes de la personne, celle de l'agent, celle de la personne) : la plus étroite l'emporte, et le chat indique qu'il est limité. Les changements s'appliquent en 30 secondes.",

@@ -1,7 +1,7 @@
-"""Governance for admins: tool rules, tool classes, and the decisions checks made.
+"""Governance for admins: tool rules, tool classes, the decisions checks made, and the grants running.
 
-Both live in the gateway's database (``llm_gateway_tool_rule``,
-``llm_gateway_policy_decision``). The gateway reads a tenant's rules at most
+All live in the gateway's database (``llm_gateway_tool_rule``,
+``llm_gateway_policy_decision``, ``approval_grant``). The gateway reads a tenant's rules at most
 30 s old, so a change takes effect within half a minute on every worker.
 
 A rule's ``message`` is what users are told; its ``name`` is for admins. The
@@ -12,6 +12,8 @@ The policy's name in a decision (the auditor's view) is EE.
 
 from __future__ import annotations
 
+import json
+import logging
 import uuid
 from datetime import datetime
 from typing import Annotated, Any, Literal
@@ -25,6 +27,7 @@ from faden_backend.db.models.users import User
 from faden_backend.web.api.admin.dependencies import require_superuser
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 Admin = Annotated[User, Depends(require_superuser)]
 
@@ -278,3 +281,60 @@ async def list_decisions(
             item["created_at"] = item["created_at"].isoformat()
             data.append(item)
         return {"data": data}
+
+
+def _grant(row: Any) -> dict[str, Any]:
+    out = dict(row._mapping)  # noqa: SLF001
+    out["id"] = str(out["id"])
+    if isinstance(out.get("scope"), str):
+        out["scope"] = json.loads(out["scope"])
+    for key in ("issued_at", "expires_at", "paused_at"):
+        out[key] = out[key].isoformat() if out.get(key) else None
+    return out
+
+
+@router.get("/grants", name="governance_grants")
+async def list_grants(request: Request, _admin: Admin, tenant_id: str = "default") -> dict[str, Any]:
+    """The grants running now (sdk/38 §6, D9): active or paused, not ended, not spent; the newest first.
+
+    What a person let an agent on one of their devices do for a while without asking: one tool, or reads
+    and writes in named places. The time left is the database's, as the gateway counts it.
+    """
+    async with _gateway(request)() as db:
+        rows = await db.execute(
+            text(
+                "SELECT id, kind, status, user_id, agent_id, agent_version, device_id, conversation_id, "
+                "scope, issued_at, expires_at, paused_at, max_calls, calls_used, "
+                "GREATEST(0, EXTRACT(EPOCH FROM expires_at - clock_timestamp()))::int AS remaining_s "
+                "FROM approval_grant WHERE tenant_id = :tenant_id AND status IN ('active', 'paused') "
+                "AND expires_at > clock_timestamp() AND (max_calls IS NULL OR calls_used < max_calls) "
+                "ORDER BY issued_at DESC LIMIT 500",
+            ),
+            {"tenant_id": tenant_id},
+        )
+        return {"data": [_grant(row) for row in rows]}
+
+
+@router.delete(
+    "/grants/{grant_id}", name="governance_grant_revoke", status_code=status.HTTP_204_NO_CONTENT,
+)
+async def revoke_grant(grant_id: uuid.UUID, request: Request, admin: Admin) -> None:
+    """End a running grant from its next call on (D9); a call already running finishes.
+
+    The grant keeps who ended it (``revoked_by`` ``admin``) and when; which admin goes to the security log
+    (ASVS 5.0 16.3.2: authorization decisions are logged).
+    """
+    async with _gateway(request)() as db:
+        ended = await db.execute(
+            text(
+                "UPDATE approval_grant SET status = 'revoked', revoked_at = clock_timestamp(), "
+                "revoked_by = 'admin' WHERE id = :id AND status <> 'revoked' "
+                "AND expires_at > clock_timestamp() RETURNING tenant_id",
+            ),
+            {"id": grant_id},
+        )
+        tenant = ended.scalar_one_or_none()
+        if tenant is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such running grant.")
+        await db.commit()
+    logger.info("Admin %s revoked grant %s of tenant %s", admin.id, grant_id, tenant)

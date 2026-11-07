@@ -269,6 +269,10 @@ Lizenz gültig ist.
 abgelehnte Text selbst wird nie gespeichert, nur ein mit einem Schlüssel gebildeter Fingerabdruck: Derselbe Text,
 zweimal abgelehnt, zeigt denselben Wert, und niemand kann den Text daraus zurückgewinnen.
 
+### Laufende Freigaben auf Zeit {#running-grants}
+
+**Agenten → Governance → Freigaben auf Zeit** listet die Freigaben auf Zeit auf, die gerade laufen. Eine solche Freigabe erteilt ein Benutzer einem Agenten auf einem seiner Geräte für eine begrenzte Zeit: entweder für ein einzelnes Tool (**Für eine Zeit**) oder zum Lesen und Schreiben an benannten Orten (**Gemeinsam arbeiten**), sodass läuft, was sonst nachfragen würde. Sie gilt nie für zerstörende oder nicht klassifizierte Tools und nie für das, was eine Regel **Erst nachfragen** oder ein als **Immer nachfragen** markiertes Tool abdeckt. Jede Zeile zeigt die Person, den Agenten, was die Freigabe abdeckt, die Restzeit und die Zahl der genutzten Aufrufe. **Widerrufen** beendet eine Freigabe ab dem nächsten Aufruf des Agenten; ein Aufruf, der bereits läuft, läuft noch zu Ende. Benutzer können ihre eigenen in den **Einstellungen → Freigaben** des Agenten beenden. Eine Freigabe endet außerdem mit ihrer Zeit und sobald der Agent eine neue Version erhält.
+
 ## Was Benutzer sehen, wenn etwas gestoppt wird {#what-people-see-when-something-is-stopped}
 
 | Was geschehen ist | Im Chat |

@@ -4633,6 +4633,7 @@
       "rules": "工具规则",
       "classes": "工具类别",
       "decisions": "决定",
+      "grants": "生效中的授权",
       "limits": "工具模式限制"
     },
     "pattern": "工具模式",
@@ -4710,6 +4711,37 @@
         "rejected": "已拒绝",
         "expired": "已过期"
       }
+    },
+    "grants": {
+      "title": "生效中的授权",
+      "empty": "没有正在运行的授权。",
+      "user": "用户",
+      "agent": "智能体",
+      "kind": "类型",
+      "kind_value": {
+        "time": "限时",
+        "work": "协同工作"
+      },
+      "what": "内容",
+      "classes_value": {
+        "read": "读取",
+        "write": "写入"
+      },
+      "left": "剩余时间",
+      "minutes_left_one": "剩余 {{count}} 分钟",
+      "minutes_left_other": "剩余 {{count}} 分钟",
+      "paused": "已暂停",
+      "calls": "调用次数",
+      "started": "开始时间",
+      "device": "设备",
+      "conversation": "对话",
+      "version": "智能体版本",
+      "expires": "结束时间",
+      "id": "授权",
+      "revoke": "撤销",
+      "revoke_title": "撤销此授权？",
+      "revoke_body": "{{user}} 允许 {{agent}} 无需询问即可执行此操作。撤销后，智能体从下一次调用起会再次询问；已在运行的调用会执行完毕。",
+      "gone": "此授权已经结束。"
     },
     "limits": {
       "intro": "聊天可使用的最高工具模式。一个聊天可能同时适用多个限制（所有人的、该人员所在团队的、智能体的、该人员自己的）：以最严格的为准，聊天会显示已受限。更改在 30 秒内生效。",

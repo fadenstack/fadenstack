@@ -4633,6 +4633,7 @@
       "rules": "Reglas de herramientas",
       "classes": "Clases de herramientas",
       "decisions": "Decisiones",
+      "grants": "Autorizaciones activas",
       "limits": "Límites del modo de herramientas"
     },
     "pattern": "Patrón de herramienta",
@@ -4710,6 +4711,37 @@
         "rejected": "Rechazado",
         "expired": "Caducado"
       }
+    },
+    "grants": {
+      "title": "Autorizaciones activas",
+      "empty": "No hay autorizaciones en curso.",
+      "user": "Persona",
+      "agent": "Agente",
+      "kind": "Tipo",
+      "kind_value": {
+        "time": "Por un tiempo",
+        "work": "Trabajo conjunto"
+      },
+      "what": "Qué",
+      "classes_value": {
+        "read": "Lectura",
+        "write": "Escritura"
+      },
+      "left": "Tiempo restante",
+      "minutes_left_one": "queda {{count}} minuto",
+      "minutes_left_other": "quedan {{count}} minutos",
+      "paused": "En pausa",
+      "calls": "Llamadas",
+      "started": "Inicio",
+      "device": "Dispositivo",
+      "conversation": "Conversación",
+      "version": "Versión del agente",
+      "expires": "Termina",
+      "id": "Autorización",
+      "revoke": "Revocar",
+      "revoke_title": "¿Revocar esta autorización?",
+      "revoke_body": "{{user}} permitió que {{agent}} haga esto sin preguntar. Al revocarla, el agente vuelve a preguntar desde su próxima llamada; una llamada que ya está en curso termina.",
+      "gone": "Esta autorización ya había terminado."
     },
     "limits": {
       "intro": "El modo de herramientas más amplio que puede tener un chat. A un chat pueden aplicarse varios (el de todos, el de los equipos de la persona, el del agente, el de la propia persona): gana el más estrecho, y el chat indica que está limitado. Los cambios se aplican en 30 segundos.",

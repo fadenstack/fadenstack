@@ -248,6 +248,10 @@ person picks again; the limits are kept, and apply again once the licence is val
 stored: only a keyed fingerprint, so the same text refused twice shows the same value, and nobody can read it
 back.
 
+### Running grants {#running-grants}
+
+**Agents → Governance → Active grants** lists the grants that are running. A grant is what a person gives one agent on one of their devices, for a while: either one tool (**For a time**), or reading and writing in named places (**Working alongside**), so that what would otherwise ask runs without asking. It never covers destructive or unclassified tools, and never what an **Ask first** rule or a tool marked **Always ask** covers. Each row shows the person, the agent, what it covers, the time left and the number of calls used. **Revoke** ends one from the agent's next call; a call already running finishes. People can end their own in the agent's **Settings → Approvals**. A grant also ends at its time, and when the agent gets a new version.
+
 ## What people see when something is stopped
 
 | What happened | In the chat |

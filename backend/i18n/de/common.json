@@ -4633,6 +4633,7 @@
       "rules": "Tool-Regeln",
       "classes": "Tool-Klassen",
       "decisions": "Entscheidungen",
+      "grants": "Freigaben auf Zeit",
       "limits": "Grenzen für den Tool-Modus"
     },
     "pattern": "Tool-Muster",
@@ -4710,6 +4711,37 @@
         "rejected": "Abgelehnt",
         "expired": "Abgelaufen"
       }
+    },
+    "grants": {
+      "title": "Freigaben auf Zeit",
+      "empty": "Es laufen keine Freigaben auf Zeit.",
+      "user": "Person",
+      "agent": "Agent",
+      "kind": "Art",
+      "kind_value": {
+        "time": "Für eine Zeit",
+        "work": "Gemeinsam arbeiten"
+      },
+      "what": "Was",
+      "classes_value": {
+        "read": "Lesen",
+        "write": "Schreiben"
+      },
+      "left": "Restzeit",
+      "minutes_left_one": "noch {{count}} Minute",
+      "minutes_left_other": "noch {{count}} Minuten",
+      "paused": "Pausiert",
+      "calls": "Aufrufe",
+      "started": "Gestartet",
+      "device": "Gerät",
+      "conversation": "Unterhaltung",
+      "version": "Agent-Version",
+      "expires": "Endet",
+      "id": "Freigabe",
+      "revoke": "Widerrufen",
+      "revoke_title": "Diese Freigabe widerrufen?",
+      "revoke_body": "{{user}} hat {{agent}} erlaubt, dies ohne Rückfrage zu tun. Nach dem Widerruf fragt der Agent ab seinem nächsten Aufruf wieder nach; ein Aufruf, der bereits läuft, läuft noch zu Ende.",
+      "gone": "Diese Freigabe war bereits beendet."
     },
     "limits": {
       "intro": "Der höchste Tool-Modus, den ein Chat haben darf. Für einen Chat können mehrere gelten (der für alle, die der Teams der Person, der des Agenten, der eigene der Person): Der engste gilt, und der Chat zeigt, dass er begrenzt ist. Änderungen wirken innerhalb von 30 Sekunden.",
