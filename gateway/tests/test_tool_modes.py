@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
-from collections.abc import Iterator
+from collections.abc import Awaitable, Callable, Iterator
 from typing import Any
 
 import pytest
@@ -17,7 +17,7 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from faden_gateway.db.models.gateway import ChatSession, ProviderType, ToolClassification
+from faden_gateway.db.models.gateway import ChatSession, ProviderType, ToolClassification, ToolRule
 from faden_gateway.services.extensions import registry
 from faden_gateway.services.gateway import governance as gov
 from faden_gateway.services.gateway import tool_classes as tc
@@ -66,6 +66,21 @@ async def _setup(fastapi_app: FastAPI, db: AsyncSession) -> uuid.UUID:
 async def _classify(db: AsyncSession, pattern: str, tool_class: str, priority: int = 10) -> None:
     db.add(ToolClassification(tenant_id="tenant-a", tool_pattern=pattern, tool_class=tool_class, priority=priority))
     await db.flush()
+
+
+async def _answer_when_asked(
+    client: AsyncClient, approved: bool, *, first: Callable[[], Awaitable[None]] | None = None,
+) -> int:
+    """Answer the call that waits for the user, after *first* (a change made while they were asked)."""
+    for _ in range(500):
+        if gov.approvals.waiting():
+            if first is not None:
+                await first()
+            approval = gov.approvals.waiting()[0]
+            return (await client.post(f"/v1/approvals/{approval}", headers=_headers(),
+                                      json={"approved": approved})).status_code
+        await asyncio.sleep(0.01)
+    raise AssertionError("nobody asked")
 
 
 # -- the table --------------------------------------------------------------------------
@@ -243,6 +258,79 @@ async def test_the_session_setting_and_a_ceiling_decide_the_mode(
 
     bad = await client.patch(f"/v1/sessions/{sid}/tool-policy", headers=_headers(), json={"tool_mode": "yolo"})
     assert bad.status_code in (400, 422)
+
+
+# -- read again before a call runs (39 F2) ----------------------------------------------------------
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("stream", [False, True], ids=["whole", "streamed"])
+async def test_a_ceiling_lowered_between_rounds_holds_for_the_next_call(
+    stream: bool, fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await _setup(fastapi_app, db_session)
+    await _classify(db_session, "knowledge_search", "write")
+    knowledge = _Knowledge(monkeypatch)
+    model = _Model(monkeypatch, _call("knowledge_search", {"query": "a"}), _call("knowledge_search", {"query": "b"}),
+                   _say("Done."))
+
+    async def lowered_once_a_search_ran(_: tc.CeilingContext) -> str | None:
+        return "read_only" if knowledge.searches else None
+
+    registry.tool_mode_ceilings.append(lowered_once_a_search_ran)
+    r = await client.post("/v1/chat/completions", headers=_headers(**{"X-Faden-Tool-Mode": "auto"}), json={
+        "model": ALIAS, "stream": stream, "messages": [{"role": "user", "content": "When?"}]})
+    assert r.status_code == 200, r.text
+    assert [s["query"] for s in knowledge.searches] == ["a"], "the second round runs under the lowered ceiling"
+    assert "Only read-only tools are allowed in this chat." in model.sent[2]["messages"][-1]["content"]
+
+
+@pytest.mark.anyio
+async def test_an_ask_first_rule_added_while_the_mode_asked_refuses_the_approved_call(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await _setup(fastapi_app, db_session)
+    await _classify(db_session, "knowledge_search", "write")
+    knowledge = _Knowledge(monkeypatch)
+    model = _Model(monkeypatch, _call("knowledge_search", {"query": "launch"}), _say("Done."))
+
+    async def add_rule() -> None:
+        db_session.add(ToolRule(tenant_id="tenant-a", name="look twice", tool_pattern="knowledge_*",
+                                action="approval_required", message="Searching needs a second look.",
+                                category="tool_rule", priority=10, enabled=True))
+        await db_session.flush()
+
+    ask = client.post("/v1/chat/completions", headers=_headers(**EVENTS), json={
+        "model": ALIAS, "stream": True, "messages": [{"role": "user", "content": "When?"}]})
+    r, status = await asyncio.wait_for(asyncio.gather(ask, _answer_when_asked(client, True, first=add_rule)), 10)
+    assert status == 200 and knowledge.searches == [], "approved for the mode, not for the rule"
+    told = "The tool policy changed before this call ran: Searching needs a second look."
+    assert told in model.sent[1]["messages"][-1]["content"]
+    assert any(e.get("name") == "faden.tool_denied" and e["value"]["message"] == told for e in _faden(r.text))
+
+
+@pytest.mark.anyio
+async def test_an_approved_call_runs_when_only_the_mode_that_asks_moved(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await _setup(fastapi_app, db_session)
+    await _classify(db_session, "knowledge_search", "destructive")
+    knowledge = _Knowledge(monkeypatch)
+    _Model(monkeypatch, _call("knowledge_search", {"query": "launch"}), _say("Done."))
+    ceiling: list[str | None] = ["ask"]
+
+    async def held(_: tc.CeilingContext) -> str | None:
+        return ceiling[0]
+
+    async def lift() -> None:
+        ceiling[0] = None  # Auto now, where a destructive tool still asks: the user's answer stands
+
+    registry.tool_mode_ceilings.append(held)
+    ask = client.post("/v1/chat/completions", headers=_headers(**EVENTS, **{"X-Faden-Tool-Mode": "auto"}), json={
+        "model": ALIAS, "stream": True, "messages": [{"role": "user", "content": "When?"}]})
+    r, status = await asyncio.wait_for(asyncio.gather(ask, _answer_when_asked(client, True, first=lift)), 10)
+    assert status == 200 and len(knowledge.searches) == 1, r.text
 
 
 @pytest.mark.anyio

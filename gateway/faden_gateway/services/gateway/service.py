@@ -7,7 +7,7 @@ import mimetypes
 import re
 import time
 import uuid
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import PurePosixPath
@@ -1011,6 +1011,16 @@ class ToolModeCheck:
             message=tool_classes.reason(self.mode, decision),
             policy_name=f"Tool mode {self.mode.value}",
         )
+
+
+def _same_objection(answered: gov.Verdict, now: gov.Verdict) -> bool:
+    """Whether the objection the user answered still stands: the same check objects, in the same way.
+
+    For a rule or a policy, the same one; for the chat's tool mode, whichever mode asks now.
+    """
+    if answered.blocked != now.blocked or answered.check != now.check:
+        return False
+    return now.check == ToolModeCheck.name or answered.decision.policy_id == now.decision.policy_id
 
 
 class _AgentLogFields(TypedDict, total=False):
@@ -2227,13 +2237,14 @@ class GatewayService:
         )
 
     async def _resolve_tool_mode(
-        self, req: _Prepared, auth: AuthContext, mcp_tools: list[dict[str, Any]] | None,
+        self, req: _Prepared, auth: AuthContext, annotations: Mapping[str, Mapping[str, Any]] | None,
     ) -> None:
         """The chat's tool mode (narrowed by any ceiling), what classifies its tools, and its check.
 
         The session's setting when it has one, else the ``X-Faden-Tool-Mode``
         header, else Ask; both given, the narrower. EE ceilings narrow it
-        further (``registry.tool_mode_ceilings``).
+        further (``registry.tool_mode_ceilings``). *annotations*: the MCP
+        tools' own, by qualified name.
         """
         header = tool_classes.parse_mode(req.tool_mode_header)
         chosen = header
@@ -2262,11 +2273,22 @@ class GatewayService:
             rules=await tool_classes.class_rules.for_tenant(self.dao.session, auth.tenant_id),
             gateway_tools=frozenset(_GATEWAY_TOOLS),
             contract=contract,
-            annotations={
-                t.get("qualified_name", ""): t["annotations"] for t in mcp_tools or [] if t.get("annotations")
-            },
+            annotations=annotations,
         )
         req.checks.append(ToolModeCheck(req.classifier, req.tool_mode.mode))
+
+    async def _read_tool_policy(self, req: _Prepared, auth: AuthContext) -> None:
+        """The tool rules, the chat's tool mode and its ceilings, read again for the calls about to be run.
+
+        A request runs up to ``mcp_tool_loop_max_iterations`` tool rounds and may wait
+        ``governance_approval_timeout_s`` for the user, so what an admin or the user changed meanwhile -- a
+        rule turned to deny, a ceiling lowered, the chat set to Read only -- holds for the next call that
+        runs, not the next request (ASVS 5.0 V8.3.2). The connection goes back at once: the user may be asked
+        next, for minutes.
+        """
+        req.checks = await self._governance_checks(auth)
+        await self._resolve_tool_mode(req, auth, req.classifier.annotations if req.classifier else None)
+        await self._release_request_connection()
 
     def _hidden(self, req: _Prepared, name: str) -> bool:
         if req.tool_mode is None or req.classifier is None:
@@ -2487,6 +2509,32 @@ class GatewayService:
             outcome = "approved" if approved else ("rejected" if approved is False else "expired")
             await gov.record_on_own_session(self.dao.session.bind, ctx, verdict, text=None, outcome=outcome)
 
+    async def _recheck_after_wait(
+        self, req: _Prepared, calls: list[dict[str, Any]], screened: dict[str, tuple[str, gov.Verdict]],
+        answered: dict[str, bool], *, auth: AuthContext, request_id: str,
+    ) -> frozenset[str]:
+        """After the user's answers, the round's calls checked again on the policy read now (39 F2).
+
+        The answers took up to ``governance_approval_timeout_s``. A call whose verdict is now stricter than
+        what the user answered -- refused now, or asking for another reason, such as an "Ask first" rule
+        added while the chat's mode asked -- does not run; its new objection goes in *screened*, and its id in
+        what this returns, so the refusal says the policy changed. A call that no longer needs approval runs;
+        one the user declined still does not.
+        """
+        await self._read_tool_policy(req, auth)
+        now = await self._screen_calls(req, calls, auth=auth, request_id=request_id)
+        changed: set[str] = set()
+        for call in calls:
+            call_id = call.get("id", "")
+            before, after = screened.get(call_id), now.get(call_id)
+            if after is None or answered.get(call_id) is False:
+                continue  # nothing objects now, or the user said no: it runs, or it does not, as answered
+            if before is not None and (before[1].blocked or _same_objection(before[1], after[1])):
+                continue  # refused already, or what the user answered still stands
+            screened[call_id] = after
+            changed.add(call_id)
+        return frozenset(changed)
+
     @staticmethod
     def _class_of(req: _Prepared, name: str) -> str:
         """The class the gateway holds for *name*: a rule's, the agent's contract's, else unknown."""
@@ -2571,18 +2619,23 @@ class GatewayService:
 
     async def _refused(
         self, req: _Prepared, call: dict[str, Any], name: str, verdict: gov.Verdict, answer: bool | None,
-        *, auth: AuthContext, request_id: str,
+        *, changed: bool = False, auth: AuthContext, request_id: str,
     ) -> str:
-        """Record a refused call and tell the client; what the model is told."""
+        """Record a refused call and tell the client; what the model is told.
+
+        *changed*: the policy turned against the call while the user was asked (:meth:`_recheck_after_wait`).
+        """
         message = verdict.decision.message
-        if not verdict.blocked:
+        if changed:
+            message = f"The tool policy changed before this call ran: {message}"
+        elif not verdict.blocked:
             message = (
                 f"{message} The user declined." if answer is False
                 else f"{message} It needs the user's approval, which could not be asked for here."
             )
         ctx = self._context(req, auth, request_id, gov.GovernanceStage.TOOL, tool_id=name)
         decision_id = None
-        if verdict.blocked or answer is None:
+        if verdict.blocked or answer is None or changed:
             decision_id, _ = await gov.record_on_own_session(self.dao.session.bind, ctx, verdict, text=None)
         event = gov.tool_denied_event(call, name, message, decision_id)
         if req.faden_events:
@@ -2774,7 +2827,9 @@ class GatewayService:
         req.payload = payload
         if chat:
             # The session is resolved (and the user's): its tool mode applies.
-            await self._resolve_tool_mode(req, auth, mcp_tools)
+            await self._resolve_tool_mode(req, auth, {
+                t.get("qualified_name", ""): t["annotations"] for t in mcp_tools or [] if t.get("annotations")
+            })
         if mcp_tools:
             req.mcp_findable, req.mcp_on = await self._chat_tools(mcp_tools, auth, req.session_id, req.skills)
             # A tool the mode hides is not found by the tool search either.
@@ -3632,6 +3687,7 @@ class GatewayService:
             message = choices[0].get("message") if choices else None
             if not message or not message.get("tool_calls"):
                 break
+            await self._read_tool_policy(req, auth)
             answers = await self._run_tool_calls(
                 req, message["tool_calls"], iteration=iteration, auth=auth, request_id=request_id,
             )
@@ -3736,15 +3792,21 @@ class GatewayService:
                         yield faden_events.sse_event(start)
                 screened: dict[str, tuple[str, gov.Verdict]] = {}
                 answered: dict[str, bool] = {}
+                changed: frozenset[str] = frozenset()
                 if not any(_tool_name(c) in req.client_tools for c in calls.calls()):
+                    await self._read_tool_policy(req, auth)
                     screened = await self._screen_calls(req, calls.calls(), auth=auth, request_id=request_id)
                     async for asking in self._ask_approvals(
                         req, calls.calls(), screened, answered, auth=auth, request_id=request_id,
                     ):
                         yield asking
+                    if answered:
+                        changed = await self._recheck_after_wait(
+                            req, calls.calls(), screened, answered, auth=auth, request_id=request_id,
+                        )
                 answers = await self._run_tool_calls(
                     req, calls.calls(), iteration=iteration, auth=auth, request_id=request_id,
-                    screened=screened, answered=answered,
+                    screened=screened, answered=answered, changed=changed,
                 )
                 # The tool router reads the session's policy; the next round is
                 # another model call.
@@ -3760,8 +3822,10 @@ class GatewayService:
                     continue
             if calls:
                 # Tools the client defined: its to run, as in any streamed answer -- after what it must hear
-                # about them (a refusal, or the user's approval first).
+                # about them (a refusal, or the user's approval first), on the policy as it is now.
                 handed = calls.calls()
+                if iteration:
+                    await self._read_tool_policy(req, auth)
                 told = await self._client_call_events(req, handed, auth=auth, request_id=request_id)
                 for notice in told:
                     yield faden_events.sse_event(notice)
@@ -3850,12 +3914,14 @@ class GatewayService:
         request_id: str,
         screened: dict[str, tuple[str, gov.Verdict]] | None = None,
         answered: dict[str, bool] | None = None,
+        changed: frozenset[str] = frozenset(),
     ) -> list[dict[str, Any]] | None:
         """Run *calls*; the tool messages that answer them, PII-scanned.
 
         A call a check refuses is not run: the model is told why (*screened*,
         from :meth:`_screen_calls`; *answered*, what the user said about calls
-        that needed approval).
+        that needed approval; *changed*, the calls the policy turned against
+        while the user was asked).
 
         ``None`` when any of them is not the gateway's to run (a tool the
         client defined): the model's message then goes to the client as it
@@ -3881,9 +3947,10 @@ class GatewayService:
             row: dict[str, Any] = {"iteration": iteration, "tool_name": name, "mcp_server": None}
             objection = screened.get(call.get("id", ""))
             answer = answered.get(call.get("id", ""))
-            if objection is not None and (objection[1].blocked or answer is not True):
+            moved = call.get("id", "") in changed
+            if objection is not None and (objection[1].blocked or answer is not True or moved):
                 content = await self._refused(
-                    req, call, name, objection[1], answer, auth=auth, request_id=request_id,
+                    req, call, name, objection[1], answer, changed=moved, auth=auth, request_id=request_id,
                 )
                 is_error = True
                 row["denied"] = True

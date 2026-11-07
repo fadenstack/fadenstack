@@ -511,6 +511,40 @@ async def test_only_the_user_who_waits_can_answer_and_a_client_that_cannot_ask_i
     assert await waiting is False
 
 
+# -- the policy read again before a call runs (39 F2) --------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_a_rule_turned_to_deny_while_the_user_was_asked_refuses_the_approved_call(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await _setup(fastapi_app, db_session)
+    await _rule(db_session, "knowledge_search", "approval_required", "Searching needs your OK.")
+    knowledge = _Knowledge(monkeypatch)
+    model = _Model(monkeypatch, _call("knowledge_search", {"query": "launch"}), _say("I could not search."))
+
+    async def deny_then_approve() -> int:
+        while not gov.approvals.waiting():
+            await asyncio.sleep(0.01)
+        rule = (await db_session.execute(select(ToolRule))).scalar_one()
+        rule.action, rule.message = "deny", "Searching is closed now."
+        await db_session.flush()
+        return await _approve_when_asked(client, True)
+
+    ask = client.post("/v1/chat/completions", headers=_headers(**EVENTS), json={
+        "model": ALIAS, "stream": True, "messages": [{"role": "user", "content": "When is the launch?"}],
+    })
+    r, answered = await asyncio.wait_for(asyncio.gather(ask, deny_then_approve()), 10)
+    assert answered == 200 and knowledge.searches == [], "approved, then denied before it ran"
+    changed = "The tool policy changed before this call ran: Searching is closed now."
+    assert changed in model.sent[1]["messages"][-1]["content"]
+    [denied] = [e for e in _faden(r.text) if e.get("name") == "faden.tool_denied"]
+    assert denied["value"]["message"] == changed
+    assert {(d.outcome, d.message) for d in await _decisions(db_session)} == {
+        ("approved", "Searching needs your OK."), ("block", "Searching is closed now."),
+    }
+
+
 # -- errors, limits, the plugin -------------------------------------------------------------------
 
 

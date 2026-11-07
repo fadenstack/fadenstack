@@ -218,11 +218,12 @@ class ToolRuleCheck:
 
 
 class ToolRules:
-    """Each tenant's tool rules, read at each check by default.
+    """Each tenant's tool rules, read whenever calls are checked, by default.
 
-    They decide whether a tool may run, so a rule changed holds at the next call in every worker (ASVS 5.0
-    V8.3.2); they live in the gateway's own database, which the count of changes to access does not cover.
-    A *ttl_sec* above 0 keeps them that long (tests).
+    They decide whether a tool may run, so a rule changed holds for the next call that runs, in every worker
+    (ASVS 5.0 V8.3.2): a request reads them as it starts, again at each tool round, and again after the user
+    answered a call that waited (``service._read_tool_policy``). They live in the gateway's own database,
+    which the count of changes to access does not cover. A *ttl_sec* above 0 keeps them that long (tests).
     """
 
     def __init__(self, ttl_sec: float = 0.0) -> None:
