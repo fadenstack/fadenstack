@@ -222,10 +222,10 @@ async def test_two_workers_and_a_callee_share_one_budget_exactly(engine: AsyncEn
             return await grants.cover(bind, OWNER, replace(_call_of("write"), call_id=f"call-{n}")) is not None
 
         async def callee(n: int) -> bool:
-            async with AsyncSession(engine, expire_on_commit=False) as session:
-                found = await session.get(ApprovalGrant, grant.id)
+            async with grants.autocommit(engine) as conn:
+                found = await grants.load(conn, grant.id)
                 assert found is not None
-                return await grants.consume(session, found, replace(_call_of("write"), call_id=f"callee-{n}"))
+                return await grants.consume(conn, found, replace(_call_of("write"), call_id=f"callee-{n}"))
 
         results = await asyncio.gather(
             *(worker(engine, n) for n in range(20)), *(worker(other_worker, 100 + n) for n in range(20)),

@@ -16,14 +16,15 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import AsyncIterator, Mapping, Sequence
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
 from urllib.parse import urlsplit
 
-from sqlalchemy import func, insert, or_, select, update
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import Integer, String, bindparam, func, insert, or_, select, update
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncSession
 
 from faden_gateway.db.models.gateway import ApprovalGrant, ApprovalGrantCall
 
@@ -194,55 +195,110 @@ def _usable() -> Any:
 # -- covering a call --------------------------------------------------------------------------
 
 
-async def candidates(session: AsyncSession, owner: Owner, call: Call) -> list[ApprovalGrant]:
+@dataclass(frozen=True, slots=True)
+class Candidate:
+    """A grant as covering a call needs it: no more is read on that path."""
+
+    id: uuid.UUID
+    kind: str
+    scope: Mapping[str, Any]
+    evidence_level: str
+
+
+_CANDIDATE = (ApprovalGrant.id, ApprovalGrant.kind, ApprovalGrant.scope, ApprovalGrant.evidence_level)
+_RECORDED = ApprovalGrantCall.__table__.c
+
+# The two statements of covering a call, built once: making them anew for each call cost more CPU in the
+# gateway than the database spent running them (sdk/40 A2.1, the load runs).
+_CANDIDATES = select(*_CANDIDATE).where(
+    ApprovalGrant.tenant_id == bindparam("tenant_id"), ApprovalGrant.user_id == bindparam("user_id"),
+    ApprovalGrant.agent_id == bindparam("agent_id"), ApprovalGrant.device_id == bindparam("device_id"),
+    ApprovalGrant.agent_version.is_not_distinct_from(bindparam("agent_version", type_=Integer)),
+    _usable(),
+    or_(
+        ApprovalGrant.conversation_id.is_(None),
+        ApprovalGrant.conversation_id == bindparam("conversation_id", type_=String),
+    ),
+).order_by(ApprovalGrant.expires_at)
+_COUNTED = (
+    update(ApprovalGrant).where(ApprovalGrant.id == bindparam("grant"), _usable())
+    .values(calls_used=ApprovalGrant.calls_used + 1)
+    .returning(ApprovalGrant.id.label("grant_id"), _clock().label("at"))
+    .cte("counted")
+)
+_COUNT_AND_RECORD = insert(ApprovalGrantCall).from_select(
+    ["id", "grant_id", "request_id", "call_id", "tool_id", "target", "arguments", "created_at"],
+    select(
+        bindparam("record", type_=_RECORDED.id.type), _COUNTED.c.grant_id,
+        bindparam("request_id", type_=_RECORDED.request_id.type),
+        bindparam("call_id", type_=_RECORDED.call_id.type),
+        bindparam("tool_id", type_=_RECORDED.tool_id.type),
+        bindparam("target", type_=_RECORDED.target.type),
+        bindparam("arguments", type_=_RECORDED.arguments.type), _COUNTED.c.at,
+    ),
+).add_cte(_COUNTED).returning(ApprovalGrantCall.id)
+
+
+@asynccontextmanager
+async def autocommit(bind: AsyncEngine) -> AsyncIterator[AsyncConnection]:
+    """A connection on which each statement is its own transaction.
+
+    The count holds the grant's row lock only while the server runs it, never across a round trip back to this
+    worker -- 50 callers on one grant would otherwise queue behind each other's commits.
+    """
+    async with bind.connect() as conn:
+        yield await conn.execution_options(isolation_level="AUTOCOMMIT")
+
+
+async def candidates(conn: AsyncConnection, owner: Owner, call: Call) -> list[Candidate]:
     """The owner's usable grants that cover *call*, the one ending first first.
 
     Read only: nothing counts here.
     """
-    rows = (await session.execute(
-        select(ApprovalGrant).where(
-            _owned(owner), _usable(),
-            or_(
-                ApprovalGrant.conversation_id.is_(None),
-                ApprovalGrant.conversation_id == owner.conversation_id,
-            ),
-        ).order_by(ApprovalGrant.expires_at),
-    )).scalars().all()
-    return [g for g in rows if in_scope(g.kind, g.scope or {}, call)]
+    rows = (await conn.execute(_CANDIDATES, {
+        "tenant_id": owner.tenant_id, "user_id": owner.user_id, "agent_id": owner.agent_id,
+        "device_id": owner.device_id, "agent_version": owner.agent_version,
+        "conversation_id": owner.conversation_id,
+    })).all()
+    found = [Candidate(row.id, row.kind, row.scope or {}, row.evidence_level) for row in rows]
+    return [g for g in found if in_scope(g.kind, g.scope, call)]
 
 
-async def consume(session: AsyncSession, grant: ApprovalGrant, call: Call) -> bool:
-    """Count *call* against *grant* if it is still usable; whether it counted.
+async def load(conn: AsyncConnection, grant_id: uuid.UUID) -> Candidate | None:
+    """One grant by its id, as a delegated callee's calls count against the caller's (D12)."""
+    row = (await conn.execute(select(*_CANDIDATE).where(ApprovalGrant.id == grant_id))).first()
+    return Candidate(row.id, row.kind, row.scope or {}, row.evidence_level) if row else None
 
-    One conditional ``UPDATE``: the check and the count cannot be split by another worker (39 §4 ``CONSUME``).
-    The call's record goes in the same transaction, with its arguments when the grant records calls (L-60).
+
+async def consume(conn: AsyncConnection, grant: Candidate, call: Call) -> bool:
+    """Count *call* against *grant* if it is still usable, and record it; whether it counted.
+
+    One statement does both (39 §4 ``CONSUME``): the conditional ``UPDATE`` checks status, expiry and budget
+    and counts, and the call's evidence row is inserted from what it returns -- with its arguments when the
+    grant records calls (L-60), and the time the count was made. Nothing can come between the check and the
+    count, nor between the count and its record; another worker waits on the row only while the server runs
+    it.
     """
-    counted = (await session.execute(
-        update(ApprovalGrant).where(ApprovalGrant.id == grant.id, _usable())
-        .values(calls_used=ApprovalGrant.calls_used + 1).returning(ApprovalGrant.id),
-    )).first()
-    if counted is None:  # spent, expired, paused or revoked meanwhile: the UPDATE changed nothing
-        return False
-    session.add(ApprovalGrantCall(
-        id=uuid.uuid4(), grant_id=grant.id, request_id=call.request_id[:128], call_id=call.call_id[:128],
-        tool_id=call.tool_id[:256], target=call.place[1] if call.place else None, created_at=_clock(),
-        arguments=(
-            dict(call.arguments) if grant.evidence_level == "calls" and call.arguments is not None else None
-        ),
-    ))
-    await session.commit()
-    return True
+    arguments = None
+    if grant.evidence_level == "calls" and call.arguments is not None:
+        arguments = dict(call.arguments)
+    recorded = await conn.execute(_COUNT_AND_RECORD, {
+        "grant": grant.id, "record": uuid.uuid4(), "request_id": call.request_id[:128],
+        "call_id": call.call_id[:128], "tool_id": call.tool_id[:256],
+        "target": call.place[1] if call.place else None, "arguments": arguments,
+    })
+    return recorded.first() is not None
 
 
-async def cover(bind: Any, owner: Owner, call: Call) -> uuid.UUID | None:
-    """The grant that covers and counts *call*, or ``None``; on a session of its own, committed at once.
+async def cover(bind: AsyncEngine, owner: Owner, call: Call) -> uuid.UUID | None:
+    """The grant that covers and counts *call*, or ``None``; on a connection of its own, each step committed.
 
     A lookup that fails covers nothing: the call asks rather than runs (sdk/38 §6, 39 F5).
     """
     try:
-        async with AsyncSession(bind, expire_on_commit=False) as session:
-            for grant in await candidates(session, owner, call):
-                if await consume(session, grant, call):
+        async with autocommit(bind) as conn:
+            for grant in await candidates(conn, owner, call):
+                if await consume(conn, grant, call):
                     return grant.id
     except Exception:
         logger.exception("The grant lookup failed; the call asks")
