@@ -862,7 +862,8 @@ async def test_the_profile_carries_what_the_sdk_caches_not_the_instructions(
     assert profile["local_mcp"] == {"mode": "disable", "developer_mode": True}
     assert profile["required_client_modules"] == []
     assert profile["edition"] == "community" and "agents" in profile["features"]
-    assert {"approval_scopes.time", "client_events.trigger"} <= set(profile["features"])
+    assert "client_events.trigger" in profile["features"]
+    assert "approval_scopes.time" not in profile["features"], "no approval for a time held by the app"
     assert profile["user"] == {"language": None}
     assert profile["skills"] is False, "no Skills module here: the SDK shows no skill picker"
 
@@ -1309,7 +1310,8 @@ async def test_features_answer_any_signed_in_caller(client: AsyncClient, backend
         r = await client.get("/v1/features", headers=_headers(token))
         assert r.status_code == 200
         assert r.json()["edition"] == "community"
-        assert {"agents", "streaming", "approval_scopes.time", "client_events.trigger"} <= set(r.json()["features"])
+        assert {"agents", "streaming", "client_events.trigger"} <= set(r.json()["features"])
+        assert "approval_scopes.time" not in r.json()["features"]
     assert (await client.get("/v1/features")).status_code == 401
 
 
