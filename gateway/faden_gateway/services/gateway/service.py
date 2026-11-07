@@ -1013,6 +1013,12 @@ class ToolModeCheck:
         )
 
 
+#: Classes whose calls take an approval for themselves alone, never one that stands for the chat or always.
+_ONCE_ONLY_CLASSES = frozenset({
+    tool_classes.ToolClass.DESTRUCTIVE.value, tool_classes.ToolClass.UNKNOWN.value,
+})
+
+
 def _same_objection(answered: gov.Verdict, now: gov.Verdict) -> bool:
     """Whether the objection the user answered still stands: the same check objects, in the same way.
 
@@ -2486,7 +2492,9 @@ class GatewayService:
         """Ask the user about each call that needs approval, one at a time; answers go in *answered*.
 
         Only a stream to a client that reads events can ask; anywhere else the
-        call is refused, saying it needs approval.
+        call is refused, saying it needs approval. A destructive or
+        unclassified call, or one a rule asks about, takes an approval for
+        itself alone (``gov.refusal``); the answer's scope is recorded.
         """
         if not req.faden_events:
             return
@@ -2497,17 +2505,21 @@ class GatewayService:
             if verdict is None or verdict.blocked:
                 continue
             approval_id = uuid.uuid4().hex
+            tool_class, rule = self._class_of(req, name), verdict.check != ToolModeCheck.name
             yield faden_events.sse_event(gov.approval_event(
-                approval_id, call, name, verdict.decision.message, timeout,
-                tool_class=self._class_of(req, name), rule=verdict.check != ToolModeCheck.name,
+                approval_id, call, name, verdict.decision.message, timeout, tool_class=tool_class, rule=rule,
             ))
-            approved = await gov.approvals.wait(
+            answer = await gov.approvals.wait(
                 tenant_id=auth.tenant_id, user_id=auth.user_id, approval_id=approval_id, timeout=timeout,
+                once_only=rule or tool_class in _ONCE_ONLY_CLASSES,
             )
-            answered[call_id] = bool(approved)
+            answered[call_id] = bool(answer and answer.approved)
             ctx = self._context(req, auth, request_id, gov.GovernanceStage.TOOL, tool_id=name)
-            outcome = "approved" if approved else ("rejected" if approved is False else "expired")
-            await gov.record_on_own_session(self.dao.session.bind, ctx, verdict, text=None, outcome=outcome)
+            outcome = "expired" if answer is None else "approved" if answer.approved else "rejected"
+            await gov.record_on_own_session(
+                self.dao.session.bind, ctx, verdict, text=None, outcome=outcome,
+                answer_scope=answer.scope if answer else None,
+            )
 
     async def _recheck_after_wait(
         self, req: _Prepared, calls: list[dict[str, Any]], screened: dict[str, tuple[str, gov.Verdict]],

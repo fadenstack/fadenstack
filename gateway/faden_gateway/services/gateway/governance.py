@@ -318,8 +318,12 @@ async def record(
     *,
     text: str | None,
     outcome: str | None = None,
+    answer_scope: str | None = None,
 ) -> tuple[uuid.UUID, str | None]:
-    """Write the decision record (not committed); its id and the text's HMAC."""
+    """Write the decision record (not committed); its id and the text's HMAC.
+
+    *answer_scope*: what the user's answer to a waiting call said it covers.
+    """
     digest = content_hmac(await keyring.key(session, ctx.tenant_id), text) if text else None
     row = PolicyDecisionRecord(
         id=uuid.uuid4(),
@@ -330,6 +334,7 @@ async def record(
         request_id=ctx.request_id,
         stage=ctx.stage.value,
         outcome=outcome or verdict.decision.outcome,
+        answer_scope=answer_scope,
         policy_id=verdict.decision.policy_id,
         policy_name=verdict.decision.policy_name,
         category=verdict.decision.category,
@@ -346,6 +351,7 @@ async def record(
 
 async def record_on_own_session(
     bind: Any, ctx: GovernanceContext, verdict: Verdict, *, text: str | None, outcome: str | None = None,
+    answer_scope: str | None = None,
 ) -> tuple[uuid.UUID | None, str | None]:
     """:func:`record`, committed on a session of its own; ``(None, None)`` when the database fails.
 
@@ -354,7 +360,7 @@ async def record_on_own_session(
     """
     try:
         async with AsyncSession(bind, expire_on_commit=False) as own:
-            found = await record(own, ctx, verdict, text=text, outcome=outcome)
+            found = await record(own, ctx, verdict, text=text, outcome=outcome, answer_scope=answer_scope)
             await own.commit()
             return found
     except Exception:
@@ -583,11 +589,52 @@ def content_filter_chunk(head: Mapping[str, Any]) -> bytes:
 # ---------------------------------------------------------------------------
 
 
+#: What an approval says it covers: this call, this chat, or always (on the device that answered).
+ApprovalScope = Literal["once", "chat", "always"]
+
+
+@dataclass(frozen=True, slots=True)
+class Answer:
+    """The user's answer to a call that waited."""
+
+    approved: bool
+    #: What the approval covers; ``None`` from a client that does not say.
+    scope: str | None = None
+
+
+class Answered(StrEnum):
+    """What became of an answer."""
+
+    TAKEN = "taken"
+    #: No call of this user's waits for it (or it was answered already).
+    UNKNOWN = "unknown"
+    #: The call takes ``once`` only, and the approval named another scope.
+    ONCE_ONLY = "once_only"
+    #: The call takes ``once`` only, the approval named no scope, and the gateway is set to refuse that.
+    SCOPE_REQUIRED = "scope_required"
+
+
+def refusal(*, once_only: bool, approved: bool, scope: str | None, require_scope: bool) -> Answered | None:
+    """Why the gateway refuses an answer, or ``None`` when it takes it.
+
+    A destructive or unclassified call, or one a rule asks about (*once_only*), is approved for itself
+    alone: an approval that stands for the chat or always on a device must not answer it (38 §6; 39 F1,
+    F6). The gateway holds to this whatever the client does (ASVS 5.0 V8.3.1). A "no" is always taken.
+    """
+    if not approved or not once_only:
+        return None
+    if scope is None:
+        return Answered.SCOPE_REQUIRED if require_scope else None
+    return None if scope == "once" else Answered.ONCE_ONLY
+
+
 @dataclass
 class _Waiting:
     tenant_id: str
     user_id: str
-    future: asyncio.Future[bool] = field(default_factory=lambda: asyncio.get_running_loop().create_future())
+    #: Takes an approval for this call alone (:func:`refusal`).
+    once_only: bool = False
+    future: asyncio.Future[Answer] = field(default_factory=lambda: asyncio.get_running_loop().create_future())
 
 
 class Approvals:
@@ -595,7 +642,9 @@ class Approvals:
 
     The request waits here; ``POST /v1/approvals/{id}`` answers it. With
     Redis, the answer may arrive on another worker: it is published on the
-    approval's own channel, which the waiting worker listens to.
+    approval's own channel, which the waiting worker listens to. The
+    approval's key says whose call it is and whether it takes ``once``
+    only, so the answering worker checks both.
     """
 
     def __init__(self) -> None:
@@ -605,16 +654,19 @@ class Approvals:
     def use(self, redis: Any | None) -> None:
         self._redis = redis
 
-    async def wait(self, *, tenant_id: str, user_id: str, approval_id: str, timeout: float) -> bool | None:
-        """``True`` approved, ``False`` rejected, ``None`` nobody answered in time."""
-        waiting = _Waiting(tenant_id=tenant_id, user_id=user_id)
+    async def wait(
+        self, *, tenant_id: str, user_id: str, approval_id: str, timeout: float, once_only: bool = False,
+    ) -> Answer | None:
+        """The user's answer; ``None`` when nobody answered in time."""
+        waiting = _Waiting(tenant_id=tenant_id, user_id=user_id, once_only=once_only)
         self._waiting[approval_id] = waiting
         listener: asyncio.Task[None] | None = None
         pubsub = None
         try:
             if self._redis is not None:
                 await self._redis.set(
-                    f"faden:approval:{approval_id}", json.dumps({"tenant": tenant_id, "user": user_id}),
+                    f"faden:approval:{approval_id}",
+                    json.dumps({"tenant": tenant_id, "user": user_id, "once_only": once_only}),
                     ex=int(timeout) + 60,
                 )
                 pubsub = self._redis.pubsub()
@@ -643,30 +695,45 @@ class Approvals:
         while not waiting.future.done():
             message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
             if message and message.get("type") == "message" and not waiting.future.done():
-                waiting.future.set_result(bool(json.loads(message["data"]).get("approved")))
+                said = json.loads(message["data"])
+                answer = Answer(approved=bool(said.get("approved")), scope=said.get("scope"))
+                waiting.future.set_result(answer)
 
     def waiting(self) -> list[str]:
         """The approvals this worker waits for."""
         return list(self._waiting)
 
-    async def answer(self, *, tenant_id: str, user_id: str, approval_id: str, approved: bool) -> bool:
-        """Answer a waiting call of this user's; ``False`` when there is none."""
+    async def answer(
+        self, *, tenant_id: str, user_id: str, approval_id: str, approved: bool, scope: str | None = None,
+        require_scope: bool = False,
+    ) -> Answered:
+        """Answer a waiting call of this user's. A refused answer leaves the call waiting for another."""
         local = self._waiting.get(approval_id)
+        owner = await self._owner(approval_id, local)
+        if owner is None or owner[:2] != (tenant_id, user_id):
+            return Answered.UNKNOWN
+        refused = refusal(once_only=owner[2], approved=approved, scope=scope, require_scope=require_scope)
+        if refused is not None:
+            return refused
         if local is not None:
-            if (local.tenant_id, local.user_id) != (tenant_id, user_id) or local.future.done():
-                return False
-            local.future.set_result(approved)
-            return True
+            local.future.set_result(Answer(approved=approved, scope=scope))
+        else:
+            await self._redis.publish(
+                f"faden:approval:{approval_id}", json.dumps({"approved": approved, "scope": scope}),
+            )
+        return Answered.TAKEN
+
+    async def _owner(self, approval_id: str, local: _Waiting | None) -> tuple[str, str, bool] | None:
+        """Whose call waits for *approval_id* -- tenant, user -- and whether it takes ``once`` only."""
+        if local is not None:
+            return None if local.future.done() else (local.tenant_id, local.user_id, local.once_only)
         if self._redis is None:
-            return False
-        owner = await self._redis.get(f"faden:approval:{approval_id}")
-        if not owner:
-            return False
-        who = json.loads(owner.decode() if isinstance(owner, bytes) else owner)
-        if (who.get("tenant"), who.get("user")) != (tenant_id, user_id):
-            return False
-        await self._redis.publish(f"faden:approval:{approval_id}", json.dumps({"approved": approved}))
-        return True
+            return None
+        stored = await self._redis.get(f"faden:approval:{approval_id}")
+        if not stored:
+            return None
+        who = json.loads(stored.decode() if isinstance(stored, bytes) else stored)
+        return who.get("tenant"), who.get("user"), bool(who.get("once_only"))
 
 
 approvals = Approvals()

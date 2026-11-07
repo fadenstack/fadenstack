@@ -1100,8 +1100,11 @@ class PolicyDecisionRecord(Base):
     request_id: Mapped[str] = mapped_column(String(128), nullable=False)
     #: ``input``, ``output`` or ``tool``.
     stage: Mapped[str] = mapped_column(String(16), nullable=False)
-    #: ``block``, ``approval_required``, ``approved`` or ``rejected``.
+    #: ``block``, ``approval_required``, ``approved``, ``rejected`` or ``expired``.
     outcome: Mapped[str] = mapped_column(String(32), nullable=False)
+    #: What the user's answer to a waiting call said it covers: ``once``, ``chat`` or ``always``; ``None``
+    #: without an answer, or from a client that does not say.
+    answer_scope: Mapped[str | None] = mapped_column(String(16), nullable=True)
     policy_id: Mapped[str] = mapped_column(String(128), nullable=False)
     #: The policy's name: for auditors, never shown to the user.
     policy_name: Mapped[str | None] = mapped_column(String(256), nullable=True)

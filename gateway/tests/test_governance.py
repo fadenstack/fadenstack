@@ -15,6 +15,8 @@ from typing import Any
 import httpx
 import openai
 import pytest
+from fakeredis import FakeServer
+from fakeredis.aioredis import FakeRedis
 from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy import select
@@ -27,10 +29,12 @@ from faden_gateway.db.models.gateway import (
     PolicyDecisionRecord,
     ProviderType,
     TenantLLMPolicy,
+    ToolClassification,
     ToolRule,
 )
 from faden_gateway.services.extensions import load_plugin, registry
 from faden_gateway.services.gateway import governance as gov
+from faden_gateway.services.gateway import tool_classes
 from faden_gateway.services.gateway.llm_adapter import LLMAdapter
 from faden_gateway.settings import settings
 from tests.test_gateway_knowledge_tools import (
@@ -74,9 +78,11 @@ class _Policy:
 def _clean() -> Iterator[None]:
     saved = list(registry.governance_checks)
     gov.tool_rules.invalidate()
+    tool_classes.class_rules.invalidate()
     yield
     registry.governance_checks[:] = saved
     gov.tool_rules.invalidate()
+    tool_classes.class_rules.invalidate()
 
 
 def _headers(token: str | None = None, **extra: str) -> dict[str, str]:
@@ -508,7 +514,7 @@ async def test_only_the_user_who_waits_can_answer_and_a_client_that_cannot_ask_i
     stranger = await client.post("/v1/approvals/a1", headers=_headers(_other_tenant_token()), json={"approved": True})
     assert stranger.status_code == 404
     assert (await client.post("/v1/approvals/a1", headers=_headers(), json={"approved": False})).status_code == 200
-    assert await waiting is False
+    assert await waiting == gov.Answer(approved=False)
 
 
 # -- the policy read again before a call runs (39 F2) --------------------------------------------------
@@ -543,6 +549,133 @@ async def test_a_rule_turned_to_deny_while_the_user_was_asked_refuses_the_approv
     assert {(d.outcome, d.message) for d in await _decisions(db_session)} == {
         ("approved", "Searching needs your OK."), ("block", "Searching is closed now."),
     }
+
+
+# -- answers name their scope (38 §6; 39 F1, F6) ----------------------------------------------------
+
+
+_TAKEN, _ONCE_ONLY, _SCOPE_REQUIRED = None, gov.Answered.ONCE_ONLY, gov.Answered.SCOPE_REQUIRED
+
+
+@pytest.mark.parametrize(("once_only", "scope", "require_scope", "expected"), [
+    # A read or write call the chat's mode asks about: any scope, or none.
+    *[(False, scope, setting, _TAKEN) for scope in (None, "once", "chat", "always") for setting in (False, True)],
+    # A destructive or unclassified call, or one a rule asks about: once only.
+    (True, "once", False, _TAKEN), (True, "once", True, _TAKEN),
+    (True, "chat", False, _ONCE_ONLY), (True, "chat", True, _ONCE_ONLY),
+    (True, "always", False, _ONCE_ONLY), (True, "always", True, _ONCE_ONLY),
+    (True, None, False, _TAKEN),  # an older client, while the setting is off
+    (True, None, True, _SCOPE_REQUIRED),
+])
+def test_which_answers_the_gateway_takes(
+    once_only: bool, scope: str | None, require_scope: bool, expected: gov.Answered | None,
+) -> None:
+    assert gov.refusal(once_only=once_only, approved=True, scope=scope, require_scope=require_scope) is expected
+    assert gov.refusal(once_only=once_only, approved=False, scope=scope, require_scope=require_scope) is None, (
+        "a no is always taken"
+    )
+
+
+async def _make(db: AsyncSession, kind: str) -> None:
+    """``knowledge_search`` (a gateway tool: read) made to wait, as *kind*."""
+    if kind == "rule":
+        await _rule(db, "knowledge_search", "approval_required", "Searching needs your OK.")
+    else:  # "annotations" without any: unclassified
+        tool_class = "annotations" if kind == "unknown" else kind
+        db.add(ToolClassification(tenant_id="tenant-a", tool_pattern="knowledge_search", tool_class=tool_class))
+        await db.flush()
+
+
+async def _post_answers(client: AsyncClient, *bodies: dict[str, Any]) -> list[httpx.Response]:
+    """Once a call waits: post *bodies* to it in turn, until one is taken."""
+    while not gov.approvals.waiting():
+        await asyncio.sleep(0.01)
+    approval_id = gov.approvals.waiting()[0]
+    sent: list[httpx.Response] = []
+    for body in bodies:
+        sent.append(await client.post(f"/v1/approvals/{approval_id}", headers=_headers(), json=body))
+        if sent[-1].status_code == 200:
+            break
+    return sent
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("kind", ["write", "destructive", "unknown", "rule"])
+async def test_a_waiting_call_takes_the_scopes_its_class_allows_and_the_scope_is_recorded(
+    kind: str, fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    once_only = kind != "write"  # a write tool the chat's mode asks about takes any scope
+    await _setup(fastapi_app, db_session)
+    await _make(db_session, kind)
+    knowledge = _Knowledge(monkeypatch)
+    _Model(monkeypatch, _call("knowledge_search", {"query": "launch"}), _say("Done."))
+
+    ask = client.post("/v1/chat/completions", headers=_headers(**EVENTS), json={
+        "model": ALIAS, "stream": True, "messages": [{"role": "user", "content": "When?"}],
+    })
+    r, sent = await asyncio.wait_for(asyncio.gather(ask, _post_answers(
+        client, {"approved": True, "scope": "always"}, {"approved": True, "scope": "once"},
+    )), 10)
+    if once_only:
+        assert [s.status_code for s in sent] == [409, 200], "refused for always; the call waited on for once"
+        assert sent[0].json()["error"]["code"] == "approval_once_only"
+    else:
+        assert [s.status_code for s in sent] == [200]
+    assert len(knowledge.searches) == 1, r.text
+    [approved] = [d for d in await _decisions(db_session) if d.outcome == "approved"]
+    assert approved.answer_scope == ("once" if once_only else "always")
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("require_scope", [False, True], ids=["setting-off", "setting-on"])
+async def test_an_answer_without_a_scope_is_refused_only_with_the_setting_on(
+    require_scope: bool, fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "approvals_require_answer_scope", require_scope)
+    await _setup(fastapi_app, db_session)
+    await _make(db_session, "destructive")
+    knowledge = _Knowledge(monkeypatch)
+    _Model(monkeypatch, _call("knowledge_search", {"query": "launch"}), _say("Done."))
+
+    ask = client.post("/v1/chat/completions", headers=_headers(**EVENTS), json={
+        "model": ALIAS, "stream": True, "messages": [{"role": "user", "content": "When?"}],
+    })
+    r, sent = await asyncio.wait_for(asyncio.gather(ask, _post_answers(
+        client, {"approved": True}, {"approved": True, "scope": "once"},
+    )), 10)
+    if require_scope:
+        assert [s.status_code for s in sent] == [409, 200]
+        assert sent[0].json()["error"]["code"] == "approval_scope_required"
+    else:
+        assert [s.status_code for s in sent] == [200], "an older client's answer, as before"
+    assert len(knowledge.searches) == 1, r.text
+
+
+@pytest.mark.anyio
+async def test_an_answer_on_another_worker_is_held_to_the_same_scope() -> None:
+    server = FakeServer()
+    waiting_worker, answering_worker = gov.Approvals(), gov.Approvals()
+    redis = FakeRedis(server=server)
+    waiting_worker.use(redis)
+    answering_worker.use(FakeRedis(server=server))
+    waiting = asyncio.create_task(waiting_worker.wait(
+        tenant_id="tenant-a", user_id="user-1", approval_id="a1", timeout=5, once_only=True,
+    ))
+    for _ in range(500):
+        if (await redis.pubsub_numsub("faden:approval:a1"))[0][1]:
+            break
+        await asyncio.sleep(0.01)
+
+    async def answer(**kw: Any) -> gov.Answered:
+        return await answering_worker.answer(
+            tenant_id="tenant-a", user_id="user-1", approval_id="a1", approved=True, **kw,
+        )
+
+    assert await answer(scope="always") is gov.Answered.ONCE_ONLY
+    assert await answer(scope=None, require_scope=True) is gov.Answered.SCOPE_REQUIRED
+    assert await answer(scope="once") is gov.Answered.TAKEN
+    assert await asyncio.wait_for(waiting, 5) == gov.Answer(approved=True, scope="once")
 
 
 # -- errors, limits, the plugin -------------------------------------------------------------------
