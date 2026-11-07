@@ -56,7 +56,7 @@ Die Seite des Agenten öffnet sich. Sein Status in der Liste ist **Entwurf**, **
 
 | Reiter | Was er enthält |
 |---|---|
-| **Definition** | Die Version, die Benutzer erhalten: **Anweisungen**, **Modell**, **Wissen** (Sammlungen, die er durchsuchen darf), **Server-Tools** (**Wie im Chat**, **Nur diese** oder **Keine**), **Lokale MCP-Server**, **Host-Tools** (die Tools der Anwendung und ihre Klassen), **Darstellung** (Begrüßung und vorgeschlagene Prompts) und **Datenschutz**. |
+| **Definition** | Die Version, die Benutzer erhalten: **Anweisungen**, **Modell**, **Wissen** (Sammlungen, die er durchsuchen darf), **Server-Tools** (**Wie im Chat**, **Nur diese** oder **Keine**), **Lokale MCP-Server**, **Host-Tools** (die Tools der Anwendung und ihre Klassen), **Freigabestufen** (der Tool-Modus, in dem Unterhaltungen beginnen, und der höchste), **Darstellung** (Begrüßung und vorgeschlagene Prompts) und **Datenschutz**. |
 | **Versionen** | Jede Version. Mit **Veröffentlichen** eine Version veröffentlichen, mit **Zurücksetzen** zu einer früheren zurückkehren, unter **Änderungen** die Unterschiede sehen. |
 | **Zugriff** | **Wer ihn nutzen darf**, die Liste **Ausgeschlossene Personen** <span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span> und seine **Betreuer** (mit Enterprise: **Betreuer und Prüfer** <span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span>). **Zugriff prüfen** zeigt, ob eine Person den Agenten nutzen darf, und warum. |
 | **Aktivität** | Nutzung über einen Zeitraum (Anfragen, Fehler, Tokens, Benutzer, Unterhaltungen: nur Zahlen, nie Inhalte), nur, wenn mindestens fünf Personen den Agenten im Zeitraum genutzt haben; der Eigentümer eines persönlichen Agenten sieht dessen Zahlen trotzdem. Was die Anwendungen gemeldet haben (ausgeführte Tools, Zustimmungen) und **Angemeldete Geräte**. Der Reiter nennt niemanden außer Ihnen selbst. |
@@ -192,8 +192,11 @@ Jedes Tool, das eine Anwendung mitbringt, hat eine Klasse, die die Version des A
 | **Zerstörend** | Fragt immer nach. |
 | **Nicht eingestuft** | Fragt immer nach. |
 
-Benutzer wählen den Tool-Modus im Bereich des Agenten, pro Unterhaltung; jede Unterhaltung beginnt mit
-**Fragen**. Die Anwendung kann eine Klasse verschärfen, nie lockern. Ihre [Tool-Regeln](policies.md#tool-rules)
+Benutzer wählen den Tool-Modus im Bereich des Agenten, pro Unterhaltung. Unter **Freigabestufen** legt die Version
+fest, wo jede Unterhaltung beginnt (**Beginnt in**, **Fragen**, solange Sie nichts ändern) und welchen Modus Benutzer
+höchstens wählen können (**Höchstens**, **Automatisch**, solange Sie nichts ändern); der Start liegt nie über dem
+höchsten, und die Grenzen Ihrer Organisation schränken beide ein. Ein Recherche-Agent etwa kann in **Nur lesen**
+beginnen und höchstens **Fragen** erlauben. Die Anwendung kann eine Klasse verschärfen, nie lockern. Ihre [Tool-Regeln](policies.md#tool-rules)
 gelten für Agenten ebenso wie für Chats.
 
 Unter **Host-Tools** kann die Version außerdem festlegen, wie jedes Tool nachfragt (**Freigabe**):

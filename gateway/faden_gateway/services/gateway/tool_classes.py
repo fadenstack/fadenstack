@@ -299,12 +299,23 @@ class EffectiveMode:
         }
 
 
+def limited(top: ToolMode | None, limit: ToolMode | None) -> ToolMode | None:
+    """The ceiling *top* narrowed by an agent's highest level *limit*; Auto, the widest, narrows nothing."""
+    if limit is None or limit is ToolMode.AUTO:
+        return top
+    return narrowest(top, limit) if top is not None else limit
+
+
 async def effective(
     chosen: ToolMode | None, ceilings: Iterable[ToolModeCeiling], ctx: CeilingContext,
+    *, default: ToolMode | None = None, limit: ToolMode | None = None,
 ) -> EffectiveMode:
-    """The user's (or the default) mode, narrowed by the ceilings."""
-    picked = chosen or ToolMode(DEFAULT_MODE)
-    top = await ceiling(ceilings, ctx)
+    """The user's mode -- else *default*, the agent's level, else Ask -- narrowed by the ceilings and *limit*.
+
+    *limit* is the agent's highest level (sdk/38 §5): the narrowest of it and the EE ceilings applies.
+    """
+    picked = chosen or default or ToolMode(DEFAULT_MODE)
+    top = limited(await ceiling(ceilings, ctx), limit)
     return EffectiveMode(mode=narrowest(picked, top), chosen=picked, ceiling=top)
 
 

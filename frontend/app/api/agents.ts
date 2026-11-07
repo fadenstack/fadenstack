@@ -9,6 +9,7 @@
  */
 import { json, query, requester, segment } from "./http";
 import { principalIds, type PrincipalOption, type PrincipalType } from "./principals";
+import type { ToolMode } from "./tools";
 
 const request = requester("/api/agents");
 
@@ -35,6 +36,19 @@ export interface AgentPii {
   allow_mode_override: boolean | null;
 }
 
+/**
+ * The agent's approval levels (sdk/38 §5): the tool mode its conversations start in, and the most they may use.
+ * The default is never above the highest; the tenant's ceilings narrow both.
+ */
+export interface AgentApprovals {
+  default_level: ToolMode;
+  max_level: ToolMode;
+  /** For grants (later); kept as stored. */
+  standing?: string[] | null;
+  max_grant_minutes?: number | null;
+  grant_classes?: string[] | null;
+}
+
 export interface AgentDefinition {
   instructions: string;
   model_alias: string | null;
@@ -46,6 +60,7 @@ export interface AgentDefinition {
   /** What the SDKs show: `greeting`, `suggestions`. */
   ui: Record<string, unknown>;
   pii: AgentPii;
+  approvals: AgentApprovals;
   /** Enterprise settings; kept as they are. */
   extensions: Record<string, unknown>;
 }

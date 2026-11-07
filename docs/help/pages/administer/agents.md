@@ -53,7 +53,7 @@ The agent's page opens. Its list status is **Draft**, **Published** or **Retired
 
 | Tab | What it holds |
 |---|---|
-| **Definition** | The version people get: **Instructions**, **Model**, **Knowledge** (collections it may search), **Server tools** (**What a chat gets**, **Only these**, or **None**), **Local MCP servers**, **Host tools** (the application's tools and their classes), **Appearance** (greeting and suggested prompts) and **Privacy**. |
+| **Definition** | The version people get: **Instructions**, **Model**, **Knowledge** (collections it may search), **Server tools** (**What a chat gets**, **Only these**, or **None**), **Local MCP servers**, **Host tools** (the application's tools and their classes), **Approval levels** (the tool mode conversations start in, and the highest), **Appearance** (greeting and suggested prompts) and **Privacy**. |
 | **Versions** | Every version. **Publish** one, **Roll back** to an earlier one, see the **Changes**. |
 | **Access** | **Who may use it**, the **Excluded people** <span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span> and its **Maintainers** (with Enterprise: **Maintainers and auditors** <span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span>). **Check someone's access** says whether a person may use the agent, and why. |
 | **Activity** | Usage over a time range (requests, errors, tokens, users, conversations: counts only, never content), shown only when at least five people used the agent in the range; the owner of a personal agent sees its figures all the same. What the applications reported (tools that ran, approvals), and the **Signed-in devices**. It names nobody but you. |
@@ -182,7 +182,10 @@ Each tool an application brings has a class, which the agent's version sets:
 | **Destructive** | Always asks. |
 | **Unclassified** | Always asks. |
 
-People pick the tool mode in the panel, per conversation; every conversation starts in **Ask**. The
+People pick the tool mode in the panel, per conversation. Under **Approval levels** the version says where every
+conversation starts (**Starts in**, **Ask** unless you change it) and the highest mode people may pick
+(**At most**, **Auto** unless you change it); the start is never above the highest, and your organisation's limits
+narrow both. A research agent, for example, might start in **Read only** and go at most to **Ask**. The
 application can make a class stricter, never looser. Your [tool rules](policies.md#tool-rules) apply to agents
 as well as chats.
 

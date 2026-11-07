@@ -4410,6 +4410,7 @@
       "local_mcp_mode": "Local MCP servers",
       "ui": "Appearance",
       "pii": "Privacy",
+      "approvals": "Approval levels",
       "extensions": "Enterprise settings"
     },
     "import": {
@@ -4431,6 +4432,7 @@
       "save_and_publish": "Save and publish",
       "problem_duplicate_tools": "Two host tools have the same name. Each name may appear once.",
       "problem_never_risky": "Never ask is only for read and write tools. Change the tool's class or its approval.",
+      "problem_default_above_max": "The tool mode conversations start in is above the highest one. Lower the start or raise the highest.",
       "behaviour": "Behaviour",
       "instructions": "Instructions",
       "instructions_help": "Put before every conversation. Users and the SDK never see them.",
@@ -4452,6 +4454,10 @@
       "local_mcp_allow_help": "The SDK may attach MCP servers on the user's machine. Their tools are unclassified, so they always ask first.",
       "host_tools": "Host tools",
       "host_tools_help": "The tools the application provides. A request that declares any other tool is refused. Empty: no restriction.",
+      "approvals": "Approval levels",
+      "approvals_help": "The tool mode the agent's conversations start in, and the highest a person may switch to. Your organisation's limits narrow both.",
+      "default_level": "Starts in",
+      "max_level": "At most",
       "appearance": "Appearance",
       "appearance_help": "What the chat panel shows before the first message.",
       "greeting": "Greeting",

@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, model_validator
 
 from faden_backend.db.models.agents import AgentStatus, LocalMcpMode, PrincipalType
 
@@ -32,6 +32,38 @@ class AgentPii(BaseModel):
     allow_mode_override: StrictBool | None = None
 
 
+#: The tool modes, from least to most (gateway ``tool_classes.ToolMode``). Bypass is no agent's level yet:
+#: only a tenant that allows it may give it, and no tenant can (sdk/38 D2, D3).
+ToolLevel = Literal["off", "read_only", "ask", "auto"]
+_LEVEL_ORDER = ("off", "read_only", "ask", "auto")
+
+
+class AgentApprovals(BaseModel):
+    """The agent's approval levels (sdk/38 §5, D1, D2): where its conversations start, and the most they use.
+
+    The author's statement of what the agent is safe for, part of its version. The tenant's ceilings narrow
+    both.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    default_level: ToolLevel = "ask"
+    max_level: ToolLevel = "auto"
+    #: Which standing approvals the agent's card may offer; ``None``: as the SDK offers today. From A2 on.
+    standing: list[Literal["chat", "time", "grant", "always"]] | None = None
+    #: The longest grant, in minutes; ``None``: the tenant's. Read from A2 on.
+    max_grant_minutes: int | None = Field(default=None, ge=15, le=1440)
+    #: The classes a grant may cover: never destructive or unclassified (sdk/38 §4.3). Read from A2 on.
+    grant_classes: list[Literal["read", "write"]] | None = None
+
+    @model_validator(mode="after")
+    def _default_within_max(self) -> AgentApprovals:
+        if _LEVEL_ORDER.index(self.default_level) > _LEVEL_ORDER.index(self.max_level):
+            msg = "The default level must not be above the highest level."
+            raise ValueError(msg)
+        return self
+
+
 class AgentVersionFields(BaseModel):
     """What a version defines. A new version starts from the fields sent."""
 
@@ -43,6 +75,7 @@ class AgentVersionFields(BaseModel):
     local_mcp_mode: LocalMcpMode = LocalMcpMode.DISABLE
     ui: dict[str, Any] = Field(default_factory=dict)
     pii: AgentPii = Field(default_factory=AgentPii)
+    approvals: AgentApprovals = Field(default_factory=AgentApprovals)
     extensions: dict[str, Any] = Field(default_factory=dict)
 
 

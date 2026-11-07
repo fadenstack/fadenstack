@@ -3,7 +3,14 @@
  * without the version's own metadata. Pure functions, so the editor, the
  * create dialog and the version comparison agree on what a definition is.
  */
-import type { Agent, AgentDefinition, AgentPii, AgentVersion, HostTool } from "~/api/agents";
+import type { Agent, AgentApprovals, AgentDefinition, AgentPii, AgentVersion, HostTool } from "~/api/agents";
+import type { ToolMode } from "~/api/tools";
+
+/** The tool modes, least to most: an agent's default level is never above its highest. */
+export const TOOL_LEVELS: ToolMode[] = ["off", "read_only", "ask", "auto"];
+
+/** Without levels of its own an agent starts in Ask and goes up to Auto, as agents always did. */
+const DEFAULT_APPROVALS: AgentApprovals = { default_level: "ask", max_level: "auto" };
 
 export const EMPTY_DEFINITION: AgentDefinition = {
   instructions: "",
@@ -14,6 +21,7 @@ export const EMPTY_DEFINITION: AgentDefinition = {
   local_mcp_mode: "disable",
   ui: {},
   pii: { allow_mode_override: null },
+  approvals: DEFAULT_APPROVALS,
   extensions: {},
 };
 
@@ -24,6 +32,7 @@ export const DEFINITION_FIELDS = [
   "knowledge",
   "server_tools",
   "host_tool_contract",
+  "approvals",
   "local_mcp_mode",
   "ui",
   "pii",
@@ -44,6 +53,7 @@ export function definitionOf(version: AgentVersion | null | undefined): AgentDef
     local_mcp_mode: version.local_mcp_mode ?? "disable",
     ui: version.ui ?? {},
     pii: piiOf(version.pii),
+    approvals: approvalsOf(version.approvals),
     extensions: version.extensions ?? {},
   };
 }
@@ -52,6 +62,21 @@ export function definitionOf(version: AgentVersion | null | undefined): AgentDef
 function piiOf(value: unknown): AgentPii {
   const allow = value && typeof value === "object" ? (value as Partial<AgentPii>).allow_mode_override : null;
   return { allow_mode_override: typeof allow === "boolean" ? allow : null };
+}
+
+/** The approval levels as the console keeps them: a level it does not know is the default's; unset keys go. */
+function approvalsOf(value: unknown): AgentApprovals {
+  const stored = value && typeof value === "object" ? (value as Partial<AgentApprovals>) : {};
+  const level = (v: unknown, fallback: ToolMode) => (TOOL_LEVELS.includes(v as ToolMode) ? (v as ToolMode) : fallback);
+  const out: AgentApprovals = {
+    ...stored,
+    default_level: level(stored.default_level, DEFAULT_APPROVALS.default_level),
+    max_level: level(stored.max_level, DEFAULT_APPROVALS.max_level),
+  };
+  for (const key of ["standing", "max_grant_minutes", "grant_classes"] as const) {
+    if (out[key] === null || out[key] === undefined) delete out[key];
+  }
+  return out;
 }
 
 /** A definition as it is saved: trimmed, empty values dropped, tools without a name left out. */
@@ -65,6 +90,7 @@ export function cleanDefinition(definition: AgentDefinition): AgentDefinition {
       .filter((tool) => tool.name !== ""),
     ui: cleanUi(definition.ui),
     pii: piiOf(definition.pii),
+    approvals: approvalsOf(definition.approvals),
   };
 }
 
@@ -113,6 +139,10 @@ export function definitionProblems(definition: AgentDefinition): string[] {
   const problems: string[] = [];
   if (new Set(names).size !== names.length) problems.push("agents.definition.problem_duplicate_tools");
   if (definition.host_tool_contract.some(neverOnRiskyTool)) problems.push("agents.definition.problem_never_risky");
+  const { default_level, max_level } = approvalsOf(definition.approvals);
+  if (TOOL_LEVELS.indexOf(default_level) > TOOL_LEVELS.indexOf(max_level)) {
+    problems.push("agents.definition.problem_default_above_max");
+  }
   if (TOKEN_LIFETIMES.some((f) => (tokenLifetimeOf(definition, f) ?? MIN_TOKEN_LIFETIME_S) < MIN_TOKEN_LIFETIME_S)) {
     problems.push("agents.definition.problem_token_short");
   }
@@ -254,6 +284,7 @@ export function parseAgentImport(text: string): ImportedAgent {
   const definition = { ...EMPTY_DEFINITION, ...Object.fromEntries(known.map((f) => [f, fields[f]])) } as AgentDefinition;
   definition.host_tool_contract = (definition.host_tool_contract ?? []).map(toolFrom);
   definition.pii = piiOf(definition.pii);
+  definition.approvals = approvalsOf(definition.approvals);
   return {
     slug: typeof record.slug === "string" ? record.slug : undefined,
     name: typeof record.name === "string" ? record.name : undefined,

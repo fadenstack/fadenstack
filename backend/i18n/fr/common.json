@@ -4412,6 +4412,7 @@
       "local_mcp_mode": "Serveurs MCP locaux",
       "ui": "Apparence",
       "pii": "Confidentialité",
+      "approvals": "Niveaux d'approbation",
       "extensions": "Paramètres Enterprise"
     },
     "import": {
@@ -4433,6 +4434,7 @@
       "save_and_publish": "Enregistrer et publier",
       "problem_duplicate_tools": "Deux outils de l'hôte portent le même nom. Chaque nom ne peut apparaître qu'une fois.",
       "problem_never_risky": "Ne jamais demander est réservé aux outils de lecture et d'écriture. Changez la classe ou l'approbation de l'outil.",
+      "problem_default_above_max": "Le mode d'outils dans lequel commencent les conversations est au-dessus du maximum. Baissez le départ ou relevez le maximum.",
       "behaviour": "Comportement",
       "instructions": "Instructions",
       "instructions_help": "Placées avant chaque conversation. Les utilisateurs et le SDK ne les voient jamais.",
@@ -4454,6 +4456,10 @@
       "local_mcp_allow_help": "Le SDK peut attacher des serveurs MCP sur la machine de l'utilisateur. Leurs outils ne sont pas classés et demandent donc toujours.",
       "host_tools": "Outils de l'hôte",
       "host_tools_help": "Les outils fournis par l'application. Une requête qui déclare un autre outil est refusée. Vide : aucune restriction.",
+      "approvals": "Niveaux d'approbation",
+      "approvals_help": "Le mode d'outils dans lequel commencent les conversations de l'agent, et le plus élevé qu'une personne peut choisir. Les limites de votre organisation restreignent les deux.",
+      "default_level": "Commence en",
+      "max_level": "Au plus",
       "appearance": "Apparence",
       "appearance_help": "Ce que le panneau de chat affiche avant le premier message.",
       "greeting": "Message d'accueil",
@@ -4489,7 +4495,7 @@
       "approval_ask": "Demander",
       "approval_always": "Toujours demander",
       "never_read_write": "Seulement pour la lecture et l'écriture",
-      "approval_help": "Toujours demander : demande à chaque fois, et rien de ce que la personne a autorisé avant n'y répond ; pour les outils qui décident au sujet de personnes ou agissent dans le monde physique. Demander : demande même là où le mode d'outils exécuterait l'outil ; la personne peut l'autoriser pour le chat ou toujours. Ne jamais demander : un outil de lecture ou d'écriture s'exécute sans demander en Demander et Auto."
+      "approval_help": "Toujours demander : demande à chaque fois, et rien de ce que la personne a autorisé avant n'y répond ; pour les outils qui décident au sujet de personnes ou agissent dans le monde physique. Demander : demande même là où le mode d'outils exécuterait l'outil ; la personne peut l'autoriser pour le chat ou toujours. Ne jamais demander : un outil de lecture ou d'écriture s'exécute sans demander en Demander et Automatique."
     },
     "versions": {
       "version": "Version",

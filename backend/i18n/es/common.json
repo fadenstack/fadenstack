@@ -4412,6 +4412,7 @@
       "local_mcp_mode": "Servidores MCP locales",
       "ui": "Apariencia",
       "pii": "Privacidad",
+      "approvals": "Niveles de aprobación",
       "extensions": "Ajustes Enterprise"
     },
     "import": {
@@ -4433,6 +4434,7 @@
       "save_and_publish": "Guardar y publicar",
       "problem_duplicate_tools": "Dos herramientas del anfitrión tienen el mismo nombre. Cada nombre puede aparecer una sola vez.",
       "problem_never_risky": "No preguntar nunca solo es para herramientas de lectura y escritura. Cambie la clase o la aprobación de la herramienta.",
+      "problem_default_above_max": "El modo de herramientas en el que empiezan las conversaciones está por encima del máximo. Baje el inicial o suba el máximo.",
       "behaviour": "Comportamiento",
       "instructions": "Instrucciones",
       "instructions_help": "Se anteponen a cada conversación. Los usuarios y el SDK nunca las ven.",
@@ -4454,6 +4456,10 @@
       "local_mcp_allow_help": "El SDK puede conectar servidores MCP en el equipo del usuario. Sus herramientas no están clasificadas, así que siempre preguntan.",
       "host_tools": "Herramientas del anfitrión",
       "host_tools_help": "Las herramientas que ofrece la aplicación. Una solicitud que declare otra herramienta se rechaza. Vacío: sin restricción.",
+      "approvals": "Niveles de aprobación",
+      "approvals_help": "El modo de herramientas en el que empiezan las conversaciones del agente y el máximo al que una persona puede cambiar. Los límites de su organización restringen ambos.",
+      "default_level": "Empieza en",
+      "max_level": "Como máximo",
       "appearance": "Apariencia",
       "appearance_help": "Lo que muestra el panel de chat antes del primer mensaje.",
       "greeting": "Saludo",
@@ -4489,7 +4495,7 @@
       "approval_ask": "Preguntar",
       "approval_always": "Preguntar siempre",
       "never_read_write": "Solo para lectura y escritura",
-      "approval_help": "Preguntar siempre: pregunta cada vez, y nada de lo que la persona permitió antes responde por ella; úselo para herramientas que deciden sobre personas o actúan en el mundo físico. Preguntar: pregunta incluso donde el modo de herramientas la ejecutaría; la persona puede permitirla para el chat o siempre. No preguntar nunca: una herramienta de lectura o escritura se ejecuta sin preguntar en Preguntar y Auto."
+      "approval_help": "Preguntar siempre: pregunta cada vez, y nada de lo que la persona permitió antes responde por ella; úselo para herramientas que deciden sobre personas o actúan en el mundo físico. Preguntar: pregunta incluso donde el modo de herramientas la ejecutaría; la persona puede permitirla para el chat o siempre. No preguntar nunca: una herramienta de lectura o escritura se ejecuta sin preguntar en Preguntar y Automático."
     },
     "versions": {
       "version": "Versión",

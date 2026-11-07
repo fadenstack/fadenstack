@@ -1,7 +1,8 @@
 /**
  * An agent's definition: its instructions and model, what it may use (knowledge,
- * the gateway's tools, the host's tools, local MCP servers), and what the SDKs
- * show. Controlled: the parent owns the value and decides when to save it.
+ * the gateway's tools, the host's tools, local MCP servers), the tool modes its
+ * conversations start in and may reach, and what the SDKs show. Controlled: the
+ * parent owns the value and decides when to save it.
  */
 import { useTranslation } from "react-i18next";
 
@@ -18,6 +19,7 @@ import { hasFeature } from "~/api/about";
 import { AGENT_TOKEN_LIFETIMES, type AgentDefinition, type LocalMcpMode } from "~/api/agents";
 import { chatApi } from "~/api/chatClient";
 import { ragLite } from "~/api/rag";
+import type { ToolMode } from "~/api/tools";
 import { ChipListField } from "~/components/ChipListField";
 import { SectionCard as Section } from "~/components/SectionCard";
 import { useAsyncData } from "~/lib/useAsyncData";
@@ -30,6 +32,7 @@ import {
   suggestionsOf,
   TOKEN_LIFETIMES,
   TOKEN_SETTING,
+  TOOL_LEVELS,
   tokenLifetimeOf,
   withPiiModeSwitch,
   withServerToolsMode,
@@ -184,6 +187,30 @@ export function AgentDefinitionEditor({ value, onChange, readOnly = false }: Age
           readOnly={readOnly}
           onChange={(tools) => set("host_tool_contract", tools)}
         />
+      </Section>
+
+      <Section title={t("agents.definition.approvals")} description={t("agents.definition.approvals_help")}>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+          {(["default_level", "max_level"] as const).map((key) => (
+            <TextField
+              key={key}
+              select
+              size="small"
+              label={t(`agents.definition.${key}`)}
+              value={value.approvals[key]}
+              disabled={readOnly}
+              error={key === "default_level" && TOOL_LEVELS.indexOf(value.approvals.default_level) > TOOL_LEVELS.indexOf(value.approvals.max_level)}
+              onChange={(e) => set("approvals", { ...value.approvals, [key]: e.target.value as ToolMode })}
+              sx={{ minWidth: 200 }}
+            >
+              {TOOL_LEVELS.map((level) => (
+                <MenuItem key={level} value={level}>
+                  {t(`tools.mode.${level}`)}
+                </MenuItem>
+              ))}
+            </TextField>
+          ))}
+        </Stack>
       </Section>
 
       <Section title={t("agents.definition.appearance")} description={t("agents.definition.appearance_help")}>

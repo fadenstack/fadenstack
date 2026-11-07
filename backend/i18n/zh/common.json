@@ -4412,6 +4412,7 @@
       "local_mcp_mode": "本地 MCP 服务器",
       "ui": "外观",
       "pii": "隐私",
+      "approvals": "审批级别",
       "extensions": "企业版设置"
     },
     "import": {
@@ -4433,6 +4434,7 @@
       "save_and_publish": "保存并发布",
       "problem_duplicate_tools": "两个宿主工具同名。每个名称只能出现一次。",
       "problem_never_risky": "“从不询问”仅适用于读取和写入类工具。请更改该工具的类别或审批设置。",
+      "problem_default_above_max": "对话开始时的工具模式高于最高模式。请降低起始模式或提高最高模式。",
       "behaviour": "行为",
       "instructions": "指令",
       "instructions_help": "置于每次对话之前。用户和 SDK 永远看不到。",
@@ -4454,6 +4456,10 @@
       "local_mcp_allow_help": "SDK 可以连接用户电脑上的 MCP 服务器。它们的工具未分类，因此总会先询问。",
       "host_tools": "宿主工具",
       "host_tools_help": "应用提供的工具。声明其他工具的请求会被拒绝。留空：不限制。",
+      "approvals": "审批级别",
+      "approvals_help": "该智能体的对话开始时使用的工具模式，以及用户最多可切换到的模式。您组织的限制会进一步收窄这两者。",
+      "default_level": "起始模式",
+      "max_level": "最高模式",
       "appearance": "外观",
       "appearance_help": "聊天面板在第一条消息之前显示的内容。",
       "greeting": "问候语",

@@ -192,6 +192,7 @@ def _version_fields(fields: AgentVersionFields) -> dict[str, Any]:
     _check_extensions(fields.extensions)
     data = fields.model_dump()
     data["host_tool_contract"] = [tool.model_dump(exclude_none=True) for tool in fields.host_tool_contract]
+    data["approvals"] = fields.approvals.model_dump(exclude_none=True)
     names = [tool["name"] for tool in data["host_tool_contract"]]
     if len(names) != len(set(names)):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Host tool names must be unique.")

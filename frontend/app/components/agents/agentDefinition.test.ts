@@ -69,6 +69,23 @@ describe("agent definitions", () => {
     expect(definitionProblems(EMPTY_DEFINITION)).toEqual([]);
   });
 
+  it("hold the agent's default and highest tool mode: Ask up to Auto unless set (sdk/38 §5)", () => {
+    expect(definitionOf({ ...VERSION, approvals: undefined } as unknown as AgentVersion).approvals).toEqual({
+      default_level: "ask",
+      max_level: "auto",
+    });
+    const odd = { ...VERSION, approvals: { default_level: "bypass", max_level: "auto", standing: null } };
+    expect(definitionOf(odd as unknown as AgentVersion).approvals).toEqual({ default_level: "ask", max_level: "auto" });
+    const above = { ...EMPTY_DEFINITION, approvals: { default_level: "auto" as const, max_level: "ask" as const } };
+    expect(definitionProblems(above)).toEqual(["agents.definition.problem_default_above_max"]);
+    const research = { ...EMPTY_DEFINITION, approvals: { default_level: "read_only" as const, max_level: "ask" as const } };
+    expect(definitionProblems(research)).toEqual([]);
+    expect(changedFields(EMPTY_DEFINITION, research)).toEqual(["approvals"]);
+    expect(parseAgentImport('{"approvals": {"default_level": "read_only", "max_level": "ask"}}').definition.approvals).toEqual(
+      research.approvals,
+    );
+  });
+
   it("refuse Never ask on a tool that is neither read nor write (sdk/38 D7)", () => {
     const tools = (risk?: "read" | "write" | "destructive") => ({
       ...EMPTY_DEFINITION,

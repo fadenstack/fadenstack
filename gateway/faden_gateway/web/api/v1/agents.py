@@ -368,9 +368,11 @@ async def agent_profile(
     resolver = getattr(request.app.state, "group_membership_resolver", None)
     if registry.tool_mode_ceilings and resolver is not None:
         groups = tuple(await resolver.resolve(auth.user_id) or ())
-    top = await tool_classes.ceiling(registry.tool_mode_ceilings, tool_classes.CeilingContext(
+    default, highest = profile.levels()
+    ceiling = await tool_classes.ceiling(registry.tool_mode_ceilings, tool_classes.CeilingContext(
         tenant_id=auth.tenant_id, user_id=auth.user_id, agent_id=profile.id, groups=groups,
     ))
+    top = tool_classes.limited(ceiling, highest)
     return {
         "object": "agent.profile",
         "id": profile.id,
@@ -393,11 +395,13 @@ async def agent_profile(
             # unless an Enterprise lock says otherwise (in ``extensions``).
             "developer_mode": agent.developer_mode,
         },
-        # Sessions start in "ask"; the SDK sends its session's mode
-        # (X-Faden-Tool-Mode), never wider than the ceiling (EE).
+        # Sessions start in the agent's default level (sdk/38 §5); the SDK sends its session's mode
+        # (X-Faden-Tool-Mode), never wider than the ceiling: the narrowest of the agent's highest level
+        # (``max``) and the EE ceilings. An agent that goes up to Auto adds no ceiling.
         "tool_modes": {
-            "default": tool_classes.DEFAULT_MODE,
+            "default": tool_classes.narrowest(default, top).value,
             "ceiling": top.value if top else None,
+            "max": highest.value,
             "open_world_enforced": tool_classes.OPEN_WORLD_ENFORCED,
         },
         # Whether the conversation's own PII mode (X-Faden-PII-Mode) is applied: the agent's

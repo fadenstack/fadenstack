@@ -382,4 +382,60 @@ async def test_an_agents_host_tools_are_classed_by_its_contract(
     assert "read_page" in offered and "delete_page" not in offered, "its contract says which is which"
     profile = (await client.get("/v1/agents/eplan-assistant/profile",
                                 headers={"Authorization": f"Bearer {_agent_token()}"})).json()
-    assert profile["tool_modes"] == {"default": "ask", "ceiling": None, "open_world_enforced": False}
+    assert profile["tool_modes"] == {"default": "ask", "ceiling": None, "max": "auto", "open_world_enforced": False}
+
+
+# -- each agent's default and highest level (sdk/38 §5, D1, D2) -------------------------------------------
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(("levels", "ee_ceiling", "expected"), [
+    ({}, None, {"default": "ask", "ceiling": None, "max": "auto"}),  # as before: no new ceiling
+    ({"default_level": "auto", "max_level": "auto"}, None, {"default": "auto", "ceiling": None, "max": "auto"}),
+    ({"default_level": "read_only", "max_level": "ask"}, None, {"default": "read_only", "ceiling": "ask", "max": "ask"}),
+    ({"default_level": "auto", "max_level": "auto"}, "read_only",
+     {"default": "read_only", "ceiling": "read_only", "max": "auto"}),  # the narrowest applies
+    ({"default_level": "ask", "max_level": "bypass"}, None,
+     {"default": "read_only", "ceiling": "read_only", "max": "read_only"}),  # unknown: never wider
+], ids=["unset", "auto-agent", "research-agent", "ee-narrower", "unknown-max"])
+async def test_the_profile_says_the_agents_default_and_highest_level(
+    levels: dict[str, str], ee_ceiling: str | None, expected: dict[str, str | None],
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession,
+    backend: _Backend,  # noqa: F811 - the fixture
+) -> None:
+    await _seed(db_session, provider=ProviderType.REMOTE_OPENAI, pii=None)
+    backend.put(_profile(**levels))
+    fastapi_app.state.agent_directory.invalidate()
+    if ee_ceiling is not None:
+        async def ceiling(_: tc.CeilingContext) -> str:
+            return ee_ceiling
+
+        registry.tool_mode_ceilings.append(ceiling)
+    profile = (await client.get("/v1/agents/eplan-assistant/profile",
+                                headers={"Authorization": f"Bearer {_agent_token()}"})).json()
+    assert {k: profile["tool_modes"][k] for k in expected} == expected
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(("levels", "header", "asked"), [
+    ({"default_level": "auto", "max_level": "auto"}, None, False),  # starts in the agent's Auto
+    ({}, None, True),  # unset: Ask, as before
+    ({"default_level": "ask", "max_level": "ask"}, "auto", True),  # Auto asked for, Ask is the most
+], ids=["agent-default-auto", "unset-ask", "header-above-max"])
+async def test_an_agents_levels_decide_its_conversations_mode(
+    levels: dict[str, str], header: str | None, asked: bool,
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+    backend: _Backend,  # noqa: F811 - the fixture
+) -> None:
+    await _seed(db_session, provider=ProviderType.REMOTE_OPENAI, pii=None)
+    backend.put(_profile(host_tool_contract=({"name": "update_page", "risk": "write"},), **levels))
+    fastapi_app.state.agent_directory.invalidate()
+    _Model(monkeypatch, _call("update_page", {"page": 3}))
+    update_page = {"type": "function", "function": {"name": "update_page", "parameters": {"type": "object"}}}
+    headers = {"Authorization": f"Bearer {_agent_token()}", **EVENTS, **({"X-Faden-Tool-Mode": header} if header else {})}
+    r = await client.post("/v1/agents/eplan-assistant/chat/completions", json={
+        "model": "x", "stream": True, "tools": [update_page], "messages": [{"role": "user", "content": "Fix page 3."}],
+    }, headers=headers)
+    assert r.status_code == 200, r.text
+    marks = [e for e in _faden(r.text) if e.get("name") == "faden.approval_required"]
+    assert bool(marks) is asked

@@ -205,6 +205,34 @@ async def test_never_ask_is_published_only_for_read_and_write_tools(
         assert (await client.get("/api/agents/never-asks")).json()["published_version"] is None
 
 
+async def test_a_version_says_its_default_and_highest_level(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession,
+) -> None:
+    """sdk/38 §5, D1, D2: in the version, as Ask up to Auto unless the author says otherwise."""
+    signed_in.user = await _user(dbsession, admin=True)
+    await _agent(client, slug="as-before")
+    stored = (await client.get("/api/agents/as-before/versions/1")).json()["approvals"]
+    assert (stored["default_level"], stored["max_level"], stored["standing"]) == ("ask", "auto", None)
+    await _agent(client, slug="researcher", approvals={"default_level": "read_only", "max_level": "ask"})
+    stored = (await client.get("/api/agents/researcher/versions/1")).json()["approvals"]
+    assert (stored["default_level"], stored["max_level"]) == ("read_only", "ask")
+
+
+@pytest.mark.parametrize("approvals", [
+    {"default_level": "auto", "max_level": "ask"},  # the default above the highest
+    {"default_level": "bypass", "max_level": "auto"},  # never Bypass
+    {"default_level": "ask", "max_level": "bypass"},  # no tenant can allow it yet
+    {"default_level": "ask", "max_level": "auto", "grant_classes": ["destructive"]},
+    {"default_level": "ask", "max_level": "auto", "unknown": 1},
+], ids=["default-above-max", "bypass-default", "bypass-max", "destructive-grant", "unknown-key"])
+async def test_a_version_with_impossible_levels_is_refused(
+    approvals: dict[str, Any], signed_in: _As, client: AsyncClient, dbsession: AsyncSession,
+) -> None:
+    signed_in.user = await _user(dbsession, admin=True)
+    r = await client.post("/api/agents", json={"slug": "odd-levels", "name": "x", "version": {"approvals": approvals}})
+    assert r.status_code == 422, r.text
+
+
 async def test_host_tool_names_are_unique(signed_in: _As, client: AsyncClient, dbsession: AsyncSession) -> None:
     signed_in.user = await _user(dbsession, admin=True)
     r = await client.post("/api/agents", json={

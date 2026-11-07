@@ -2284,6 +2284,8 @@ class GatewayService:
         groups: tuple[str, ...] = ()
         if extension_registry.tool_mode_ceilings and self.group_memberships is not None:
             groups = await self.group_memberships.resolve(auth.user_id) or ()
+        # An agent's conversations start in its default level and go no higher than its highest (sdk/38 §5).
+        default, limit = req.agent.agent.levels() if req.agent is not None else (None, None)
         req.tool_mode = await tool_classes.effective(
             chosen, extension_registry.tool_mode_ceilings,
             tool_classes.CeilingContext(
@@ -2291,6 +2293,7 @@ class GatewayService:
                 agent_id=req.agent.agent.id if req.agent is not None else None,
                 session_id=req.session_id, groups=tuple(groups),
             ),
+            default=default, limit=limit,
         )
         tools = req.agent.agent.host_tool_contract if req.agent is not None else ()
         req.classifier = tool_classes.Classifier(

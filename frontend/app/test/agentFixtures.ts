@@ -80,6 +80,7 @@ export function versionFixture(version: number, overrides: Partial<AgentVersion>
     local_mcp_mode: "disable",
     ui: {},
     pii: { allow_mode_override: null },
+    approvals: { default_level: "ask", max_level: "auto" },
     extensions: {},
     created_at: "2026-09-30T10:00:00Z",
     published_at: version === 1 ? "2026-09-30T10:05:00Z" : null,

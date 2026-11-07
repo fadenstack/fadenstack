@@ -4412,6 +4412,7 @@
       "local_mcp_mode": "Lokale MCP-Server",
       "ui": "Darstellung",
       "pii": "Datenschutz",
+      "approvals": "Freigabestufen",
       "extensions": "Enterprise-Einstellungen"
     },
     "import": {
@@ -4433,6 +4434,7 @@
       "save_and_publish": "Speichern und veröffentlichen",
       "problem_duplicate_tools": "Zwei Host-Tools haben denselben Namen. Jeder Name darf nur einmal vorkommen.",
       "problem_never_risky": "Nie nachfragen gibt es nur für Tools der Klassen Lesen und Schreiben. Ändern Sie die Klasse oder die Freigabe des Tools.",
+      "problem_default_above_max": "Der Tool-Modus, in dem Unterhaltungen beginnen, liegt über dem höchsten. Senken Sie den Start oder heben Sie den höchsten an.",
       "behaviour": "Verhalten",
       "instructions": "Anweisungen",
       "instructions_help": "Werden jedem Gespräch vorangestellt. Nutzer und das SDK sehen sie nie.",
@@ -4454,6 +4456,10 @@
       "local_mcp_allow_help": "Das SDK darf MCP-Server auf dem Rechner des Nutzers einbinden. Ihre Tools sind nicht klassifiziert und fragen deshalb immer nach.",
       "host_tools": "Host-Tools",
       "host_tools_help": "Die Tools, die die Anwendung bereitstellt. Eine Anfrage mit einem anderen Tool wird abgelehnt. Leer: keine Einschränkung.",
+      "approvals": "Freigabestufen",
+      "approvals_help": "Der Tool-Modus, in dem Unterhaltungen des Agenten beginnen, und der höchste, den eine Person wählen kann. Die Grenzen Ihrer Organisation schränken beide ein.",
+      "default_level": "Beginnt in",
+      "max_level": "Höchstens",
       "appearance": "Darstellung",
       "appearance_help": "Was das Chat-Fenster vor der ersten Nachricht zeigt.",
       "greeting": "Begrüßung",
@@ -4489,7 +4495,7 @@
       "approval_ask": "Nachfragen",
       "approval_always": "Immer nachfragen",
       "never_read_write": "Nur für Lesen und Schreiben",
-      "approval_help": "Immer nachfragen: fragt jedes Mal, und nichts, was die Person vorher erlaubt hat, beantwortet die Frage; für Tools, die über Personen entscheiden oder in der physischen Welt handeln. Nachfragen: fragt auch dort, wo der Tool-Modus das Tool ausführen würde; die Person kann es für den Chat oder immer erlauben. Nie nachfragen: Ein Tool der Klasse Lesen oder Schreiben läuft in Nachfragen und Auto ohne Nachfrage."
+      "approval_help": "Immer nachfragen: fragt jedes Mal, und nichts, was die Person vorher erlaubt hat, beantwortet die Frage; für Tools, die über Personen entscheiden oder in der physischen Welt handeln. Nachfragen: fragt auch dort, wo der Tool-Modus das Tool ausführen würde; die Person kann es für den Chat oder immer erlauben. Nie nachfragen: Ein Tool der Klasse Lesen oder Schreiben läuft in Fragen und Automatisch ohne Nachfrage."
     },
     "versions": {
       "version": "Version",
