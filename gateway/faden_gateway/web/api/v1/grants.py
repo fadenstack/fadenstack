@@ -10,6 +10,12 @@
   on.
 - ``POST /v1/agents/{agent}/grants/{id}/extend``: more time or places, from the grant's device, in place and
   never past the longest grant from when it was issued.
+- ``POST /v1/agents/{agent}/grants/{id}/report``: at the end of a turn under Bypass, the calls the device ran
+  under the grant; the gateway compares them with its own records and flags any difference (sdk/09 L-61).
+
+A ``bypass`` grant (sdk/40 A3) is made only where Bypass may be chosen -- the installation's switch, the
+agent's highest level, no lower ceiling (L-57) -- for one conversation. Its row is the record the device waits
+for before it relies on Bypass (L-59).
 
 A grant is the device's: only the agent's route with a device sign-in (the agent token's ``did``) makes,
 lists, pauses and resumes one. The gateway checks and counts every covered call itself
@@ -21,16 +27,21 @@ from __future__ import annotations
 import uuid
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from faden_gateway.db.dao.gateway_dao import GatewayDAO
-from faden_gateway.services.gateway import grants
+from faden_gateway.services.gateway import approval_settings, grants
 from faden_gateway.services.gateway.agents import AgentRequest
 from faden_gateway.services.gateway.auth import AuthContext, get_auth_context
 from faden_gateway.services.gateway.errors import GatewayError
-from faden_gateway.web.api.v1.agents import CONVERSATION_HEADER, agent_request
+from faden_gateway.web.api.v1.agents import (
+    CONVERSATION_HEADER,
+    agent_request,
+    bypass_offered,
+    tool_mode_ceiling,
+)
 
 router = APIRouter()
 
@@ -68,6 +79,10 @@ class GrantRequest(BaseModel):
     conversation: bool = False
     #: The SHA-256 of the text the card showed the person.
     shown_text_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    #: The person's own words on why (Bypass, optional; sdk/09 L-59).
+    reason: str | None = Field(default=None, max_length=500)
+    #: The client as it names itself, e.g. ``Fadenstack.Agents/0.3.0`` (L-59).
+    client_version: str | None = Field(default=None, max_length=64)
 
 
 def _device(caller: tuple[AuthContext, AgentRequest]) -> tuple[AuthContext, AgentRequest, str]:
@@ -112,32 +127,38 @@ async def _answer(dao: GatewayDAO, grant: Any | None, status_code: int = 200) ->
 
 @router.post("/v1/agents/{agent}/grants", status_code=status.HTTP_201_CREATED, response_model=None)
 async def issue_grant(
+    request: Request,
     body: GrantRequest,
     caller: Annotated[tuple[AuthContext, AgentRequest], Depends(agent_request)],
     dao: Annotated[GatewayDAO, Depends()],
 ) -> JSONResponse:
     """Store what the person allowed, within the agent's limits; ``narrowed`` names what was cut."""
     auth, agent, device_id = _device(caller)
-    bound = body.kind == "work" or body.conversation
+    bound = body.kind in ("work", "bypass") or body.conversation
     if bound and not agent.conversation_id:
         raise GatewayError(
             status_code=422, code="grant_conversation_required", param=CONVERSATION_HEADER,
             message=f"This grant belongs to one conversation: send {CONVERSATION_HEADER}.",
         )
+    found = await approval_settings.current(dao.session.bind)
+    allowed = body.kind == "bypass" and bypass_offered(
+        agent.agent, await tool_mode_ceiling(request, auth, agent.agent), found,
+    )
     try:
         granted = grants.limit(
             kind=body.kind, tools=body.tools, classes=body.classes,
             targets=[t.model_dump() for t in body.targets], minutes=body.minutes, max_calls=body.max_calls,
-            agent=agent.agent,
+            agent=agent.agent, tenant_longest=found.longest_grant_minutes, bypass_allowed=allowed,
         )
     except grants.RefusedError as exc:
+        refused = exc.code in ("grant_not_offered", "bypass_not_allowed")
         raise GatewayError(
-            status_code=403 if exc.code == "grant_not_offered" else 422, code=exc.code, message=str(exc),
-            error_type="permission_error" if exc.code == "grant_not_offered" else "invalid_request_error",
+            status_code=403 if refused else 422, code=exc.code, message=str(exc),
+            error_type="permission_error" if refused else "invalid_request_error",
         ) from exc
     grant = await grants.issue(
         dao.session, _owner(auth, agent, device_id, agent.conversation_id if bound else None), granted,
-        shown_text_hash=body.shown_text_sha256,
+        shown_text_hash=body.shown_text_sha256, client_version=body.client_version, reason=body.reason,
     )
     now = await grants.server_now(dao.session)
     return JSONResponse(
@@ -243,6 +264,7 @@ async def extend_grant(
     that a new grant needs the full card again. Each extension is recorded with what the card showed.
     """
     auth, agent, device_id = _device(caller)
+    found = await approval_settings.current(dao.session.bind)
     if not body.minutes and not body.targets:
         raise GatewayError(
             status_code=422, code="grant_scope_invalid", message="Say what the extension adds.",
@@ -251,7 +273,7 @@ async def extend_grant(
         grant, cut = await grants.extend(
             dao.session, _grant_id(grant_id), _owner(auth, agent, device_id), minutes=body.minutes,
             targets=[t.model_dump() for t in body.targets],
-            longest_minutes=agent.agent.max_grant_minutes or grants.DEFAULT_LONGEST_MINUTES,
+            longest_minutes=grants.longest(agent.agent, found.longest_grant_minutes),
             shown_text_hash=body.shown_text_sha256,
         )
     except grants.RefusedError as exc:
@@ -261,4 +283,36 @@ async def extend_grant(
     now = await grants.server_now(dao.session)
     return JSONResponse({
         "object": "agent.grant", **grants.as_dict(grant, now), "server_now": now.isoformat(), "narrowed": cut,
+    })
+
+
+class GrantReport(BaseModel):
+    """The calls the device ran under its Bypass grant in the turn that just ended (sdk/09 L-61)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    calls: list[Annotated[str, Field(min_length=1, max_length=128)]] = Field(
+        default_factory=list, max_length=1000,
+    )
+
+
+@router.post("/v1/agents/{agent}/grants/{grant_id}/report", response_model=None)
+async def report_grant(
+    grant_id: str,
+    body: GrantReport,
+    caller: Annotated[tuple[AuthContext, AgentRequest], Depends(agent_request)],
+    dao: Annotated[GatewayDAO, Depends()],
+) -> JSONResponse:
+    """Compare the device's calls with the gateway's records; how many matched and how many differ.
+
+    The trail does not rely on the device: a difference is flagged for admins, whichever side it is on. Only
+    the grant's device reports; the grant may have ended meanwhile.
+    """
+    auth, agent, device_id = _device(caller)
+    found = await grants.report(dao.session, _grant_id(grant_id), _owner(auth, agent, device_id), body.calls)
+    if found is None:
+        raise _not_found()
+    return JSONResponse({
+        "object": "agent.grant_report", "matched": found.matched,
+        "device_only": len(found.device_only), "gateway_only": len(found.gateway_only),
     })

@@ -9,9 +9,14 @@ class, whether a tool runs, waits for the user, or is not offered at all:
     read_only   run     hidden  hidden       hidden
     ask         run     ask     ask          ask        <- every session starts here
     auto        run     run     ask          ask
+    bypass      run     run     ask*         ask*       <- * run under a Bypass grant
 
-There is no mode that runs an unknown or destructive tool unasked: an admin
-who wants that classifies the tool.
+No mode alone runs an unknown or destructive tool unasked. Bypass (sdk/38
+§4.1, sdk/09 §3.12) acts as Auto by itself; the calls Auto would ask about run
+only while the conversation holds a server grant ``kind: bypass``, which the
+gateway checks itself (``grants.py``; 39 F1). The level is reachable only where
+the installation allows it and the agent's highest level is Bypass
+(:func:`effective`); anywhere else a chosen Bypass is Auto.
 
 The agent's author may say more per tool, in its host tool contract
 (``approval``, 38 §4.3): ``always`` asks every time, and nothing the person
@@ -73,6 +78,8 @@ class ToolMode(StrEnum):
     READ_ONLY = "read_only"
     ASK = "ask"
     AUTO = "auto"
+    #: Auto, plus what the conversation's Bypass grant covers (sdk/38 §4.1).
+    BYPASS = "bypass"
 
 
 class Decision(StrEnum):
@@ -83,7 +90,7 @@ class Decision(StrEnum):
     HIDDEN = "hidden"
 
 
-_ORDER = {ToolMode.OFF: 0, ToolMode.READ_ONLY: 1, ToolMode.ASK: 2, ToolMode.AUTO: 3}
+_ORDER = {ToolMode.OFF: 0, ToolMode.READ_ONLY: 1, ToolMode.ASK: 2, ToolMode.AUTO: 3, ToolMode.BYPASS: 4}
 
 _TABLE: dict[ToolMode, dict[ToolClass, Decision]] = {
     ToolMode.OFF: dict.fromkeys(ToolClass, Decision.HIDDEN),
@@ -100,6 +107,8 @@ _TABLE: dict[ToolMode, dict[ToolClass, Decision]] = {
         ToolClass.DESTRUCTIVE: Decision.ASK, ToolClass.UNKNOWN: Decision.ASK,
     },
 }
+# What Bypass runs beyond Auto is the grant's to cover, never the table's.
+_TABLE[ToolMode.BYPASS] = dict(_TABLE[ToolMode.AUTO])
 
 
 def decide(mode: ToolMode, tool: Classified) -> Decision:
@@ -300,23 +309,32 @@ class EffectiveMode:
 
 
 def limited(top: ToolMode | None, limit: ToolMode | None) -> ToolMode | None:
-    """The ceiling *top* narrowed by an agent's highest level *limit*; Auto, the widest, narrows nothing."""
-    if limit is None or limit is ToolMode.AUTO:
+    """The ceiling *top* narrowed by an agent's highest level *limit*; Auto or above narrows nothing.
+
+    Bypass above Auto is narrowed in :func:`effective`, so the ceiling that clients without Bypass see stays
+    as it was.
+    """
+    if limit is None or limit in (ToolMode.AUTO, ToolMode.BYPASS):
         return top
     return narrowest(top, limit) if top is not None else limit
 
 
 async def effective(
     chosen: ToolMode | None, ceilings: Iterable[ToolModeCeiling], ctx: CeilingContext,
-    *, default: ToolMode | None = None, limit: ToolMode | None = None,
+    *, default: ToolMode | None = None, limit: ToolMode | None = None, bypass_allowed: bool = False,
 ) -> EffectiveMode:
     """The user's mode -- else *default*, the agent's level, else Ask -- narrowed by the ceilings and *limit*.
 
-    *limit* is the agent's highest level (sdk/38 §5): the narrowest of it and the EE ceilings applies.
+    *limit* is the agent's highest level (sdk/38 §5): the narrowest of it and the EE ceilings applies. Bypass
+    stays Bypass only where the installation allows it (*bypass_allowed*, sdk/09 L-57) and the agent's highest
+    level is Bypass; anywhere else it is Auto.
     """
     picked = chosen or default or ToolMode(DEFAULT_MODE)
     top = limited(await ceiling(ceilings, ctx), limit)
-    return EffectiveMode(mode=narrowest(picked, top), chosen=picked, ceiling=top)
+    mode = narrowest(picked, top)
+    if mode is ToolMode.BYPASS and not (bypass_allowed and limit is ToolMode.BYPASS):
+        mode = ToolMode.AUTO
+    return EffectiveMode(mode=mode, chosen=picked, ceiling=top)
 
 
 def reason(mode: ToolMode, decision: Decision, approval: str | None = None) -> str:

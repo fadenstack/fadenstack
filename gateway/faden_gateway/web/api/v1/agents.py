@@ -34,7 +34,7 @@ from starlette import status
 from faden_gateway.db.dao.gateway_dao import GatewayDAO
 from faden_gateway.db.models.gateway import AgentClientEvent
 from faden_gateway.services.extensions import registry
-from faden_gateway.services.gateway import agent_manifests, grants, tool_classes
+from faden_gateway.services.gateway import agent_manifests, approval_settings, grants, tool_classes
 from faden_gateway.services.gateway import governance as gov
 from faden_gateway.services.gateway.agents import (
     AgentLookupError,
@@ -69,6 +69,44 @@ logger = logging.getLogger(__name__)
 
 _ID = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 CONVERSATION_HEADER = "x-faden-conversation-id"
+#: What a client announces it can do beyond the agent API it was written for (sdk/40 §3 rule 5): a list of
+#: names, comma separated. New levels and fields are offered only to clients that name them.
+CLIENT_SUPPORTS_HEADER = "x-faden-client-supports"
+#: The client shows Bypass with its confirmation and marker, and makes its grant (sdk/40 A3).
+SUPPORTS_BYPASS = "tool_mode.bypass"
+
+
+def client_supports(request: Request) -> frozenset[str]:
+    """The names the client announced in ``x-faden-client-supports``."""
+    raw = request.headers.get(CLIENT_SUPPORTS_HEADER, "")
+    return frozenset(part.strip().lower() for part in raw.split(",") if part.strip())
+
+
+async def tool_mode_ceiling(
+    request: Request, auth: AuthContext, profile: Any,
+) -> tool_classes.ToolMode | None:
+    """The EE ceilings' narrowest for this person and agent; ``None``: none registered or none applies."""
+    groups: tuple[str, ...] = ()
+    resolver = getattr(request.app.state, "group_membership_resolver", None)
+    if registry.tool_mode_ceilings and resolver is not None:
+        groups = tuple(await resolver.resolve(auth.user_id) or ())
+    return await tool_classes.ceiling(registry.tool_mode_ceilings, tool_classes.CeilingContext(
+        tenant_id=auth.tenant_id, user_id=auth.user_id, agent_id=profile.id, groups=groups,
+    ))
+
+
+def bypass_offered(
+    profile: Any, ceiling: tool_classes.ToolMode | None, found: approval_settings.ApprovalSettings,
+) -> bool:
+    """Whether a person may choose Bypass with this agent now (sdk/09 L-57).
+
+    The installation allows it, the agent's version goes up to it, and no ceiling is lower.
+    """
+    _, highest = profile.levels()
+    return (
+        found.bypass_allowed and highest is tool_classes.ToolMode.BYPASS
+        and (ceiling is None or ceiling is tool_classes.ToolMode.BYPASS)
+    )
 TURN_HEADER = "x-faden-turn-id"
 #: The tools held back from the request, because the agent's contract does not list them.
 HELD_TOOLS_HEADER = "x-faden-held-tools"
@@ -364,15 +402,27 @@ async def agent_profile(
     language = await _user_language(request, auth.user_id)
     tenant_policy = await dao.get_tenant_policy(auth.tenant_id)
     tenant_allows = bool(getattr(tenant_policy, "allow_mode_override", False)) if tenant_policy else False
-    groups: tuple[str, ...] = ()
-    resolver = getattr(request.app.state, "group_membership_resolver", None)
-    if registry.tool_mode_ceilings and resolver is not None:
-        groups = tuple(await resolver.resolve(auth.user_id) or ())
     default, highest = profile.levels()
-    ceiling = await tool_classes.ceiling(registry.tool_mode_ceilings, tool_classes.CeilingContext(
-        tenant_id=auth.tenant_id, user_id=auth.user_id, agent_id=profile.id, groups=groups,
-    ))
+    ceiling = await tool_mode_ceiling(request, auth, profile)
     top = tool_classes.limited(ceiling, highest)
+    found = await approval_settings.current(dao.session.bind)
+    # Bypass only to clients that announce it (sdk/40 §3 rule 5) and only where it may be chosen; any other
+    # client sees Auto as the highest level, as before.
+    supports_bypass = SUPPORTS_BYPASS in client_supports(request)
+    offered = supports_bypass and bypass_offered(profile, ceiling, found)
+    bypass = tool_classes.ToolMode.BYPASS
+    shown_max = highest if highest is not bypass or offered else tool_classes.ToolMode.AUTO
+    longest = grants.longest(profile, found.longest_grant_minutes)
+    approvals: dict[str, Any] = {
+        "standing": list(profile.standing) if profile.standing is not None else None,
+        "longest_grant_minutes": longest,
+        "grant_classes": [
+            c for c in grants.GRANT_CLASSES if profile.grant_classes is None or c in profile.grant_classes
+        ],
+    }
+    if supports_bypass:
+        # What the Bypass confirmation says: whether it may be chosen, for how long at most, what is recorded.
+        approvals["bypass"] = {"allowed": offered, "longest_minutes": longest, "evidence": "calls"}
     return {
         "object": "agent.profile",
         "id": profile.id,
@@ -401,18 +451,13 @@ async def agent_profile(
         "tool_modes": {
             "default": tool_classes.narrowest(default, top).value,
             "ceiling": top.value if top else None,
-            "max": highest.value,
+            "max": shown_max.value,
             "open_world_enforced": tool_classes.OPEN_WORLD_ENFORCED,
         },
         # What the agent's approval card may offer (sdk/38 §5, §7): its standing approvals (``None``: any),
-        # the longest grant and the classes a grant may cover. The gateway applies them again to each grant.
-        "approvals": {
-            "standing": list(profile.standing) if profile.standing is not None else None,
-            "longest_grant_minutes": profile.max_grant_minutes or grants.DEFAULT_LONGEST_MINUTES,
-            "grant_classes": [
-                c for c in grants.GRANT_CLASSES if profile.grant_classes is None or c in profile.grant_classes
-            ],
-        },
+        # the longest grant (the agent's, never past the installation's) and the classes a grant may cover.
+        # The gateway applies them again to each grant.
+        "approvals": approvals,
         # Whether the conversation's own PII mode (X-Faden-PII-Mode) is applied: the agent's
         # setting, or the tenant's when the agent has none.
         "pii": {
@@ -441,7 +486,8 @@ class HostToolCheck(BaseModel):
 
     name: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
     arguments: dict[str, Any] = Field(default_factory=dict)
-    tool_mode: Literal["off", "read_only", "ask", "auto"]
+    #: The session's level; ``bypass`` is checked as Auto here: a command is not a call a grant covers.
+    tool_mode: Literal["off", "read_only", "ask", "auto", "bypass"]
     origin: Literal["user_command", "user_history"] = "user_command"
     phase: Literal["prepare", "dispatch"] = "prepare"
     schema_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")

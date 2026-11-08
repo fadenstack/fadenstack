@@ -180,12 +180,15 @@ class AgentProfile:
     def levels(self) -> tuple[tool_classes.ToolMode, tool_classes.ToolMode]:
         """The level conversations start in, and the highest.
 
-        A highest level this gateway does not know (or Bypass, which no tenant may give yet) counts as
-        read-only: it narrows, never widens.
+        A highest level this gateway does not know counts as read-only: it narrows, never widens. A highest
+        level of Bypass holds only where the installation allows it (``tool_classes.effective``); no
+        conversation starts in Bypass (sdk/38 D2), so a start stored as Bypass is Ask.
         """
         modes = tool_classes
         top = modes.parse_mode(self.max_level) or modes.ToolMode.READ_ONLY
         start = modes.parse_mode(self.default_level) or modes.ToolMode(modes.DEFAULT_MODE)
+        if start is modes.ToolMode.BYPASS:
+            start = modes.ToolMode(modes.DEFAULT_MODE)
         return modes.narrowest(start, top), top
 
     @property

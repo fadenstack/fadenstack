@@ -1138,6 +1138,8 @@ class ApprovalGrant(Base):
 
     ``time`` covers one tool; ``work`` the classes ``read`` and ``write`` in named places. Only a call that would
     ask is covered, never past the floor, never a destructive or unclassified tool (``services/gateway/grants.py``).
+    ``bypass`` covers what the mode would ask about in one conversation while it is in Bypass, any class,
+    never past the floor; every call that runs under it is recorded (sdk/09 L-57 to L-65).
     ``calls_used`` counts in one conditional update with the database's clock; ``status`` is ``active``,
     ``paused`` or ``revoked`` -- a grant past ``expires_at`` is expired whatever its status says.
     """
@@ -1146,7 +1148,7 @@ class ApprovalGrant(Base):
     __table_args__ = (Index("ix_approval_grant_owner", "tenant_id", "user_id", "agent_id", "device_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    #: ``time`` or ``work`` (``plan`` and ``bypass`` come later).
+    #: ``time``, ``work`` or ``bypass`` (``plan`` comes later).
     kind: Mapped[str] = mapped_column(String(16), nullable=False)
     tenant_id: Mapped[str] = mapped_column(String(128), nullable=False)
     user_id: Mapped[str] = mapped_column(String(128), nullable=False)
@@ -1165,12 +1167,16 @@ class ApprovalGrant(Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="active", server_default="active")
     paused_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    #: ``person``, ``admin`` or ``agent`` (the device ended it).
+    #: ``person``, ``admin``, ``agent`` (the device ended it) or ``kill_switch`` (Bypass turned off).
     revoked_by: Mapped[str | None] = mapped_column(String(16), nullable=True)
     #: What allowed it (the agent's version and the limits applied), what is recorded, what the person saw.
     policy_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
     evidence_level: Mapped[str] = mapped_column(String(16), nullable=False, default="decisions")
     shown_text_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    #: The client that asked for it, as it names itself (sdk/09 L-59).
+    client_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    #: The person's own words on why, if they gave any (Bypass); encrypted: it may name anyone.
+    reason: Mapped[str | None] = mapped_column(EncryptedText("grant-evidence"), nullable=True)
 
 
 class ApprovalGrantCall(Base):
@@ -1194,6 +1200,33 @@ class ApprovalGrantCall(Base):
     target: Mapped[str | None] = mapped_column(EncryptedText("grant-evidence"), nullable=True)
     arguments: Mapped[dict[str, Any] | None] = mapped_column(EncryptedJSON("grant-evidence"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    #: ``client`` (the device runs it) or ``gateway``; ``None`` on rows from before Bypass.
+    side: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    #: When the device reported running it (Bypass, L-61), and when the gateway compared it with the report.
+    reported_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ApprovalGrantFlag(Base):
+    """A difference between what the gateway counted under a Bypass grant and what the device reported (L-61).
+
+    ``gateway_only``: the gateway let a call of the client's tool run and the device's report did not name it.
+    ``device_only``: the device reported a call the gateway never counted. Either is for an admin to look at;
+    the trail does not rely on the device being honest.
+    """
+
+    __tablename__ = "approval_grant_flag"
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    grant_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("approval_grant.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
+    call_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    tool_id: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
 
 
 class ApprovalGrantChange(Base):

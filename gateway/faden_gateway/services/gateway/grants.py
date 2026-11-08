@@ -10,6 +10,13 @@ The budget and the expiry are checked and counted in one conditional ``UPDATE`` 
 never read first and written after, so several workers and a delegated callee share one budget exactly
 (ASVS 5.0 2.3.3, 2.3.4; 39 §4). A grant revoked or paused holds from the next call (ASVS 5.0 V8.3.2); a call
 already running finishes (owner, 2026-11-07). A lookup that fails covers nothing: the call asks.
+
+A ``bypass`` grant (sdk/09 §3.12, sdk/40 A3) belongs to one conversation and covers, while the chat's level
+is Bypass, what its mode would ask about -- any class, still never past the floor. Every call that runs under
+it is recorded with its arguments (L-60), whether it would have asked or not (:func:`record`). At the end of
+each turn the device reports the calls it ran under it, and the gateway flags any difference (:func:`report`,
+L-61). A delegated callee never uses it (L-58). It ends when the installation turns Bypass off
+(:func:`end_bypass`) and is deleted with its calls after the retention (:func:`purge_bypass`, L-65).
 """
 
 from __future__ import annotations
@@ -23,24 +30,32 @@ from datetime import datetime, timedelta
 from typing import Any
 from urllib.parse import urlsplit
 
-from sqlalchemy import Integer, String, bindparam, func, insert, or_, select, update
+from sqlalchemy import Integer, String, bindparam, delete, func, insert, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncSession
 
-from faden_gateway.db.models.gateway import ApprovalGrant, ApprovalGrantCall, ApprovalGrantChange
+from faden_gateway.db.models.gateway import (
+    ApprovalGrant,
+    ApprovalGrantCall,
+    ApprovalGrantChange,
+    ApprovalGrantFlag,
+)
 
 logger = logging.getLogger(__name__)
 
-#: The kinds built so far; ``plan`` waits for the plan model (desktop 16 F-12), ``bypass`` for A3.
-KINDS = ("time", "work")
-#: A grant never covers more than these (sdk/38 §4.3: never destructive, never unclassified).
+#: The kinds built so far; ``plan`` waits for the plan model (desktop 16 F-12).
+KINDS = ("time", "work", "bypass")
+#: A ``time`` or ``work`` grant never covers more than these (sdk/38 §4.3: never destructive, never
+#: unclassified).
 GRANT_CLASSES = ("read", "write")
+#: What a ``bypass`` grant covers: every class (sdk/38 §4.1), never past the floor.
+BYPASS_CLASSES = ("read", "write", "destructive", "unknown")
 PLACE_TYPES = ("document", "folder", "site", "app", "desk")
 #: The longest grant while the tenant has no setting of its own (sdk/38 D5: 2 hours).
 DEFAULT_LONGEST_MINUTES = 120
 #: The standing approval an agent's ``standing`` must offer for each kind (sdk/38 §5).
 STANDING = {"time": "time", "work": "grant"}
-#: What a grant records of each covered call: ``work`` its arguments too (L-60).
-EVIDENCE = {"time": "decisions", "work": "calls"}
+#: What a grant records of each covered call: ``work`` and ``bypass`` their arguments too (L-60).
+EVIDENCE = {"time": "decisions", "work": "calls", "bypass": "calls"}
 
 
 # -- what a call is checked against -----------------------------------------------------------
@@ -59,6 +74,10 @@ class Call:
     #: ``(type, value)`` of the call's place, from the contract's ``target_argument``.
     place: tuple[str, str] | None = None
     arguments: Mapping[str, Any] | None = None
+    #: Whether the chat's effective level is Bypass: only then does a ``bypass`` grant cover the call.
+    bypass: bool = False
+    #: ``client`` (the device runs the call) or ``gateway``.
+    side: str = "gateway"
 
 
 def pointer(document: Any, path: str) -> Any:
@@ -134,6 +153,8 @@ def place_in(place: tuple[str, str], target: Mapping[str, Any]) -> bool:
 
 def in_scope(kind: str, scope: Mapping[str, Any], call: Call) -> bool:
     """Whether a grant of *kind* and *scope* covers *call* -- the floor and the classes first."""
+    if kind == "bypass":
+        return call.bypass and call.tool_class in BYPASS_CLASSES and call.approval != "always"
     if call.tool_class not in GRANT_CLASSES or call.approval == "always":
         return False
     if kind == "time":
@@ -227,7 +248,7 @@ _COUNTED = (
     .cte("counted")
 )
 _COUNT_AND_RECORD = insert(ApprovalGrantCall).from_select(
-    ["id", "grant_id", "request_id", "call_id", "tool_id", "target", "arguments", "created_at"],
+    ["id", "grant_id", "request_id", "call_id", "tool_id", "target", "arguments", "created_at", "side"],
     select(
         bindparam("record", type_=_RECORDED.id.type), _COUNTED.c.grant_id,
         bindparam("request_id", type_=_RECORDED.request_id.type),
@@ -235,6 +256,7 @@ _COUNT_AND_RECORD = insert(ApprovalGrantCall).from_select(
         bindparam("tool_id", type_=_RECORDED.tool_id.type),
         bindparam("target", type_=_RECORDED.target.type),
         bindparam("arguments", type_=_RECORDED.arguments.type), _COUNTED.c.at,
+        bindparam("side", type_=_RECORDED.side.type),
     ),
 ).add_cte(_COUNTED).returning(ApprovalGrantCall.id)
 
@@ -250,8 +272,10 @@ async def autocommit(bind: AsyncEngine) -> AsyncIterator[AsyncConnection]:
         yield await conn.execution_options(isolation_level="AUTOCOMMIT")
 
 
-async def candidates(conn: AsyncConnection, owner: Owner, call: Call) -> list[Candidate]:
-    """The owner's usable grants that cover *call*, the one ending first first.
+async def candidates(
+    conn: AsyncConnection, owner: Owner, call: Call, kinds: Sequence[str] = KINDS,
+) -> list[Candidate]:
+    """The owner's usable grants of *kinds* that cover *call*, the one ending first first.
 
     Read only: nothing counts here.
     """
@@ -261,12 +285,17 @@ async def candidates(conn: AsyncConnection, owner: Owner, call: Call) -> list[Ca
         "conversation_id": owner.conversation_id,
     })).all()
     found = [Candidate(row.id, row.kind, row.scope or {}, row.evidence_level) for row in rows]
-    return [g for g in found if in_scope(g.kind, g.scope, call)]
+    return [g for g in found if g.kind in kinds and in_scope(g.kind, g.scope, call)]
 
 
 async def load(conn: AsyncConnection, grant_id: uuid.UUID) -> Candidate | None:
-    """One grant by its id, as a delegated callee's calls count against the caller's (D12)."""
-    row = (await conn.execute(select(*_CANDIDATE).where(ApprovalGrant.id == grant_id))).first()
+    """One grant by its id, as a delegated callee's calls count against the caller's (D12).
+
+    Never a Bypass grant: a delegated or receiving agent does not inherit Bypass (sdk/09 L-58).
+    """
+    row = (await conn.execute(
+        select(*_CANDIDATE).where(ApprovalGrant.id == grant_id, ApprovalGrant.kind != "bypass"),
+    )).first()
     return Candidate(row.id, row.kind, row.scope or {}, row.evidence_level) if row else None
 
 
@@ -285,24 +314,38 @@ async def consume(conn: AsyncConnection, grant: Candidate, call: Call) -> bool:
     recorded = await conn.execute(_COUNT_AND_RECORD, {
         "grant": grant.id, "record": uuid.uuid4(), "request_id": call.request_id[:128],
         "call_id": call.call_id[:128], "tool_id": call.tool_id[:256],
-        "target": call.place[1] if call.place else None, "arguments": arguments,
+        "target": call.place[1] if call.place else None, "arguments": arguments, "side": call.side,
     })
     return recorded.first() is not None
 
 
-async def cover(bind: AsyncEngine, owner: Owner, call: Call) -> uuid.UUID | None:
+async def cover(
+    bind: AsyncEngine, owner: Owner, call: Call, kinds: Sequence[str] = KINDS,
+) -> uuid.UUID | None:
     """The grant that covers and counts *call*, or ``None``; on a connection of its own, each step committed.
 
     A lookup that fails covers nothing: the call asks rather than runs (sdk/38 §6, 39 F5).
     """
     try:
         async with autocommit(bind) as conn:
-            for grant in await candidates(conn, owner, call):
+            for grant in await candidates(conn, owner, call, kinds):
                 if await consume(conn, grant, call):
                     return grant.id
     except Exception:
         logger.exception("The grant lookup failed; the call asks")
     return None
+
+
+async def record(bind: AsyncEngine, owner: Owner, call: Call) -> uuid.UUID | None:
+    """Record a call that runs anyway (a read, or a write at Auto) against the chat's Bypass grant (L-60).
+
+    Every call under Bypass is evidence, not only those it spared a question; it counts against the grant's
+    budget as they do. ``None``: no Bypass grant (the call runs as at Auto, unrecorded), or the record
+    failed -- logged, and the call still runs, as it would without Bypass.
+    """
+    if not call.bypass:
+        return None
+    return await cover(bind, owner, call, kinds=("bypass",))
 
 
 async def still_usable(bind: Any, grant_id: uuid.UUID) -> bool:
@@ -350,25 +393,44 @@ class RefusedError(ValueError):
         self.code = code
 
 
+def longest(agent: Any, tenant_longest: int = DEFAULT_LONGEST_MINUTES) -> int:
+    """The longest grant for *agent*: its own, never longer than the installation's (sdk/38 §5)."""
+    return min(agent.max_grant_minutes or tenant_longest, tenant_longest)
+
+
 def limit(
     *, kind: str, tools: Sequence[str], classes: Sequence[str], targets: Sequence[Mapping[str, Any]],
-    minutes: int, max_calls: int | None, agent: Any,
+    minutes: int, max_calls: int | None, agent: Any, tenant_longest: int = DEFAULT_LONGEST_MINUTES,
+    bypass_allowed: bool = False,
 ) -> Granted:
     """The grant the agent's limits allow for this request: kinds, standing, classes and the longest duration.
 
-    *agent* is the ``AgentProfile``. Raises :class:`RefusedError` when nothing of it can be granted.
+    *agent* is the ``AgentProfile``; *tenant_longest* the installation's longest grant; *bypass_allowed*
+    whether a Bypass grant may be made now -- the installation's switch, the agent's highest level and the
+    ceilings (sdk/09 L-57), which the caller works out. Raises :class:`RefusedError` when nothing of it can be
+    granted.
     """
     if kind not in KINDS:
         raise RefusedError("grant_kind_unavailable", f"Grants of kind '{kind}' are not available.")
+    span = longest(agent, tenant_longest)
+    cut = ["minutes"] if minutes > span else []
+    if kind == "bypass":
+        if not bypass_allowed:
+            raise RefusedError(
+                "bypass_not_allowed", "Bypass is not allowed here: by the organisation, or for this agent.",
+            )
+        return Granted(
+            "bypass", {"classes": list(BYPASS_CLASSES)}, min(minutes, span), max_calls,
+            f"v{agent.version}/{span}m/bypass", cut,
+        )
     if agent.standing is not None and STANDING[kind] not in agent.standing:
         raise RefusedError("grant_not_offered", "The agent does not offer this kind of grant.")
-    longest = agent.max_grant_minutes or DEFAULT_LONGEST_MINUTES
-    cut = ["minutes"] if minutes > longest else []
-    policy = f"v{agent.version}/{longest}m"
+    longest_minutes = span
+    policy = f"v{agent.version}/{longest_minutes}m"
     if kind == "time":
         if len(tools) != 1:
             raise RefusedError("grant_scope_invalid", "A grant for a time covers exactly one tool.")
-        return Granted("time", {"tools": list(tools)}, min(minutes, longest), max_calls, policy, cut)
+        return Granted("time", {"tools": list(tools)}, min(minutes, longest_minutes), max_calls, policy, cut)
     allowed = [
         c for c in GRANT_CLASSES if c in classes and (agent.grant_classes is None or c in agent.grant_classes)
     ]
@@ -389,14 +451,20 @@ def limit(
     if not places:
         raise RefusedError("grant_scope_invalid", "A grant for a stretch of work names the places it covers.")
     return Granted(
-        "work", {"classes": allowed, "targets": places}, min(minutes, longest), max_calls, policy, cut,
+        "work", {"classes": allowed, "targets": places}, min(minutes, longest_minutes), max_calls, policy,
+        cut,
     )
 
 
 async def issue(
     session: AsyncSession, owner: Owner, granted: Granted, *, shown_text_hash: str | None = None,
+    client_version: str | None = None, reason: str | None = None,
 ) -> ApprovalGrant:
-    """Store a grant; it starts and ends by the database's clock. Committed."""
+    """Store a grant; it starts and ends by the database's clock. Committed.
+
+    The stored row is the record of the switch-on that the device waits for (sdk/09 L-59): who, which device,
+    agent and version, conversation, scope, expiry, what allowed it, the client and the person's reason.
+    """
     grant = (await session.execute(
         insert(ApprovalGrant).values(
             id=uuid.uuid4(), kind=granted.kind, tenant_id=owner.tenant_id, user_id=owner.user_id,
@@ -405,6 +473,7 @@ async def issue(
             expires_at=func.now() + timedelta(minutes=granted.minutes), max_calls=granted.max_calls,
             calls_used=0, status="active", policy_version=granted.policy_version,
             evidence_level=EVIDENCE[granted.kind], shown_text_hash=shown_text_hash,
+            client_version=client_version, reason=reason,
         ).returning(ApprovalGrant),
     )).scalar_one()
     await session.commit()
@@ -562,6 +631,126 @@ def _holds(known: Mapping[str, Any], place: Mapping[str, Any], classes: Sequence
         known.get("type") == place["type"] and list(known.get("identifiers") or ()) == place["identifiers"]
         and set(place["actions"]) <= set(known.get("actions") or classes)
     )
+
+
+# -- Bypass: the kill switch, the device's report, the retention -------------------------------
+
+
+async def end_bypass(bind: AsyncEngine, *, by: str = "kill_switch") -> int:
+    """End every running Bypass grant, recorded as ended *by*; how many. Idempotent; a failure is logged.
+
+    The installation turned Bypass off (sdk/09 L-57, L-59): no call is covered from the next one on.
+    """
+    try:
+        async with autocommit(bind) as conn:
+            ended = await conn.execute(
+                update(ApprovalGrant)
+                .where(
+                    ApprovalGrant.kind == "bypass", ApprovalGrant.status.in_(("active", "paused")),
+                    ApprovalGrant.expires_at > _clock(),
+                )
+                .values(status="revoked", revoked_at=_clock(), revoked_by=by),
+            )
+            return ended.rowcount or 0
+    except Exception:
+        logger.exception("The running Bypass grants could not be ended")
+        return 0
+
+
+@dataclass(frozen=True, slots=True)
+class Report:
+    """What comparing the device's report with the gateway's records found (L-61)."""
+
+    matched: int
+    #: Calls the device reported that the gateway never counted under the grant.
+    device_only: list[str]
+    #: Calls of the client's tools the gateway counted that the report did not name.
+    gateway_only: list[str]
+
+
+async def report(
+    session: AsyncSession, grant_id: uuid.UUID, owner: Owner, call_ids: Sequence[str],
+) -> Report | None:
+    """Compare the calls the device ran under its Bypass grant with what the gateway counted; flag the rest.
+
+    Sent at the end of each turn. The client's calls the gateway counted before this report and no report has
+    named are flagged ``gateway_only``; reported calls it never counted ``device_only``. Each counted call is
+    compared once. ``None``: no such Bypass grant of this device (it may have ended: a report still counts).
+    Committed.
+    """
+    grant = (await session.execute(
+        select(ApprovalGrant.id).where(
+            ApprovalGrant.id == grant_id, _device_owned(owner), ApprovalGrant.kind == "bypass",
+        ),
+    )).scalar_one_or_none()
+    if grant is None:
+        return None
+    named = {str(c)[:128] for c in call_ids if c}
+    rows = (await session.execute(
+        select(ApprovalGrantCall.id, ApprovalGrantCall.call_id, ApprovalGrantCall.tool_id).where(
+            ApprovalGrantCall.grant_id == grant_id, ApprovalGrantCall.side == "client",
+            ApprovalGrantCall.checked_at.is_(None),
+        ),
+    )).all()
+    counted = {row.call_id for row in rows}
+    seen_before = set((await session.execute(
+        select(ApprovalGrantCall.call_id).where(
+            ApprovalGrantCall.grant_id == grant_id, ApprovalGrantCall.call_id.in_(named),
+            ApprovalGrantCall.checked_at.is_not(None),
+        ),
+    )).scalars().all()) if named else set()
+    device_only = sorted(named - counted - seen_before)
+    gateway_only = sorted({row.call_id for row in rows} - named)
+    now = _clock()
+    matched_ids = [row.id for row in rows if row.call_id in named]
+    if matched_ids:
+        await session.execute(
+            update(ApprovalGrantCall).where(ApprovalGrantCall.id.in_(matched_ids))
+            .values(reported_at=now, checked_at=now),
+        )
+    missed = [row for row in rows if row.call_id not in named]
+    if missed:
+        await session.execute(
+            update(ApprovalGrantCall).where(ApprovalGrantCall.id.in_([row.id for row in missed]))
+            .values(checked_at=now),
+        )
+    for call_id in device_only:
+        session.add(ApprovalGrantFlag(
+            id=uuid.uuid4(), grant_id=grant_id, call_id=call_id, tool_id=None, kind="device_only",
+            created_at=now,
+        ))
+    for row in missed:
+        session.add(ApprovalGrantFlag(
+            id=uuid.uuid4(), grant_id=grant_id, call_id=row.call_id, tool_id=row.tool_id,
+            kind="gateway_only", created_at=now,
+        ))
+    await session.commit()
+    if device_only or gateway_only:
+        logger.warning(
+            "Bypass grant %s: the device's report differs from the gateway's "
+            "(%d device only, %d gateway only)",
+            grant_id, len(device_only), len(gateway_only),
+        )
+    return Report(matched=len(matched_ids), device_only=device_only, gateway_only=gateway_only)
+
+
+async def purge_bypass(bind: AsyncEngine, days: int) -> int:
+    """Delete Bypass grants that ended more than *days* ago, with their calls and flags (L-65); how many.
+
+    A grant ended when it was revoked or, if never, when it expired. A failure is logged and deletes nothing.
+    """
+    try:
+        async with autocommit(bind) as conn:
+            ended_at = func.coalesce(ApprovalGrant.revoked_at, ApprovalGrant.expires_at)
+            gone = await conn.execute(
+                delete(ApprovalGrant).where(
+                    ApprovalGrant.kind == "bypass", ended_at < _clock() - timedelta(days=days),
+                ),
+            )
+            return gone.rowcount or 0
+    except Exception:
+        logger.exception("Bypass evidence past its retention could not be deleted")
+        return 0
 
 
 # -- as the API and the events show it --------------------------------------------------------

@@ -152,7 +152,7 @@ def test_a_grant_is_cut_to_the_agents_limits_and_says_what_was_cut() -> None:
 
 @pytest.mark.parametrize(("fields", "code"), [
     ({"kind": "plan"}, "grant_kind_unavailable"),
-    ({"kind": "bypass"}, "grant_kind_unavailable"),
+    ({"kind": "bypass"}, "bypass_not_allowed"),
     ({"kind": "time", "tools": []}, "grant_scope_invalid"),
     ({"kind": "time", "tools": ["a", "b"]}, "grant_scope_invalid"),
     ({"kind": "work", "classes": ["write"], "agent": {"grant_classes": ("read",)}}, "grant_scope_invalid"),
