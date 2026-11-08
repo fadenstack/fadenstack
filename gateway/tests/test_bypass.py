@@ -23,7 +23,12 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from faden_gateway.db.crypto import EncryptedText
-from faden_gateway.db.models.gateway import ApprovalGrant, ApprovalGrantCall, ApprovalGrantFlag
+from faden_gateway.db.models.gateway import (
+    ApprovalGrant,
+    ApprovalGrantCall,
+    ApprovalGrantChange,
+    ApprovalGrantFlag,
+)
 from faden_gateway.services.gateway import approval_settings, grants
 from faden_gateway.services.gateway import tool_classes as tc
 from faden_gateway.web.api.v1.agents import client_supports
@@ -223,6 +228,32 @@ async def test_a_bypass_grant_is_the_record_the_device_waits_for(
     approval_settings.remember(OFF, ttl_sec=3600)
     off = await _bypass(client)
     assert (off.status_code, off.json()["error"]["code"]) == (403, "bypass_not_allowed")
+
+
+@pytest.mark.anyio
+@needs_postgres
+async def test_a_bypass_grant_is_never_extended_more_time_is_a_new_bypass(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession,  # noqa: F811 - the fixture
+    backend: _Backend,  # noqa: F811 - the fixture
+) -> None:
+    """Owner, 2026-11-08 (sdk/09 L-58): a Bypass grant runs for the time its confirmation chose."""
+    backend.put(_profile(max_level="bypass"))
+    fastapi_app.state.agent_directory.invalidate()
+    made = (await _bypass(client)).json()
+    grant_id = uuid.UUID(made["id"])
+    shown = select(ApprovalGrant.expires_at, ApprovalGrant.scope, ApprovalGrant.status).where(ApprovalGrant.id == grant_id)
+    before = (await db_session.execute(shown)).one()
+    for body in ({"minutes": 30}, {"minutes": 5, "targets": [{"type": "document", "identifiers": ["/plan.docx"]}]}):
+        r = await client.post(f"{GRANTS}/{made['id']}/extend", headers=_auth(), json=body)
+        assert r.status_code == 409, r.text
+        assert r.json()["error"]["code"] == "bypass_not_extendable"
+    assert (await db_session.execute(shown)).one() == before, "the grant as it was"
+    changes = (await db_session.execute(
+        select(ApprovalGrantChange).where(ApprovalGrantChange.grant_id == grant_id),
+    )).scalars().all()
+    assert changes == [], "no extension recorded"
+    again = await _bypass(client)
+    assert again.status_code == 201, "more time is a new Bypass, with its confirmation"
 
 
 @pytest.mark.anyio

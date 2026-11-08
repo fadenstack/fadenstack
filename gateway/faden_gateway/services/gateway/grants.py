@@ -565,7 +565,10 @@ async def extend(
     The grant grows, never past ``issued_at`` plus the longest grant (owner, 2026-11-07: every grant ends,
     D5); the places hold only the classes it already covers, so an extension never widens what it lets the
     agent do. Each extension is kept with what the card showed (``approval_grant_change``). ``None``: no such
-    running grant. Raises :class:`RefusedError` when nothing can be added. Committed.
+    running grant. Raises :class:`RefusedError` when nothing can be added, and ``bypass_not_extendable`` for a
+    Bypass grant: it runs for the time its confirmation chose, and more time is a new Bypass with the
+    confirmation again (sdk/09 L-58; ASVS 5.0 V8.3.1: the server refuses, whatever the device sends).
+    Committed.
     """
     try:
         grant = (await session.execute(
@@ -577,6 +580,11 @@ async def extend(
         if grant is None:
             await session.rollback()
             return None, []
+        if grant.kind == "bypass":
+            raise RefusedError(
+                "bypass_not_extendable",
+                "A Bypass grant is not extended: more time is a new Bypass, confirmed again.",
+            )
         added = _added_places(grant, targets)
         cap = grant.issued_at + timedelta(minutes=longest_minutes)
         wanted = grant.expires_at + timedelta(minutes=minutes)

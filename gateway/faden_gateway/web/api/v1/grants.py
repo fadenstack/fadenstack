@@ -9,7 +9,7 @@
 - ``POST /v1/agents/{agent}/grants/{id}/pause`` and ``.../resume``: only the grant's device; the clock runs
   on.
 - ``POST /v1/agents/{agent}/grants/{id}/extend``: more time or places, from the grant's device, in place and
-  never past the longest grant from when it was issued.
+  never past the longest grant from when it was issued; never a Bypass grant (409 ``bypass_not_extendable``).
 - ``POST /v1/agents/{agent}/grants/{id}/report``: at the end of a turn under Bypass, the calls the device ran
   under the grant; the gateway compares them with its own records and flags any difference (sdk/09 L-61).
 
@@ -262,6 +262,9 @@ async def extend_grant(
 
     Owner, 2026-11-07: the grant's whole span stays within the longest grant from when it was issued; past
     that a new grant needs the full card again. Each extension is recorded with what the card showed.
+    A Bypass grant is never extended (owner, 2026-11-08; sdk/09 L-58): 409 ``bypass_not_extendable``, the
+    grant as it was -- the request is well formed, the grant's kind is what refuses it. More time is a new
+    Bypass, with its confirmation.
     """
     auth, agent, device_id = _device(caller)
     found = await approval_settings.current(dao.session.bind)
@@ -277,7 +280,8 @@ async def extend_grant(
             shown_text_hash=body.shown_text_sha256,
         )
     except grants.RefusedError as exc:
-        raise GatewayError(status_code=422, code=exc.code, message=str(exc)) from exc
+        conflict = exc.code == "bypass_not_extendable"
+        raise GatewayError(status_code=409 if conflict else 422, code=exc.code, message=str(exc)) from exc
     if grant is None:
         raise _not_found()
     now = await grants.server_now(dao.session)
