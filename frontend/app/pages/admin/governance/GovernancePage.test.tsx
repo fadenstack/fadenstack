@@ -220,7 +220,11 @@ describe("GovernancePage", () => {
 
   it("shows the approval limits tab only with its feature", async () => {
     vi.mocked(hasFeature).mockImplementation(async (f) => f === APPROVAL_LIMITS);
-    vi.mocked(approvalLimitsApi.list).mockResolvedValue({ limits: [], bypass_for: [] });
+    vi.mocked(approvalLimitsApi.list).mockResolvedValue({
+      limits: [],
+      bypass_for: [],
+      bypass_sides: { people: false, agents: false },
+    });
     open("approvals");
 
     expect(await screen.findByText(/^No limits:/)).toBeInTheDocument();

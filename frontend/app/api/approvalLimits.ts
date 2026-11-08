@@ -39,9 +39,28 @@ export interface BypassEntry {
   created_by: string | null;
 }
 
+/**
+ * The two sides of the Bypass list, people (persons and teams) and agents, each restricted on its own: from its
+ * first entry until an administrator lifts it. A restricted side with no entries names nobody, so Bypass is for
+ * nobody on it -- also when its entries went with a deleted team, person or agent.
+ */
+export type BypassSide = "people" | "agents";
+export interface BypassSides {
+  people: boolean;
+  agents: boolean;
+}
+
 export interface ApprovalLimits {
   limits: ApprovalLimit[];
   bypass_for: BypassEntry[];
+  bypass_sides: BypassSides;
+}
+
+/** What a change of the Bypass list did: the sides now, the running Bypass sessions it ended, the entries it took. */
+export interface BypassListChange {
+  bypass_sides: BypassSides;
+  ended: number;
+  removed: number;
 }
 
 export interface LimitFields {
@@ -57,8 +76,14 @@ export const approvalLimitsApi = {
   set: (scope: LimitScope, target: string, fields: LimitFields) =>
     request<ApprovalLimit & { cut: number }>(`/limits${at(scope, target)}`, json("PUT", fields)),
   remove: (scope: LimitScope, target: string) => request<void>(`/limits${at(scope, target)}`, json("DELETE")),
+  /** A side's first entry restricts it; the running Bypass sessions the list stops naming end (`ended`). */
   addToBypassList: (scope: ListScope, target: string) =>
-    request<BypassEntry>(`/bypass-for${at(scope, target)}`, json("PUT", {})),
+    request<BypassEntry & { ended: number }>(`/bypass-for${at(scope, target)}`, json("PUT", {})),
+  /** The side stays restricted; sessions the list stops naming end (`ended`). */
   removeFromBypassList: (scope: ListScope, target: string) =>
-    request<void>(`/bypass-for${at(scope, target)}`, json("DELETE")),
+    request<BypassListChange>(`/bypass-for${at(scope, target)}`, json("DELETE")),
+  /** Restrict a side with nobody named yet: Bypass for nobody on it; sessions it stops naming end. */
+  restrictSide: (side: BypassSide) => request<BypassListChange>(`/bypass-sides/${segment(side)}`, json("PUT", {})),
+  /** Lift a side: Bypass for any person (or agent) again, its entries go (`removed`). */
+  liftSide: (side: BypassSide) => request<BypassListChange>(`/bypass-sides/${segment(side)}`, json("DELETE")),
 };

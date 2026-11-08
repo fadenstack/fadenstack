@@ -262,10 +262,17 @@ A grant takes its longest time and its level when it is made. A **shorter** limi
 grants it covers that would last longer end at their start plus the new limit, and each such change is recorded
 beside the grant. A longer limit, a removed limit or a changed level leaves running grants as they are.
 
-**Bypass for.** Below the limits, **Bypass for** names the teams, agents and people Bypass is for. While the list
-names anyone, nobody else can choose Bypass: a person must be named or be in a named team, and when the list also
-names agents, the chat's agent must be named too. The list only narrows: the installation must still allow
-[Bypass](#bypass), and the agent's highest level must be **Bypass**. Everyone it does not name gets **Auto** at most.
+**Bypass for.** Below the limits, **Bypass for** names whom Bypass is for, on two sides, each on its own: people
+(persons and teams) and agents. Once a side names anyone, only those on it may use Bypass: a person must be named or
+be in a named team, and when agents are named too, the chat's agent must be one of them. Everyone it does not name
+gets **Auto** at most. The list only narrows: the installation must still allow [Bypass](#bypass), and the agent's
+highest level must be **Bypass**.
+
+- **A side stays restricted when its entries go**, removed here or deleted with their team, person or agent. A
+  side with nobody left names nobody, so Bypass is for nobody on it, until you select **Bypass for any person** (or
+  **Bypass for any agent**), which lifts the side and takes its entries off the list.
+- **A narrower list ends the running Bypass sessions** of the chats it no longer names, at once, and says how many:
+  the first entry of a side, an entry removed, a side restricted. A wider list ends nothing.
 
 Every change is recorded in the audit log. Without a valid Enterprise licence the limits and the list cannot be
 applied, so no grant is made while any exist: each call asks. A notice for administrators says so, and **Lift**

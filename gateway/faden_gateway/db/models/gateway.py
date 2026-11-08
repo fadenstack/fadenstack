@@ -1167,7 +1167,8 @@ class ApprovalGrant(Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="active", server_default="active")
     paused_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    #: ``person``, ``admin``, ``agent`` (the device ended it) or ``kill_switch`` (Bypass turned off).
+    #: ``person``, ``admin``, ``agent`` (the device ended it), ``kill_switch`` (Bypass turned off) or ``limit`` (a
+    #: limit an administrator changed no longer allows it; an extension's, as ``approval_grant_change.changed_by``).
     revoked_by: Mapped[str | None] = mapped_column(String(16), nullable=True)
     #: What allowed it (the agent's version and the limits applied), what is recorded, what the person saw.
     policy_version: Mapped[str | None] = mapped_column(String(64), nullable=True)

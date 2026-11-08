@@ -286,11 +286,20 @@ Laufende Freigaben, die sie abdeckt und die länger dauern würden, enden bei ih
 jede solche Änderung wird neben der Freigabe festgehalten. Eine längere Grenze, eine entfernte Grenze oder eine
 geänderte Stufe lässt laufende Freigaben, wie sie sind.
 
-**Bypass für.** Unter den Grenzen nennt **Bypass für** die Teams, Agenten und Personen, für die Bypass gilt.
-Solange die Liste jemanden nennt, kann niemand sonst Bypass wählen: Eine Person muss genannt sein oder zu einem
-genannten Team gehören, und nennt die Liste auch Agenten, muss der Agent des Chats ebenfalls genannt sein. Die
-Liste schränkt nur ein: Die Installation muss [Bypass](#bypass) weiterhin erlauben, und die höchste Stufe des
-Agenten muss **Bypass** sein. Wen sie nicht nennt, erhält höchstens **Automatisch**.
+**Bypass für.** Unter den Grenzen nennt **Bypass für**, für wen Bypass gilt, auf zwei Seiten, jede für sich:
+Personen (Personen und Teams) und Agenten. Sobald eine Seite jemanden nennt, dürfen nur die auf ihr Genannten Bypass
+nutzen: Eine Person muss genannt sein oder zu einem genannten Team gehören, und sind auch Agenten genannt, muss der
+Agent des Chats einer von ihnen sein. Wen die Liste nicht nennt, erhält höchstens **Automatisch**. Die Liste
+schränkt nur ein: Die Installation muss [Bypass](#bypass) weiterhin erlauben, und die höchste Stufe des Agenten muss
+**Bypass** sein.
+
+- **Eine Seite bleibt eingeschränkt, wenn ihre Einträge gehen**, ob hier entfernt oder mit ihrem Team, ihrer
+  Person oder ihrem Agenten gelöscht. Eine Seite, auf der niemand mehr steht, nennt niemanden, Bypass gilt dann
+  auf ihr für niemanden, bis Sie **Bypass für jede Person** (oder **Bypass für jeden Agenten**) wählen: Das hebt
+  die Einschränkung der Seite auf und nimmt ihre Einträge von der Liste.
+- **Eine engere Liste beendet laufende Bypass-Sitzungen** der Chats, die sie nicht mehr nennt, sofort, und sagt,
+  wie viele: der erste Eintrag einer Seite, ein entfernter Eintrag, eine eingeschränkte Seite. Eine weitere Liste
+  beendet nichts.
 
 Jede Änderung wird im Audit-Protokoll festgehalten. Ohne gültige Enterprise-Lizenz lassen sich die Grenzen und die
 Liste nicht anwenden, daher entsteht keine Freigabe, solange es welche gibt: Jeder Aufruf fragt nach. Ein Hinweis

@@ -112,7 +112,7 @@ def _owner(
 async def _limits(
     request: Request, auth: AuthContext, agent: AgentRequest, kind: str | None,
 ) -> grants.Limits:
-    """The registered grant limits for this grant; one that fails makes none (ASVS 5.0 V8.3.1: fail closed)."""
+    """The registered grant limits for this grant; one that fails makes none (ASVS 5.0 16.5.3: no fail-open)."""
     try:
         return await grant_limits(request, auth, agent.agent, kind)
     except grants.LimitsUnavailableError as exc:

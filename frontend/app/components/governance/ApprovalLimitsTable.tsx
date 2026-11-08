@@ -29,6 +29,8 @@ import {
   LONGEST_MAX,
   LONGEST_MIN,
   type ApprovalLimits,
+  type BypassListChange,
+  type BypassSide,
   type EvidenceLevel,
   type LimitScope,
   type ListScope,
@@ -36,6 +38,7 @@ import {
 import { principalKey, type PrincipalOption } from "~/api/principals";
 import { EVERYONE } from "~/api/toolCeilings";
 import { AsyncSection } from "~/components/AsyncSection";
+import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { PrincipalPicker } from "~/components/PrincipalPicker";
 import { formatDateTime } from "~/lib/dates";
 import { useAction } from "~/lib/useAction";
@@ -44,6 +47,9 @@ import { useAsyncData } from "~/lib/useAsyncData";
 const SCOPES: LimitScope[] = ["tenant", "team", "agent", "user"];
 const LIST_SCOPES: ListScope[] = ["team", "agent", "user"];
 const NO_LEVEL = "";
+const BYPASS_SIDES: BypassSide[] = ["people", "agents"];
+/** Persons and teams are the people side of the Bypass list; agents are the other. */
+const sideOf = (scope: ListScope): BypassSide => (scope === "agent" ? "agents" : "people");
 
 interface Target {
   id: string;
@@ -119,7 +125,7 @@ function TargetPicker({
 export function ApprovalLimitsTable() {
   const { t } = useTranslation();
   const state = useAsyncData(() => approvalLimitsApi.list(), [], {
-    initialValue: { limits: [], bypass_for: [] } as ApprovalLimits,
+    initialValue: { limits: [], bypass_for: [], bypass_sides: { people: false, agents: false } } as ApprovalLimits,
   });
   const agents = useAsyncData(async () => (await agentsApi.list()).map((a) => ({ id: a.id, label: a.name })), [], {
     initialValue: [] as Target[],
@@ -138,6 +144,8 @@ export function ApprovalLimitsTable() {
   const [listScope, setListScope] = useState<ListScope>("team");
   const [listTarget, setListTarget] = useState<Target | null>(null);
   const bypass = useAction();
+  const [ended, setEnded] = useState<number | null>(null);
+  const [lifting, setLifting] = useState<BypassSide | null>(null);
 
   const takenLimits = useMemo(() => new Set(state.data.limits.map((l) => `${l.scope}:${l.target_id}`)), [state.data.limits]);
   const takenBypass = useMemo(
@@ -171,13 +179,32 @@ export function ApprovalLimitsTable() {
 
   const addToList = () => {
     if (!listTarget) return;
+    setEnded(null);
     void bypass.run(
       () => approvalLimitsApi.addToBypassList(listScope, listTarget.id),
-      () => {
+      (added) => {
+        setEnded(added.ended);
         setListTarget(null);
         return reload();
       },
     );
+  };
+
+  /** Runs a change of the list, shows the sessions it ended, and reloads so the sides show their new state. */
+  const changeList = (work: () => Promise<BypassListChange>) => {
+    setEnded(null);
+    return bypass.run(work, (changed) => {
+      setEnded(changed.ended);
+      return reload();
+    });
+  };
+  const removeFromList = (s: ListScope, id: string) =>
+    void changeList(() => approvalLimitsApi.removeFromBypassList(s, id));
+  const restrict = (side: BypassSide) => void changeList(() => approvalLimitsApi.restrictSide(side));
+  const confirmLift = () => {
+    const side = lifting;
+    if (!side) return;
+    void changeList(() => approvalLimitsApi.liftSide(side)).then(() => setLifting(null));
   };
 
   return (
@@ -315,6 +342,9 @@ export function ApprovalLimitsTable() {
           {t("governance.approvals.bypass_intro")}
         </Typography>
         {bypass.error && <Alert severity="error">{bypass.error}</Alert>}
+        {ended !== null && ended > 0 && (
+          <Alert severity="info">{t("governance.approvals.ended", { count: ended })}</Alert>
+        )}
 
         <Stack direction={{ xs: "column", md: "row" }} spacing={1} alignItems={{ md: "center" }}>
           <TextField
@@ -349,46 +379,85 @@ export function ApprovalLimitsTable() {
         </Stack>
 
         <AsyncSection loading={state.loading} error={state.error} empty={false}>
-          <List dense disablePadding>
-            {state.data.bypass_for.map((b) => (
-              <ListItem
-                key={`${b.scope}:${b.target_id}`}
-                divider
-                secondaryAction={
-                  <IconButton
-                    edge="end"
-                    size="small"
-                    aria-label={t("common.remove")}
-                    disabled={bypass.busy}
-                    onClick={() =>
-                      void bypass.run(() => approvalLimitsApi.removeFromBypassList(b.scope, b.target_id), reload)
-                    }
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                }
-              >
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ flex: 1, minWidth: 0, pr: 6 }}>
-                  <Chip size="small" variant="outlined" label={t(`governance.limits.scope_${b.scope}`)} />
-                  <ListItemText
-                    primary={b.label ?? b.target_id}
-                    secondary={t("governance.approvals.added", {
-                      who: b.created_by ?? "—",
-                      when: formatDateTime(b.created_at),
-                    })}
-                    slotProps={{ primary: { noWrap: true } }}
-                  />
+          <Stack spacing={2}>
+            {BYPASS_SIDES.map((side) => {
+              const restricted = state.data.bypass_sides[side];
+              const entries = state.data.bypass_for.filter((b) => sideOf(b.scope) === side);
+              return (
+                <Stack key={side} spacing={1} data-testid={`bypass-side-${side}`}>
+                  <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                    <Typography variant="subtitle2" component="h3">
+                      {t(`governance.approvals.bypass_side_${side}`)}
+                    </Typography>
+                    {restricted ? (
+                      <Button size="small" disabled={bypass.busy} onClick={() => setLifting(side)}>
+                        {t(`governance.approvals.bypass_lift_${side}`)}
+                      </Button>
+                    ) : (
+                      <Button size="small" color="inherit" disabled={bypass.busy} onClick={() => restrict(side)}>
+                        {t(`governance.approvals.bypass_restrict_${side}`)}
+                      </Button>
+                    )}
+                  </Stack>
+                  {!restricted && (
+                    <Typography variant="body2" color="text.secondary">
+                      {t(`governance.approvals.bypass_${side}_open`)}
+                    </Typography>
+                  )}
+                  {restricted && entries.length === 0 && (
+                    <Alert severity="warning">{t(`governance.approvals.bypass_${side}_empty`)}</Alert>
+                  )}
+                  {restricted && entries.length > 0 && (
+                    <List dense disablePadding>
+                      {entries.map((b) => (
+                        <ListItem
+                          key={`${b.scope}:${b.target_id}`}
+                          divider
+                          secondaryAction={
+                            <IconButton
+                              edge="end"
+                              size="small"
+                              aria-label={t("common.remove")}
+                              disabled={bypass.busy}
+                              onClick={() => removeFromList(b.scope, b.target_id)}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          }
+                        >
+                          <Stack direction="row" spacing={1} alignItems="center" sx={{ flex: 1, minWidth: 0, pr: 6 }}>
+                            <Chip size="small" variant="outlined" label={t(`governance.limits.scope_${b.scope}`)} />
+                            <ListItemText
+                              primary={b.label ?? b.target_id}
+                              secondary={t("governance.approvals.added", {
+                                who: b.created_by ?? "—",
+                                when: formatDateTime(b.created_at),
+                              })}
+                              slotProps={{ primary: { noWrap: true } }}
+                            />
+                          </Stack>
+                        </ListItem>
+                      ))}
+                    </List>
+                  )}
                 </Stack>
-              </ListItem>
-            ))}
-            {state.data.bypass_for.length === 0 && (
-              <ListItem>
-                <ListItemText secondary={t("governance.approvals.bypass_none")} />
-              </ListItem>
-            )}
-          </List>
+              );
+            })}
+          </Stack>
         </AsyncSection>
       </Stack>
+
+      <ConfirmDialog
+        open={lifting !== null}
+        title={t("governance.approvals.bypass_lift_title")}
+        message={lifting ? t(`governance.approvals.bypass_lift_body_${lifting}`) : ""}
+        confirmLabel={lifting ? t(`governance.approvals.bypass_lift_${lifting}`) : ""}
+        confirmColor="primary"
+        cancelLabel={t("common.cancel")}
+        loading={bypass.busy}
+        onConfirm={confirmLift}
+        onClose={() => setLifting(null)}
+      />
     </Stack>
   );
 }

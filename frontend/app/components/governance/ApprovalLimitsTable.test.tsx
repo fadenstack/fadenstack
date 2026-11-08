@@ -3,7 +3,12 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { approvalLimitsApi, type ApprovalLimit, type ApprovalLimits, type BypassEntry } from "~/api/approvalLimits";
+import {
+  approvalLimitsApi,
+  type ApprovalLimit, type ApprovalLimits, type BypassEntry,
+  type BypassListChange,
+  type BypassSides,
+} from "~/api/approvalLimits";
 import { renderPage } from "~/test/renderPage";
 
 import { ApprovalLimitsTable } from "./ApprovalLimitsTable";
@@ -12,7 +17,10 @@ vi.mock("~/api/approvalLimits", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/api/approvalLimits")>();
   return {
     ...actual,
-    approvalLimitsApi: { list: vi.fn(), set: vi.fn(), remove: vi.fn(), addToBypassList: vi.fn(), removeFromBypassList: vi.fn() },
+    approvalLimitsApi: { list: vi.fn(), set: vi.fn(), remove: vi.fn(), addToBypassList: vi.fn(), removeFromBypassList: vi.fn(),
+      restrictSide: vi.fn(),
+      liftSide: vi.fn(),
+    },
   };
 });
 vi.mock("~/api/agents", async (importOriginal) => {
@@ -54,7 +62,17 @@ const ENTRY: BypassEntry = {
   created_by: "ada@example.com",
 };
 
-const state = (limits: ApprovalLimit[], bypass_for: BypassEntry[] = []): ApprovalLimits => ({ limits, bypass_for });
+const state = (
+  limits: ApprovalLimit[],
+  bypass_for: BypassEntry[] = [],
+  bypass_sides: BypassSides = { people: false, agents: bypass_for.length > 0 },
+): ApprovalLimits => ({ limits, bypass_for, bypass_sides });
+const change = (over: Partial<BypassListChange> = {}): BypassListChange => ({
+  bypass_sides: { people: false, agents: false },
+  ended: 0,
+  removed: 0,
+  ...over,
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -78,7 +96,7 @@ describe("ApprovalLimitsTable", () => {
     renderPage(<ApprovalLimitsTable />);
 
     expect(await screen.findByText(/^No limits:/)).toBeInTheDocument();
-    expect(screen.getByText(/^Nobody is named/)).toBeInTheDocument();
+    expect(screen.getByText(/^Any person may use Bypass/)).toBeInTheDocument();
   });
 
   it("sets a limit for everyone only once a value is given, and says how many grants it ended", async () => {
@@ -148,11 +166,11 @@ describe("ApprovalLimitsTable", () => {
   });
 
   it("adds to and removes from the Bypass list", async () => {
-    api.addToBypassList.mockResolvedValue({ ...ENTRY, scope: "user", target_id: "u-1", label: "anna@example.com" });
-    api.removeFromBypassList.mockResolvedValue(undefined);
+    api.addToBypassList.mockResolvedValue({ ...ENTRY, ended: 0 });
+    api.removeFromBypassList.mockResolvedValue(change());
     api.list.mockResolvedValue(state([], []));
     renderPage(<ApprovalLimitsTable />);
-    await screen.findByText(/^Nobody is named/);
+    await screen.findByText(/^Any person may use Bypass/);
 
     const add = screen.getByRole("button", { name: "Add" });
     expect(add).toBeDisabled();
@@ -170,5 +188,71 @@ describe("ApprovalLimitsTable", () => {
     api.list.mockResolvedValue(state([], []));
     await userEvent.click(within(row).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(api.removeFromBypassList).toHaveBeenCalledWith("agent", "a-1"));
+  });
+
+  it("names nobody: a restricted side with no entries shows a warning, each side on its own", async () => {
+    api.list.mockResolvedValue(state([], [], { people: true, agents: false }));
+    const { unmount } = renderPage(<ApprovalLimitsTable />);
+    expect(await screen.findByText("Names no person: Bypass is for nobody.")).toBeInTheDocument();
+    expect(screen.queryByText(/^Names no agent/)).not.toBeInTheDocument();
+    expect(screen.getByText(/^Bypass is for the chats of any agent/)).toBeInTheDocument();
+    unmount();
+
+    api.list.mockResolvedValue(state([], [], { people: false, agents: true }));
+    renderPage(<ApprovalLimitsTable />);
+    expect(await screen.findByText("Names no agent: Bypass is for no agent's chats.")).toBeInTheDocument();
+    expect(screen.queryByText(/^Names no person/)).not.toBeInTheDocument();
+  });
+
+  it("shows an unrestricted side as open to any person, with no entries", async () => {
+    api.list.mockResolvedValue(state([], [], { people: false, agents: false }));
+    renderPage(<ApprovalLimitsTable />);
+
+    expect(await screen.findByText(/^Any person may use Bypass/)).toBeInTheDocument();
+    expect(screen.getByText(/^Bypass is for the chats of any agent/)).toBeInTheDocument();
+    expect(screen.queryByText(/^Names no/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Bypass for any person" })).not.toBeInTheDocument();
+  });
+
+  it("lifts a side only after the confirmation", async () => {
+    api.liftSide.mockResolvedValue(change({ removed: 1 }));
+    renderPage(<ApprovalLimitsTable />);
+    await screen.findByText("Office agent", { selector: ".MuiListItemText-primary" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Bypass for any agent" }));
+    expect(api.liftSide).not.toHaveBeenCalled();
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/entries|taken off it|are taken off/)).toBeInTheDocument();
+    api.list.mockResolvedValue(state([], [], { people: false, agents: false }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Bypass for any agent" }));
+
+    await waitFor(() => expect(api.liftSide).toHaveBeenCalledWith("agents"));
+    expect(await screen.findByText(/^Bypass is for the chats of any agent/)).toBeInTheDocument();
+  });
+
+  it("restricts a side with nobody named yet and says how many sessions it ended", async () => {
+    api.list.mockResolvedValue(state([], [], { people: false, agents: false }));
+    api.restrictSide.mockResolvedValue(change({ bypass_sides: { people: true, agents: false }, ended: 3 }));
+    renderPage(<ApprovalLimitsTable />);
+    await screen.findByText(/^Any person may use Bypass/);
+
+    api.list.mockResolvedValue(state([], [], { people: true, agents: false }));
+    await userEvent.click(screen.getByRole("button", { name: "Bypass for nobody yet" }));
+
+    await waitFor(() => expect(api.restrictSide).toHaveBeenCalledWith("people"));
+    expect(await screen.findByText("Ended 3 running Bypass sessions the list no longer names")).toBeInTheDocument();
+    expect(await screen.findByText("Names no person: Bypass is for nobody.")).toBeInTheDocument();
+  });
+
+  it("says how many Bypass sessions a removal ended", async () => {
+    api.removeFromBypassList.mockResolvedValue(change({ bypass_sides: { people: false, agents: true }, ended: 2 }));
+    renderPage(<ApprovalLimitsTable />);
+    const row = (await screen.findByText("Office agent", { selector: ".MuiListItemText-primary" })).closest("li") as HTMLElement;
+
+    api.list.mockResolvedValue(state([], [], { people: false, agents: true }));
+    await userEvent.click(within(row).getByRole("button", { name: "Remove" }));
+
+    expect(await screen.findByText("Ended 2 running Bypass sessions the list no longer names")).toBeInTheDocument();
+    expect(await screen.findByText("Names no agent: Bypass is for no agent's chats.")).toBeInTheDocument();
   });
 });

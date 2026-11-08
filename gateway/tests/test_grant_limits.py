@@ -100,7 +100,7 @@ async def test_the_shortest_longest_grant_and_the_most_recorded_level_apply() ->
     _broken, _answering(0), _answering(-5), _answering(True), _answering("60"), _answering(None, "everything"),
 ], ids=["fails", "zero-minutes", "negative", "a-bool", "a-string", "unknown-level"])
 async def test_a_limit_that_fails_or_answers_no_limit_makes_no_grant(rule: Any) -> None:
-    """ASVS 5.0 V8.3.1: a limit that cannot be applied must not widen a grant."""
+    """ASVS 5.0 16.5.3: a limit that cannot be applied must not widen a grant (no fail-open)."""
     with pytest.raises(grants.LimitsUnavailableError):
         await grants.extension_limits([_answering(60), rule], CTX)
 
