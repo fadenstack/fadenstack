@@ -135,7 +135,53 @@ describe("GrantsTable", () => {
     expect(within(dialog).getByText("mail.send")).toBeInTheDocument();
     expect(within(dialog).getByText("Recorded by the gateway, not reported by the device")).toBeInTheDocument();
     expect(within(dialog).getByText("call-ccc")).toBeInTheDocument();
-    expect(within(dialog).getByText(/Arguments are not shown here/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/shown as far as the grant recorded them/)).toBeInTheDocument();
+  });
+
+  it("shows a call's place, arguments, outcome and result, and the person's reason", async () => {
+    api.grants.mockResolvedValue([BYPASS]);
+    api.grantCalls.mockResolvedValue({
+      data: [
+        {
+          id: "c-1",
+          request_id: "r-1",
+          call_id: "call-aaa",
+          tool_id: "mail.send",
+          side: "gateway",
+          created_at: "2026-11-07T10:05:00Z",
+          reported_at: null,
+          flag: null,
+          target: "C:\\Users\\anna\\report.docx",
+          arguments: { to: "boss@example.com", subject: "Report" },
+          outcome: "error",
+          result: "Mailbox is full",
+          result_at: "2026-11-07T10:05:02Z",
+        },
+      ],
+      device_only: [],
+      kind: "bypass",
+      evidence: "shown",
+      evidence_level: "results",
+      reason: "Preparing the board meeting",
+    });
+    renderPage(<GrantsTable />);
+
+    const dialog = await openCalls();
+    expect(await within(dialog).findByText("Preparing the board meeting")).toBeInTheDocument();
+    expect(within(dialog).getByText("C:\\Users\\anna\\report.docx")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Arguments").textContent).toContain('"to": "boss@example.com"');
+    expect(within(dialog).getByText("Outcome: error")).toBeInTheDocument();
+    expect(within(dialog).getByText("Mailbox is full")).toBeInTheDocument();
+    expect(within(dialog).queryByText(/could not show the places/)).not.toBeInTheDocument();
+  });
+
+  it("says when the server could not show the places and arguments", async () => {
+    api.grants.mockResolvedValue([BYPASS]);
+    api.grantCalls.mockResolvedValue({ data: [], device_only: [], evidence: "unavailable" });
+    renderPage(<GrantsTable />);
+
+    const dialog = await openCalls();
+    expect(await within(dialog).findByText(/could not show the places and arguments/)).toBeInTheDocument();
   });
 
   it("says the auditor role is needed when reading the calls is refused", async () => {

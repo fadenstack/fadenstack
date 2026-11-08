@@ -111,7 +111,10 @@ export interface Grant {
   flags: number;
 }
 
-/** One call under a Bypass grant, as the device reported it and the gateway recorded it. Arguments are not part of it. */
+/**
+ * One call under a grant, as the device reported it and the gateway recorded it. The place, the arguments and the
+ * result are there as far as the grant recorded them and the gateway decrypted them for this read.
+ */
 export interface GrantCall {
   id: string;
   request_id: string | null;
@@ -121,12 +124,24 @@ export interface GrantCall {
   created_at: string;
   reported_at: string | null;
   flag: "gateway_only" | null;
+  target?: string | null;
+  arguments?: Record<string, unknown> | null;
+  /** For a grant that records results: how the call ended, and the error or the start of the result. */
+  outcome?: "ok" | "error" | null;
+  result?: string | null;
+  result_at?: string | null;
 }
 
-/** The calls of a Bypass grant: what the gateway recorded, and the device's reports it has no record of. */
+/** The calls of a grant: what the gateway recorded, and the device's reports it has no record of. */
 export interface GrantCalls {
   data: GrantCall[];
   device_only: { call_id: string; created_at: string }[];
+  kind?: "time" | "work" | "bypass";
+  /** `unavailable`: the gateway could not decrypt the places and arguments for this read. */
+  evidence?: "shown" | "unavailable";
+  evidence_level?: "decisions" | "calls" | "results" | null;
+  /** The person's own words on why (Bypass), if they gave any. */
+  reason?: string | null;
 }
 
 /** List, create, change and remove one kind of ordered pattern rule. */

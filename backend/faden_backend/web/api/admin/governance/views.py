@@ -1,7 +1,8 @@
 """Governance for admins: tool rules, tool classes, the decisions checks made, and the grants running.
 
-What ran under a Bypass session (its calls, with their arguments) is for holders of the role
-``approvals_auditor`` only, whatever else they are, and each read is in the audit trail (sdk/09 L-64, L-65).
+What ran under a grant (its calls, with their places, arguments and results, which the gateway decrypts for the
+read) is for holders of the role ``approvals_auditor`` only, whatever else they are, and each read is in the
+audit trail (sdk/09 L-64, L-65).
 
 All live in the gateway's database (``llm_gateway_tool_rule``,
 ``llm_gateway_policy_decision``, ``approval_grant``). The gateway reads a tenant's rules at most
@@ -32,6 +33,7 @@ from faden_backend.db.dao.rbac_dao import APPROVALS_EVIDENCE_AUDIT, RbacDAO
 from faden_backend.db.dependencies import get_db_session
 from faden_backend.db.models.containers import AuditResult
 from faden_backend.db.models.users import User, current_active_user
+from faden_backend.settings import settings
 from faden_backend.web.api.admin.dependencies import require_superuser
 
 router = APIRouter()
@@ -360,6 +362,23 @@ def _recorded_call(row: Any) -> dict[str, Any]:
     return out
 
 
+async def _evidence(grant_id: uuid.UUID, reader: uuid.UUID, tenant_id: str) -> dict[str, Any] | None:
+    """The grant's calls with their places, arguments, outcomes and summaries, as the gateway decrypts them.
+
+    ``None`` when the gateway does not hand them over: the list then shows what this database holds.
+    """
+    from faden_backend.services.chat.gateway_client import EvidenceUnavailable, shared_client  # noqa: PLC0415
+
+    try:
+        return await shared_client().grant_evidence(
+            {"grant": str(grant_id), "part": "calls"}, reader=str(reader), tenant_id=tenant_id,
+            secret=settings.users_secret,
+        )
+    except EvidenceUnavailable as exc:
+        logger.warning("The evidence of grant %s could not be read from the gateway: %s", grant_id, exc)
+        return None
+
+
 @router.get("/grants/{grant_id}/calls", name="governance_grant_calls")
 async def grant_calls(
     grant_id: uuid.UUID,
@@ -367,33 +386,38 @@ async def grant_calls(
     user: Annotated[User, Depends(current_active_user)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> dict[str, Any]:
-    """Every call recorded under one Bypass session: tool, side, time, whether the device reported it (L-64).
+    """Every call recorded under one grant: tool, side, time, whether the device reported it (L-64).
 
-    The place and the arguments stay with the gateway, encrypted under its own key (``grant-evidence``); this
-    list does not show them (sdk/40 A3, left for later). Only for holders of ``approvals.evidence:audit``
-    through a role (``approvals_auditor``); superuser status alone does not count (L-65: a dedicated audit
-    permission). Every read and every refusal is in the audit trail (ASVS 5.0 16.3.2), with the grant and
-    whose session it was.
+    With each call its place, arguments, outcome and the start of its result, as far as the grant recorded
+    them: they stay encrypted under the gateway's own key (``grant-evidence``), so the gateway decrypts them
+    for this read (``evidence``: ``unavailable`` when it could not). Only for holders of
+    ``approvals.evidence:audit`` through a role (``approvals_auditor``); superuser status alone does not count
+    (L-65: a dedicated audit permission). Every read and every refusal is in the audit trail (ASVS 5.0
+    16.3.2), with the grant and whose it was, before anything is decrypted.
     """
     allowed = await RbacDAO(session).has_permission(user.id, *APPROVALS_EVIDENCE_AUDIT)
     async with _gateway(request)() as db:
         grant = (await db.execute(
-            text("SELECT id, user_id, kind FROM approval_grant WHERE id = :id"), {"id": grant_id},
+            text("SELECT id, user_id, kind, tenant_id FROM approval_grant WHERE id = :id"), {"id": grant_id},
         )).first()
-        if grant is None or grant.kind != "bypass":
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such Bypass session.")
+        if grant is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such grant.")
         await AuditDAO(session).log(
             action="approvals.evidence.view", target_type="approval_grant", target_id=str(grant_id),
             result=AuditResult.ALLOW if allowed else AuditResult.DENY, actor_id=user.id, severity="high",
             metadata_json=json.dumps(
-                {"person_id": grant.user_id, **({} if allowed else {"refused": "not_auditor"})},
+                {"person_id": grant.user_id, "kind": grant.kind,
+                 **({"arguments": True} if allowed else {"refused": "not_auditor"})},
             ),
         )
         if not allowed:
+            # The audit row goes in with the refusal (the session commits it on the way out).
+            await session.commit()
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Reading what ran under a Bypass session needs the role approvals_auditor.",
+                detail="Reading what ran under a grant needs the role approvals_auditor.",
             )
+        await session.commit()  # the read is recorded before the gateway decrypts anything
         rows = await db.execute(
             text(
                 "SELECT c.id, c.request_id, c.call_id, c.tool_id, c.side, c.created_at, "
@@ -410,9 +434,19 @@ async def grant_calls(
             ),
             {"id": grant_id},
         )
-        return {
-            "data": [_recorded_call(row) for row in rows],
-            "device_only": [
-                {"call_id": r.call_id, "created_at": r.created_at.isoformat()} for r in device_only
-            ],
-        }
+        calls = [_recorded_call(row) for row in rows]
+        flagged = [{"call_id": r.call_id, "created_at": r.created_at.isoformat()} for r in device_only]
+    found = await _evidence(grant_id, user.id, grant.tenant_id)
+    decrypted = {c["id"]: c for c in (found or {}).get("calls") or ()}
+    for call in calls:
+        held = decrypted.get(call["id"])
+        if held is not None:
+            call.update({k: held.get(k) for k in ("target", "arguments", "outcome", "result", "result_at")})
+    return {
+        "data": calls,
+        "device_only": flagged,
+        "kind": grant.kind,
+        "evidence": "unavailable" if found is None else "shown",
+        "evidence_level": (found or {}).get("evidence_level"),
+        "reason": (found or {}).get("reason"),
+    }

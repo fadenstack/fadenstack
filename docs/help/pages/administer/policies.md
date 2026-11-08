@@ -238,6 +238,76 @@ Without a valid Enterprise licence the limits cannot be applied, so tools in eve
 licence is back; a notice for administrators says so. **Lift** on that notice gives every chat the mode each
 person picks again; the limits are kept, and apply again once the licence is valid.
 
+### Approval limits {#approval-limits}
+
+<span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span>
+
+With Enterprise, **Agents → Governance → Approval limits** sets, for **Everyone**, **A team**, **An agent** or
+**A person**, how long a [grant](#running-grants) may last and what the server keeps of the calls it covers. Choose
+who it is **For**, pick the team, agent or person, give a **Longest grant (minutes)** (15 to 720), an **Evidence
+level**, or both, and select **Set limit**. Several limits can apply to one grant: the shortest longest grant and
+the most recorded level win. The agent's own longest grant and **Longest grant (minutes)** in **Settings →
+Approvals** still apply; the shortest of all of them counts.
+
+| Evidence level | What the server keeps of each covered call |
+|---|---|
+| **Decisions** | The tool, the time, which side ran it, and which grant covered it |
+| **Calls** | That, and its place and arguments after personal data is masked |
+| **Results** | That, and whether it worked: the error, or the first 500 characters of its result after personal data is masked |
+
+Without a limit, grants for a time keep **Decisions**, and working alongside and Bypass keep **Calls**. A level you
+set replaces that, also for Bypass. Places, arguments and results are kept encrypted on the server.
+
+A grant takes its longest time and its level when it is made. A **shorter** limit takes effect at once: running
+grants it covers that would last longer end at their start plus the new limit, and each such change is recorded
+beside the grant. A longer limit, a removed limit or a changed level leaves running grants as they are.
+
+**Bypass for.** Below the limits, **Bypass for** names the teams, agents and people Bypass is for. While the list
+names anyone, nobody else can choose Bypass: a person must be named or be in a named team, and when the list also
+names agents, the chat's agent must be named too. The list only narrows: the installation must still allow
+[Bypass](#bypass), and the agent's highest level must be **Bypass**. Everyone it does not name gets **Auto** at most.
+
+Every change is recorded in the audit log. Without a valid Enterprise licence the limits and the list cannot be
+applied, so no grant is made while any exist: each call asks. A notice for administrators says so, and **Lift**
+on it lets people make grants within the core limits again.
+
+**Alerts by mail.** With [mail](mail.md) set up, administrators and the addresses under its **Alerts** get a mail:
+
+- when someone switches Bypass on: who, which agent and version, on which device, from when until when, and the
+  reason they gave, if any;
+- when the report of a Bypass session's device differs from what the server recorded: once per session.
+
+### Agent actions {#agent-actions}
+
+<span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span>
+
+**Agents → Governance → Agent actions** shows what agents did and how each call was allowed, newest first:
+
+| State | Meaning |
+|---|---|
+| **Asked** | The server asked the person and has no answer recorded |
+| **Once**, **For this chat**, **Always** | The person allowed it, for this call, for the chat, or always (**Approved** from an app that does not say which) |
+| **Declined**, **Expired** | The person said no, or did not answer in time |
+| **Blocked** | A rule refused the call |
+| **Grant**, **Bypass** | A grant or a Bypass session covered it, without a question |
+| **Without asking** | The server ran it without a question: the chat's tool mode allowed it |
+| **Ran** | The device reported running it; a question it asked first is its own row |
+
+Each row shows the time, the person, the agent and the version in effect then, the tool, the device, the turn, the
+model, and whether the row is the server's record or the device's report. Search by person, agent, device,
+workspace and time (at most 31 days; the last day by default). A workspace is a document, a folder or a site: the
+search finds the calls a grant covered there. **Calls** opens a grant's calls with their places, arguments and
+results, as far as the grant kept them. **Export (CloudEvents)** downloads the same rows as
+[CloudEvents](https://cloudevents.io/) in JSON Lines, one event per line, for a SIEM to read in; nothing is sent
+anywhere by itself.
+
+Only people with the role `approvals_auditor` can open the actions and the export. Every search, export and refused
+attempt is recorded in the audit log.
+
+!!! note "Works council (Germany)"
+    The actions are records per person, so using them needs an agreement with the works council (BetrVG §87(1)
+    no. 6). They are kept for analysing incidents, not for judging performance.
+
 ### Decisions
 
 ![Agents → Governance on the Decisions tab: filters for Stage, Outcome and Agent, and three tool decisions, Approval required, Expired and Approved, each with what the user was told](../images/administer/governance-decisions-top.png)
@@ -279,7 +349,7 @@ The **Starts in** level can never be Bypass, so no conversation starts in it. A 
 
 **Switch it off.** Turning **Allow Bypass** off makes Bypass act as **Auto** at once (within half a minute on every server worker) and ends running Bypass sessions, recorded as ended by the switch.
 
-**Who may read what ran.** Only people with the role `approvals_auditor`. Nobody has it at install, and being an administrator is not enough. Every read and every refused attempt is in the audit trail. The console's list shows the tool, the time, which side ran it (device or server), whether the device reported it, and differences. It does not show the arguments: they stay encrypted on the server, and showing them is planned.
+**Who may read what ran.** Only people with the role `approvals_auditor`. Nobody has it at install, and being an administrator is not enough. Every read and every refused attempt is in the audit trail. The console's list shows the tool, the time, which side ran it (device or server), whether the device reported it, differences, and, as far as the grant kept them, the place, the arguments and the result. They stay encrypted on the server and are decrypted only for the read. With Enterprise, [Agent actions](#agent-actions) searches them across sessions.
 
 !!! note "Works council (Germany)"
     Records per person need an agreement with the works council (BetrVG §87(1) no. 6). The records are for analysing incidents, not for judging performance.
@@ -308,6 +378,7 @@ Applications using the API get the same outcomes as errors they can handle; the 
 | The prompt | | Content policies on the prompt <span class="fs-planned">Planned</span> |
 | The answer | | Content policies on the answer <span class="fs-planned">Planned</span> |
 | Tools | Tool rules, tool classes, tool modes | Tool mode limits for everyone, a team, an agent or a person; content policies on tool arguments <span class="fs-planned">Planned</span> |
-| The record | Decisions, without the text | An auditor's view with policy names, and exports <span class="fs-planned">Planned</span> |
+| Grants | Grants for a time, working alongside, Bypass; the installation's longest grant | Approval limits for everyone, a team, an agent or a person; whom Bypass is for; alerts by mail |
+| The record | Decisions, without the text; the calls of a grant for auditors | Agent actions for auditors, with an export as CloudEvents; policy names <span class="fs-planned">Planned</span> |
 
 Content policies will refuse a prompt, an answer or a tool call by what it says.

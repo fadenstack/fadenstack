@@ -80,6 +80,32 @@ def erase_grant(scope: str, target: str, *, secret: str) -> str:
     return pyjwt.encode(claims, secret, algorithm="HS256")
 
 
+#: The grant for reading a grant's evidence in the gateway, which alone decrypts it: only the backend signs it,
+#: for one grant and part, or one search by place.
+EVIDENCE_GRANT_HEADER = "X-Faden-Evidence-Grant"
+EVIDENCE_TOKEN_TYPE = "grant_evidence"  # noqa: S105 - a claim value, not a secret
+EVIDENCE_TTL_SEC = 60
+
+
+def evidence_grant(what: dict[str, Any], *, reader: str, tenant_id: str, secret: str) -> str:
+    """The signed grant that the gateway may decrypt *what* (``grant`` + ``part``, or ``place`` + window) for
+    *reader*."""
+    now = int(time.time())
+    claims = {
+        **what, "typ": EVIDENCE_TOKEN_TYPE, "sub": reader, "tenant": tenant_id, "jti": uuid.uuid4().hex,
+        "iat": now, "exp": now + EVIDENCE_TTL_SEC,
+    }
+    return pyjwt.encode(claims, secret, algorithm="HS256")
+
+
+class EvidenceUnavailable(RuntimeError):
+    """The gateway did not hand over a grant's evidence (not reached, refused, not found)."""
+
+    def __init__(self, message: str, status_code: int = 502) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
+
 class EraseFailed(RuntimeError):
     """The gateway did not erase what it was asked to (not reached, refused, not found)."""
 
@@ -470,6 +496,25 @@ class GatewayChatClient:
             raise EraseFailed(f"The gateway could not be reached: {exc}") from exc
         if response.status_code != 200:  # noqa: PLR2004
             raise EraseFailed(f"The gateway answered {response.status_code}.", status_code=502)
+        return response.json()
+
+    async def grant_evidence(
+        self, what: dict[str, Any], *, reader: str, tenant_id: str, secret: str,
+    ) -> dict[str, Any]:
+        """A grant's evidence, decrypted by the gateway (``/internal/grant-evidence`` there), for *reader*.
+
+        Only after the caller checked that *reader* may read it, and recorded the read.
+        """
+        client = self._ensure_client()
+        token = evidence_grant(what, reader=reader, tenant_id=tenant_id, secret=secret)
+        try:
+            response = await client.post("/internal/grant-evidence", headers={EVIDENCE_GRANT_HEADER: token})
+        except httpx.HTTPError as exc:
+            raise EvidenceUnavailable(f"The gateway could not be reached: {exc}") from exc
+        if response.status_code == 404:  # noqa: PLR2004
+            raise EvidenceUnavailable("The gateway has no such grant.", status_code=404)
+        if response.status_code != 200:  # noqa: PLR2004
+            raise EvidenceUnavailable(f"The gateway answered {response.status_code}.")
         return response.json()
 
     async def delete_session(self, session_id: str, jwt: str) -> None:

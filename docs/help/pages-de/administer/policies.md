@@ -259,6 +259,84 @@ lesend, bis die Lizenz zurück ist; ein Hinweis für Administratoren sagt das. *
 jedem Chat wieder den Modus, den jede Person wählt; die Grenzen bleiben gespeichert und gelten wieder, sobald die
 Lizenz gültig ist.
 
+### Freigabe-Grenzen {#approval-limits}
+
+<span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span>
+
+Mit Enterprise legt **Agenten → Governance → Freigabe-Grenzen** für **Alle**, **Ein Team**, **Einen Agenten**
+oder **Eine Person** fest, wie lange eine [Freigabe auf Zeit](#running-grants) dauern darf und was der Server von
+den Aufrufen festhält, die sie abdeckt. Wählen Sie unter **Für**, für wen, wählen Sie das Team, den Agenten oder
+die Person, geben Sie eine **Längste Freigabe (Minuten)** (15 bis 720), eine **Nachweisstufe** oder beides an, und
+wählen Sie **Grenze setzen**. Für eine Freigabe können mehrere Grenzen gelten: Die kürzeste längste Freigabe und
+die Stufe, die am meisten festhält, gelten. Die eigene längste Freigabe des Agenten und **Longest grant (minutes)**
+unter **Einstellungen → Freigaben** gelten weiter; die kürzeste von allen zählt.
+
+| Nachweisstufe | Was der Server von jedem abgedeckten Aufruf festhält |
+|---|---|
+| **Entscheidungen** | Das Tool, die Zeit, welche Seite es ausführte und welche Freigabe es abdeckte |
+| **Aufrufe** | Dazu seinen Ort und seine Argumente, nachdem personenbezogene Daten maskiert wurden |
+| **Ergebnisse** | Dazu, ob er gelang: den Fehler oder die ersten 500 Zeichen seines Ergebnisses, nachdem personenbezogene Daten maskiert wurden |
+
+Ohne Grenze halten Freigaben für eine Zeit **Entscheidungen** fest, gemeinsames Arbeiten und Bypass **Aufrufe**.
+Eine Stufe, die Sie setzen, ersetzt das, auch für Bypass. Orte, Argumente und Ergebnisse liegen verschlüsselt auf
+dem Server.
+
+Eine Freigabe erhält ihre längste Dauer und ihre Stufe, wenn sie entsteht. Eine **kürzere** Grenze wirkt sofort:
+Laufende Freigaben, die sie abdeckt und die länger dauern würden, enden bei ihrem Beginn plus der neuen Grenze, und
+jede solche Änderung wird neben der Freigabe festgehalten. Eine längere Grenze, eine entfernte Grenze oder eine
+geänderte Stufe lässt laufende Freigaben, wie sie sind.
+
+**Bypass für.** Unter den Grenzen nennt **Bypass für** die Teams, Agenten und Personen, für die Bypass gilt.
+Solange die Liste jemanden nennt, kann niemand sonst Bypass wählen: Eine Person muss genannt sein oder zu einem
+genannten Team gehören, und nennt die Liste auch Agenten, muss der Agent des Chats ebenfalls genannt sein. Die
+Liste schränkt nur ein: Die Installation muss [Bypass](#bypass) weiterhin erlauben, und die höchste Stufe des
+Agenten muss **Bypass** sein. Wen sie nicht nennt, erhält höchstens **Automatisch**.
+
+Jede Änderung wird im Audit-Protokoll festgehalten. Ohne gültige Enterprise-Lizenz lassen sich die Grenzen und die
+Liste nicht anwenden, daher entsteht keine Freigabe, solange es welche gibt: Jeder Aufruf fragt nach. Ein Hinweis
+für Administratoren sagt das, und **Aufheben** darin erlaubt wieder Freigaben innerhalb der Grenzen von Core.
+
+**Warnungen per E-Mail.** Ist [E-Mail](mail.md) eingerichtet, erhalten Administratoren und die Adressen unter
+deren **Warnungen** eine E-Mail:
+
+- wenn jemand Bypass einschaltet: wer, mit welchem Agenten und welcher Version, auf welchem Gerät, von wann bis
+  wann, und den Grund, den die Person angegeben hat, falls sie einen angegeben hat;
+- wenn sich die Meldung des Geräts einer Bypass-Sitzung von dem unterscheidet, was der Server festgehalten hat:
+  einmal je Sitzung.
+
+### Agentenaktionen {#agent-actions}
+
+<span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span>
+
+**Agenten → Governance → Agentenaktionen** zeigt, was Agenten getan haben und wie jeder Aufruf erlaubt wurde, die
+neuesten zuerst:
+
+| Zustand | Bedeutung |
+|---|---|
+| **Gefragt** | Der Server hat die Person gefragt, eine Antwort ist nicht festgehalten |
+| **Einmal**, **Für diesen Chat**, **Immer** | Die Person hat es erlaubt, für diesen Aufruf, für den Chat oder immer (**Freigegeben** von einer Anwendung, die nicht sagt, wofür) |
+| **Abgelehnt**, **Abgelaufen** | Die Person hat abgelehnt oder nicht rechtzeitig geantwortet |
+| **Gesperrt** | Eine Regel hat den Aufruf abgelehnt |
+| **Freigabe**, **Bypass** | Eine Freigabe auf Zeit oder eine Bypass-Sitzung deckte ihn ab, ohne Rückfrage |
+| **Ohne Rückfrage** | Der Server führte ihn ohne Rückfrage aus: Der Tool-Modus des Chats erlaubte es |
+| **Ausgeführt** | Das Gerät hat gemeldet, dass es ihn ausgeführt hat; eine Rückfrage davor ist eine eigene Zeile |
+
+Jede Zeile zeigt die Zeit, die Person, den Agenten und die damals geltende Version, das Tool, das Gerät, die Runde,
+das Modell und ob die Zeile die Aufzeichnung des Servers oder die Meldung des Geräts ist. Suchen Sie nach Person,
+Agent, Gerät, Arbeitsbereich und Zeit (höchstens 31 Tage; standardmäßig der letzte Tag). Ein Arbeitsbereich ist
+ein Dokument, ein Ordner oder eine Website: Die Suche findet die Aufrufe, die eine Freigabe dort abdeckte.
+**Aufrufe** öffnet die Aufrufe einer Freigabe mit ihren Orten, Argumenten und Ergebnissen, soweit die Freigabe sie
+festhielt. **Exportieren (CloudEvents)** lädt dieselben Zeilen als [CloudEvents](https://cloudevents.io/) im
+Format JSON Lines herunter, ein Ereignis je Zeile, zum Einlesen in ein SIEM; von selbst wird nichts irgendwohin
+gesendet.
+
+Nur Personen mit der Rolle `approvals_auditor` können die Aktionen und den Export öffnen. Jede Suche, jeder Export
+und jeder abgelehnte Versuch steht im Audit-Protokoll.
+
+!!! note "Betriebsrat (Deutschland)"
+    Die Aktionen sind Aufzeichnungen je Person, ihre Nutzung braucht daher eine Vereinbarung mit dem Betriebsrat
+    (BetrVG §87 Abs. 1 Nr. 6). Sie dienen der Analyse von Vorfällen, nicht der Leistungsbeurteilung.
+
 ### Entscheidungen {#decisions}
 
 ![Agenten → Governance auf dem Reiter „Entscheidungen“: Filter für Phase, Ergebnis und Agent sowie drei Tool-Entscheidungen, Freigabe nötig, Abgelaufen und Freigegeben, jeweils mit dem, was der Nutzer erfuhr](../images/administer/governance-decisions-top.png)
@@ -300,7 +378,7 @@ Die Stufe **Beginnt in** kann nie Bypass sein, daher beginnt keine Unterhaltung 
 
 **Ausschalten.** Schalten Sie **Allow Bypass** aus, wirkt Bypass sofort wie **Automatisch** (innerhalb einer halben Minute auf jedem Server-Worker), und laufende Bypass-Sitzungen enden, festgehalten als durch den Schalter beendet.
 
-**Wer lesen darf, was lief.** Nur Personen mit der Rolle `approvals_auditor`. Bei der Installation hat sie niemand, und Administrator zu sein genügt nicht. Jedes Lesen und jeder abgelehnte Versuch steht im Audit-Protokoll. Die Liste der Konsole zeigt das Tool, die Zeit, welche Seite es ausführte (Gerät oder Server), ob das Gerät es gemeldet hat, und Unterschiede. Die Argumente zeigt sie nicht: Sie bleiben auf dem Server verschlüsselt, ihre Anzeige ist geplant.
+**Wer lesen darf, was lief.** Nur Personen mit der Rolle `approvals_auditor`. Bei der Installation hat sie niemand, und Administrator zu sein genügt nicht. Jedes Lesen und jeder abgelehnte Versuch steht im Audit-Protokoll. Die Liste der Konsole zeigt das Tool, die Zeit, welche Seite es ausführte (Gerät oder Server), ob das Gerät es gemeldet hat, Unterschiede und, soweit die Freigabe sie festhielt, den Ort, die Argumente und das Ergebnis. Sie bleiben auf dem Server verschlüsselt und werden nur für das Lesen entschlüsselt. Mit Enterprise durchsucht [Agentenaktionen](#agent-actions) sie über Sitzungen hinweg.
 
 !!! note "Betriebsrat (Deutschland)"
     Aufzeichnungen je Person brauchen eine Vereinbarung mit dem Betriebsrat (BetrVG §87 Abs. 1 Nr. 6). Die Aufzeichnungen dienen der Analyse von Vorfällen, nicht der Leistungsbeurteilung.
@@ -329,6 +407,7 @@ Einzelheiten stehen auf der Website [Developers](https://developers.fadenstack.c
 | Die Eingabe | | Inhaltsrichtlinien für die Eingabe <span class="fs-planned">Geplant</span> |
 | Die Antwort | | Inhaltsrichtlinien für die Antwort <span class="fs-planned">Geplant</span> |
 | Tools | Tool-Regeln, Tool-Klassen, Tool-Modi | Grenzen für den Tool-Modus für alle, ein Team, einen Agenten oder eine Person; Inhaltsrichtlinien für Tool-Argumente <span class="fs-planned">Geplant</span> |
-| Die Aufzeichnung | Entscheidungen, ohne den Text | Eine Ansicht für Prüfer mit den Namen der Richtlinien sowie Exporte <span class="fs-planned">Geplant</span> |
+| Freigaben | Freigaben auf Zeit, gemeinsames Arbeiten, Bypass; die längste Freigabe der Installation | Freigabe-Grenzen für alle, ein Team, einen Agenten oder eine Person; für wen Bypass gilt; Warnungen per E-Mail |
+| Die Aufzeichnung | Entscheidungen, ohne den Text; die Aufrufe einer Freigabe für Prüfer | Agentenaktionen für Prüfer, mit einem Export als CloudEvents; die Namen der Richtlinien <span class="fs-planned">Geplant</span> |
 
 Inhaltsrichtlinien werden eine Eingabe, eine Antwort oder einen Tool-Aufruf anhand ihres Inhalts ablehnen.

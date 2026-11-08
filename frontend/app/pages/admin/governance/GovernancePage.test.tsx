@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { hasFeature } from "~/api/about";
 import { governanceApi, type ToolRule } from "~/api/governance";
+import { APPROVAL_VIEWS, approvalActionsApi } from "~/api/approvalActions";
+import { APPROVAL_LIMITS, approvalLimitsApi } from "~/api/approvalLimits";
 import { TOOL_MODE_CEILINGS, toolCeilingsApi } from "~/api/toolCeilings";
 import { renderPage } from "~/test/renderPage";
 
@@ -27,6 +29,15 @@ vi.mock("~/api/about", () => ({ hasFeature: vi.fn() }));
 vi.mock("~/api/toolCeilings", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/api/toolCeilings")>();
   return { ...actual, toolCeilingsApi: { list: vi.fn(), set: vi.fn(), remove: vi.fn() } };
+});
+
+vi.mock("~/api/approvalLimits", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/api/approvalLimits")>();
+  return { ...actual, approvalLimitsApi: { list: vi.fn() } };
+});
+vi.mock("~/api/approvalActions", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/api/approvalActions")>();
+  return { ...actual, approvalActionsApi: { list: vi.fn(), exportUrl: vi.fn().mockReturnValue("/export") } };
 });
 
 const api = vi.mocked(governanceApi, { deep: true });
@@ -198,5 +209,38 @@ describe("GovernancePage", () => {
     const row = screen.getByText("Finance").closest("li") as HTMLElement;
     await userEvent.click(within(row).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(ceilings.remove).toHaveBeenCalledWith("team", "g-1"));
+  });
+
+  it("has no approval limits or agent actions tab where the server offers neither", async () => {
+    open("approvals");
+    expect(await screen.findByText("mcp.github.delete_*")).toBeInTheDocument(); // the first tab instead
+    expect(screen.queryByRole("tab", { name: "Approval limits" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Agent actions" })).not.toBeInTheDocument();
+  });
+
+  it("shows the approval limits tab only with its feature", async () => {
+    vi.mocked(hasFeature).mockImplementation(async (f) => f === APPROVAL_LIMITS);
+    vi.mocked(approvalLimitsApi.list).mockResolvedValue({ limits: [], bypass_for: [] });
+    open("approvals");
+
+    expect(await screen.findByText(/^No limits:/)).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Approval limits" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Agent actions" })).not.toBeInTheDocument();
+  });
+
+  it("shows the agent actions tab only with its feature", async () => {
+    vi.mocked(hasFeature).mockImplementation(async (f) => f === APPROVAL_VIEWS);
+    vi.mocked(approvalActionsApi.list).mockResolvedValue({
+      data: [],
+      next: null,
+      since: "2026-11-06T10:00:00Z",
+      until: "2026-11-07T10:00:00Z",
+      places_truncated: false,
+    });
+    open("actions");
+
+    expect(await screen.findByText("No agent actions in this period.")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Agent actions" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Approval limits" })).not.toBeInTheDocument();
   });
 });

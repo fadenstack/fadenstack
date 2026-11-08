@@ -47,8 +47,22 @@ const shortName = (identifier: string) => {
 
 const places = (g: Grant) => (g.scope.targets ?? []).flatMap((target) => target.identifiers);
 
-/** The calls of one Bypass grant. Arguments never come with them; reading is for the auditor role alone. */
-function CallsDialog({ grant, onClose }: { grant: Grant; onClose: () => void }) {
+/** A block of JSON or text that stays small: about ten lines, then it scrolls. */
+const scrollBox = {
+  fontFamily: "monospace",
+  fontSize: "0.75rem",
+  m: 0,
+  maxHeight: "15em",
+  overflow: "auto",
+  whiteSpace: "pre-wrap",
+  overflowWrap: "anywhere",
+} as const;
+
+/**
+ * The calls of one grant, with the places, arguments and results as far as the grant recorded them. Reading is for
+ * the auditor role alone, and every read is recorded.
+ */
+export function GrantCallsDialog({ grantId, onClose }: { grantId: string; onClose: () => void }) {
   const { t } = useTranslation();
   const [calls, setCalls] = useState<GrantCalls | null>(null);
   const [forbidden, setForbidden] = useState(false);
@@ -57,7 +71,7 @@ function CallsDialog({ grant, onClose }: { grant: Grant; onClose: () => void }) 
   useEffect(() => {
     let live = true;
     governanceApi
-      .grantCalls(grant.id)
+      .grantCalls(grantId)
       .then((answer) => live && setCalls(answer))
       .catch((err: unknown) => {
         if (!live) return;
@@ -67,7 +81,7 @@ function CallsDialog({ grant, onClose }: { grant: Grant; onClose: () => void }) 
     return () => {
       live = false;
     };
-  }, [grant.id]);
+  }, [grantId]);
 
   const loading = !calls && !forbidden && !error;
   const empty = calls !== null && calls.data.length === 0 && calls.device_only.length === 0;
@@ -78,6 +92,15 @@ function CallsDialog({ grant, onClose }: { grant: Grant; onClose: () => void }) 
       <DialogContent>
         <Stack spacing={2}>
           <Alert severity="info">{t("governance.grants.calls_note")}</Alert>
+          {calls?.reason && (
+            <Stack spacing={0.5}>
+              <Typography variant="subtitle2">{t("governance.grants.calls_reason")}</Typography>
+              <Typography variant="body2" sx={{ overflowWrap: "anywhere" }}>
+                {calls.reason}
+              </Typography>
+            </Stack>
+          )}
+          {calls?.evidence === "unavailable" && <Alert severity="warning">{t("governance.grants.calls_unavailable")}</Alert>}
           {loading && <CircularProgress size={24} aria-label={t("common.loading")} />}
           {forbidden && <Alert severity="warning">{t("governance.grants.calls_forbidden")}</Alert>}
           {error && <Alert severity="error">{error}</Alert>}
@@ -98,7 +121,51 @@ function CallsDialog({ grant, onClose }: { grant: Grant; onClose: () => void }) 
                 {calls.data.map((c) => (
                   <TableRow key={c.id}>
                     <TableCell sx={{ fontFamily: "monospace", wordBreak: "break-all" }}>{c.call_id}</TableCell>
-                    <TableCell sx={{ fontFamily: "monospace", wordBreak: "break-all" }}>{c.tool_id ?? "—"}</TableCell>
+                    <TableCell>
+                      <Typography variant="body2" fontFamily="monospace" sx={{ wordBreak: "break-all" }}>
+                        {c.tool_id ?? "—"}
+                      </Typography>
+                      {c.target && (
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ display: "block", overflowWrap: "anywhere" }}
+                          aria-label={t("governance.grants.calls_place")}
+                        >
+                          {c.target}
+                        </Typography>
+                      )}
+                      {c.arguments && (
+                        <Box
+                          component="pre"
+                          sx={scrollBox}
+                          aria-label={t("governance.grants.calls_arguments")}
+                          tabIndex={0}
+                        >
+                          {JSON.stringify(c.arguments, null, 2)}
+                        </Box>
+                      )}
+                      {c.outcome && (
+                        <Chip
+                          size="small"
+                          sx={{ mt: 0.5 }}
+                          color={c.outcome === "error" ? "error" : "success"}
+                          label={t("governance.grants.calls_outcome", {
+                            outcome: t(`governance.grants.outcome_${c.outcome}`),
+                          })}
+                        />
+                      )}
+                      {c.result && (
+                        <Box
+                          component="pre"
+                          sx={{ ...scrollBox, mt: 0.5 }}
+                          aria-label={t("governance.grants.calls_result")}
+                          tabIndex={0}
+                        >
+                          {c.result}
+                        </Box>
+                      )}
+                    </TableCell>
                     <TableCell>{t(`governance.grants.side_${c.side}`)}</TableCell>
                     <TableCell>{formatDateTime(c.created_at)}</TableCell>
                     <TableCell>{c.reported_at ? t("common.yes") : t("common.no")}</TableCell>
@@ -344,7 +411,7 @@ export function GrantsTable() {
           },
         ]}
       />
-      {viewing && <CallsDialog grant={viewing} onClose={() => setViewing(null)} />}
+      {viewing && <GrantCallsDialog grantId={viewing.id} onClose={() => setViewing(null)} />}
       <ConfirmDialog
         open={revoking !== null}
         title={t("governance.grants.revoke_title")}

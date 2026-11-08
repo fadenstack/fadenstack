@@ -17,6 +17,10 @@ A ``bypass`` grant (sdk/40 A3) is made only where Bypass may be chosen -- the in
 agent's highest level, no lower ceiling (L-57) -- for one conversation. Its row is the record the device waits
 for before it relies on Bypass (L-59).
 
+The grant limits an extension registers (``registry.grant_limits``) narrow the longest grant at issue and at
+extend, and set what a grant's covered calls leave behind; one that fails makes and extends no grant (503
+``grant_limits_unavailable``), so each call asks.
+
 A grant is the device's: only the agent's route with a device sign-in (the agent token's ``did``) makes,
 lists, pauses and resumes one. The gateway checks and counts every covered call itself
 (``services/gateway/grants.py``); what the device holds is a copy.
@@ -40,6 +44,7 @@ from faden_gateway.web.api.v1.agents import (
     CONVERSATION_HEADER,
     agent_request,
     bypass_offered,
+    grant_limits,
     tool_mode_ceiling,
 )
 
@@ -104,6 +109,19 @@ def _owner(
     )
 
 
+async def _limits(
+    request: Request, auth: AuthContext, agent: AgentRequest, kind: str | None,
+) -> grants.Limits:
+    """The registered grant limits for this grant; one that fails makes none (ASVS 5.0 V8.3.1: fail closed)."""
+    try:
+        return await grant_limits(request, auth, agent.agent, kind)
+    except grants.LimitsUnavailableError as exc:
+        raise GatewayError(
+            status_code=503, error_type="server_error", code="grant_limits_unavailable",
+            message="Grants cannot be checked against their limits right now, so none is made; each call asks.",
+        ) from exc
+
+
 def _grant_id(value: str) -> uuid.UUID:
     try:
         return uuid.UUID(value)
@@ -141,6 +159,7 @@ async def issue_grant(
             message=f"This grant belongs to one conversation: send {CONVERSATION_HEADER}.",
         )
     found = await approval_settings.current(dao.session.bind)
+    limits = await _limits(request, auth, agent, body.kind)
     allowed = body.kind == "bypass" and bypass_offered(
         agent.agent, await tool_mode_ceiling(request, auth, agent.agent), found,
     )
@@ -148,7 +167,7 @@ async def issue_grant(
         granted = grants.limit(
             kind=body.kind, tools=body.tools, classes=body.classes,
             targets=[t.model_dump() for t in body.targets], minutes=body.minutes, max_calls=body.max_calls,
-            agent=agent.agent, tenant_longest=found.longest_grant_minutes, bypass_allowed=allowed,
+            agent=agent.agent, tenant_longest=limits.longest(found.longest_grant_minutes), bypass_allowed=allowed,
         )
     except grants.RefusedError as exc:
         refused = exc.code in ("grant_not_offered", "bypass_not_allowed")
@@ -159,6 +178,7 @@ async def issue_grant(
     grant = await grants.issue(
         dao.session, _owner(auth, agent, device_id, agent.conversation_id if bound else None), granted,
         shown_text_hash=body.shown_text_sha256, client_version=body.client_version, reason=body.reason,
+        evidence_level=limits.evidence_level,
     )
     now = await grants.server_now(dao.session)
     return JSONResponse(
@@ -253,6 +273,7 @@ class GrantExtension(BaseModel):
 
 @router.post("/v1/agents/{agent}/grants/{grant_id}/extend", response_model=None)
 async def extend_grant(
+    request: Request,
     grant_id: str,
     body: GrantExtension,
     caller: Annotated[tuple[AuthContext, AgentRequest], Depends(agent_request)],
@@ -272,11 +293,12 @@ async def extend_grant(
         raise GatewayError(
             status_code=422, code="grant_scope_invalid", message="Say what the extension adds.",
         )
+    limits = await _limits(request, auth, agent, None)
     try:
         grant, cut = await grants.extend(
             dao.session, _grant_id(grant_id), _owner(auth, agent, device_id), minutes=body.minutes,
             targets=[t.model_dump() for t in body.targets],
-            longest_minutes=grants.longest(agent.agent, found.longest_grant_minutes),
+            longest_minutes=grants.longest(agent.agent, limits.longest(found.longest_grant_minutes)),
             shown_text_hash=body.shown_text_sha256,
         )
     except grants.RefusedError as exc:

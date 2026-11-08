@@ -10,7 +10,9 @@ from __future__ import annotations
 import json
 import uuid
 from collections.abc import AsyncIterator
+from typing import Any
 
+import jwt as pyjwt
 import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
@@ -21,6 +23,7 @@ from starlette import status
 from faden_backend.db.dao.rbac_dao import APPROVALS_AUDITOR_ROLE, RbacDAO
 from faden_backend.db.models.containers import AuditEvent, AuditResult
 from faden_backend.db.models.users import User, current_active_user
+from faden_backend.services.chat.gateway_client import EvidenceUnavailable, GatewayChatClient, evidence_grant
 
 #: The gateway's tables, as its migrations leave them (gateway migrations gr4nts, gr4ntx, byp4ss).
 _GRANT_TABLE = """
@@ -184,28 +187,97 @@ async def test_a_bypass_session_shows_its_flags_in_the_list(
     assert (shown["id"], shown["kind"], shown["flags"]) == (grant, "bypass", 2)
 
 
-async def test_only_an_approvals_auditor_reads_what_ran_under_bypass_and_every_read_is_audited(
-    client: AsyncClient, fastapi_app: FastAPI, gateway_db: AsyncSession, dbsession: AsyncSession, admin: User,
-) -> None:
-    grant = await _bypass_session(gateway_db)
-    refused = await client.get(f"/api/admin/governance/grants/{grant}/calls")
-    assert refused.status_code == status.HTTP_403_FORBIDDEN, "superuser status alone does not give it (L-65)"
+class _Gateway:
+    """The gateway's evidence route, as the backend's client reaches it: what it was asked, what it answers."""
+
+    def __init__(self, monkeypatch: pytest.MonkeyPatch, answer: dict[str, Any] | None) -> None:
+        self.asked: list[dict[str, Any]] = []
+        gateway = self
+
+        async def grant_evidence(_self: Any, what: dict[str, Any], **kw: Any) -> dict[str, Any]:
+            gateway.asked.append({**what, **{k: v for k, v in kw.items() if k != "secret"}})
+            if answer is None:
+                raise EvidenceUnavailable("The gateway could not be reached: test")
+            return answer
+
+        monkeypatch.setattr(GatewayChatClient, "grant_evidence", grant_evidence)
+
+
+async def _auditor(dbsession: AsyncSession, user: User) -> None:
     rbac = RbacDAO(dbsession)
     await rbac.seed_defaults()
     role = await rbac.get_role_by_name(APPROVALS_AUDITOR_ROLE)
     assert role is not None, "a built-in role"
-    await rbac.assign_role(admin.id, role.id)
+    await rbac.assign_role(user.id, role.id)
     await dbsession.flush()
+
+
+async def test_only_an_approvals_auditor_reads_what_ran_under_bypass_and_every_read_is_audited(
+    client: AsyncClient, fastapi_app: FastAPI, gateway_db: AsyncSession, dbsession: AsyncSession, admin: User,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    gateway = _Gateway(monkeypatch, None)
+    grant = await _bypass_session(gateway_db)
+    refused = await client.get(f"/api/admin/governance/grants/{grant}/calls")
+    assert refused.status_code == status.HTTP_403_FORBIDDEN, "superuser status alone does not give it (L-65)"
+    assert gateway.asked == [], "nothing decrypted for a refused read"
+    await _auditor(dbsession, admin)
     r = await client.get(f"/api/admin/governance/grants/{grant}/calls")
     assert r.status_code == status.HTTP_200_OK, r.text
     calls = {c["call_id"]: c for c in r.json()["data"]}
     assert {k: (c["side"], c["flag"], c["reported_at"] is not None) for k, c in calls.items()} == {
         "c1": ("client", None, True), "c2": ("client", "gateway_only", False), "c3": ("gateway", None, False),
     }
-    assert "arguments" not in calls["c1"], "the arguments stay with the gateway, under its key"
+    assert "arguments" not in calls["c1"], "the gateway was away: nothing it holds is shown"
+    assert r.json()["evidence"] == "unavailable"
     assert [d["call_id"] for d in r.json()["device_only"]] == ["c9"]
     assert await _views(dbsession, grant) == sorted([
         ("approvals.evidence.view", AuditResult.DENY.value), ("approvals.evidence.view", AuditResult.ALLOW.value),
     ]), "the refusal and the read"
     other = await _grant(gateway_db, kind="work")
-    assert (await client.get(f"/api/admin/governance/grants/{other}/calls")).status_code == 404, "Bypass only"
+    assert (await client.get(f"/api/admin/governance/grants/{other}/calls")).status_code == 200, "any grant (L-64)"
+    assert (await client.get(f"/api/admin/governance/grants/{uuid.uuid4()}/calls")).status_code == 404
+
+
+async def test_an_auditor_sees_the_places_arguments_and_results_the_gateway_decrypts_after_the_read_is_audited(
+    client: AsyncClient, gateway_db: AsyncSession, dbsession: AsyncSession, admin: User,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """sdk/09 L-64: the backend authorizes and records the read, the gateway decrypts (sdk/40 A4.0)."""
+    grant = await _bypass_session(gateway_db)
+    ids = {
+        r.call_id: str(r.id) for r in await gateway_db.execute(
+            text("SELECT id, call_id FROM approval_grant_call WHERE grant_id = :g"), {"g": grant},
+        )
+    }
+    await _auditor(dbsession, admin)
+    held = {"id": ids["c1"], "call_id": "c1", "target": "C:\\Docs\\plan.docx", "arguments": {"to": "v2"},
+            "outcome": "error", "result": "Error: in use", "result_at": "2026-11-08T10:00:00+00:00"}
+    gateway = _Gateway(monkeypatch, {"grant_id": grant, "kind": "bypass", "evidence_level": "results",
+                                     "reason": "Renaming drawings", "calls": [held]})
+    r = await client.get(f"/api/admin/governance/grants/{grant}/calls")
+    assert r.status_code == status.HTTP_200_OK, r.text
+    body = r.json()
+    calls = {c["call_id"]: c for c in body["data"]}
+    assert {k: calls["c1"][k] for k in ("target", "arguments", "outcome", "result")} == {
+        "target": "C:\\Docs\\plan.docx", "arguments": {"to": "v2"}, "outcome": "error", "result": "Error: in use",
+    }
+    assert "arguments" not in calls["c3"], "what the gateway did not hand over is not made up"
+    assert (body["evidence"], body["evidence_level"], body["reason"]) == ("shown", "results", "Renaming drawings")
+    assert gateway.asked == [{
+        "grant": grant, "part": "calls", "reader": str(admin.id), "tenant_id": "default",
+    }], "for this grant and this reader only"
+    [metadata] = (await dbsession.execute(
+        select(AuditEvent.metadata_json).where(AuditEvent.target_id == grant),
+    )).scalars().all()
+    assert json.loads(metadata) == {"person_id": "u-1", "kind": "bypass", "arguments": True}
+
+
+def test_the_evidence_grant_names_one_grant_and_reader_and_lives_a_minute() -> None:
+    token = evidence_grant({"grant": "g-1", "part": "calls"}, reader="r-1", tenant_id="default",
+                           secret="a-secret-of-at-least-thirty-two-bytes")
+    claims = pyjwt.decode(token, "a-secret-of-at-least-thirty-two-bytes", algorithms=["HS256"])
+    assert {k: claims[k] for k in ("typ", "sub", "tenant", "grant", "part")} == {
+        "typ": "grant_evidence", "sub": "r-1", "tenant": "default", "grant": "g-1", "part": "calls",
+    }
+    assert claims["exp"] - claims["iat"] == 60

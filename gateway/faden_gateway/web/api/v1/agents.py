@@ -33,7 +33,7 @@ from starlette import status
 
 from faden_gateway.db.dao.gateway_dao import GatewayDAO
 from faden_gateway.db.models.gateway import AgentClientEvent
-from faden_gateway.services.extensions import registry
+from faden_gateway.services.extensions import GrantContext, registry
 from faden_gateway.services.gateway import agent_manifests, approval_settings, grants, tool_classes
 from faden_gateway.services.gateway import governance as gov
 from faden_gateway.services.gateway.agents import (
@@ -92,6 +92,24 @@ async def tool_mode_ceiling(
         groups = tuple(await resolver.resolve(auth.user_id) or ())
     return await tool_classes.ceiling(registry.tool_mode_ceilings, tool_classes.CeilingContext(
         tenant_id=auth.tenant_id, user_id=auth.user_id, agent_id=profile.id, groups=groups,
+    ))
+
+
+async def grant_limits(
+    request: Request, auth: AuthContext, profile: Any, kind: str | None = None,
+) -> grants.Limits:
+    """What the registered grant limits say for this person, agent and *kind* (``None``: the profile's, any).
+
+    Raises ``grants.LimitsUnavailableError`` when one fails: no grant is made then.
+    """
+    if not registry.grant_limits:
+        return grants.Limits()
+    groups: tuple[str, ...] = ()
+    resolver = getattr(request.app.state, "group_membership_resolver", None)
+    if resolver is not None:
+        groups = tuple(await resolver.resolve(auth.user_id) or ())
+    return await grants.extension_limits(registry.grant_limits, GrantContext(
+        tenant_id=auth.tenant_id, user_id=auth.user_id, agent_id=profile.id, groups=groups, kind=kind,
     ))
 
 
@@ -409,10 +427,15 @@ async def agent_profile(
     # Bypass only to clients that announce it (sdk/40 §3 rule 5) and only where it may be chosen; any other
     # client sees Auto as the highest level, as before.
     supports_bypass = SUPPORTS_BYPASS in client_supports(request)
-    offered = supports_bypass and bypass_offered(profile, ceiling, found)
+    # The grant limits of extensions narrow the longest grant; one that fails leaves no grant to offer (0).
+    try:
+        limits: grants.Limits | None = await grant_limits(request, auth, profile)
+    except grants.LimitsUnavailableError:
+        limits = None
+    offered = supports_bypass and limits is not None and bypass_offered(profile, ceiling, found)
     bypass = tool_classes.ToolMode.BYPASS
     shown_max = highest if highest is not bypass or offered else tool_classes.ToolMode.AUTO
-    longest = grants.longest(profile, found.longest_grant_minutes)
+    longest = grants.longest(profile, limits.longest(found.longest_grant_minutes)) if limits is not None else 0
     approvals: dict[str, Any] = {
         "standing": list(profile.standing) if profile.standing is not None else None,
         "longest_grant_minutes": longest,
@@ -422,7 +445,10 @@ async def agent_profile(
     }
     if supports_bypass:
         # What the Bypass confirmation says: whether it may be chosen, for how long at most, what is recorded.
-        approvals["bypass"] = {"allowed": offered, "longest_minutes": longest, "evidence": "calls"}
+        approvals["bypass"] = {
+            "allowed": offered, "longest_minutes": longest,
+            "evidence": limits.evidence("bypass") if limits is not None else grants.EVIDENCE["bypass"],
+        }
     return {
         "object": "agent.profile",
         "id": profile.id,

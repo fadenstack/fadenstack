@@ -681,6 +681,15 @@ def _tool_arguments(call: dict[str, Any]) -> dict[str, Any]:
     return parsed if isinstance(parsed, dict) else {}
 
 
+def _message_text(content: Any) -> str:
+    """A message's text: its string, or the text of its parts."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(str(p.get("text") or "") for p in content if isinstance(p, Mapping) and p.get("type") == "text")
+    return ""
+
+
 def _restored(value: Any, mapping: dict[str, str]) -> Any:
     """*value* with PII tokens put back, in every string it holds."""
     if isinstance(value, str):
@@ -1271,6 +1280,9 @@ class _Prepared:
     #: The calls of this round a grant covered: call id -> the grant. Counted once; the check after a wait
     #: reads it.
     grant_covered: dict[str, uuid.UUID] = field(default_factory=dict)
+    #: The calls of this round whose grant records results (L-60): call id -> its evidence row, which gets the
+    #: outcome and the start of the result once the call ran.
+    grant_results: dict[str, uuid.UUID] = field(default_factory=dict)
     #: The user's messages this request stored in its session.
     user_message_ids: list[uuid.UUID] = field(default_factory=list)
     #: An output check refused the answer: the decision and the answer's HMAC.
@@ -2525,6 +2537,7 @@ class GatewayService:
         """
         if not recheck:
             req.grant_covered = {}
+            req.grant_results = {}
         if not any(gov.GovernanceStage.TOOL in c.stages for c in req.checks):
             return {}
         found: dict[str, tuple[str, gov.Verdict]] = {}
@@ -2583,9 +2596,31 @@ class GatewayService:
             return
         if req.agent is None or not req.agent.device_id or not call.get("id"):
             return
-        await grants.record(
+        covered = await grants.record_call(
             self.dao.session.bind, self._grant_owner(req, auth), self._grant_call(req, call, name, side),
         )
+        self._keep_for_result(req, call, covered)
+
+    async def _note_client_results(self, req: _Prepared, auth: AuthContext, egress: Mapping[str, Any]) -> None:
+        """The device's results of covered calls, in this request's tool messages after its egress scan (L-61).
+
+        Only on an agent's route from a device, and only when the request carries tool results.
+        """
+        if req.agent is None or not req.agent.device_id:
+            return
+        results = {
+            str(m.get("tool_call_id")): _message_text(m.get("content"))
+            for m in egress.get("messages") or () if isinstance(m, Mapping) and m.get("role") == "tool"
+            and m.get("tool_call_id")
+        }
+        if results:
+            await grants.note_client_results(self.dao.session.bind, self._grant_owner(req, auth), results)
+
+    @staticmethod
+    def _keep_for_result(req: _Prepared, call: dict[str, Any], covered: grants.Covered | None) -> None:
+        """Remember a covered call whose grant records results, so its run can leave them (L-60)."""
+        if covered is not None and covered.evidence_level == "results":
+            req.grant_results[str(call.get("id") or "")] = covered.record_id
 
     async def _covered(
         self, req: _Prepared, auth: AuthContext, call: dict[str, Any], name: str, verdict: gov.Verdict,
@@ -2610,12 +2645,14 @@ class GatewayService:
             return None
         if req.agent is None or not req.agent.device_id or not call_id or _floor(req, name, verdict):
             return None
-        grant_id = await grants.cover(
+        covered = await grants.cover_call(
             self.dao.session.bind, self._grant_owner(req, auth), self._grant_call(req, call, name, side),
         )
-        if grant_id is not None:
-            req.grant_covered[call_id] = grant_id
-        return grant_id
+        if covered is None:
+            return None
+        req.grant_covered[call_id] = covered.grant_id
+        self._keep_for_result(req, call, covered)
+        return covered.grant_id
 
     async def _ask_approvals(
         self, req: _Prepared, calls: list[dict[str, Any]], screened: dict[str, tuple[str, gov.Verdict]],
@@ -2704,6 +2741,7 @@ class GatewayService:
         if not req.faden_events or not req.checks:
             return []
         req.grant_covered = {}
+        req.grant_results = {}  # the device's results come in its next request (:meth:`_note_client_results`)
         events: list[dict[str, Any]] = []
         for call in calls:
             name = _tool_name(call)
@@ -3036,6 +3074,7 @@ class GatewayService:
         if scanned is not None and _needs_scan(req.pii_policy, req.decision.candidate):
             egress, req.token_mapping = scanned
             egress = self._inject_pii_system_prompt(egress, req.pii_policy)  # type: ignore[arg-type]
+        await self._note_client_results(req, auth, egress)
 
         req.trace_context = self.observability.start_request_trace(
             request_id=request_id,
@@ -4181,7 +4220,25 @@ class GatewayService:
         for row, answer in done:
             req.tool_calls.append(row)
             answers.append(answer)
-        return await self._scan_tool_results(req, answers)
+        scanned = await self._scan_tool_results(req, answers)
+        await self._note_results(req, done, scanned)
+        return scanned
+
+    async def _note_results(
+        self, req: _Prepared, done: list[tuple[dict[str, Any], dict[str, Any]]], scanned: list[dict[str, Any]],
+    ) -> None:
+        """The outcome and the start of each result whose grant records results (L-60), as the model gets it.
+
+        After the PII scan, so what is kept is what left the gateway; a failed call keeps its error.
+        """
+        if not req.grant_results:
+            return
+        for (row, _), answer in zip(done, scanned, strict=True):
+            record_id = req.grant_results.get(str(answer.get("tool_call_id") or ""))
+            if record_id is not None:
+                await grants.note_result(
+                    self.dao.session.bind, record_id, error=bool(row.get("is_error")), text=answer.get("content"),
+                )
 
     async def _scan_tool_results(self, req: _Prepared, answers: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Tool results pass through PII like the rest of what leaves.

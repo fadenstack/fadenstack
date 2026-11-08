@@ -6,6 +6,8 @@ enforces it (``registry.tenant_restrictions`` lists those that are):
 
 - ``tool_mode_ceilings`` (Enterprise: the most a tenant, team, agent or person may pick as a chat's tool
   mode): every chat's tool mode is at most ``read_only``; the gateway applies it.
+- ``grant_limits`` (limits an extension keeps on the grants people make: how long, what they record, who may
+  choose Bypass): no grant is made or extended, so each call asks; the gateway applies it.
 
 Administrators see a notice for each unenforced one and may lift it (the restriction's own data, kept by the
 extension, is not touched; the extension may mark the tenant again when it is back).
@@ -24,8 +26,10 @@ from faden_backend.services.extensions import AdminNotice, ExtensionRegistry, re
 
 #: Tool mode ceilings: while unenforced, every chat's tools are at most read-only.
 TOOL_MODE_CEILINGS = "tool_mode_ceilings"
+#: Limits on grants: while unenforced, no grant is made.
+GRANT_LIMITS = "grant_limits"
 #: The names core knows how to fail closed for; an extension marks only these.
-KNOWN = frozenset({TOOL_MODE_CEILINGS})
+KNOWN = frozenset({TOOL_MODE_CEILINGS, GRANT_LIMITS})
 #: The tenant the backend serves (as the agents' routes).
 TENANT = "default"
 

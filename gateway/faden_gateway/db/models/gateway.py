@@ -1199,12 +1199,20 @@ class ApprovalGrantCall(Base):
     #: The place the call acted on, when its tool names one.
     target: Mapped[str | None] = mapped_column(EncryptedText("grant-evidence"), nullable=True)
     arguments: Mapped[dict[str, Any] | None] = mapped_column(EncryptedJSON("grant-evidence"), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), index=True,
+    )
     #: ``client`` (the device runs it) or ``gateway``; ``None`` on rows from before Bypass.
     side: Mapped[str | None] = mapped_column(String(8), nullable=True)
     #: When the device reported running it (Bypass, L-61), and when the gateway compared it with the report.
     reported_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: When the gateway saw the call's result: after running it, or in the device's next request (L-61).
+    result_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: For a grant that records results (L-60): ``ok`` or ``error``, and the error's text or the start of the
+    #: result after the gateway's PII masking, encrypted as the arguments are.
+    outcome: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    result: Mapped[str | None] = mapped_column(EncryptedText("grant-evidence"), nullable=True)
 
 
 class ApprovalGrantFlag(Base):
@@ -1249,6 +1257,9 @@ class ApprovalGrantChange(Base):
     expires_after: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     shown_text_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    #: ``device`` (its device extended it) or ``limit`` (a lower longest grant cut it, ``added_seconds`` below
+    #: zero); ``None`` on rows from before.
+    changed_by: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
 
 class ToolRule(Base):

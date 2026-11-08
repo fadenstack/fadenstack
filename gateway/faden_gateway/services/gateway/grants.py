@@ -56,6 +56,13 @@ DEFAULT_LONGEST_MINUTES = 120
 STANDING = {"time": "time", "work": "grant"}
 #: What a grant records of each covered call: ``work`` and ``bypass`` their arguments too (L-60).
 EVIDENCE = {"time": "decisions", "work": "calls", "bypass": "calls"}
+#: The evidence levels, from the least recorded: the call; its arguments too; and its outcome and a summary of
+#: its result (L-60).
+EVIDENCE_LEVELS = ("decisions", "calls", "results")
+#: How much of a result a ``results`` grant keeps, after the gateway's PII masking (L-60).
+RESULT_CHARS = 500
+#: How long after a covered call of the client's tool its result is looked for in the next request.
+RESULT_WINDOW = timedelta(hours=1)
 
 
 # -- what a call is checked against -----------------------------------------------------------
@@ -299,44 +306,63 @@ async def load(conn: AsyncConnection, grant_id: uuid.UUID) -> Candidate | None:
     return Candidate(row.id, row.kind, row.scope or {}, row.evidence_level) if row else None
 
 
-async def consume(conn: AsyncConnection, grant: Candidate, call: Call) -> bool:
-    """Count *call* against *grant* if it is still usable, and record it; whether it counted.
+async def consume(conn: AsyncConnection, grant: Candidate, call: Call) -> uuid.UUID | None:
+    """Count *call* against *grant* if it is still usable, and record it; the record's id, ``None`` if not.
 
     One statement does both (39 §4 ``CONSUME``): the conditional ``UPDATE`` checks status, expiry and budget
     and counts, and the call's evidence row is inserted from what it returns -- with its arguments when the
-    grant records calls (L-60), and the time the count was made. Nothing can come between the check and the
-    count, nor between the count and its record; another worker waits on the row only while the server runs
-    it.
+    grant records calls or results (L-60), and the time the count was made. Nothing can come between the check
+    and the count, nor between the count and its record; another worker waits on the row only while the server
+    runs it.
     """
     arguments = None
-    if grant.evidence_level == "calls" and call.arguments is not None:
+    if grant.evidence_level in ("calls", "results") and call.arguments is not None:
         arguments = dict(call.arguments)
     recorded = await conn.execute(_COUNT_AND_RECORD, {
         "grant": grant.id, "record": uuid.uuid4(), "request_id": call.request_id[:128],
         "call_id": call.call_id[:128], "tool_id": call.tool_id[:256],
         "target": call.place[1] if call.place else None, "arguments": arguments, "side": call.side,
     })
-    return recorded.first() is not None
+    row = recorded.first()
+    return row[0] if row is not None else None
 
 
-async def cover(
+@dataclass(frozen=True, slots=True)
+class Covered:
+    """A covered call, counted: its grant, its evidence row, and what the grant records."""
+
+    grant_id: uuid.UUID
+    record_id: uuid.UUID
+    evidence_level: str
+
+
+async def cover_call(
     bind: AsyncEngine, owner: Owner, call: Call, kinds: Sequence[str] = KINDS,
-) -> uuid.UUID | None:
-    """The grant that covers and counts *call*, or ``None``; on a connection of its own, each step committed.
+) -> Covered | None:
+    """The grant that covers and counts *call*, with its record, or ``None``; on a connection of its own.
 
     A lookup that fails covers nothing: the call asks rather than runs (sdk/38 §6, 39 F5).
     """
     try:
         async with autocommit(bind) as conn:
             for grant in await candidates(conn, owner, call, kinds):
-                if await consume(conn, grant, call):
-                    return grant.id
+                record_id = await consume(conn, grant, call)
+                if record_id is not None:
+                    return Covered(grant.id, record_id, grant.evidence_level)
     except Exception:
         logger.exception("The grant lookup failed; the call asks")
     return None
 
 
-async def record(bind: AsyncEngine, owner: Owner, call: Call) -> uuid.UUID | None:
+async def cover(
+    bind: AsyncEngine, owner: Owner, call: Call, kinds: Sequence[str] = KINDS,
+) -> uuid.UUID | None:
+    """The grant that covers and counts *call*, or ``None`` (:func:`cover_call` without the record)."""
+    covered = await cover_call(bind, owner, call, kinds)
+    return covered.grant_id if covered is not None else None
+
+
+async def record_call(bind: AsyncEngine, owner: Owner, call: Call) -> Covered | None:
     """Record a call that runs anyway (a read, or a write at Auto) against the chat's Bypass grant (L-60).
 
     Every call under Bypass is evidence, not only those it spared a question; it counts against the grant's
@@ -345,7 +371,84 @@ async def record(bind: AsyncEngine, owner: Owner, call: Call) -> uuid.UUID | Non
     """
     if not call.bypass:
         return None
-    return await cover(bind, owner, call, kinds=("bypass",))
+    return await cover_call(bind, owner, call, kinds=("bypass",))
+
+
+async def record(bind: AsyncEngine, owner: Owner, call: Call) -> uuid.UUID | None:
+    """:func:`record_call`'s grant id."""
+    covered = await record_call(bind, owner, call)
+    return covered.grant_id if covered is not None else None
+
+
+# -- the results of covered calls (L-60, the start of L-61's own sight) ------------------------
+
+
+def summary(text: Any) -> str:
+    """What a ``results`` grant keeps of a result: its first :data:`RESULT_CHARS` characters."""
+    return str(text or "")[:RESULT_CHARS]
+
+
+async def note_result(bind: AsyncEngine, record_id: uuid.UUID, *, error: bool, text: Any) -> bool:
+    """Keep a covered gateway call's outcome and the start of its result; whether its record was there.
+
+    *text* is the result as the model gets it, after the gateway's PII masking; for a failed call, its error.
+    Only for a record of a ``results`` grant. A failure is logged: the call has run, and its record stays.
+    """
+    try:
+        async with autocommit(bind) as conn:
+            done = await conn.execute(
+                update(ApprovalGrantCall).where(ApprovalGrantCall.id == record_id).values(
+                    outcome="error" if error else "ok", result=summary(text), result_at=_clock(),
+                ),
+            )
+            return bool(done.rowcount)
+    except Exception:
+        logger.exception("The result of a covered call could not be recorded")
+        return False
+
+
+def client_outcome(text: str) -> str:
+    """How a client tool's result reads: ``error`` when it starts as the SDKs word a failure (``Error: ...``)."""
+    return "error" if text.lstrip().lower().startswith("error") else "ok"
+
+
+async def note_client_results(bind: AsyncEngine, owner: Owner, results: Mapping[str, str]) -> int:
+    """The gateway's own sight of the client's results: *results* maps a tool call id to its message text.
+
+    The device sends a tool's result in its next request. The owner's covered client calls of the last hour
+    with those ids get ``result_at`` (the gateway saw the result come back, sdk/09 L-61), and those of a
+    ``results`` grant also its outcome and the start of the text, which is after the request's egress scan
+    (L-60). Each record is noted once. How many were noted; a failure is logged and notes nothing.
+    """
+    ids = [str(call_id)[:128] for call_id in results if call_id]
+    if not ids:
+        return 0
+    try:
+        async with autocommit(bind) as conn:
+            found = (await conn.execute(
+                select(ApprovalGrantCall.id, ApprovalGrantCall.call_id, ApprovalGrant.evidence_level)
+                .join(ApprovalGrant, ApprovalGrant.id == ApprovalGrantCall.grant_id)
+                .where(
+                    # Only grants that were still running within the window: the owner's older ones are many.
+                    _device_owned(owner), ApprovalGrant.expires_at > _clock() - RESULT_WINDOW,
+                    ApprovalGrantCall.call_id.in_(ids), ApprovalGrantCall.side == "client",
+                    ApprovalGrantCall.result_at.is_(None), ApprovalGrantCall.created_at > _clock() - RESULT_WINDOW,
+                ),
+            )).all()
+            for row in found:
+                text = results.get(row.call_id, "")
+                values: dict[str, Any] = {"result_at": _clock()}
+                if row.evidence_level == "results":
+                    values |= {"outcome": client_outcome(text), "result": summary(text)}
+                await conn.execute(
+                    update(ApprovalGrantCall)
+                    .where(ApprovalGrantCall.id == row.id, ApprovalGrantCall.result_at.is_(None))
+                    .values(**values),
+                )
+            return len(found)
+    except Exception:
+        logger.exception("The results of covered client calls could not be noted")
+        return 0
 
 
 async def still_usable(bind: Any, grant_id: uuid.UUID) -> bool:
@@ -396,6 +499,63 @@ class RefusedError(ValueError):
 def longest(agent: Any, tenant_longest: int = DEFAULT_LONGEST_MINUTES) -> int:
     """The longest grant for *agent*: its own, never longer than the installation's (sdk/38 §5)."""
     return min(agent.max_grant_minutes or tenant_longest, tenant_longest)
+
+
+# -- limits from extensions (``registry.grant_limits``) ---------------------------------------
+
+
+class LimitsUnavailableError(RuntimeError):
+    """A grant limit failed, or answered what is no limit: no grant is made, and each call asks (fail closed)."""
+
+
+@dataclass(frozen=True, slots=True)
+class Limits:
+    """What the extensions' grant limits say together: the shortest longest grant, the most recorded level."""
+
+    longest_minutes: int | None = None
+    evidence_level: str | None = None
+
+    def longest(self, installation: int) -> int:
+        """The installation's longest grant, narrowed by the extensions'."""
+        return min(installation, self.longest_minutes) if self.longest_minutes is not None else installation
+
+    def evidence(self, kind: str) -> str:
+        """What a grant of *kind* records: the extensions' level, else core's default for the kind."""
+        return self.evidence_level or EVIDENCE[kind]
+
+
+async def extension_limits(rules: Sequence[Any], ctx: Any) -> Limits:
+    """What every rule in *rules* (``registry.grant_limits``) says of the grant in *ctx*, combined.
+
+    Raises :class:`LimitsUnavailableError` when one fails or answers a duration that is no whole number of
+    minutes above zero, or an unknown level: a limit that cannot be applied must not widen a grant.
+    """
+    minutes: list[int] = []
+    levels: list[str] = []
+    for rule in rules:
+        try:
+            answer = await rule(ctx)
+        except Exception as exc:
+            logger.warning("A grant limit failed; no grant is made: %s", exc, exc_info=True)
+            raise LimitsUnavailableError(str(exc)) from exc
+        if answer is None:
+            continue
+        found = getattr(answer, "longest_minutes", None)
+        if found is not None:
+            if isinstance(found, bool) or not isinstance(found, int) or found < 1:
+                msg = f"A grant limit answered {found!r} as the longest grant"
+                raise LimitsUnavailableError(msg)
+            minutes.append(found)
+        level = getattr(answer, "evidence_level", None)
+        if level is not None:
+            if level not in EVIDENCE_LEVELS:
+                msg = f"A grant limit answered {level!r} as the evidence level"
+                raise LimitsUnavailableError(msg)
+            levels.append(level)
+    return Limits(
+        longest_minutes=min(minutes) if minutes else None,
+        evidence_level=max(levels, key=EVIDENCE_LEVELS.index) if levels else None,
+    )
 
 
 def limit(
@@ -458,12 +618,14 @@ def limit(
 
 async def issue(
     session: AsyncSession, owner: Owner, granted: Granted, *, shown_text_hash: str | None = None,
-    client_version: str | None = None, reason: str | None = None,
+    client_version: str | None = None, reason: str | None = None, evidence_level: str | None = None,
 ) -> ApprovalGrant:
     """Store a grant; it starts and ends by the database's clock. Committed.
 
     The stored row is the record of the switch-on that the device waits for (sdk/09 L-59): who, which device,
     agent and version, conversation, scope, expiry, what allowed it, the client and the person's reason.
+    *evidence_level*: what its covered calls leave behind (:data:`EVIDENCE_LEVELS`); core's default for the
+    kind without one.
     """
     grant = (await session.execute(
         insert(ApprovalGrant).values(
@@ -472,7 +634,7 @@ async def issue(
             conversation_id=owner.conversation_id, scope=granted.scope,
             expires_at=func.now() + timedelta(minutes=granted.minutes), max_calls=granted.max_calls,
             calls_used=0, status="active", policy_version=granted.policy_version,
-            evidence_level=EVIDENCE[granted.kind], shown_text_hash=shown_text_hash,
+            evidence_level=evidence_level or EVIDENCE[granted.kind], shown_text_hash=shown_text_hash,
             client_version=client_version, reason=reason,
         ).returning(ApprovalGrant),
     )).scalar_one()
@@ -602,6 +764,7 @@ async def extend(
         session.add(ApprovalGrantChange(
             id=uuid.uuid4(), grant_id=grant.id, added_seconds=seconds, added_targets=added or None,
             expires_before=before, expires_after=end, shown_text_hash=shown_text_hash, created_at=_clock(),
+            changed_by="device",
         ))
         await session.commit()
     except Exception:
@@ -761,6 +924,91 @@ async def purge_bypass(bind: AsyncEngine, days: int) -> int:
         return 0
 
 
+# -- for auditors: the records as they are, decrypted here (sdk/09 L-64) ------------------------
+
+#: The most calls one grant's evidence lists, and the widest window and most calls a search by place reads.
+EVIDENCE_CALLS = 5000
+SEARCH_DAYS = 31
+SEARCH_ROWS = 5000
+
+
+async def evidence(session: AsyncSession, grant_id: uuid.UUID, tenant_id: str) -> dict[str, Any] | None:
+    """A grant's reason and its calls' places, arguments, outcomes and summaries, decrypted; ``None``: no grant.
+
+    For the backend's auditors only (``/internal/grant-evidence``): the place, the arguments and the result
+    stay encrypted at rest under this gateway's key, which the backend does not hold.
+    """
+    grant = await session.get(ApprovalGrant, grant_id)
+    if grant is None or grant.tenant_id != tenant_id:
+        return None
+    calls = (await session.execute(
+        select(ApprovalGrantCall).where(ApprovalGrantCall.grant_id == grant_id)
+        .order_by(ApprovalGrantCall.created_at).limit(EVIDENCE_CALLS),
+    )).scalars().all()
+    return {
+        "grant_id": str(grant.id), "kind": grant.kind, "evidence_level": grant.evidence_level,
+        "reason": grant.reason,
+        "calls": [
+            {
+                "id": str(c.id), "call_id": c.call_id, "target": c.target, "arguments": c.arguments,
+                "outcome": c.outcome, "result": c.result,
+                "result_at": c.result_at.isoformat() if c.result_at else None,
+            }
+            for c in calls
+        ],
+    }
+
+
+def place_matches(place: str, value: str | None) -> bool:
+    """Whether the recorded place *value* is *place* or lies in it.
+
+    The same document, app or desk; a path under a folder; a page of a site (when *place* names an origin).
+    """
+    if not value or not place:
+        return False
+    if _path(value) == _path(place) or _within(place, value):
+        return True
+    if "://" in place and "://" in value:
+        origin = _origin(place)
+        return origin is not None and _origin(value) == origin
+    return False
+
+
+async def find_by_place(
+    session: AsyncSession, *, tenant_id: str, place: str, since: datetime, until: datetime,
+    user_id: str | None = None, agent_id: str | None = None, device_id: str | None = None,
+) -> tuple[list[dict[str, Any]], bool]:
+    """The covered calls of the window whose place is *place* or lies in it, newest first; whether it was cut.
+
+    The places are encrypted, so they are read and compared here: at most :data:`SEARCH_ROWS` calls of a
+    window of at most :data:`SEARCH_DAYS` days (``ValueError`` beyond).
+    """
+    if until <= since or until - since > timedelta(days=SEARCH_DAYS):
+        msg = f"A search by place covers more than nothing and at most {SEARCH_DAYS} days."
+        raise ValueError(msg)
+    query = (
+        select(ApprovalGrantCall.id, ApprovalGrantCall.grant_id, ApprovalGrantCall.target)
+        .join(ApprovalGrant, ApprovalGrant.id == ApprovalGrantCall.grant_id)
+        .where(
+            ApprovalGrant.tenant_id == tenant_id, ApprovalGrantCall.target.is_not(None),
+            ApprovalGrantCall.created_at >= since, ApprovalGrantCall.created_at < until,
+        )
+    )
+    for column, value in (
+        (ApprovalGrant.user_id, user_id), (ApprovalGrant.agent_id, agent_id), (ApprovalGrant.device_id, device_id),
+    ):
+        if value:
+            query = query.where(column == value)
+    rows = (await session.execute(
+        query.order_by(ApprovalGrantCall.created_at.desc()).limit(SEARCH_ROWS + 1),
+    )).all()
+    found = [
+        {"id": str(row.id), "grant_id": str(row.grant_id), "target": row.target}
+        for row in rows[:SEARCH_ROWS] if place_matches(place, row.target)
+    ]
+    return found, len(rows) > SEARCH_ROWS
+
+
 # -- as the API and the events show it --------------------------------------------------------
 
 
@@ -794,6 +1042,8 @@ def as_dict(grant: ApprovalGrant, now: datetime) -> dict[str, Any]:
         "paused_at": grant.paused_at.isoformat() if grant.paused_at else None,
         "revoked_at": grant.revoked_at.isoformat() if grant.revoked_at else None,
         "revoked_by": grant.revoked_by,
+        #: What its covered calls leave on the server (``EVIDENCE_LEVELS``), for the device to say.
+        "evidence_level": grant.evidence_level,
     }
 
 

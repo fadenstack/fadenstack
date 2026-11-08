@@ -27,7 +27,8 @@ USAGE_READ = {"usage": ["read"]}
 #: 32(4); M06).
 USAGE_PEOPLE_AUDIT = ("usage.people", "audit")
 USAGE_AUDITOR_ROLE = "usage_auditor"
-#: The calls recorded under a person's Bypass session: tools, places and arguments (sdk/09 L-65). Only the
+#: The calls recorded under a person's grants, Bypass sessions above all: tools, places, arguments and results
+#: (sdk/09 L-64, L-65). Only the
 #: role ``approvals_auditor`` has it, nobody has that role at install, and superuser status does not give
 #: it; it is checked by the role grant itself. Every read is in the audit trail.
 APPROVALS_EVIDENCE_AUDIT = ("approvals.evidence", "audit")

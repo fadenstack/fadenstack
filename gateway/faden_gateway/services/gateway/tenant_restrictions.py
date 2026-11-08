@@ -7,9 +7,11 @@ says what each name means), and an installed extension that enforces one lists i
 fails closed for each name nothing enforces:
 
 - ``tool_mode_ceilings``: every chat's tool mode is at most ``read_only`` (a ceiling, ``tool_classes``).
+- ``grant_limits``: no grant is made or extended, and each call asks (a grant limit that fails, ``grants``).
 
 When the names cannot be read the ceiling fails, which counts as ``read_only`` (core's rule for a ceiling
-that fails): a restriction that cannot be checked must not widen what tools may do.
+that fails), and so does the grant limit, which then makes no grant: a restriction that cannot be checked must
+not widen what tools may do.
 """
 
 from __future__ import annotations
@@ -19,7 +21,7 @@ import logging
 import time
 from typing import Any
 
-from faden_gateway.services.extensions import ExtensionRegistry
+from faden_gateway.services.extensions import ExtensionRegistry, GrantContext
 from faden_gateway.services.gateway import access_epoch
 from faden_gateway.services.gateway.tool_classes import CeilingContext, ToolMode
 
@@ -27,6 +29,8 @@ logger = logging.getLogger(__name__)
 
 #: Tool mode ceilings: while unenforced, every chat's tools are at most read-only.
 TOOL_MODE_CEILINGS = "tool_mode_ceilings"
+#: Limits on grants: while unenforced, no grant is made.
+GRANT_LIMITS = "grant_limits"
 #: How long a tenant's names are kept, in seconds.
 TTL_S = 30.0
 _SQL = "SELECT name FROM tenant_restrictions WHERE tenant_id = $1"
@@ -63,6 +67,14 @@ class TenantRestrictions:
         if TOOL_MODE_CEILINGS in await self.names(ctx.tenant_id):
             return ToolMode.READ_ONLY
         return None
+
+    async def grant_limit(self, ctx: GrantContext) -> None:
+        """No word while the tenant keeps no grant limits or they are enforced; raises otherwise: no grant."""
+        if GRANT_LIMITS in self._registry.tenant_restrictions:
+            return
+        if GRANT_LIMITS in await self.names(ctx.tenant_id):
+            msg = "The tenant's limits on grants are not enforced here, so no grant is made"
+            raise RuntimeError(msg)
 
     def forget(self) -> None:
         """Drop what is kept (tests)."""
