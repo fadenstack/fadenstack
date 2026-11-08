@@ -1,5 +1,8 @@
 """Governance for admins: tool rules, tool classes, the decisions checks made, and the grants running.
 
+What ran under a Bypass session (its calls, with their arguments) is for holders of the role
+``approvals_auditor`` only, whatever else they are, and each read is in the audit trail (sdk/09 L-64, L-65).
+
 All live in the gateway's database (``llm_gateway_tool_rule``,
 ``llm_gateway_policy_decision``, ``approval_grant``). The gateway reads a tenant's rules at most
 30 s old, so a change takes effect within half a minute on every worker.
@@ -21,9 +24,14 @@ from typing import Annotated, Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
-from faden_backend.db.models.users import User
+from faden_backend.db.dao.audit_dao import AuditDAO
+from faden_backend.db.dao.rbac_dao import APPROVALS_EVIDENCE_AUDIT, RbacDAO
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.containers import AuditResult
+from faden_backend.db.models.users import User, current_active_user
 from faden_backend.web.api.admin.dependencies import require_superuser
 
 router = APIRouter()
@@ -297,15 +305,19 @@ def _grant(row: Any) -> dict[str, Any]:
 async def list_grants(request: Request, _admin: Admin, tenant_id: str = "default") -> dict[str, Any]:
     """The grants running now (sdk/38 §6, D9): active or paused, not ended, not spent; the newest first.
 
-    What a person let an agent on one of their devices do for a while without asking: one tool, or reads
-    and writes in named places. The time left is the database's, as the gateway counts it.
+    What a person let an agent on one of their devices do for a while without asking: one tool, reads and
+    writes in named places, or -- Bypass -- whatever the chat's mode would ask about. The time left is the
+    database's, as the gateway counts it. ``flags``: calls of a Bypass session where the device's report and
+    the gateway's record differ (L-61).
     """
     async with _gateway(request)() as db:
         rows = await db.execute(
             text(
                 "SELECT id, kind, status, user_id, agent_id, agent_version, device_id, conversation_id, "
                 "scope, issued_at, expires_at, paused_at, max_calls, calls_used, "
-                "GREATEST(0, EXTRACT(EPOCH FROM expires_at - clock_timestamp()))::int AS remaining_s "
+                "GREATEST(0, EXTRACT(EPOCH FROM expires_at - clock_timestamp()))::int AS remaining_s, "
+                "(SELECT count(*) FROM approval_grant_flag f WHERE f.grant_id = approval_grant.id)::int "
+                "AS flags "
                 "FROM approval_grant WHERE tenant_id = :tenant_id AND status IN ('active', 'paused') "
                 "AND expires_at > clock_timestamp() AND (max_calls IS NULL OR calls_used < max_calls) "
                 "ORDER BY issued_at DESC LIMIT 500",
@@ -338,3 +350,69 @@ async def revoke_grant(grant_id: uuid.UUID, request: Request, admin: Admin) -> N
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such running grant.")
         await db.commit()
     logger.info("Admin %s revoked grant %s of tenant %s", admin.id, grant_id, tenant)
+
+
+def _recorded_call(row: Any) -> dict[str, Any]:
+    out = dict(row._mapping)  # noqa: SLF001
+    out["id"] = str(out["id"])
+    for key in ("created_at", "reported_at"):
+        out[key] = out[key].isoformat() if out.get(key) else None
+    return out
+
+
+@router.get("/grants/{grant_id}/calls", name="governance_grant_calls")
+async def grant_calls(
+    grant_id: uuid.UUID,
+    request: Request,
+    user: Annotated[User, Depends(current_active_user)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> dict[str, Any]:
+    """Every call recorded under one Bypass session: tool, side, time, whether the device reported it (L-64).
+
+    The place and the arguments stay with the gateway, encrypted under its own key (``grant-evidence``); this
+    list does not show them (sdk/40 A3, left for later). Only for holders of ``approvals.evidence:audit``
+    through a role (``approvals_auditor``); superuser status alone does not count (L-65: a dedicated audit
+    permission). Every read and every refusal is in the audit trail (ASVS 5.0 16.3.2), with the grant and
+    whose session it was.
+    """
+    allowed = await RbacDAO(session).has_permission(user.id, *APPROVALS_EVIDENCE_AUDIT)
+    async with _gateway(request)() as db:
+        grant = (await db.execute(
+            text("SELECT id, user_id, kind FROM approval_grant WHERE id = :id"), {"id": grant_id},
+        )).first()
+        if grant is None or grant.kind != "bypass":
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such Bypass session.")
+        await AuditDAO(session).log(
+            action="approvals.evidence.view", target_type="approval_grant", target_id=str(grant_id),
+            result=AuditResult.ALLOW if allowed else AuditResult.DENY, actor_id=user.id, severity="high",
+            metadata_json=json.dumps(
+                {"person_id": grant.user_id, **({} if allowed else {"refused": "not_auditor"})},
+            ),
+        )
+        if not allowed:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Reading what ran under a Bypass session needs the role approvals_auditor.",
+            )
+        rows = await db.execute(
+            text(
+                "SELECT c.id, c.request_id, c.call_id, c.tool_id, c.side, c.created_at, "
+                "c.reported_at, (SELECT f.kind FROM approval_grant_flag f WHERE f.grant_id = c.grant_id "
+                "AND f.call_id = c.call_id LIMIT 1) AS flag "
+                "FROM approval_grant_call c WHERE c.grant_id = :id ORDER BY c.created_at LIMIT 5000",
+            ),
+            {"id": grant_id},
+        )
+        device_only = await db.execute(
+            text(
+                "SELECT call_id, created_at FROM approval_grant_flag WHERE grant_id = :id "
+                "AND kind = 'device_only' ORDER BY created_at",
+            ),
+            {"id": grant_id},
+        )
+        return {
+            "data": [_recorded_call(row) for row in rows],
+            "device_only": [
+                {"call_id": r.call_id, "created_at": r.created_at.isoformat()} for r in device_only
+            ],
+        }

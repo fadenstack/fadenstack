@@ -44,10 +44,12 @@ class AgentPii(BaseModel):
     allow_mode_override: StrictBool | None = None
 
 
-#: The tool modes, from least to most (gateway ``tool_classes.ToolMode``). Bypass is no agent's level yet:
-#: only a tenant that allows it may give it, and no tenant can (sdk/38 D2, D3).
+#: The tool modes, from least to most (gateway ``tool_classes.ToolMode``). Bypass is only ever the highest
+#: level, never where a conversation starts (sdk/38 D2), and is published only while the installation allows
+#: it (``approvals.bypass_allowed``, checked at publish; sdk/38 §5).
 ToolLevel = Literal["off", "read_only", "ask", "auto"]
-_LEVEL_ORDER = ("off", "read_only", "ask", "auto")
+HighestLevel = Literal["off", "read_only", "ask", "auto", "bypass"]
+_LEVEL_ORDER = ("off", "read_only", "ask", "auto", "bypass")
 
 
 class AgentApprovals(BaseModel):
@@ -60,7 +62,7 @@ class AgentApprovals(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     default_level: ToolLevel = "ask"
-    max_level: ToolLevel = "auto"
+    max_level: HighestLevel = "auto"
     #: Which standing approvals the agent's card may offer; ``None``: as the SDK offers today. From A2 on.
     standing: list[Literal["chat", "time", "grant", "always"]] | None = None
     #: The longest grant, in minutes; ``None``: the tenant's. Read from A2 on.
