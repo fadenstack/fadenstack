@@ -3,11 +3,13 @@
  * without the version's own metadata. Pure functions, so the editor, the
  * create dialog and the version comparison agree on what a definition is.
  */
-import type { Agent, AgentApprovals, AgentDefinition, AgentPii, AgentVersion, HostTool } from "~/api/agents";
-import type { ToolMode } from "~/api/tools";
+import type { Agent, AgentApprovals, AgentDefinition, AgentPii, AgentVersion, ApprovalLevel, HostTool } from "~/api/agents";
 
-/** The tool modes, least to most: an agent's default level is never above its highest. */
-export const TOOL_LEVELS: ToolMode[] = ["off", "read_only", "ask", "auto"];
+/** The approval levels, least to most: an agent's default level is never above its highest. */
+export const TOOL_LEVELS: ApprovalLevel[] = ["off", "read_only", "ask", "auto", "bypass"];
+
+/** What a conversation may start in: Bypass is only ever the highest level, never the default. */
+export const DEFAULT_LEVELS: ApprovalLevel[] = TOOL_LEVELS.filter((level) => level !== "bypass");
 
 /** Without levels of its own an agent starts in Ask and goes up to Auto, as agents always did. */
 const DEFAULT_APPROVALS: AgentApprovals = { default_level: "ask", max_level: "auto" };
@@ -67,11 +69,12 @@ function piiOf(value: unknown): AgentPii {
 /** The approval levels as the console keeps them: a level it does not know is the default's; unset keys go. */
 function approvalsOf(value: unknown): AgentApprovals {
   const stored = value && typeof value === "object" ? (value as Partial<AgentApprovals>) : {};
-  const level = (v: unknown, fallback: ToolMode) => (TOOL_LEVELS.includes(v as ToolMode) ? (v as ToolMode) : fallback);
+  const level = (v: unknown, fallback: ApprovalLevel, allowed: ApprovalLevel[]) =>
+    allowed.includes(v as ApprovalLevel) ? (v as ApprovalLevel) : fallback;
   const out: AgentApprovals = {
     ...stored,
-    default_level: level(stored.default_level, DEFAULT_APPROVALS.default_level),
-    max_level: level(stored.max_level, DEFAULT_APPROVALS.max_level),
+    default_level: level(stored.default_level, DEFAULT_APPROVALS.default_level, DEFAULT_LEVELS),
+    max_level: level(stored.max_level, DEFAULT_APPROVALS.max_level, TOOL_LEVELS),
   };
   for (const key of ["standing", "max_grant_minutes", "grant_classes"] as const) {
     if (out[key] === null || out[key] === undefined) delete out[key];

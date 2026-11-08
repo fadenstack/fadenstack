@@ -963,7 +963,8 @@
       "observability": "Beobachtbarkeit",
       "updates": "Updates",
       "chat": "Chat",
-      "branding": "Erscheinungsbild"
+      "branding": "Erscheinungsbild",
+      "approvals": "Freigaben"
     },
     "groups": {
       "auth": "Auth",
@@ -986,6 +987,8 @@
       "data_residency": "Datenresidenz",
       "update_check": "Update-Prüfung",
       "retention": "Aufbewahrung",
+      "bypass": "Bypass",
+      "grants": "Zeitfreigaben",
       "vendor_links": "Links zu fadenstack.com"
     },
     "current_value": "(aktuell: {{value}})",
@@ -3088,6 +3091,7 @@
       "read_only": "Nur lesen",
       "ask": "Fragen",
       "auto": "Automatisch",
+      "bypass": "Bypass",
       "hint_off": "In diesem Chat werden keine Tools verwendet.",
       "hint_read_only": "Nur lesende Tools werden verwendet; die anderen werden nicht angeboten.",
       "hint_ask": "Lesende Tools laufen; jedes andere wartet auf Ihre Zustimmung.",
@@ -4461,6 +4465,7 @@
       "approvals_help": "Der Tool-Modus, in dem Unterhaltungen des Agenten beginnen, und der höchste, den eine Person wählen kann. Die Grenzen Ihrer Organisation schränken beide ein.",
       "default_level": "Beginnt in",
       "max_level": "Höchstens",
+      "bypass_help": "Mit Bypass kann eine Person die Freigaben für eine Unterhaltung ausschalten. Veröffentlichen lässt sich das nur, solange Bypass unter Einstellungen → Freigaben erlaubt ist.",
       "appearance": "Darstellung",
       "appearance_help": "Was das Chat-Fenster vor der ersten Nachricht zeigt.",
       "greeting": "Begrüßung",
@@ -4720,7 +4725,8 @@
       "kind": "Art",
       "kind_value": {
         "time": "Für eine Zeit",
-        "work": "Gemeinsam arbeiten"
+        "work": "Gemeinsam arbeiten",
+        "bypass": "Bypass"
       },
       "what": "Was",
       "classes_value": {
@@ -4732,6 +4738,9 @@
       "minutes_left_other": "noch {{count}} Minuten",
       "paused": "Pausiert",
       "calls": "Aufrufe",
+      "flags_one": "{{count}} Abweichung",
+      "flags_other": "{{count}} Abweichungen",
+      "flags_hint": "Aufrufe, die das Gerät gemeldet hat und das Gateway nicht erfasst hat, oder umgekehrt.",
       "started": "Gestartet",
       "device": "Gerät",
       "conversation": "Unterhaltung",
@@ -4741,7 +4750,22 @@
       "revoke": "Widerrufen",
       "revoke_title": "Diese Freigabe widerrufen?",
       "revoke_body": "{{user}} hat {{agent}} erlaubt, dies ohne Rückfrage zu tun. Nach dem Widerruf fragt der Agent ab seinem nächsten Aufruf wieder nach; ein Aufruf, der bereits läuft, läuft noch zu Ende.",
-      "gone": "Diese Freigabe war bereits beendet."
+      "gone": "Diese Freigabe war bereits beendet.",
+      "show_calls": "Aufrufe anzeigen",
+      "calls_title": "Aufrufe unter dieser Freigabe",
+      "calls_note": "Die Argumente werden hier nicht angezeigt; sie bleiben im Gateway verschlüsselt.",
+      "calls_forbidden": "Zum Lesen dieser Aufrufe ist die Rolle approvals_auditor nötig. Administratorrechte allein genügen nicht.",
+      "calls_empty": "Es wurden keine Aufrufe erfasst.",
+      "calls_col_call": "Aufruf",
+      "calls_col_tool": "Tool",
+      "calls_col_side": "Läuft auf",
+      "calls_col_time": "Zeit",
+      "calls_col_reported": "Gemeldet",
+      "calls_col_difference": "Abweichung",
+      "side_client": "Gerät",
+      "side_gateway": "Gateway",
+      "flag_gateway_only": "Vom Gateway erfasst, vom Gerät nicht gemeldet",
+      "device_only_title": "Vom Gerät gemeldet, vom Gateway nicht erfasst"
     },
     "limits": {
       "intro": "Der höchste Tool-Modus, den ein Chat haben darf. Für einen Chat können mehrere gelten (der für alle, die der Teams der Person, der des Agenten, der eigene der Person): Der engste gilt, und der Chat zeigt, dass er begrenzt ist. Änderungen wirken innerhalb von 30 Sekunden.",

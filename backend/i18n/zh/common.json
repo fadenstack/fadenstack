@@ -963,7 +963,8 @@
       "observability": "可观测性",
       "updates": "更新",
       "chat": "聊天",
-      "branding": "品牌"
+      "branding": "品牌",
+      "approvals": "审批"
     },
     "groups": {
       "auth": "认证",
@@ -986,6 +987,8 @@
       "data_residency": "数据驻留",
       "update_check": "更新检查",
       "retention": "保留期限",
+      "bypass": "绕过",
+      "grants": "授权",
       "vendor_links": "指向 fadenstack.com 的链接"
     },
     "current_value": "（当前：{{value}}）",
@@ -3088,6 +3091,7 @@
       "read_only": "只读",
       "ask": "询问",
       "auto": "自动",
+      "bypass": "绕过",
       "hint_off": "此聊天不使用任何工具。",
       "hint_read_only": "只使用读取类工具；其他工具不会提供。",
       "hint_ask": "读取类工具直接运行；其他工具需要您批准。",
@@ -4461,6 +4465,7 @@
       "approvals_help": "该智能体的对话开始时使用的工具模式，以及用户最多可切换到的模式。您组织的限制会进一步收窄这两者。",
       "default_level": "起始模式",
       "max_level": "最高模式",
+      "bypass_help": "“绕过”允许用户在一次对话中关闭批准。只有在管理员于“设置 → 审批”中允许绕过时，才能发布。",
       "appearance": "外观",
       "appearance_help": "聊天面板在第一条消息之前显示的内容。",
       "greeting": "问候语",
@@ -4720,7 +4725,8 @@
       "kind": "类型",
       "kind_value": {
         "time": "限时",
-        "work": "协同工作"
+        "work": "协同工作",
+        "bypass": "绕过"
       },
       "what": "内容",
       "classes_value": {
@@ -4732,6 +4738,9 @@
       "minutes_left_other": "剩余 {{count}} 分钟",
       "paused": "已暂停",
       "calls": "调用次数",
+      "flags_one": "{{count}} 处差异",
+      "flags_other": "{{count}} 处差异",
+      "flags_hint": "设备已上报但网关没有记录的调用，或相反。",
       "started": "开始时间",
       "device": "设备",
       "conversation": "对话",
@@ -4741,7 +4750,22 @@
       "revoke": "撤销",
       "revoke_title": "撤销此授权？",
       "revoke_body": "{{user}} 允许 {{agent}} 无需询问即可执行此操作。撤销后，智能体从下一次调用起会再次询问；已在运行的调用会执行完毕。",
-      "gone": "此授权已经结束。"
+      "gone": "此授权已经结束。",
+      "show_calls": "查看调用",
+      "calls_title": "此授权下的调用",
+      "calls_note": "此处不显示参数；参数在网关中保持加密。",
+      "calls_forbidden": "读取这些调用需要 approvals_auditor 角色。仅有管理员权限不够。",
+      "calls_empty": "没有记录任何调用。",
+      "calls_col_call": "调用",
+      "calls_col_tool": "工具",
+      "calls_col_side": "运行于",
+      "calls_col_time": "时间",
+      "calls_col_reported": "已上报",
+      "calls_col_difference": "差异",
+      "side_client": "设备",
+      "side_gateway": "网关",
+      "flag_gateway_only": "网关已记录，设备未上报",
+      "device_only_title": "设备已上报，网关未记录"
     },
     "limits": {
       "intro": "聊天可使用的最高工具模式。一个聊天可能同时适用多个限制（所有人的、该人员所在团队的、智能体的、该人员自己的）：以最严格的为准，聊天会显示已受限。更改在 30 秒内生效。",

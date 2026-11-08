@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { AgentVersion } from "~/api/agents";
 
 import {
+  DEFAULT_LEVELS,
   EMPTY_DEFINITION,
   changedFields,
   cleanDefinition,
@@ -14,6 +15,7 @@ import {
   serverToolsMode,
   slugFromName,
   suggestionsOf,
+  TOOL_LEVELS,
   tokenLifetimeOf,
   withPiiModeSwitch,
   withServerToolsMode,
@@ -80,6 +82,16 @@ describe("agent definitions", () => {
     expect(definitionProblems(withTool({ target_type: "folder" }))).toEqual([key]);
     expect(definitionProblems(withTool({ target_argument: "/path" }))).toEqual([key]);
     expect(definitionProblems(withTool({ target_argument: "path", target_type: "site" }))).toEqual([key]);
+  });
+
+  it("take Bypass as the highest level only, never as the default", () => {
+    const bypass = { ...EMPTY_DEFINITION, approvals: { default_level: "auto" as const, max_level: "bypass" as const } };
+    expect(definitionOf({ ...VERSION, approvals: bypass.approvals } as unknown as AgentVersion).approvals).toEqual(bypass.approvals);
+    expect(definitionProblems(bypass)).toEqual([]);
+    expect(TOOL_LEVELS.at(-1)).toBe("bypass");
+    expect(DEFAULT_LEVELS).not.toContain("bypass");
+    const above = { ...EMPTY_DEFINITION, approvals: { default_level: "bypass" as const, max_level: "auto" as const } };
+    expect(cleanDefinition(above).approvals.default_level).toBe("ask");
   });
 
   it("hold the agent's default and highest tool mode: Ask up to Auto unless set (sdk/38 §5)", () => {

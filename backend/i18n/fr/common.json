@@ -958,7 +958,8 @@
       "observability": "Observabilité",
       "updates": "Mises à jour",
       "chat": "Chat",
-      "branding": "Image de marque"
+      "branding": "Image de marque",
+      "approvals": "Approbations"
     },
     "groups": {
       "auth": "Auth",
@@ -981,6 +982,8 @@
       "data_residency": "Résidence des données",
       "update_check": "Vérification des mises à jour",
       "retention": "Conservation",
+      "bypass": "Bypass",
+      "grants": "Autorisations",
       "vendor_links": "Liens vers fadenstack.com"
     },
     "current_value": "(actuel : {{value}})",
@@ -3183,6 +3186,7 @@
       "read_only": "Lecture seule",
       "ask": "Demander",
       "auto": "Automatique",
+      "bypass": "Bypass",
       "hint_off": "Aucun outil n'est utilisé dans ce chat.",
       "hint_read_only": "Seuls les outils de lecture sont utilisés ; les autres ne sont pas proposés.",
       "hint_ask": "Les outils de lecture s'exécutent ; tout autre outil attend votre accord.",
@@ -4461,6 +4465,7 @@
       "approvals_help": "Le mode d'outils dans lequel commencent les conversations de l'agent, et le plus élevé qu'une personne peut choisir. Les limites de votre organisation restreignent les deux.",
       "default_level": "Commence en",
       "max_level": "Au plus",
+      "bypass_help": "Bypass permet à une personne de désactiver les approbations pour une conversation. Il ne peut être publié que tant qu'un administrateur autorise Bypass dans Paramètres → Approbations.",
       "appearance": "Apparence",
       "appearance_help": "Ce que le panneau de chat affiche avant le premier message.",
       "greeting": "Message d'accueil",
@@ -4720,7 +4725,8 @@
       "kind": "Type",
       "kind_value": {
         "time": "Pour un temps",
-        "work": "Travail en commun"
+        "work": "Travail en commun",
+        "bypass": "Bypass"
       },
       "what": "Quoi",
       "classes_value": {
@@ -4732,6 +4738,9 @@
       "minutes_left_other": "{{count}} minutes restantes",
       "paused": "En pause",
       "calls": "Appels",
+      "flags_one": "{{count}} écart",
+      "flags_other": "{{count}} écarts",
+      "flags_hint": "Appels que l'appareil a signalés et que le gateway n'a pas enregistrés, ou l'inverse.",
       "started": "Début",
       "device": "Appareil",
       "conversation": "Conversation",
@@ -4741,7 +4750,22 @@
       "revoke": "Révoquer",
       "revoke_title": "Révoquer cette autorisation ?",
       "revoke_body": "{{user}} a permis à {{agent}} de le faire sans demander. Une fois révoquée, l'agent demande de nouveau dès son prochain appel ; un appel déjà en cours se termine.",
-      "gone": "Cette autorisation était déjà terminée."
+      "gone": "Cette autorisation était déjà terminée.",
+      "show_calls": "Afficher les appels",
+      "calls_title": "Appels de cette autorisation",
+      "calls_note": "Les arguments ne sont pas affichés ici ; ils restent chiffrés dans le gateway.",
+      "calls_forbidden": "La lecture de ces appels exige le rôle approvals_auditor. Être administrateur ne suffit pas.",
+      "calls_empty": "Aucun appel n'a été enregistré.",
+      "calls_col_call": "Appel",
+      "calls_col_tool": "Outil",
+      "calls_col_side": "S'exécute sur",
+      "calls_col_time": "Heure",
+      "calls_col_reported": "Signalé",
+      "calls_col_difference": "Écart",
+      "side_client": "Appareil",
+      "side_gateway": "Gateway",
+      "flag_gateway_only": "Enregistré par le gateway, non signalé par l'appareil",
+      "device_only_title": "Signalés par l'appareil, non enregistrés par le gateway"
     },
     "limits": {
       "intro": "Le mode des outils le plus large qu'un chat peut avoir. Plusieurs limites peuvent s'appliquer à un chat (celle de tous, celles des équipes de la personne, celle de l'agent, celle de la personne) : la plus étroite l'emporte, et le chat indique qu'il est limité. Les changements s'appliquent en 30 secondes.",

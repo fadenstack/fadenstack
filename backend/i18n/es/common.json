@@ -963,7 +963,8 @@
       "observability": "Observabilidad",
       "updates": "Actualizaciones",
       "chat": "Chat",
-      "branding": "Marca"
+      "branding": "Marca",
+      "approvals": "Aprobaciones"
     },
     "groups": {
       "auth": "Auth",
@@ -986,6 +987,8 @@
       "data_residency": "Residencia de datos",
       "update_check": "Comprobación de actualizaciones",
       "retention": "Conservación",
+      "bypass": "Bypass",
+      "grants": "Autorizaciones",
       "vendor_links": "Enlaces a fadenstack.com"
     },
     "current_value": "(actual: {{value}})",
@@ -3088,6 +3091,7 @@
       "read_only": "Solo lectura",
       "ask": "Preguntar",
       "auto": "Automático",
+      "bypass": "Bypass",
       "hint_off": "En este chat no se usan herramientas.",
       "hint_read_only": "Solo se usan herramientas de lectura; las demás no se ofrecen.",
       "hint_ask": "Las herramientas de lectura se ejecutan; cualquier otra espera su aprobación.",
@@ -4461,6 +4465,7 @@
       "approvals_help": "El modo de herramientas en el que empiezan las conversaciones del agente y el máximo al que una persona puede cambiar. Los límites de su organización restringen ambos.",
       "default_level": "Empieza en",
       "max_level": "Como máximo",
+      "bypass_help": "Bypass permite a una persona desactivar las aprobaciones en una conversación. Solo se puede publicar mientras un administrador permita Bypass en Ajustes → Aprobaciones.",
       "appearance": "Apariencia",
       "appearance_help": "Lo que muestra el panel de chat antes del primer mensaje.",
       "greeting": "Saludo",
@@ -4720,7 +4725,8 @@
       "kind": "Tipo",
       "kind_value": {
         "time": "Por un tiempo",
-        "work": "Trabajo conjunto"
+        "work": "Trabajo conjunto",
+        "bypass": "Bypass"
       },
       "what": "Qué",
       "classes_value": {
@@ -4732,6 +4738,9 @@
       "minutes_left_other": "quedan {{count}} minutos",
       "paused": "En pausa",
       "calls": "Llamadas",
+      "flags_one": "{{count}} diferencia",
+      "flags_other": "{{count}} diferencias",
+      "flags_hint": "Llamadas que el dispositivo notificó y el gateway no registró, o al revés.",
       "started": "Inicio",
       "device": "Dispositivo",
       "conversation": "Conversación",
@@ -4741,7 +4750,22 @@
       "revoke": "Revocar",
       "revoke_title": "¿Revocar esta autorización?",
       "revoke_body": "{{user}} permitió que {{agent}} haga esto sin preguntar. Al revocarla, el agente vuelve a preguntar desde su próxima llamada; una llamada que ya está en curso termina.",
-      "gone": "Esta autorización ya había terminado."
+      "gone": "Esta autorización ya había terminado.",
+      "show_calls": "Ver llamadas",
+      "calls_title": "Llamadas de esta autorización",
+      "calls_note": "Los argumentos no se muestran aquí; permanecen cifrados en el gateway.",
+      "calls_forbidden": "Leer estas llamadas requiere el rol approvals_auditor. Ser administrador no basta.",
+      "calls_empty": "No se registró ninguna llamada.",
+      "calls_col_call": "Llamada",
+      "calls_col_tool": "Herramienta",
+      "calls_col_side": "Se ejecuta en",
+      "calls_col_time": "Hora",
+      "calls_col_reported": "Notificada",
+      "calls_col_difference": "Diferencia",
+      "side_client": "Dispositivo",
+      "side_gateway": "Gateway",
+      "flag_gateway_only": "Registrada por el gateway, no notificada por el dispositivo",
+      "device_only_title": "Notificadas por el dispositivo, no registradas por el gateway"
     },
     "limits": {
       "intro": "El modo de herramientas más amplio que puede tener un chat. A un chat pueden aplicarse varios (el de todos, el de los equipos de la persona, el del agente, el de la propia persona): gana el más estrecho, y el chat indica que está limitado. Los cambios se aplican en 30 segundos.",

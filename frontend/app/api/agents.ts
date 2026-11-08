@@ -43,13 +43,16 @@ export interface AgentPii {
   allow_mode_override: boolean | null;
 }
 
+/** The tool modes plus Bypass, which an agent may only have as its highest level. */
+export type ApprovalLevel = ToolMode | "bypass";
+
 /**
  * The agent's approval levels (sdk/38 §5): the tool mode its conversations start in, and the most they may use.
  * The default is never above the highest; the tenant's ceilings narrow both.
  */
 export interface AgentApprovals {
-  default_level: ToolMode;
-  max_level: ToolMode;
+  default_level: ApprovalLevel;
+  max_level: ApprovalLevel;
   /** For grants (later); kept as stored. */
   standing?: string[] | null;
   max_grant_minutes?: number | null;
