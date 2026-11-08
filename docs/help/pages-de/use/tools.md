@@ -51,7 +51,7 @@ Der **Tool-Modus** legt fest, was Tools in diesem Chat tun dürfen, ohne Sie zu 
 
 Jeder Chat beginnt mit **Fragen**. Sie können den Modus ändern, sobald der Chat begonnen hat; er bleibt dann bei diesem Chat. Bei einem Tool, das zuerst fragt, steht in der Liste **fragt zuerst**.
 
-Kein Modus führt ein zerstörendes oder nicht eingestuftes Tool aus, ohne Sie zu fragen.
+Kein Modus bis **Automatisch** führt ein zerstörendes oder nicht eingestuftes Tool aus, ohne Sie zu fragen. Nur [Bypass](#bypass), das Ihr Administrator erlauben muss, tut das.
 
 ??? info "Warum viele Tools zuerst fragen"
     Die Tools vieler Dienste sind nicht eingestuft, bis Ihr Administrator festlegt, was sie tun: Sie fragen immer, und **Nur lesen** lässt sie weg.
@@ -68,6 +68,32 @@ Wenn ein Tool Ihre Zustimmung braucht, hält die Antwort an, und eine Karte zeig
 ??? info "Mehr zum Zulassen von Tools"
     - Wenn Sie die Karte einige Minuten lang nicht beantworten, wird das Tool nicht ausgeführt.
     - Ihre Organisation kann außerdem Regeln für einzelne Tools haben: Manche werden nie ausgeführt, manche fragen immer zuerst. Wenn eine Regel ein Tool stoppt, sehen Sie, während die Antwort geschrieben wird, **Nicht ausgeführt** mit dem Namen des Tools und dem Grund.
+
+## Bypass für lange, sich wiederholende Arbeit {#bypass}
+
+**Bypass** ist eine fünfte Stufe über **Automatisch**, für eine lange Aufgabe, der Sie vertrauen, etwa hunderte Dateien auf dieselbe Weise durchzugehen. In einer Unterhaltung laufen zerstörende und nicht eingestufte Tools für eine von Ihnen gewählte Zeit ohne Nachfrage. Viele Organisationen lassen es ausgeschaltet.
+
+Es steht nur zur Verfügung, wenn Ihr Administrator es erlaubt hat, der Agent es als höchste Stufe anbietet und die Anwendung des Agenten es unterstützt. Sie schalten es selbst in der Anwendung des Agenten ein. Keine Unterhaltung beginnt damit.
+
+1. Wählen Sie im Tool-Modus des Agenten **Bypass**.
+2. Lesen Sie die Bestätigung. Sie sagt, wonach nicht mehr gefragt wird und wie lange.
+3. Bestätigen Sie. Bypass beginnt erst, wenn der Server es festgehalten hat: Sind Sie offline oder lehnt der Server ab, gibt es kein Bypass, und Sie werden darüber informiert.
+
+Solange es läuft, zeigt eine Markierung die Restzeit. Wählen Sie **Stoppen**, um es sofort zu beenden. Auch das Verlassen von Bypass beendet es, ebenso das Ende der Zeit.
+
+Bypass überspringt Fragen, nie Regeln. Diese fragen weiter oder werden abgelehnt:
+
+- Tools, die für Sie ausgeblendet oder abgelehnt sind, und Tools, die Ihr Administrator sperrt;
+- alles, was Ihr Administrator zuerst erfragt haben will;
+- Tools, die der Autor des Agenten mit **Immer nachfragen** markiert hat.
+
+??? info "Mehr zu Bypass"
+    - Eine neue Unterhaltung erbt Bypass nie, ebenso wenig ein Agent, an den Sie delegieren, oder einer, der Arbeit von Ihrem Agenten übernimmt. Das Modell, ein Tool, ein Skill oder ein anderer Agent kann es nicht für Sie einschalten.
+    - Die längste Zeit legt Ihr Administrator fest.
+    - Jeder Aufruf, der unter Bypass läuft, wird auf dem Server festgehalten: das Tool, die Zeit und seine Argumente, mit maskierten personenbezogenen Daten. Lesende und schreibende Aufrufe sind eingeschlossen. Ihr Gerät meldet nach jeder Runde außerdem, was es ausgeführt hat, und der Server kennzeichnet jeden Unterschied. Nur Personen, die Ihre Organisation als Freigabe-Prüfer benannt hat, können diese Aufzeichnungen lesen, und jeder Blick wird ebenfalls festgehalten.
+    - Schaltet Ihr Administrator Bypass aus, wirkt es sofort wie **Automatisch**, und laufendes Bypass endet.
+
+Mehr für Administratoren: [Bypass](../administer/policies.md#bypass).
 
 ## Ausführung {#execution}
 

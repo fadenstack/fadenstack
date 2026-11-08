@@ -219,8 +219,8 @@ People pick a tool mode per chat, and the class decides what runs:
 | **Ask** (every chat starts here) | runs | asks | asks | asks |
 | **Auto** | runs | runs | asks | asks |
 
-No mode runs a destructive or unclassified tool without asking. To let a tool run in **Auto**, classify it
-as **read** or **write**.
+No mode up to **Auto** runs a destructive or unclassified tool without asking. To let a tool run in **Auto**, classify it
+as **read** or **write**. A fifth mode, [Bypass](#bypass), is off unless you allow it.
 Fadenstack's own tools (the knowledge base search, the time, the tool search) are read tools.
 
 ### Tool mode limits {#tool-mode-limits}
@@ -251,6 +251,38 @@ back.
 ### Running grants {#running-grants}
 
 **Agents → Governance → Active grants** lists the grants that are running. A grant is what a person gives one agent on one of their devices, for a while: either one tool (**For a time**), or reading and writing in named places (**Working alongside**), so that what would otherwise ask runs without asking. It never covers destructive or unclassified tools, and never what an **Ask first** rule or a tool marked **Always ask** covers. Each row shows the person, the agent, what it covers, the time left and the number of calls used. **Revoke** ends one from the agent's next call; a call already running finishes. People can end their own in the agent's **Settings → Approvals**. A grant also ends at its time, and when the agent gets a new version.
+
+### Bypass {#bypass}
+
+**Bypass** is a fifth tool mode above **Auto**, for long repetitive work a person trusts: in one conversation, destructive and unclassified tools run without asking, for a chosen time. It is off by default. People switch it on in the agent's app, see [Tools in the chat](../use/tools.md#bypass).
+
+**Allow it**
+
+1. Start **Root Mode**, which changing these settings needs.
+2. Open **Settings → Approvals** and turn on **Allow Bypass** (`approvals.bypass_allowed`).
+3. In the agent's version, set **Approval levels → At most** to **Bypass** (see [Tools and approvals](agents.md#tools-and-approvals)). Such a version can be published only while Bypass is allowed.
+
+The **Starts in** level can never be Bypass, so no conversation starts in it. A [tool mode limit](#tool-mode-limits) below Bypass (<span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span>) removes the choice.
+
+**Settings → Approvals** also holds:
+
+| Setting | Default | What it does |
+|---|---|---|
+| **Longest grant (minutes)** (`approvals.longest_grant_minutes`) | 120 (15 to 720) | The longest any grant may last: for a time, for a stretch of work, or Bypass. An agent's own longest grant may only be shorter. |
+| **Keep Bypass records (days)** (`approvals.bypass_retention_days`) | 365 (90 to 1095) | Bypass sessions and their calls are deleted this long after they ended. |
+
+**What Bypass does not skip.** Hidden and refused tools stay so. **Deny** rules, **Ask first** rules and tools the agent's author marked **Always ask** still apply. Tools that act on machines or the physical world are not recognised on their own yet: mark them **Always ask** or give them an **Ask first** rule.
+
+**What is recorded.** Every call that runs under Bypass is recorded on the server: the tool, the time and its arguments after personal data is masked, reads and writes alike. At the end of each turn the person's device reports the calls it ran, and the server compares; any difference is flagged. Bypass itself is recorded before it takes effect, and without the server's confirmation there is no Bypass.
+
+**Watch and stop it.** **Agents → Governance → Active grants** lists running Bypass sessions, with any differences, and **Revoke** ends one (see [Running grants](#running-grants)).
+
+**Switch it off.** Turning **Allow Bypass** off makes Bypass act as **Auto** at once (within half a minute on every server worker) and ends running Bypass sessions, recorded as ended by the switch.
+
+**Who may read what ran.** Only people with the role `approvals_auditor`. Nobody has it at install, and being an administrator is not enough. Every read and every refused attempt is in the audit trail. The console's list shows the tool, the time, which side ran it (device or server), whether the device reported it, and differences. It does not show the arguments: they stay encrypted on the server, and showing them is planned.
+
+!!! note "Works council (Germany)"
+    Records per person need an agreement with the works council (BetrVG §87(1) no. 6). The records are for analysing incidents, not for judging performance.
 
 ## What people see when something is stopped
 

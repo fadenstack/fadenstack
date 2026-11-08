@@ -238,8 +238,8 @@ Benutzer wählen pro Chat einen Tool-Modus, und die Klasse entscheidet, was läu
 | **Fragen** (damit beginnt jeder Chat) | läuft | fragt nach | fragt nach | fragt nach |
 | **Automatisch** | läuft | läuft | fragt nach | fragt nach |
 
-Kein Modus führt ein zerstörendes oder nicht eingestuftes Tool aus, ohne nachzufragen. Damit ein Tool in
-**Automatisch** läuft, stufen Sie es als **lesen** oder **schreiben** ein.
+Kein Modus bis **Automatisch** führt ein zerstörendes oder nicht eingestuftes Tool aus, ohne nachzufragen. Damit ein Tool in
+**Automatisch** läuft, stufen Sie es als **lesen** oder **schreiben** ein. Ein fünfter Modus, [Bypass](#bypass), ist aus, solange Sie ihn nicht erlauben.
 Die eigenen Tools von Fadenstack (die Suche in der Wissensdatenbank, die Uhrzeit, die Tool-Suche) sind lesende Tools.
 
 ### Grenzen für den Tool-Modus {#tool-mode-limits}
@@ -272,6 +272,38 @@ zweimal abgelehnt, zeigt denselben Wert, und niemand kann den Text daraus zurüc
 ### Laufende Freigaben auf Zeit {#running-grants}
 
 **Agenten → Governance → Freigaben auf Zeit** listet die Freigaben auf Zeit auf, die gerade laufen. Eine solche Freigabe erteilt ein Benutzer einem Agenten auf einem seiner Geräte für eine begrenzte Zeit: entweder für ein einzelnes Tool (**Für eine Zeit**) oder zum Lesen und Schreiben an benannten Orten (**Gemeinsam arbeiten**), sodass läuft, was sonst nachfragen würde. Sie gilt nie für zerstörende oder nicht klassifizierte Tools und nie für das, was eine Regel **Erst nachfragen** oder ein als **Immer nachfragen** markiertes Tool abdeckt. Jede Zeile zeigt die Person, den Agenten, was die Freigabe abdeckt, die Restzeit und die Zahl der genutzten Aufrufe. **Widerrufen** beendet eine Freigabe ab dem nächsten Aufruf des Agenten; ein Aufruf, der bereits läuft, läuft noch zu Ende. Benutzer können ihre eigenen in den **Einstellungen → Freigaben** des Agenten beenden. Eine Freigabe endet außerdem mit ihrer Zeit und sobald der Agent eine neue Version erhält.
+
+### Bypass {#bypass}
+
+**Bypass** ist ein fünfter Tool-Modus über **Automatisch**, für lange, sich wiederholende Arbeit, der eine Person vertraut: In einer Unterhaltung laufen zerstörende und nicht eingestufte Tools für eine gewählte Zeit ohne Nachfrage. Es ist standardmäßig aus. Benutzer schalten es in der Anwendung des Agenten ein, siehe [Tools im Chat](../use/tools.md#bypass).
+
+**Erlauben**
+
+1. Starten Sie den **Root-Modus**, den das Ändern dieser Einstellungen braucht.
+2. Öffnen Sie **Einstellungen → Freigaben** und schalten Sie **Allow Bypass** ein (`approvals.bypass_allowed`).
+3. Stellen Sie in der Version des Agenten unter **Freigabestufen → Höchstens** **Bypass** ein (siehe [Tools und Zustimmungen](agents.md#tools-and-approvals)). Eine solche Version lässt sich nur veröffentlichen, solange Bypass erlaubt ist.
+
+Die Stufe **Beginnt in** kann nie Bypass sein, daher beginnt keine Unterhaltung darin. Eine [Grenze für den Tool-Modus](#tool-mode-limits) unter Bypass (<span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span>) nimmt die Wahl weg.
+
+**Einstellungen → Freigaben** enthält außerdem:
+
+| Einstellung | Standard | Was sie bewirkt |
+|---|---|---|
+| **Longest grant (minutes)** (`approvals.longest_grant_minutes`) | 120 (15 bis 720) | Die längste Dauer jeder Freigabe: auf Zeit, für einen Arbeitsabschnitt oder Bypass. Die eigene längste Freigabe eines Agenten darf nur kürzer sein. |
+| **Keep Bypass records (days)** (`approvals.bypass_retention_days`) | 365 (90 bis 1095) | Bypass-Sitzungen und ihre Aufrufe werden so lange nach ihrem Ende gelöscht. |
+
+**Was Bypass nicht überspringt.** Ausgeblendete und abgelehnte Tools bleiben es. Regeln **Deny**, Regeln **Erst nachfragen** und Tools, die der Autor des Agenten mit **Immer nachfragen** markiert hat, gelten weiter. Tools, die an Maschinen oder in der physischen Welt handeln, werden noch nicht von selbst erkannt: Markieren Sie sie mit **Immer nachfragen** oder legen Sie eine Regel **Erst nachfragen** an.
+
+**Was festgehalten wird.** Jeder Aufruf unter Bypass wird auf dem Server festgehalten: das Tool, die Zeit und seine Argumente nach dem Maskieren personenbezogener Daten, lesend wie schreibend. Am Ende jeder Runde meldet das Gerät der Person die Aufrufe, die es ausgeführt hat, und der Server vergleicht; jeder Unterschied wird gekennzeichnet. Bypass selbst wird festgehalten, bevor es wirkt, und ohne Bestätigung des Servers gibt es kein Bypass.
+
+**Beobachten und beenden.** **Agenten → Governance → Freigaben auf Zeit** listet laufende Bypass-Sitzungen mit etwaigen Unterschieden, und **Widerrufen** beendet eine (siehe [Laufende Freigaben auf Zeit](#running-grants)).
+
+**Ausschalten.** Schalten Sie **Allow Bypass** aus, wirkt Bypass sofort wie **Automatisch** (innerhalb einer halben Minute auf jedem Server-Worker), und laufende Bypass-Sitzungen enden, festgehalten als durch den Schalter beendet.
+
+**Wer lesen darf, was lief.** Nur Personen mit der Rolle `approvals_auditor`. Bei der Installation hat sie niemand, und Administrator zu sein genügt nicht. Jedes Lesen und jeder abgelehnte Versuch steht im Audit-Protokoll. Die Liste der Konsole zeigt das Tool, die Zeit, welche Seite es ausführte (Gerät oder Server), ob das Gerät es gemeldet hat, und Unterschiede. Die Argumente zeigt sie nicht: Sie bleiben auf dem Server verschlüsselt, ihre Anzeige ist geplant.
+
+!!! note "Betriebsrat (Deutschland)"
+    Aufzeichnungen je Person brauchen eine Vereinbarung mit dem Betriebsrat (BetrVG §87 Abs. 1 Nr. 6). Die Aufzeichnungen dienen der Analyse von Vorfällen, nicht der Leistungsbeurteilung.
 
 ## Was Benutzer sehen, wenn etwas gestoppt wird {#what-people-see-when-something-is-stopped}
 

@@ -51,7 +51,7 @@ The **Tool mode** decides what tools may do in this chat without asking you:
 
 Every chat starts in **Ask**. You can change the mode once the chat has started; it stays with that chat. A tool that will ask first says **asks first** in the list.
 
-No mode runs a destructive or unclassified tool without asking you.
+No mode up to **Auto** runs a destructive or unclassified tool without asking you. Only [Bypass](#bypass), which your administrator must allow, does.
 
 ??? info "Why many tools ask first"
     Many services' tools are unclassified until your administrator says what they do: they always ask, and **Read only** leaves them out.
@@ -68,6 +68,32 @@ When a tool needs your approval, the reply pauses and a card shows **… wants t
 ??? info "More about approving tools"
     - If you leave the card unanswered for a few minutes, the tool does not run.
     - Your organisation can also have rules for single tools: some never run, some always ask first. When a rule stops a tool, you see **Not run** with the tool's name and the reason while the reply is written.
+
+## Bypass for long, repetitive work {#bypass}
+
+**Bypass** is a fifth level above **Auto**, for a long task you trust, such as going through hundreds of files the same way. In one conversation, destructive and unclassified tools run without asking, for a time you choose. Many organisations leave it off.
+
+It is there only when your administrator has allowed it, the agent offers it as its highest level, and the agent's app supports it. You switch it on yourself, in the agent's app. No conversation starts in it.
+
+1. Choose **Bypass** in the agent's tool mode.
+2. Read the confirmation. It says what will no longer be asked, and for how long.
+3. Confirm. Bypass starts only once the server has recorded it: when you are offline or the server refuses, there is no Bypass, and you are told so.
+
+While it runs, a marker shows the time left. Select **Stop** to end it at once. Leaving Bypass ends it too, and so does the end of the time.
+
+Bypass skips questions, never rules. These still ask, or are refused:
+
+- tools that are hidden or refused for you, and tools your administrator denies;
+- anything your administrator wants asked first;
+- tools the agent's author marked **Always ask**.
+
+??? info "More about Bypass"
+    - A new conversation never inherits Bypass, and neither does an agent you delegate to or one that receives work from yours. The model, a tool, a skill or another agent cannot switch it on for you.
+    - The longest time is set by your administrator.
+    - Every call that runs under Bypass is recorded on the server: the tool, the time and its arguments, with personal data masked. Reads and writes are included. After each turn your device also reports what it ran, and the server flags any difference. Only people your organisation has named as approvals auditors can read these records, and every look is recorded too.
+    - If your administrator turns Bypass off, it acts as **Auto** at once and any running Bypass ends.
+
+More for administrators: [Bypass](../administer/policies.md#bypass).
 
 ## Execution
 
