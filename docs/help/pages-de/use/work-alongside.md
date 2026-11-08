@@ -9,6 +9,9 @@ sehen, solange er arbeitet, und ein Klick hält ihn an.
 
 - Die Desktop-App, angemeldet (siehe [Eine Desktop-App anmelden](sign-in-an-app.md)).
 - Ihr Administrator erlaubt es für den Assistenten. Sonst zeigt die App **Mit mir zusammenarbeiten…** nicht an.
+- **Mit mir zusammenarbeiten** ist unter **Einstellungen → Arbeitsweise** eingeschaltet. Es ist aus, bis Sie es
+  einschalten, und gilt nur für Sie: Wer diesen Computer sonst benutzt, hat eine eigene Einstellung. Solange es aus
+  ist, öffnet **Mit mir zusammenarbeiten…** diese Einstellung.
 - Etwas, worin er arbeiten kann: ein Dokument, das in Word, Excel oder PowerPoint mit seinem Assistenten offen ist,
   ein Ordner, den Sie unter **Einstellungen → Dateien** hinzugefügt haben, oder ein Fenster, das Sie freigeben.
 
@@ -20,7 +23,7 @@ sehen, solange er arbeitet, und ein Klick hält ihn an.
    neben einem Ort **Entfernen**, um ihn auszulassen.
 3. Wählen Sie unter **Wie lange** eine Zeit. 30 Minuten sind vorausgewählt.
 4. Lesen Sie, was die Karte ohne Nachfrage erlaubt und wonach er weiterhin fragt, und wählen Sie dann **Zulassen**.
-   **Nicht jetzt** erlaubt nichts.
+   **Nicht jetzt** erlaubt nichts, und ein neuer Chat bleibt leer.
 
 Die Karte zeigt dann **Arbeitet mit Ihnen**. Ohne Nachfrage läuft nichts, bevor der Server Ihrer Organisation es
 bestätigt hat.
@@ -31,6 +34,10 @@ bestätigt hat.
     Tool, bei dem Ihr Administrator zuerst gefragt werden möchte. Der Server Ihrer Organisation prüft jeden Schritt:
     Ein Schritt außerhalb dessen, was Sie erlaubt haben, fragt wie immer nach.
 
+    Führt ein Pfad an einem erlaubten Ort über eine Verknüpfung (eine symbolische Verknüpfung oder unter Windows
+    eine Verzeichnisverbindung) an einen anderen Ort, fragt die App vor diesem Schritt und sagt, wohin der Pfad
+    wirklich führt.
+
 ## Während er arbeitet {#while-it-works}
 
 | Wo | Was Sie sehen |
@@ -40,9 +47,10 @@ bestätigt hat.
 | Die Menüs des Avatars und des Infobereichs | **Zusammenarbeit beenden** |
 
 - **Stoppen** beendet sie sofort, an allen Orten, und hält die Antwort an, die gerade geschrieben wird.
-- **Zwei Minuten vor dem Ende** fragt die App **Weitere 30 Min. mit Ihnen zusammenarbeiten?**. **Weitermachen** gibt
-  die Zeit dazu, mit denselben Orten und denselben Regeln; mit **Nicht jetzt** endet sie. **Weitere 30 Min.** im Chat
-  tut dasselbe.
+- **Zwei Minuten vor dem Ende** fragt sie einmal, ob sie weitere 30 Minuten mit Ihnen zusammenarbeiten soll: bei
+  offenem Chat im Chat mit **Weitere 30 Min.**, sonst in einer Meldung neben dem Avatar, **Weitere 30 Min. mit Ihnen
+  zusammenarbeiten?**, mit **Weitermachen** und **Nicht jetzt**. **Weitere 30 Min.** und **Weitermachen** geben die
+  Zeit dazu, mit denselben Orten und denselben Regeln; mit **Nicht jetzt** endet sie.
 - **Ein neuer Ort:** Geben Sie ein weiteres Fenster frei oder öffnen Sie ein weiteres Dokument mit seinem Assistenten,
   bietet die Karte **Weiter mit Ihnen zusammenarbeiten?** nur diesen Ort an, unter **Außerdem in:**.
 - **In Word** unter Windows öffnet sich zu Beginn der Kommentarrand, damit Kommentare, die er später einfügt, die
@@ -69,7 +77,8 @@ Orte, **Ohne Rückfrage ausgeführt:** wie viele Schritte ohne Nachfrage liefen,
 dennoch gefragt haben, und warum sie endete.
 
 Sie können sie auch in den **Einstellungen** des Chats unter **Freigaben** mit **Widerrufen** beenden. Auch Ihr
-Administrator kann sie beenden; die Meldung sagt dann, dass der Server sie beendet hat.
+Administrator kann sie beenden; die Meldung sagt dann, dass der Server sie beendet hat. Schalten Sie **Mit mir
+zusammenarbeiten** unter **Einstellungen → Arbeitsweise** aus, endet sie ebenfalls, an allen Orten.
 
 ## Wenn es nicht funktioniert {#when-it-does-not-work}
 
@@ -81,3 +90,4 @@ Administrator kann sie beenden; die Meldung sagt dann, dass der Server sie beend
 | **Nicht zugelassen: Der Server hat es nicht bestätigt** | Es wurde nichts erlaubt. Versuchen Sie es später erneut. |
 | **Länger geht es nicht** | Die längste Zeit für diesen Assistenten ist erreicht. Wählen Sie erneut **Mit mir zusammenarbeiten…**. |
 | **Stoppen hat den Server nicht erreicht** | Wählen Sie erneut **Stoppen**. Ohne Verbindung endet sie trotzdem zu ihrer Zeit. |
+| **Das Ausschalten hat den Server nicht erreicht** | Sie läuft bis zu ihrer Zeit weiter. Die App versucht es erneut, bis der Server antwortet; Sie können auch **Stoppen** wählen. |

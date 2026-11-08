@@ -8,6 +8,9 @@ window you are in. You choose the places and the time, you see while it works, a
 
 - The desktop app, signed in (see [Sign in a desktop app](sign-in-an-app.md)).
 - Your administrator allows it for the assistant. Without that, the app does not show **Work alongside me…**.
+- **Work alongside me** turned on in **Settings → Working style**. It is off until you turn it on, and it is yours
+  alone: anyone else who uses this computer has their own setting. While it is off, **Work alongside me…** opens
+  that setting.
 - Something to work in: a document open in Word, Excel or PowerPoint with its assistant, a folder you added in
   **Settings → Files**, or a window you share.
 
@@ -19,7 +22,7 @@ window you are in. You choose the places and the time, you see while it works, a
    beside a place to leave it out.
 3. Under **For how long**, pick a time. 30 minutes is preselected.
 4. Read what the card says it may do without asking and what it still asks about, then select **Allow**.
-   **Not now** allows nothing.
+   **Not now** allows nothing, and a new chat stays empty.
 
 The card then says **Working alongside you**. Nothing runs without asking before your organisation's server has
 confirmed it.
@@ -30,6 +33,9 @@ confirmed it.
     administrator wants asked first. Your organisation's server checks every step: a step outside what you allowed
     asks as it always does.
 
+    If a path in a place you allowed leads somewhere else through a link (a symbolic link or, on Windows, a
+    junction), the app asks before that step and says where the path really leads.
+
 ## While it works
 
 | Where | What you see |
@@ -39,9 +45,10 @@ confirmed it.
 | The avatar's and the tray's menus | **Stop working alongside** |
 
 - **Stop** ends it at once, in every place, and stops the reply that is being written.
-- **Two minutes before the end** the app asks **Keep working alongside you for another 30 min?**. **Keep going**
-  adds the time, with the same places and the same rules; **Not now** lets it end. **Another 30 min** in the chat does
-  the same.
+- **Two minutes before the end** it asks once whether to keep working alongside you for another 30 minutes: while
+  the chat is open, in the chat with **Another 30 min**; otherwise in a notice beside the avatar, **Keep working
+  alongside you for another 30 min?**, with **Keep going** and **Not now**. **Another 30 min** and **Keep going** add
+  the time, with the same places and the same rules; **Not now** lets it end.
 - **A new place:** when you share another window, or open another document with its assistant, the card **Keep working
   alongside you?** offers only that place, under **Also in:**.
 - **In Word**, on Windows, the comment margin opens when it starts, so comments it adds later do not move the page
@@ -65,7 +72,8 @@ However it ends, one notice says how it went: **Worked alongside you for 25 min*
 asking:** how many steps ran without asking you, **Still asked you:** how many asked anyway, and why it ended.
 
 You can also end it in the chat's **Settings**, under **Approvals**, with **Revoke**. Your administrator can end it
-too; the notice then says that the server ended it.
+too; the notice then says that the server ended it. Turning **Work alongside me** off in **Settings → Working
+style** ends it as well, in every place.
 
 ## When it does not work
 
@@ -77,3 +85,4 @@ too; the notice then says that the server ended it.
 | **Not allowed: the server did not confirm it** | Nothing was allowed. Try again later. |
 | **This cannot run any longer** | It reached the longest time for this assistant. Select **Work alongside me…** again. |
 | **Stop did not reach the server** | Select **Stop** again. Without a connection, it still ends at its time. |
+| **Turning it off did not reach the server** | It runs on until its time. The app tries again until the server answers; you can also select **Stop**. |

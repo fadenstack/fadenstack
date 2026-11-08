@@ -60,6 +60,8 @@
 
 ["use/work-alongside.md"]
 "How do I let the assistant work without asking me at every step?" = "start-it"
+"How do I turn on working alongside in the desktop app?" = "before-you-start"
+"Why does the assistant ask although I allowed the folder?" = "start-it"
 "What may the assistant do without asking while it works alongside me?" = "start-it"
 "How do I stop the assistant working alongside me?" = "while-it-works"
 "Why did Word's comment margin open?" = "while-it-works"
