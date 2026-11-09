@@ -80,6 +80,58 @@ Sie können sie auch in den **Einstellungen** des Chats unter **Freigaben** mit 
 Administrator kann sie beenden; die Meldung sagt dann, dass der Server sie beendet hat. Schalten Sie **Mit mir
 zusammenarbeiten** unter **Einstellungen → Arbeitsweise** aus, endet sie ebenfalls, an allen Orten.
 
+## Bypass in der Desktop-App {#bypass}
+
+Für eine lange Aufgabe, der Sie vertrauen, etwa hunderte Dateien auf dieselbe Weise durchzugehen, können Sie die
+Freigaben in einem Chat eine Zeit lang abschalten: **Bypass**. Es steht nur zur Verfügung, wo Ihr Administrator es für
+den Assistenten erlaubt; viele Organisationen lassen es ausgeschaltet. Wie es überall funktioniert, steht unter
+[Bypass](tools.md#bypass).
+
+1. Wählen Sie den Tool-Modus in der Statusleiste (oder im Chat) und dort **Bypass**.
+2. Im Chat erscheint die Karte **Freigaben in diesem Chat abschalten?**. Sie sagt, wonach nicht mehr gefragt wird, was
+   weiter fragt, was der Server Ihrer Organisation festhält und **Wie lange**: Die kürzeste Zeit ist vorausgewählt.
+   Unter **Warum (optional)** können Sie einen Grund angeben; Ihre Administration sieht ihn.
+3. Wählen Sie **Bypass einschalten**. Eingabe und Esc schalten es nie ein, und **Nicht jetzt** erlaubt nichts.
+
+Bypass beginnt erst, wenn der Server Ihrer Organisation es bestätigt hat. Sind Sie offline oder lehnt der Server ab,
+sagt die Karte **Bypass ist nicht an** und warum, und der Chat bleibt in seinem Modus.
+
+??? info "Wonach nicht mehr gefragt wird, was weiter fragt und was festgehalten wird"
+    Nur in diesem Chat führt der Assistent seine Tools aus, ohne Sie vorher zu fragen, auch solche, die löschen, senden
+    oder sich nicht rückgängig machen lassen, und solche, die niemand eingestuft hat. Ihre anderen Chats fragen wie
+    bisher.
+
+    Weiterhin gefragt wird bei den Regeln **Erst nachfragen** Ihrer Administration und bei Tools, die immer nachfragen.
+    Was gesperrt ist, bleibt gesperrt.
+
+    Der Server Ihrer Organisation zeichnet jedes Tool auf, das ohne Nachfrage läuft: welches, wann und wo und, sofern
+    Ihre Organisation nicht weniger festhält, was es bekam, mit maskierten personenbezogenen Daten. Ihre Organisation
+    kann auch eine kurze Zusammenfassung jedes Ergebnisses aufbewahren. Die Karte sagt, was gilt, und ebenso das Band
+    im Chat, solange es läuft.
+
+Solange es läuft:
+
+| Wo | Was Sie sehen |
+|---|---|
+| Die Kopfzeile des Chats, im Fenster und in der Sprechblase des Avatars | **Bypass an · noch 12 Min.**, was festgehalten wird, und **Stoppen** |
+| Der Avatar | Die verbleibenden Minuten, in einem Warnrahmen |
+| Die Titelleiste | **Bypass an · noch 12 Min.**, mit **Stoppen** |
+| Die Menüs des Avatars und des Infobereichs | **Bypass beenden** |
+| Die **Einstellungen** des Chats, unter **Freigaben** | **Bypass in einem Chat**, die Restzeit und was festgehalten wird, mit **Widerrufen** |
+
+- **Stoppen** beendet es sofort und hält die Antwort an, die gerade geschrieben wird; der Chat kehrt in den Modus
+  zurück, den er vorher hatte.
+- Es lässt sich nicht verlängern: Ist die Zeit um, endet es. Für mehr Zeit wählen Sie erneut **Bypass** und
+  beantworten die Karte.
+- Ein anderer Modus, ein neuer Chat oder das Öffnen eines anderen Chats beendet es ebenfalls.
+- Das Beenden der App beendet es, und beim nächsten Start kommt es nicht zurück.
+
+??? info "Warum Bypass vorzeitig enden kann"
+    Endet Bypass, verschwindet das Band im Chat, und eine Zeile sagt, warum: **Sie haben ihn beendet** (Stoppen,
+    Widerrufen, ein anderer Modus oder ein anderes Ihrer Geräte), **Seine Zeit ist um**, **eine Administratorin oder ein
+    Administrator hat ihn beendet**, **Ihre Organisation hat Bypass abgeschaltet** oder **Ihre Organisation hat
+    eingeschränkt, wer ihn nutzen darf**. Von da an fragen die Freigaben wieder.
+
 ## Wenn es nicht funktioniert {#when-it-does-not-work}
 
 | Sie sehen | Was zu tun ist |
@@ -91,3 +143,6 @@ zusammenarbeiten** unter **Einstellungen → Arbeitsweise** aus, endet sie ebenf
 | **Länger geht es nicht** | Die längste Zeit für diesen Assistenten ist erreicht. Wählen Sie erneut **Mit mir zusammenarbeiten…**. |
 | **Stoppen hat den Server nicht erreicht** | Wählen Sie erneut **Stoppen**. Ohne Verbindung endet sie trotzdem zu ihrer Zeit. |
 | **Das Ausschalten hat den Server nicht erreicht** | Sie läuft bis zu ihrer Zeit weiter. Die App versucht es erneut, bis der Server antwortet; Sie können auch **Stoppen** wählen. |
+| **Bypass ist nicht an: Ihre Organisation erlaubt es für diesen Agenten derzeit nicht** | Ihr Administrator hat Bypass für diesen Assistenten nicht erlaubt oder abgeschaltet. Fragen Sie Ihren Administrator. |
+| **Bypass ist nicht an: Der Server war nicht erreichbar** | Prüfen Sie Ihre Verbindung und wählen Sie dann erneut **Bypass**. |
+| **Bypass ließ sich nicht beenden** | Wählen Sie erneut **Stoppen**. Ohne Verbindung endet Bypass trotzdem zu seiner Zeit. |

@@ -27,6 +27,7 @@ from faden_backend.db.dao.rbac_dao import RbacDAO
 from faden_backend.db.models.agents import Agent, AgentGrant, AgentMember, AgentRefreshToken, AgentVersion
 from faden_backend.db.models.containers import AuditEvent
 from faden_backend.db.models.groups import Group, UserGroup
+from faden_backend.db.models.system_settings import SystemSettingValue
 from faden_backend.db.models.users import User, current_active_user, end_sign_ins
 from faden_backend.services.agents import access
 from faden_backend.services.extensions import registry
@@ -221,16 +222,37 @@ async def test_a_version_says_its_default_and_highest_level(
 @pytest.mark.parametrize("approvals", [
     {"default_level": "auto", "max_level": "ask"},  # the default above the highest
     {"default_level": "bypass", "max_level": "auto"},  # never Bypass
-    {"default_level": "ask", "max_level": "bypass"},  # no tenant can allow it yet
+    {"default_level": "bypass", "max_level": "bypass"},  # never a default, even where it is the highest
     {"default_level": "ask", "max_level": "auto", "grant_classes": ["destructive"]},
     {"default_level": "ask", "max_level": "auto", "unknown": 1},
-], ids=["default-above-max", "bypass-default", "bypass-max", "destructive-grant", "unknown-key"])
+], ids=["default-above-max", "bypass-default", "bypass-default-and-max", "destructive-grant", "unknown-key"])
 async def test_a_version_with_impossible_levels_is_refused(
     approvals: dict[str, Any], signed_in: _As, client: AsyncClient, dbsession: AsyncSession,
 ) -> None:
     signed_in.user = await _user(dbsession, admin=True)
     r = await client.post("/api/agents", json={"slug": "odd-levels", "name": "x", "version": {"approvals": approvals}})
     assert r.status_code == 422, r.text
+
+
+@pytest.mark.parametrize("allowed", [False, True], ids=["installation-off", "installation-on"])
+async def test_bypass_as_the_highest_level_is_published_only_where_the_installation_allows_it(
+    allowed: bool, signed_in: _As, client: AsyncClient, dbsession: AsyncSession,
+) -> None:
+    """sdk/38 §5, sdk/40 A3: a draft may hold it; publishing it needs ``approvals.bypass_allowed``."""
+    signed_in.user = await _user(dbsession, admin=True)
+    if allowed:
+        dbsession.add(SystemSettingValue(key="approvals.bypass_allowed", value_json={"value": True}))
+        await dbsession.flush()
+    approvals = {"default_level": "ask", "max_level": "bypass"}
+    await _agent(client, slug="bypasses", publish=False, approvals=approvals)
+    assert (await client.get("/api/agents/bypasses/versions/1")).json()["approvals"]["max_level"] == "bypass"
+    r = await client.post("/api/agents/bypasses/versions/1/publish")
+    if allowed:
+        assert r.status_code == status.HTTP_200_OK, r.text
+    else:
+        assert r.status_code == status.HTTP_400_BAD_REQUEST, r.text
+        assert "Bypass is not allowed" in r.json()["detail"]
+        assert (await client.get("/api/agents/bypasses")).json()["published_version"] is None
 
 
 @pytest.mark.parametrize(("place", "status_code"), [

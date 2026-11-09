@@ -11,7 +11,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import PurePosixPath
-from typing import Any, TypedDict
+from typing import Any, TypedDict, cast
 
 from faden_gateway.db.dao.gateway_dao import GatewayDAO
 from faden_gateway.db.dao.session_dao import SessionDAO
@@ -25,7 +25,7 @@ from faden_gateway.db.models.gateway import (
 )
 from faden_gateway.services.gateway.audit import AuditService
 from faden_gateway.services.gateway.usage_group import UsageGroupResolver, usage_team
-from faden_gateway.services.gateway import usage_hooks, usage_settings
+from faden_gateway.services.gateway import approval_settings, usage_hooks, usage_settings
 from faden_gateway.services.extensions import AdmissionContext
 from faden_gateway.services.gateway.auth import AuthContext
 from faden_gateway.services.gateway import (
@@ -681,6 +681,15 @@ def _tool_arguments(call: dict[str, Any]) -> dict[str, Any]:
     return parsed if isinstance(parsed, dict) else {}
 
 
+def _message_text(content: Any) -> str:
+    """A message's text: its string, or the text of its parts."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(str(p.get("text") or "") for p in content if isinstance(p, Mapping) and p.get("type") == "text")
+    return ""
+
+
 def _restored(value: Any, mapping: dict[str, str]) -> Any:
     """*value* with PII tokens put back, in every string it holds."""
     if isinstance(value, str):
@@ -1271,6 +1280,9 @@ class _Prepared:
     #: The calls of this round a grant covered: call id -> the grant. Counted once; the check after a wait
     #: reads it.
     grant_covered: dict[str, uuid.UUID] = field(default_factory=dict)
+    #: The calls of this round whose grant records results (L-60): call id -> its evidence row, which gets the
+    #: outcome and the start of the result once the call ran.
+    grant_results: dict[str, uuid.UUID] = field(default_factory=dict)
     #: The user's messages this request stored in its session.
     user_message_ids: list[uuid.UUID] = field(default_factory=list)
     #: An output check refused the answer: the decision and the answer's HMAC.
@@ -2290,6 +2302,11 @@ class GatewayService:
             groups = await self.group_memberships.resolve(auth.user_id) or ()
         # An agent's conversations start in its default level and go no higher than its highest (sdk/38 §5).
         default, limit = req.agent.agent.levels() if req.agent is not None else (None, None)
+        # Bypass only where the installation allows it (sdk/09 L-57); read only when a chat asks for it.
+        bypass_allowed = False
+        if chosen is tool_classes.ToolMode.BYPASS and limit is tool_classes.ToolMode.BYPASS:
+            found = await approval_settings.current(self.dao.session.bind)
+            bypass_allowed = found.bypass_allowed
         req.tool_mode = await tool_classes.effective(
             chosen, extension_registry.tool_mode_ceilings,
             tool_classes.CeilingContext(
@@ -2297,7 +2314,7 @@ class GatewayService:
                 agent_id=req.agent.agent.id if req.agent is not None else None,
                 session_id=req.session_id, groups=tuple(groups),
             ),
-            default=default, limit=limit,
+            default=default, limit=limit, bypass_allowed=bypass_allowed,
         )
         tools = req.agent.agent.host_tool_contract if req.agent is not None else ()
         req.classifier = tool_classes.Classifier(
@@ -2520,6 +2537,7 @@ class GatewayService:
         """
         if not recheck:
             req.grant_covered = {}
+            req.grant_results = {}
         if not any(gov.GovernanceStage.TOOL in c.stages for c in req.checks):
             return {}
         found: dict[str, tuple[str, gov.Verdict]] = {}
@@ -2531,22 +2549,91 @@ class GatewayService:
                 req, auth, request_id, gov.GovernanceStage.TOOL, tool_id=name, arguments=_tool_arguments(call),
             )
             verdict = await gov.decide(req.checks, ctx)
-            if verdict is None or await self._covered(req, auth, call, name, verdict, recheck=recheck):
+            if verdict is None:
+                if not recheck:
+                    await self._bypass_evidence(req, auth, call, name)
+                continue
+            if await self._covered(req, auth, call, name, verdict, recheck=recheck):
                 continue
             found[call.get("id", "")] = (name, verdict)
         return found
 
+    def _grant_call(self, req: _Prepared, call: dict[str, Any], name: str, side: str) -> grants.Call:
+        """*call* as a grant is checked against it: its class, its author's ``approval``, place and level.
+
+        Only for a request of an agent (``req.agent``).
+        """
+        agent = cast("AgentRequest", req.agent)
+        tool = req.classifier.classify(name) if req.classifier is not None else None
+        arguments = _tool_arguments(call)
+        entry = next((t for t in agent.agent.host_tool_contract if t.get("name") == name), None)
+        return grants.Call(
+            request_id=req.request_id or "", call_id=str(call.get("id") or ""), tool_id=name,
+            tool_class=tool.tool_class.value if tool is not None else "unknown",
+            approval=tool.approval if tool is not None else None,
+            place=grants.place_of(entry, arguments), arguments=arguments,
+            bypass=req.tool_mode is not None and req.tool_mode.mode is tool_classes.ToolMode.BYPASS,
+            side=side,
+        )
+
+    def _grant_owner(self, req: _Prepared, auth: AuthContext) -> grants.Owner:
+        """Whose grants a call of this request may use; only for an agent's request from a device."""
+        agent = cast("AgentRequest", req.agent)
+        return grants.Owner(
+            tenant_id=auth.tenant_id, user_id=auth.user_id, agent_id=agent.agent.id,
+            agent_version=agent.agent.version, device_id=agent.device_id or "",
+            conversation_id=agent.conversation_id,
+        )
+
+    async def _bypass_evidence(
+        self, req: _Prepared, auth: AuthContext, call: dict[str, Any], name: str, *, side: str = "gateway",
+    ) -> None:
+        """Record a call no check objects to against the chat's Bypass grant; none for a chat not in Bypass.
+
+        Every call under Bypass is evidence (sdk/09 L-60), not only those it spared a question.
+        """
+        if req.tool_mode is None or req.tool_mode.mode is not tool_classes.ToolMode.BYPASS:
+            return
+        if req.agent is None or not req.agent.device_id or not call.get("id"):
+            return
+        covered = await grants.record_call(
+            self.dao.session.bind, self._grant_owner(req, auth), self._grant_call(req, call, name, side),
+        )
+        self._keep_for_result(req, call, covered)
+
+    async def _note_client_results(self, req: _Prepared, auth: AuthContext, egress: Mapping[str, Any]) -> None:
+        """The device's results of covered calls, in this request's tool messages after its egress scan (L-61).
+
+        Only on an agent's route from a device, and only when the request carries tool results.
+        """
+        if req.agent is None or not req.agent.device_id:
+            return
+        results = {
+            str(m.get("tool_call_id")): _message_text(m.get("content"))
+            for m in egress.get("messages") or () if isinstance(m, Mapping) and m.get("role") == "tool"
+            and m.get("tool_call_id")
+        }
+        if results:
+            await grants.note_client_results(self.dao.session.bind, self._grant_owner(req, auth), results)
+
+    @staticmethod
+    def _keep_for_result(req: _Prepared, call: dict[str, Any], covered: grants.Covered | None) -> None:
+        """Remember a covered call whose grant records results, so its run can leave them (L-60)."""
+        if covered is not None and covered.evidence_level == "results":
+            req.grant_results[str(call.get("id") or "")] = covered.record_id
+
     async def _covered(
         self, req: _Prepared, auth: AuthContext, call: dict[str, Any], name: str, verdict: gov.Verdict,
-        *, recheck: bool = False,
+        *, recheck: bool = False, side: str = "gateway",
     ) -> uuid.UUID | None:
         """The grant that lets *call* run instead of asking, counted against its budget; ``None``: it asks.
 
         Only a call that asks because of the chat's tool mode alone looks one up (sdk/38 §6): never a refused
         call, never a floor item (an admin's rule, a policy, the author's ``approval: always``,
         :func:`_floor`), and only on the agent's route from a device -- a grant is the device's. The class and
-        the place are checked in ``grants.in_scope``. After a wait (*recheck*) a covered call stays covered
-        while its grant is still active (ASVS 5.0 V8.3.2), and nothing new is looked up.
+        the place are checked in ``grants.in_scope``; a Bypass grant covers only while the chat's level is
+        Bypass. After a wait (*recheck*) a covered call stays covered while its grant is still active (ASVS
+        5.0 V8.3.2), and nothing new is looked up.
         """
         call_id = str(call.get("id") or "")
         if recheck:
@@ -2558,27 +2645,14 @@ class GatewayService:
             return None
         if req.agent is None or not req.agent.device_id or not call_id or _floor(req, name, verdict):
             return None
-        profile = req.agent.agent
-        tool = req.classifier.classify(name) if req.classifier is not None else None
-        arguments = _tool_arguments(call)
-        entry = next((t for t in profile.host_tool_contract if t.get("name") == name), None)
-        grant_id = await grants.cover(
-            self.dao.session.bind,
-            grants.Owner(
-                tenant_id=auth.tenant_id, user_id=auth.user_id, agent_id=profile.id,
-                agent_version=profile.version, device_id=req.agent.device_id,
-                conversation_id=req.agent.conversation_id,
-            ),
-            grants.Call(
-                request_id=req.request_id or "", call_id=call_id, tool_id=name,
-                tool_class=tool.tool_class.value if tool is not None else "unknown",
-                approval=tool.approval if tool is not None else None,
-                place=grants.place_of(entry, arguments), arguments=arguments,
-            ),
+        covered = await grants.cover_call(
+            self.dao.session.bind, self._grant_owner(req, auth), self._grant_call(req, call, name, side),
         )
-        if grant_id is not None:
-            req.grant_covered[call_id] = grant_id
-        return grant_id
+        if covered is None:
+            return None
+        req.grant_covered[call_id] = covered.grant_id
+        self._keep_for_result(req, call, covered)
+        return covered.grant_id
 
     async def _ask_approvals(
         self, req: _Prepared, calls: list[dict[str, Any]], screened: dict[str, tuple[str, gov.Verdict]],
@@ -2667,6 +2741,7 @@ class GatewayService:
         if not req.faden_events or not req.checks:
             return []
         req.grant_covered = {}
+        req.grant_results = {}  # the device's results come in its next request (:meth:`_note_client_results`)
         events: list[dict[str, Any]] = []
         for call in calls:
             name = _tool_name(call)
@@ -2678,8 +2753,9 @@ class GatewayService:
             )
             verdict = await gov.decide(req.checks, ctx)
             if verdict is None:
+                await self._bypass_evidence(req, auth, call, name, side="client")
                 continue
-            grant_id = await self._covered(req, auth, call, name, verdict)
+            grant_id = await self._covered(req, auth, call, name, verdict, side="client")
             if grant_id is not None:
                 events.append(grants.used_event(call, name, grant_id))
                 continue
@@ -2998,6 +3074,7 @@ class GatewayService:
         if scanned is not None and _needs_scan(req.pii_policy, req.decision.candidate):
             egress, req.token_mapping = scanned
             egress = self._inject_pii_system_prompt(egress, req.pii_policy)  # type: ignore[arg-type]
+        await self._note_client_results(req, auth, egress)
 
         req.trace_context = self.observability.start_request_trace(
             request_id=request_id,
@@ -4143,7 +4220,25 @@ class GatewayService:
         for row, answer in done:
             req.tool_calls.append(row)
             answers.append(answer)
-        return await self._scan_tool_results(req, answers)
+        scanned = await self._scan_tool_results(req, answers)
+        await self._note_results(req, done, scanned)
+        return scanned
+
+    async def _note_results(
+        self, req: _Prepared, done: list[tuple[dict[str, Any], dict[str, Any]]], scanned: list[dict[str, Any]],
+    ) -> None:
+        """The outcome and the start of each result whose grant records results (L-60), as the model gets it.
+
+        After the PII scan, so what is kept is what left the gateway; a failed call keeps its error.
+        """
+        if not req.grant_results:
+            return
+        for (row, _), answer in zip(done, scanned, strict=True):
+            record_id = req.grant_results.get(str(answer.get("tool_call_id") or ""))
+            if record_id is not None:
+                await grants.note_result(
+                    self.dao.session.bind, record_id, error=bool(row.get("is_error")), text=answer.get("content"),
+                )
 
     async def _scan_tool_results(self, req: _Prepared, answers: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Tool results pass through PII like the rest of what leaves.

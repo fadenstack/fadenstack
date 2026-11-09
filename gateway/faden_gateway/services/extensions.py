@@ -37,6 +37,11 @@ it.
 - ``usage_listeners``: told each request's usage (``UsageRecord``), in the
   background after its request-log row is written (EE: budget counters). One
   that raises is logged.
+- ``grant_limits``: limits of their own on the grants a person makes
+  (``services/gateway/grants.py``), each ``async (GrantContext) -> limit |
+  None`` with ``longest_minutes`` and ``evidence_level``: the shortest longest
+  grant applies, and the most recorded level. One that fails, or answers
+  something else, makes no grant: the person is asked per call.
 
 Both cost a request nothing while they are empty
 (``services/gateway/usage_hooks.py``).
@@ -160,6 +165,35 @@ class UsageRecord:
 UsageListener = Callable[[UsageRecord], Awaitable[None]]
 
 
+@dataclass(frozen=True, kw_only=True)
+class GrantContext:
+    """A grant about to be made or extended, as a grant limit sees it. Fields may be added; none is removed."""
+
+    tenant_id: str
+    user_id: str
+    agent_id: str
+    #: The person's teams, as the tool mode ceilings get them.
+    groups: tuple[str, ...] = ()
+    #: ``time``, ``work`` or ``bypass``; ``None`` for the agent's profile, which speaks for every kind.
+    kind: str | None = None
+
+
+@dataclass(frozen=True)
+class GrantLimit:
+    """A grant limit's answer; ``None`` in a field: no word on it. Any object with these fields will do."""
+
+    #: The longest a grant may last, in minutes: the shortest of every answer, the agent's and the
+    #: installation's applies.
+    longest_minutes: int | None = None
+    #: What a covered call leaves behind: ``decisions``, ``calls`` (with its arguments) or ``results`` (calls
+    #: with an outcome and a summary of the result). The most recorded answer replaces core's default.
+    evidence_level: str | None = None
+
+
+#: ``GrantContext -> GrantLimit``, or ``None`` for no word.
+GrantLimitRule = Callable[[GrantContext], Awaitable[Any]]
+
+
 @dataclass
 class ExtensionRegistry:
     """What Enterprise adds; defaults are core's behaviour."""
@@ -175,6 +209,7 @@ class ExtensionRegistry:
     tool_mode_ceilings: list[Any] = field(default_factory=list)
     admission_checks: list[AdmissionCheck] = field(default_factory=list)
     usage_listeners: list[UsageListener] = field(default_factory=list)
+    grant_limits: list[GrantLimitRule] = field(default_factory=list)
 
     def client_modules(self, extensions: dict[str, Any]) -> list[str]:
         """Every SDK module an agent with *extensions* needs, sorted."""

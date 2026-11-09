@@ -11,7 +11,7 @@ import { GrantsTable } from "./GrantsTable";
 
 vi.mock("~/api/governance", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/api/governance")>();
-  return { ...actual, governanceApi: { grants: vi.fn(), revokeGrant: vi.fn() } };
+  return { ...actual, governanceApi: { grants: vi.fn(), revokeGrant: vi.fn(), grantCalls: vi.fn() } };
 });
 vi.mock("~/api/agents", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/api/agents")>();
@@ -43,6 +43,17 @@ const TIME: Grant = {
   max_calls: 20,
   calls_used: 3,
   remaining_s: 1790,
+  flags: 0,
+};
+
+const BYPASS: Grant = {
+  ...TIME,
+  id: "g-3",
+  kind: "bypass",
+  scope: {},
+  max_calls: null,
+  calls_used: 5,
+  flags: 2,
 };
 
 const WORK: Grant = {
@@ -65,6 +76,15 @@ beforeEach(() => {
   api.revokeGrant.mockResolvedValue(undefined);
 });
 
+/** Opens the calls dialog; the rows are drawn again as the agent names arrive, so a click may need repeating. */
+const openCalls = async () => {
+  await waitFor(async () => {
+    await userEvent.click(screen.getByRole("button", { name: "Show calls" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+  return screen.getByRole("dialog");
+};
+
 /** The rows and the agent names are in. */
 const settled = async () => {
   await screen.findByText("mail.send_draft");
@@ -84,6 +104,93 @@ describe("GrantsTable", () => {
     expect(screen.getByText("Paused")).toBeInTheDocument();
     expect(screen.getByText("3 / 20")).toBeInTheDocument();
     expect(screen.getByText("30 minutes left")).toBeInTheDocument();
+  });
+
+  it("labels a Bypass grant and shows its differences", async () => {
+    api.grants.mockResolvedValue([TIME, BYPASS]);
+    renderPage(<GrantsTable />);
+    await screen.findByText("mail.send_draft");
+    await waitFor(() => expect(screen.getAllByText("Office agent")).toHaveLength(2));
+
+    expect(await screen.findByText("Bypass")).toBeInTheDocument();
+    expect(screen.getByText("2 differences")).toBeInTheDocument();
+    // Only a Bypass grant has calls to look at.
+    expect(screen.getAllByRole("button", { name: "Show calls" })).toHaveLength(1);
+  });
+
+  it("lists the calls of a Bypass grant", async () => {
+    api.grants.mockResolvedValue([BYPASS]);
+    api.grantCalls.mockResolvedValue({
+      data: [
+        { id: "c-1", request_id: "r-1", call_id: "call-aaa", tool_id: "mail.send", side: "gateway", created_at: "2026-11-07T10:05:00Z", reported_at: null, flag: "gateway_only" },
+        { id: "c-2", request_id: "r-1", call_id: "call-bbb", tool_id: "files.read", side: "client", created_at: "2026-11-07T10:06:00Z", reported_at: "2026-11-07T10:06:01Z", flag: null },
+      ],
+      device_only: [{ call_id: "call-ccc", created_at: "2026-11-07T10:07:00Z" }],
+    });
+    renderPage(<GrantsTable />);
+
+    const dialog = await openCalls();
+    expect(api.grantCalls).toHaveBeenCalledWith("g-3");
+    expect(await within(dialog).findByText("call-aaa")).toBeInTheDocument();
+    expect(within(dialog).getByText("mail.send")).toBeInTheDocument();
+    expect(within(dialog).getByText("Recorded by the gateway, not reported by the device")).toBeInTheDocument();
+    expect(within(dialog).getByText("call-ccc")).toBeInTheDocument();
+    expect(within(dialog).getByText(/shown as far as the grant recorded them/)).toBeInTheDocument();
+  });
+
+  it("shows a call's place, arguments, outcome and result, and the person's reason", async () => {
+    api.grants.mockResolvedValue([BYPASS]);
+    api.grantCalls.mockResolvedValue({
+      data: [
+        {
+          id: "c-1",
+          request_id: "r-1",
+          call_id: "call-aaa",
+          tool_id: "mail.send",
+          side: "gateway",
+          created_at: "2026-11-07T10:05:00Z",
+          reported_at: null,
+          flag: null,
+          target: "C:\\Users\\anna\\report.docx",
+          arguments: { to: "boss@example.com", subject: "Report" },
+          outcome: "error",
+          result: "Mailbox is full",
+          result_at: "2026-11-07T10:05:02Z",
+        },
+      ],
+      device_only: [],
+      kind: "bypass",
+      evidence: "shown",
+      evidence_level: "results",
+      reason: "Preparing the board meeting",
+    });
+    renderPage(<GrantsTable />);
+
+    const dialog = await openCalls();
+    expect(await within(dialog).findByText("Preparing the board meeting")).toBeInTheDocument();
+    expect(within(dialog).getByText("C:\\Users\\anna\\report.docx")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Arguments").textContent).toContain('"to": "boss@example.com"');
+    expect(within(dialog).getByText("Outcome: error")).toBeInTheDocument();
+    expect(within(dialog).getByText("Mailbox is full")).toBeInTheDocument();
+    expect(within(dialog).queryByText(/could not show the places/)).not.toBeInTheDocument();
+  });
+
+  it("says when the server could not show the places and arguments", async () => {
+    api.grants.mockResolvedValue([BYPASS]);
+    api.grantCalls.mockResolvedValue({ data: [], device_only: [], evidence: "unavailable" });
+    renderPage(<GrantsTable />);
+
+    const dialog = await openCalls();
+    expect(await within(dialog).findByText(/could not show the places and arguments/)).toBeInTheDocument();
+  });
+
+  it("says the auditor role is needed when reading the calls is refused", async () => {
+    api.grants.mockResolvedValue([BYPASS]);
+    api.grantCalls.mockRejectedValue(new ApiError("forbidden", 403));
+    renderPage(<GrantsTable />);
+
+    const dialog = await openCalls();
+    expect(await within(dialog).findByText(/needs the role approvals_auditor/)).toBeInTheDocument();
   });
 
   it("revokes one after confirming, then refreshes", async () => {

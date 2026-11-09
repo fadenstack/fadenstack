@@ -201,7 +201,7 @@ Jedes Tool, das eine Anwendung mitbringt, hat eine Klasse, die die Version des A
 Benutzer wählen den Tool-Modus im Bereich des Agenten, pro Unterhaltung. Unter **Freigabestufen** legt die Version
 fest, wo jede Unterhaltung beginnt (**Beginnt in**, **Fragen**, solange Sie nichts ändern) und welchen Modus Benutzer
 höchstens wählen können (**Höchstens**, **Automatisch**, solange Sie nichts ändern); der Start liegt nie über dem
-höchsten, und die Grenzen Ihrer Organisation schränken beide ein. Ein Recherche-Agent etwa kann in **Nur lesen**
+höchsten, und die Grenzen Ihrer Organisation schränken beide ein. **Bypass** kann nur dann die höchste Stufe sein, wenn ein Administrator es unter **Einstellungen → Freigaben** erlaubt, und eine Version mit Bypass lässt sich nur dann veröffentlichen; Unterhaltungen können nie damit beginnen. Siehe [Bypass](policies.md#bypass). Ein Recherche-Agent etwa kann in **Nur lesen**
 beginnen und höchstens **Fragen** erlauben. Die Anwendung kann eine Klasse verschärfen, nie lockern. Ihre [Tool-Regeln](policies.md#tool-rules)
 gelten für Agenten ebenso wie für Chats.
 

@@ -396,8 +396,10 @@ async def test_an_agents_host_tools_are_classed_by_its_contract(
     ({"default_level": "auto", "max_level": "auto"}, "read_only",
      {"default": "read_only", "ceiling": "read_only", "max": "auto"}),  # the narrowest applies
     ({"default_level": "ask", "max_level": "bypass"}, None,
+     {"default": "ask", "ceiling": None, "max": "auto"}),  # a client without Bypass sees Auto (sdk/40 A3)
+    ({"default_level": "ask", "max_level": "planet"}, None,
      {"default": "read_only", "ceiling": "read_only", "max": "read_only"}),  # unknown: never wider
-], ids=["unset", "auto-agent", "research-agent", "ee-narrower", "unknown-max"])
+], ids=["unset", "auto-agent", "research-agent", "ee-narrower", "bypass-max-old-client", "unknown-max"])
 async def test_the_profile_says_the_agents_default_and_highest_level(
     levels: dict[str, str], ee_ceiling: str | None, expected: dict[str, str | None],
     fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession,

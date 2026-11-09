@@ -190,7 +190,7 @@ Each tool an application brings has a class, which the agent's version sets:
 People pick the tool mode in the panel, per conversation. Under **Approval levels** the version says where every
 conversation starts (**Starts in**, **Ask** unless you change it) and the highest mode people may pick
 (**At most**, **Auto** unless you change it); the start is never above the highest, and your organisation's limits
-narrow both. A research agent, for example, might start in **Read only** and go at most to **Ask**. The
+narrow both. **Bypass** can be the highest level only while an administrator allows it in **Settings → Approvals**, and a version that has it can be published only then; it can never be where conversations start. See [Bypass](policies.md#bypass). A research agent, for example, might start in **Read only** and go at most to **Ask**. The
 application can make a class stricter, never looser. Your [tool rules](policies.md#tool-rules) apply to agents
 as well as chats.
 

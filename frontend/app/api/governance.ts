@@ -88,11 +88,12 @@ export interface GrantTarget {
 /**
  * A person let one agent on one of their devices run, for a while, what
  * would otherwise ask: one tool (`time`) or reads and writes in named places
- * (`work`). An administrator may end one; it holds from the agent's next call.
+ * (`work`); or switched approvals off for one conversation (`bypass`). An
+ * administrator may end one; it holds from the agent's next call.
  */
 export interface Grant {
   id: string;
-  kind: "time" | "work";
+  kind: "time" | "work" | "bypass";
   status: "active" | "paused";
   user_id: string;
   agent_id: string;
@@ -106,6 +107,41 @@ export interface Grant {
   max_calls: number | null;
   calls_used: number;
   remaining_s: number;
+  /** Calls the device reported and the gateway did not record, or the reverse. */
+  flags: number;
+}
+
+/**
+ * One call under a grant, as the device reported it and the gateway recorded it. The place, the arguments and the
+ * result are there as far as the grant recorded them and the gateway decrypted them for this read.
+ */
+export interface GrantCall {
+  id: string;
+  request_id: string | null;
+  call_id: string;
+  tool_id: string | null;
+  side: "client" | "gateway";
+  created_at: string;
+  reported_at: string | null;
+  flag: "gateway_only" | null;
+  target?: string | null;
+  arguments?: Record<string, unknown> | null;
+  /** For a grant that records results: how the call ended, and the error or the start of the result. */
+  outcome?: "ok" | "error" | null;
+  result?: string | null;
+  result_at?: string | null;
+}
+
+/** The calls of a grant: what the gateway recorded, and the device's reports it has no record of. */
+export interface GrantCalls {
+  data: GrantCall[];
+  device_only: { call_id: string; created_at: string }[];
+  kind?: "time" | "work" | "bypass";
+  /** `unavailable`: the gateway could not decrypt the places and arguments for this read. */
+  evidence?: "shown" | "unavailable";
+  evidence_level?: "decisions" | "calls" | "results" | null;
+  /** The person's own words on why (Bypass), if they gave any. */
+  reason?: string | null;
 }
 
 /** List, create, change and remove one kind of ordered pattern rule. */
@@ -132,4 +168,6 @@ export const governanceApi = {
     (await request<{ data: PolicyDecision[] }>(`/decisions${query({ limit: 200, ...filter })}`)).data,
   grants: async () => (await request<{ data: Grant[] }>(`/grants${query({ tenant_id: "default" })}`)).data,
   revokeGrant: (id: string) => request<void>(`/grants/${segment(id)}`, json("DELETE")),
+  /** Needs the role approvals_auditor; every read is audited. */
+  grantCalls: (id: string) => request<GrantCalls>(`/grants/${segment(id)}/calls`),
 };

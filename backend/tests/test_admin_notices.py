@@ -123,3 +123,15 @@ async def test_a_restriction_on_the_tenant_nothing_enforces_is_told_and_can_be_l
     assert (await client.get(notices)).json() == []
     event = await dbsession.scalar(select(AuditEvent).where(AuditEvent.action == "tenant.restriction.lift"))
     assert event is not None and event.severity == "high" and event.actor_id == admin.id
+
+
+async def test_grant_limits_are_a_restriction_core_keeps_closed_without_its_extension(
+    dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """While unenforced, the gateway makes no grant (``services/gateway/tenant_restrictions.py`` there)."""
+    monkeypatch.setattr(registry, "tenant_restrictions", set())
+    await tenant_restrictions.set_restricted(dbsession, tenant_restrictions.GRANT_LIMITS, on=True)
+    assert [r.name for r in await tenant_restrictions.unenforced(dbsession)] == ["grant_limits"]
+    assert [n.code for n in await tenant_restrictions.notices(dbsession)] == ["restriction_grant_limits"]
+    monkeypatch.setattr(registry, "tenant_restrictions", {tenant_restrictions.GRANT_LIMITS})
+    assert await tenant_restrictions.unenforced(dbsession) == []

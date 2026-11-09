@@ -42,6 +42,7 @@ from faden_backend.db.models.agents import (
 )
 from faden_backend.db.models.containers import AuditResult
 from faden_backend.db.models.users import User, current_active_user
+from faden_backend.services import approval_config
 from faden_backend.services.agents import access, app_review, app_templates, pairing, tokens
 from faden_backend.services.extensions import registry
 from faden_backend.services.principals import PrincipalOption, find_principals
@@ -199,6 +200,24 @@ def _check_approvals(contract: list[dict[str, Any]]) -> None:
             detail=(
                 "'Never ask' (approval: never) is only for read and write tools. Change the class or the "
                 "approval of: " + ", ".join(wrong)
+            ),
+        )
+
+
+async def _check_bypass(session: Any, approvals: dict[str, Any] | None) -> None:
+    """Refuse a version whose highest level is Bypass while the installation does not allow it (sdk/38 §5).
+
+    Checked at publish, as ``approval: never``: a draft may hold it while an admin decides. Turning Bypass off
+    later leaves such versions published; the gateway then narrows them to Auto (sdk/09 L-57).
+    """
+    if (approvals or {}).get("max_level") != "bypass":
+        return
+    if not await approval_config.bypass_allowed(session):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Bypass is not allowed in this installation, so no agent may go up to it. An administrator "
+                "turns it on in Settings, Approvals (Root Mode); or choose Auto as the highest level."
             ),
         )
 
@@ -492,6 +511,7 @@ async def _publish(dao: AgentsDAO, audit: AuditDAO, user: User, agent: Agent, ve
         )
     _check_extensions(version.extensions)
     _check_approvals(version.host_tool_contract or [])
+    await _check_bypass(dao.session, version.approvals)
     if version.published_at is None:
         version.published_at = datetime.now(UTC)
     agent.published_version_id = version.id

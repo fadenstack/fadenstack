@@ -1,4 +1,7 @@
-/** The definition editor's "Chat sessions running at once" setting: shown, chosen, back to the default. */
+/**
+ * The definition editor: its "Chat sessions running at once" setting (shown, chosen, back to the default), and the
+ * approval levels (Bypass can be the highest level, never the one a conversation starts in).
+ */
 import { useState } from "react";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -25,6 +28,15 @@ function Harness({ initial, onChange }: { initial: AgentDefinition; onChange: (d
     />
   );
 }
+
+const optionNames = async (label: string) => {
+  await userEvent.click(screen.getByRole("combobox", { name: label }));
+  const names = within(await screen.findByRole("listbox"))
+    .getAllByRole("option")
+    .map((o) => o.textContent);
+  await userEvent.keyboard("{Escape}");
+  return names;
+};
 
 describe("AgentDefinitionEditor sessions setting", () => {
   it("shows the default and the hint when the key is absent", async () => {
@@ -53,5 +65,27 @@ describe("AgentDefinitionEditor sessions setting", () => {
     await user.click(screen.getByRole("combobox", { name: "Chat sessions running at once" }));
     await user.click(within(screen.getByRole("listbox")).getByRole("option", { name: "Default (5)" }));
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ ui: { greeting: "Hi" } }));
+  });
+});
+
+describe("AgentDefinitionEditor approval levels", () => {
+  it("offers Bypass for the highest level only", async () => {
+    render(<AgentDefinitionEditor value={EMPTY_DEFINITION} onChange={vi.fn()} />);
+
+    expect(await optionNames("At most")).toEqual(["Off", "Read only", "Ask", "Auto", "Bypass"]);
+    expect(await optionNames("Starts in")).toEqual(["Off", "Read only", "Ask", "Auto"]);
+    expect(screen.getByText(/can be published only while an administrator allows Bypass/)).toBeInTheDocument();
+  });
+
+  it("saves the choice of Bypass as the highest level", async () => {
+    const onChange = vi.fn();
+    render(<AgentDefinitionEditor value={EMPTY_DEFINITION} onChange={onChange} />);
+
+    await userEvent.click(screen.getByRole("combobox", { name: "At most" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Bypass" }));
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ approvals: { default_level: "ask", max_level: "bypass" } }),
+    );
   });
 });

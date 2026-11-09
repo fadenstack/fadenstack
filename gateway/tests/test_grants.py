@@ -152,7 +152,7 @@ def test_a_grant_is_cut_to_the_agents_limits_and_says_what_was_cut() -> None:
 
 @pytest.mark.parametrize(("fields", "code"), [
     ({"kind": "plan"}, "grant_kind_unavailable"),
-    ({"kind": "bypass"}, "grant_kind_unavailable"),
+    ({"kind": "bypass"}, "bypass_not_allowed"),
     ({"kind": "time", "tools": []}, "grant_scope_invalid"),
     ({"kind": "time", "tools": ["a", "b"]}, "grant_scope_invalid"),
     ({"kind": "work", "classes": ["write"], "agent": {"grant_classes": ("read",)}}, "grant_scope_invalid"),
@@ -226,7 +226,7 @@ async def test_two_workers_and_a_callee_share_one_budget_exactly(engine: AsyncEn
             async with grants.autocommit(engine) as conn:
                 found = await grants.load(conn, grant.id)
                 assert found is not None
-                return await grants.consume(conn, found, replace(_call_of("write"), call_id=f"callee-{n}"))
+                return await grants.consume(conn, found, replace(_call_of("write"), call_id=f"callee-{n}")) is not None
 
         results = await asyncio.gather(
             *(worker(engine, n) for n in range(20)), *(worker(other_worker, 100 + n) for n in range(20)),

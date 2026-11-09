@@ -75,6 +75,52 @@ You can also end it in the chat's **Settings**, under **Approvals**, with **Revo
 too; the notice then says that the server ended it. Turning **Work alongside me** off in **Settings → Working
 style** ends it as well, in every place.
 
+## Bypass in the desktop app {#bypass}
+
+For a long task you trust, such as going through hundreds of files the same way, you can switch approvals off in one
+chat for a while: **Bypass**. It is there only where your administrator allows it for the assistant; many
+organisations leave it off. See [Bypass](tools.md#bypass) for how it works everywhere.
+
+1. Select the tool mode in the status bar (or in the chat) and choose **Bypass**.
+2. The card **Switch approvals off in this chat?** shows in the chat. It says what will no longer be asked, what
+   still asks, what your organisation's server records, and **For how long**: the shortest time is preselected.
+   Under **Why (optional)** you may say why; your administrators see it.
+3. Select **Switch Bypass on**. Enter and Esc never switch it on, and **Not now** allows nothing.
+
+Bypass starts only once your organisation's server has confirmed it. When you are offline, or the server refuses, the
+card says **Bypass is not on** and why, and the chat stays in its mode.
+
+??? info "What no longer asks, what still asks, and what is recorded"
+    In this chat only, the assistant runs its tools without asking you first, also those that delete, send or cannot
+    be undone, and those nobody has classified. Your other chats ask as before.
+
+    Still asked: your administrator's **Ask first** rules and tools marked to always ask. What is blocked stays
+    blocked.
+
+    Your organisation's server records each tool that runs without asking: which tool, when and where, and, unless
+    your organisation records less, what it was given, with personal data masked. Your organisation may also keep a
+    short summary of each result. The card says which applies, and so does the band in the chat while it runs.
+
+While it runs:
+
+| Where | What you see |
+|---|---|
+| The chat's header, in the window and in the avatar's bubble | **Bypass on · 12 min left**, what is recorded, and **Stop** |
+| The avatar | The minutes left, in a warning frame |
+| The title bar | **Bypass on · 12 min left**, with **Stop** |
+| The avatar's and the tray's menus | **Stop Bypass** |
+| The chat's **Settings**, under **Approvals** | **Bypass in a chat**, the time left and what is recorded, with **Revoke** |
+
+- **Stop** ends it at once and stops the reply that is being written; the chat goes back to the mode it had before.
+- It cannot be extended: when the time is up, it ends. For more time, choose **Bypass** again and answer the card.
+- Choosing another mode, starting a new chat or opening another one ends it as well.
+- Quitting the app ends it, and it never comes back when you start the app again.
+
+??? info "Why Bypass can end early"
+    When Bypass ends, the band in the chat goes and a line says why: **you ended it** (Stop, Revoke, another mode, or
+    another of your devices), **its time is up**, **an administrator ended it**, **your organisation turned Bypass
+    off**, or **your organisation narrowed who may use it**. From then on, approvals ask again.
+
 ## When it does not work
 
 | You see | What to do |
@@ -86,3 +132,6 @@ style** ends it as well, in every place.
 | **This cannot run any longer** | It reached the longest time for this assistant. Select **Work alongside me…** again. |
 | **Stop did not reach the server** | Select **Stop** again. Without a connection, it still ends at its time. |
 | **Turning it off did not reach the server** | It runs on until its time. The app tries again until the server answers; you can also select **Stop**. |
+| **Bypass is not on: your organisation does not allow it for this agent now** | Your administrator has not allowed Bypass for this assistant, or turned it off. Ask your administrator. |
+| **Bypass is not on: the server could not be reached** | Check your connection, then choose **Bypass** again. |
+| **Bypass could not be stopped** | Select **Stop** again. Without a connection, Bypass still ends at its time. |
