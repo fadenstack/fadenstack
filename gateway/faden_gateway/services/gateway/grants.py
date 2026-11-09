@@ -662,6 +662,16 @@ async def live(session: AsyncSession, owner: Owner) -> list[ApprovalGrant]:
     )).scalars().all())
 
 
+async def find(session: AsyncSession, grant_id: uuid.UUID, owner: Owner) -> ApprovalGrant | None:
+    """One grant of the owner's device, in whatever state; ``None`` when it is not theirs.
+
+    For the device to say why a grant ended (``revoked_by``, expiry) after it left the live list.
+    """
+    return (await session.execute(
+        select(ApprovalGrant).where(ApprovalGrant.id == grant_id, _device_owned(owner)),
+    )).scalar_one_or_none()
+
+
 async def _change(
     session: AsyncSession, grant_id: uuid.UUID, where: Any, values: dict[str, Any],
 ) -> ApprovalGrant | None:

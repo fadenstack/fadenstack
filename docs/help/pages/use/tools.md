@@ -76,7 +76,7 @@ When a tool needs your approval, the reply pauses and a card shows **… wants t
 It is there only when your administrator has allowed it, the agent offers it as its highest level, and the agent's app supports it. You switch it on yourself, in the agent's app. No conversation starts in it.
 
 1. Choose **Bypass** in the agent's tool mode.
-2. Read the confirmation. It says what will no longer be asked, and for how long.
+2. Read the confirmation. It says what will no longer be asked, what still asks, what the server records, and for how long. You may add why; your administrators see it.
 3. Confirm. Bypass starts only once the server has recorded it: when you are offline or the server refuses, there is no Bypass, and you are told so.
 
 While it runs, a marker shows the time left. Select **Stop** to end it at once. Leaving Bypass ends it too, and so does the end of the time.
@@ -90,8 +90,9 @@ Bypass skips questions, never rules. These still ask, or are refused:
 ??? info "More about Bypass"
     - A new conversation never inherits Bypass, and neither does an agent you delegate to or one that receives work from yours. The model, a tool, a skill or another agent cannot switch it on for you.
     - The longest time is set by your administrator.
-    - Every call that runs under Bypass is recorded on the server: the tool, the time and its arguments, with personal data masked. Reads and writes are included. After each turn your device also reports what it ran, and the server flags any difference. Only people your organisation has named as approvals auditors can read these records, and every look is recorded too.
-    - If your administrator turns Bypass off, it acts as **Auto** at once and any running Bypass ends.
+    - A Bypass is not extended. When its time is up it ends; more time is a new Bypass, confirmed again.
+    - Every call that runs under Bypass is recorded on the server: the tool and the time and, unless your organisation records less, its arguments, with personal data masked. Your organisation may also keep a short summary of each result. The confirmation says which. Reads and writes are included. After each turn your device also reports what it ran, and the server flags any difference. Only people your organisation has named as approvals auditors can read these records, and every look is recorded too.
+    - If your administrator turns Bypass off, it acts as **Auto** at once and any running Bypass ends. When the server ends a Bypass (its time, an administrator, Bypass turned off), the marker goes and the app says why.
 
 More for administrators: [Bypass](../administer/policies.md#bypass).
 

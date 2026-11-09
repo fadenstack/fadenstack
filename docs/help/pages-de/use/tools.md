@@ -76,7 +76,7 @@ Wenn ein Tool Ihre Zustimmung braucht, hält die Antwort an, und eine Karte zeig
 Es steht nur zur Verfügung, wenn Ihr Administrator es erlaubt hat, der Agent es als höchste Stufe anbietet und die Anwendung des Agenten es unterstützt. Sie schalten es selbst in der Anwendung des Agenten ein. Keine Unterhaltung beginnt damit.
 
 1. Wählen Sie im Tool-Modus des Agenten **Bypass**.
-2. Lesen Sie die Bestätigung. Sie sagt, wonach nicht mehr gefragt wird und wie lange.
+2. Lesen Sie die Bestätigung. Sie sagt, wonach nicht mehr gefragt wird, was weiter fragt, was der Server festhält und wie lange. Sie können einen Grund angeben; Ihre Administration sieht ihn.
 3. Bestätigen Sie. Bypass beginnt erst, wenn der Server es festgehalten hat: Sind Sie offline oder lehnt der Server ab, gibt es kein Bypass, und Sie werden darüber informiert.
 
 Solange es läuft, zeigt eine Markierung die Restzeit. Wählen Sie **Stoppen**, um es sofort zu beenden. Auch das Verlassen von Bypass beendet es, ebenso das Ende der Zeit.
@@ -90,8 +90,9 @@ Bypass überspringt Fragen, nie Regeln. Diese fragen weiter oder werden abgelehn
 ??? info "Mehr zu Bypass"
     - Eine neue Unterhaltung erbt Bypass nie, ebenso wenig ein Agent, an den Sie delegieren, oder einer, der Arbeit von Ihrem Agenten übernimmt. Das Modell, ein Tool, ein Skill oder ein anderer Agent kann es nicht für Sie einschalten.
     - Die längste Zeit legt Ihr Administrator fest.
-    - Jeder Aufruf, der unter Bypass läuft, wird auf dem Server festgehalten: das Tool, die Zeit und seine Argumente, mit maskierten personenbezogenen Daten. Lesende und schreibende Aufrufe sind eingeschlossen. Ihr Gerät meldet nach jeder Runde außerdem, was es ausgeführt hat, und der Server kennzeichnet jeden Unterschied. Nur Personen, die Ihre Organisation als Freigabe-Prüfer benannt hat, können diese Aufzeichnungen lesen, und jeder Blick wird ebenfalls festgehalten.
-    - Schaltet Ihr Administrator Bypass aus, wirkt es sofort wie **Automatisch**, und laufendes Bypass endet.
+    - Bypass wird nicht verlängert. Ist seine Zeit um, endet es; mehr Zeit ist ein neues Bypass, erneut bestätigt.
+    - Jeder Aufruf, der unter Bypass läuft, wird auf dem Server festgehalten: das Tool und die Zeit und, sofern Ihre Organisation nicht weniger festhält, seine Argumente, mit maskierten personenbezogenen Daten. Ihre Organisation kann auch eine kurze Zusammenfassung jedes Ergebnisses aufbewahren. Die Bestätigung sagt, was gilt. Lesende und schreibende Aufrufe sind eingeschlossen. Ihr Gerät meldet nach jeder Runde außerdem, was es ausgeführt hat, und der Server kennzeichnet jeden Unterschied. Nur Personen, die Ihre Organisation als Freigabe-Prüfer benannt hat, können diese Aufzeichnungen lesen, und jeder Blick wird ebenfalls festgehalten.
+    - Schaltet Ihr Administrator Bypass aus, wirkt es sofort wie **Automatisch**, und laufendes Bypass endet. Beendet der Server ein Bypass (seine Zeit, ein Administrator, Bypass ausgeschaltet), verschwindet die Markierung, und die Anwendung sagt, warum.
 
 Mehr für Administratoren: [Bypass](../administer/policies.md#bypass).
 

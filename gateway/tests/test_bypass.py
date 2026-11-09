@@ -318,6 +318,36 @@ async def test_with_the_switch_off_bypass_covers_nothing_and_the_kill_switch_end
     assert tuple(row) == ("revoked", "kill_switch")
 
 
+@pytest.mark.anyio
+@needs_postgres
+async def test_the_device_reads_why_its_bypass_ended_and_the_list_applies_the_kill_switch_first(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,  # noqa: F811 - the fixture
+    backend: _Backend,  # noqa: F811 - the fixture
+) -> None:
+    """The device's marker goes when the server ends a Bypass, and the chat says why (sdk/09 L-59, L-63)."""
+    backend.put(_profile(max_level="bypass"))
+    fastapi_app.state.agent_directory.invalidate()
+    grant = (await _bypass(client)).json()
+    running = await client.get(f"{GRANTS}/{grant['id']}", headers=_auth())
+    assert (running.status_code, running.json()["status"], running.json()["revoked_by"]) == (200, "active", None)
+    approval_settings.remember(ON, ttl_sec=0)
+
+    async def read(_: str | None = None) -> approval_settings.ApprovalSettings:
+        return OFF
+
+    monkeypatch.setattr(approval_settings, "read", read)
+    listed = await client.get(GRANTS, headers=_auth())
+    assert (listed.status_code, listed.json()["data"]) == (200, []), "the kill switch applied before the list"
+    ended = await client.get(f"{GRANTS}/{grant['id']}", headers=_auth())
+    assert (ended.status_code, ended.json()["status"], ended.json()["revoked_by"]) == (200, "revoked", "kill_switch")
+    assert ended.json()["evidence_level"] == "calls"
+    other_device = await client.get(f"{GRANTS}/{grant['id']}", headers=_auth(did="device-8"))
+    other_person = await client.get(f"{GRANTS}/{grant['id']}", headers=_auth(sub="someone-else"))
+    unknown = await client.get(f"{GRANTS}/{uuid.uuid4()}", headers=_auth())
+    assert [r.status_code for r in (other_device, unknown)] == [404, 404], "ASVS 5.0 8.2.2"
+    assert other_person.status_code in (403, 404), "an unknown person is refused at the sign-in already"
+
+
 # -- the grant's store, on Postgres -------------------------------------------------------------
 
 

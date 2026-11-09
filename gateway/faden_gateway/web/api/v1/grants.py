@@ -4,6 +4,7 @@
   it (RFC 9396: a shorter time, fewer classes) and answers with what it granted and its own time. No answer,
   no grant (L-59): the device relies on a grant only once it has this answer.
 - ``GET /v1/agents/{agent}/grants``: the device's live grants for the agent, for the marker and Settings.
+- ``GET /v1/agents/{agent}/grants/{id}``: one of the device's grants in any state, so it can say why one ended.
 - ``DELETE /v1/agents/{agent}/grants/{id}`` and ``DELETE /v1/grants/{id}``: the person ends a grant, from the
   agent or signed in anywhere. It holds from the next call on; a call already running finishes.
 - ``POST /v1/agents/{agent}/grants/{id}/pause`` and ``.../resume``: only the grant's device; the clock runs
@@ -197,11 +198,31 @@ async def list_grants(
 ) -> JSONResponse:
     """The device's live grants for the agent: active or paused, unexpired, not spent."""
     auth, agent, device_id = _device(caller)
+    # Bypass turned off since this worker last read the settings ends the running Bypass grants before they
+    # are listed, so the device's marker goes with them (ASVS 5.0 8.3.2: applied immediately).
+    await approval_settings.current(dao.session.bind)
     found = await grants.live(dao.session, _owner(auth, agent, device_id))
     now = await grants.server_now(dao.session)
     return JSONResponse({
         "object": "list", "data": [grants.as_dict(g, now) for g in found], "server_now": now.isoformat(),
     })
+
+
+@router.get("/v1/agents/{agent}/grants/{grant_id}", response_model=None)
+async def get_grant(
+    grant_id: str,
+    caller: Annotated[tuple[AuthContext, AgentRequest], Depends(agent_request)],
+    dao: Annotated[GatewayDAO, Depends()],
+) -> JSONResponse:
+    """One grant of this device, in whatever state: why it ended (``revoked_by``), once it left the list.
+
+    Only the grant's own device reads it; any other caller gets 404, as for a grant that does not exist
+    (ASVS 5.0 8.2.2).
+    """
+    auth, agent, device_id = _device(caller)
+    await approval_settings.current(dao.session.bind)
+    grant = await grants.find(dao.session, _grant_id(grant_id), _owner(auth, agent, device_id))
+    return await _answer(dao, grant)
 
 
 @router.delete("/v1/agents/{agent}/grants/{grant_id}", response_model=None)
