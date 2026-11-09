@@ -629,9 +629,11 @@ async def test_the_migration_upgrades_and_downgrades(dbsession: AsyncSession) ->
 
 
 def test_the_pairing_migration_meets_the_approval_levels_in_one_head() -> None:
-    """The desktop branch's ``p41r1ng`` and 0.6.0's line up to ``4ppr0v4l5`` join in ``m3rg3d5k``: one head."""
+    """The desktop branch's ``p41r1ng`` and 0.6.0's line up to ``4ppr0v4l5`` join in ``m3rg3d5k``; the second
+    sign-in's ``st3pup0`` joins it in ``m3rg3d6s``: one head."""
     from alembic.script import ScriptDirectory
 
     scripts = ScriptDirectory(str(MIGRATION.parent.parent))
-    assert scripts.get_heads() == ["m3rg3d5k"]
+    assert scripts.get_heads() == ["m3rg3d6s"]
+    assert set(scripts.get_revision("m3rg3d6s").down_revision) == {"m3rg3d5k", "st3pup0"}
     assert set(scripts.get_revision("m3rg3d5k").down_revision) == {"p41r1ng", "4ppr0v4l5"}

@@ -138,6 +138,42 @@
     "local_account": "Fadenstack 账户",
     "account_name": "账户名",
     "account_name_help": "您在 {{provider}} 的登录名，例如 zhangsan 或 zhangsan@example.com",
+    "step_up": {
+      "title": "重新登录",
+      "intro": "请重新登录，以便在一个聊天中关闭审批。即使你已在此处登录，应用仍需要一次新的登录。",
+      "sign_in_again": "重新登录",
+      "agent": "智能体",
+      "device": "设备",
+      "what": "在一个聊天中关闭审批：工具无需询问即可运行；规则和“先询问”仍然有效；每次调用都会被记录。",
+      "longest": "每个聊天最多 {{minutes}} 分钟",
+      "signed_in_as": "已重新登录为 {{account}}",
+      "decide_before": "请在 {{time}} 之前决定",
+      "approve": "批准",
+      "deny": "拒绝",
+      "approved": "已批准。请返回应用：它会开启 Bypass。",
+      "denied": "已拒绝。Bypass 保持关闭。",
+      "expired": "此次登录已结束。请在应用中重新开始。",
+      "error": {
+        "wrong_credentials": "这些不是应用所使用账户的登录信息。",
+        "use_sign_in_provider": "你的组织通过其自有登录方式让你登录：请使用其按钮。",
+        "too_many_tries": "尝试次数过多。请等待 {{seconds}} 秒。",
+        "sign_in_too_old": "你的登录已超过 5 分钟。请重新登录。",
+        "sign_in_first": "请先重新登录。",
+        "opened_elsewhere": "此次登录正在另一个浏览器中继续。",
+        "expired": "此次登录已结束。请在应用中重新开始。",
+        "provider_unavailable": "目前无法连接登录服务。请稍后再试。",
+        "not_offered": "此处不提供这种登录方式。",
+        "other": "登录未成功。请重试。"
+      },
+      "refused": {
+        "not_fresh": "登录服务未确认一次新的登录。请重新登录。",
+        "wrong_account": "这不是应用所使用的账户。",
+        "expired": "此次登录已结束。请在应用中重新开始。",
+        "provider_error": "登录未成功。请重试；如果仍然失败，请告知管理员。",
+        "provider_unavailable": "目前无法连接登录服务。请稍后再试。",
+        "other": "登录未成功。"
+      }
+    },
     "refused": {
       "account_disabled": "此账户已被停用。请联系管理员。",
       "account_not_verified": "此账户的电子邮件地址尚未确认。",
@@ -921,6 +957,7 @@
     "search_placeholder": "搜索设置...",
     "no_results": "没有匹配的设置项。",
     "protected_help": "更改它需要 Root 模式：请在顶部栏中启用。",
+    "protected_narrowing_help": "开启它需要 Root 模式；关闭则不需要。",
     "generate_secret": "生成安全令牌",
     "secret_generated": "已生成安全令牌。",
     "secret_generate_failed": "生成安全令牌失败。",
@@ -989,6 +1026,7 @@
       "retention": "保留期限",
       "bypass": "绕过",
       "grants": "授权",
+      "evidence": "凭证",
       "vendor_links": "指向 fadenstack.com 的链接"
     },
     "current_value": "（当前：{{value}}）",
@@ -4771,6 +4809,14 @@
       "side_gateway": "网关",
       "flag_gateway_only": "网关已记录，设备未上报",
       "device_only_title": "设备已上报，网关未记录",
+      "signed_in_again": "已重新登录：{{method}} · {{time}}",
+      "signed_in_again_provider": "已重新登录：{{method}}（{{provider}}）· {{time}}",
+      "step_up_method": {
+        "password": "密码",
+        "oidc": "OpenID Connect",
+        "saml": "SAML",
+        "ldap": "目录"
+      },
       "calls_reason": "该人员给出的理由",
       "calls_unavailable": "服务器目前无法显示地点和参数。",
       "calls_place": "地点",

@@ -109,6 +109,17 @@ export interface Grant {
   remaining_s: number;
   /** Calls the device reported and the gateway did not record, or the reverse. */
   flags: number;
+  /** For a Bypass grant: how the person signed in again before it, with which provider, and when. */
+  step_up_method?: string | null;
+  step_up_provider?: string | null;
+  step_up_at?: string | null;
+}
+
+/** How and when the person signed in again before a Bypass grant (`method`: password, oidc, saml or ldap). */
+export interface GrantStepUp {
+  method: string;
+  provider: string | null;
+  at: string | null;
 }
 
 /**
@@ -142,6 +153,8 @@ export interface GrantCalls {
   evidence_level?: "decisions" | "calls" | "results" | null;
   /** The person's own words on why (Bypass), if they gave any. */
   reason?: string | null;
+  /** The second sign-in the grant was given after, if it had one. */
+  step_up?: GrantStepUp | null;
 }
 
 /** List, create, change and remove one kind of ordered pattern rule. */

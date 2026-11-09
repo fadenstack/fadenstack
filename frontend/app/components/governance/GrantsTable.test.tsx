@@ -118,6 +118,27 @@ describe("GrantsTable", () => {
     expect(screen.getAllByRole("button", { name: "Show calls" })).toHaveLength(1);
   });
 
+  it("says how the person signed in again, in the list and in the calls", async () => {
+    api.grants.mockResolvedValue([
+      { ...BYPASS, step_up_method: "oidc", step_up_provider: "Entra", step_up_at: "2026-11-07T09:58:00Z" },
+      { ...TIME, id: "g-4", step_up_method: "password", step_up_provider: null, step_up_at: "2026-11-07T09:59:00Z" },
+    ]);
+    api.grantCalls.mockResolvedValue({
+      data: [],
+      device_only: [],
+      step_up: { method: "ldap", provider: "Corp AD", at: "2026-11-07T09:58:00Z" },
+    });
+    renderPage(<GrantsTable />);
+
+    // The rows are drawn again as the agent names arrive.
+    await settled();
+    expect(screen.getByText(/^Signed in again: OpenID Connect \(Entra\) · /)).toBeInTheDocument();
+    expect(screen.getByText(/^Signed in again: password · /)).toBeInTheDocument();
+
+    const dialog = await openCalls();
+    expect(await within(dialog).findByText(/^Signed in again: directory \(Corp AD\) · /)).toBeInTheDocument();
+  });
+
   it("lists the calls of a Bypass grant", async () => {
     api.grants.mockResolvedValue([BYPASS]);
     api.grantCalls.mockResolvedValue({

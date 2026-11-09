@@ -298,7 +298,7 @@ def _grant(row: Any) -> dict[str, Any]:
     out["id"] = str(out["id"])
     if isinstance(out.get("scope"), str):
         out["scope"] = json.loads(out["scope"])
-    for key in ("issued_at", "expires_at", "paused_at"):
+    for key in ("issued_at", "expires_at", "paused_at", "step_up_at"):
         out[key] = out[key].isoformat() if out.get(key) else None
     return out
 
@@ -310,13 +310,15 @@ async def list_grants(request: Request, _admin: Admin, tenant_id: str = "default
     What a person let an agent on one of their devices do for a while without asking: one tool, reads and
     writes in named places, or -- Bypass -- whatever the chat's mode would ask about. The time left is the
     database's, as the gateway counts it. ``flags``: calls of a Bypass session where the device's report and
-    the gateway's record differ (L-61).
+    the gateway's record differ (L-61). ``step_up_method``, ``step_up_provider``, ``step_up_at``: how and when
+    the person signed in again to switch Bypass on (sdk/41, L-59).
     """
     async with _gateway(request)() as db:
         rows = await db.execute(
             text(
                 "SELECT id, kind, status, user_id, agent_id, agent_version, device_id, conversation_id, "
                 "scope, issued_at, expires_at, paused_at, max_calls, calls_used, "
+                "step_up_method, step_up_provider, step_up_at, "
                 "GREATEST(0, EXTRACT(EPOCH FROM expires_at - clock_timestamp()))::int AS remaining_s, "
                 "(SELECT count(*) FROM approval_grant_flag f WHERE f.grant_id = approval_grant.id)::int "
                 "AS flags "
@@ -398,7 +400,11 @@ async def grant_calls(
     allowed = await RbacDAO(session).has_permission(user.id, *APPROVALS_EVIDENCE_AUDIT)
     async with _gateway(request)() as db:
         grant = (await db.execute(
-            text("SELECT id, user_id, kind, tenant_id FROM approval_grant WHERE id = :id"), {"id": grant_id},
+            text(
+                "SELECT id, user_id, kind, tenant_id, step_up_method, step_up_provider, step_up_at "
+                "FROM approval_grant WHERE id = :id",
+            ),
+            {"id": grant_id},
         )).first()
         if grant is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such grant.")
@@ -449,4 +455,12 @@ async def grant_calls(
         "evidence": "unavailable" if found is None else "shown",
         "evidence_level": (found or {}).get("evidence_level"),
         "reason": (found or {}).get("reason"),
+        # How and when the person signed in again to switch Bypass on (sdk/41).
+        "step_up": (
+            {
+                "method": grant.step_up_method, "provider": grant.step_up_provider,
+                "at": grant.step_up_at.isoformat() if grant.step_up_at else None,
+            }
+            if grant.step_up_method else None
+        ),
     }

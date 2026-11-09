@@ -77,9 +77,14 @@ It is there only when your administrator has allowed it, the agent offers it as 
 
 1. Choose **Bypass** in the agent's tool mode.
 2. Read the confirmation. It says what will no longer be asked, what still asks, what the server records, and for how long. You may add why; your administrators see it.
-3. Confirm. Bypass starts only once the server has recorded it: when you are offline or the server refuses, there is no Bypass, and you are told so.
+3. Select **Switch Bypass on** on the card. Your browser opens at Fadenstack's page **Sign in again**. Sign in there again, even if you are already signed in to the console: with your password, or with your organisation's sign-in, which asks you again (with its multi-factor step, if it has one). The page shows what you approve: the agent, the device, "switch approvals off in one chat" and the longest time. Select **Approve** or **Deny**.
+4. Meanwhile the app waits. Its card asks you to sign in again in your browser and shows a code; compare it with the code on the page. **Open the page again** opens the page once more.
 
-While it runs, a marker shows the time left. Select **Stop** to end it at once. Leaving Bypass ends it too, and so does the end of the time.
+Bypass starts only once you have approved and the server has recorded it: when you are offline, the server refuses, you select **Deny** or nobody answers within 10 minutes, there is no Bypass, and you are told so.
+
+While it runs, a marker shows the time left. Select **Stop** to end it at once. Leaving Bypass ends it too, and so does the end of the time. The reason field takes up to 500 characters.
+
+Bypass stays with its chat. Starting a new chat or switching to another does not end it. The chat list shows which chats run in Bypass and the time left; when you open such a chat, its band shows again.
 
 Bypass skips questions, never rules. These still ask, or are refused:
 
@@ -90,6 +95,9 @@ Bypass skips questions, never rules. These still ask, or are refused:
 ??? info "More about Bypass"
     - A new conversation never inherits Bypass, and neither does an agent you delegate to or one that receives work from yours. The model, a tool, a skill or another agent cannot switch it on for you.
     - The longest time is set by your administrator.
+    - One sign-in covers switching Bypass on in other chats with the same app on the same computer for 5 minutes.
+    - When the app quits, a running Bypass pauses, and its time runs on. Start the app again within 30 minutes and it resumes, with no new card and no new sign-in. Later than that, it has ended, and the app says why. If your organisation narrowed Bypass meanwhile, it ends instead of resuming.
+    - When Bypass ends, the agent is told that tools ask again. It may say so and suggest switching Bypass on again, but it cannot do that itself. Only you can: select **Switch on again** on the line that says it ended. The card and the second sign-in follow.
     - A Bypass is not extended. When its time is up it ends; more time is a new Bypass, confirmed again.
     - Every call that runs under Bypass is recorded on the server: the tool and the time and, unless your organisation records less, its arguments, with personal data masked. Your organisation may also keep a short summary of each result. The confirmation says which. Reads and writes are included. After each turn your device also reports what it ran, and the server flags any difference. Only people your organisation has named as approvals auditors can read these records, and every look is recorded too.
     - If your administrator turns Bypass off, it acts as **Auto** at once and any running Bypass ends. When the server ends a Bypass (its time, an administrator, Bypass turned off), the marker goes and the app says why.

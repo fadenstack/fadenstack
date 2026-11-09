@@ -308,10 +308,13 @@ für Administratoren sagt das, und **Aufheben** darin erlaubt wieder Freigaben i
 **Warnungen per E-Mail.** Ist [E-Mail](mail.md) eingerichtet, erhalten Administratoren und die Adressen unter
 deren **Warnungen** eine E-Mail:
 
-- wenn jemand Bypass einschaltet: wer, mit welchem Agenten und welcher Version, auf welchem Gerät, von wann bis
-  wann, und den Grund, den die Person angegeben hat, falls sie einen angegeben hat;
+- einmal am Tag, als eine Sammelmail, für jedes Einschalten seit der letzten: wer, mit welchem Agenten und welcher
+  Version, auf welchem Gerät, von wann bis wann, wie und wann die Person sich erneut angemeldet hat, und den Grund,
+  den sie angegeben hat, falls sie einen angegeben hat. Sie geht um 07:00 in der Zeitzone der Installation hinaus
+  (die unter den Nutzungs-Einstellungen gesetzte; UTC, wenn nichts gesetzt ist). Ein Tag ohne Einschalten sendet
+  keine;
 - wenn sich die Meldung des Geräts einer Bypass-Sitzung von dem unterscheidet, was der Server festgehalten hat:
-  einmal je Sitzung.
+  sofort, einmal je Sitzung.
 
 ### Agentenaktionen {#agent-actions}
 
@@ -367,7 +370,7 @@ zweimal abgelehnt, zeigt denselben Wert, und niemand kann den Text daraus zurüc
 **Erlauben**
 
 1. Starten Sie den **Root-Modus**, den das Ändern dieser Einstellungen braucht.
-2. Öffnen Sie **Einstellungen → Freigaben** und schalten Sie **Allow Bypass** ein (`approvals.bypass_allowed`).
+2. Öffnen Sie **Einstellungen → Freigaben** und schalten Sie **Allow Bypass** ein (`approvals.bypass_allowed`). Das Einschalten braucht den Root-Modus, das Ausschalten nicht. Jede Änderung steht im Audit-Protokoll mit altem und neuem Wert und der Angabe, ob der Root-Modus an war.
 3. Stellen Sie in der Version des Agenten unter **Freigabestufen → Höchstens** **Bypass** ein (siehe [Tools und Zustimmungen](agents.md#tools-and-approvals)). Eine solche Version lässt sich nur veröffentlichen, solange Bypass erlaubt ist.
 
 Die Stufe **Beginnt in** kann nie Bypass sein, daher beginnt keine Unterhaltung darin. Eine [Grenze für den Tool-Modus](#tool-mode-limits) unter Bypass (<span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span>) nimmt die Wahl weg.
@@ -378,6 +381,16 @@ Die Stufe **Beginnt in** kann nie Bypass sein, daher beginnt keine Unterhaltung 
 |---|---|---|
 | **Longest grant (minutes)** (`approvals.longest_grant_minutes`) | 120 (15 bis 720) | Die längste Dauer jeder Freigabe: auf Zeit, für einen Arbeitsabschnitt oder Bypass. Die eigene längste Freigabe eines Agenten darf nur kürzer sein. |
 | **Keep Bypass records (days)** (`approvals.bypass_retention_days`) | 365 (90 bis 1095) | Bypass-Sitzungen und ihre Aufrufe werden so lange nach ihrem Ende gelöscht. |
+| **Result summary (characters)** (`approvals.result_summary_chars`) | 500 (0 bis 2000) | Wo eine Freigabe Ergebnisse festhält, wie viel vom Ergebnis jedes abgedeckten Aufrufs bleibt, nachdem personenbezogene Daten maskiert wurden. 0 hält nur fest, ob er gelang, und den Text eines Fehlers. Ein Fehler behält immer seine ersten 500 Zeichen. |
+
+**Die erneute Anmeldung.** Um Bypass einzuschalten, meldet sich eine Person im Browser erneut an. Das lässt sich nicht abschalten. **Freigaben auf Zeit** (und, für Inhaber von `approvals_auditor`, die Aufrufe einer Sitzung) zeigen, wie und wann die Person sich erneut angemeldet hat: Passwort, OpenID Connect, SAML oder Verzeichnis, mit dem Namen des Anbieters. Prüfen Sie das bei Ihrem Anmelde-Anbieter, bevor Sie Bypass erlauben:
+
+- Ein OpenID-Connect-Anbieter wird mit `prompt=login` und `max_age=0` gefragt und muss mit `auth_time` antworten.
+- Ein SAML-Anbieter wird mit `ForceAuthn` gefragt, und das `AuthnInstant` seiner Assertion muss später als die Anfrage liegen.
+- Ein Anbieter, der aus einer älteren Sitzung antwortet, wird abgelehnt: „Der Anmelde-Anbieter hat keine frische Anmeldung bestätigt“.
+- Ein Verzeichnis (LDAP) fragt erneut nach dem Passwort.
+
+Anwendungen, die die erneute Anmeldung nicht können (ältere SDK-Versionen), erhalten Bypass nicht angeboten.
 
 **Was Bypass nicht überspringt.** Ausgeblendete und abgelehnte Tools bleiben es. Regeln **Deny**, Regeln **Erst nachfragen** und Tools, die der Autor des Agenten mit **Immer nachfragen** markiert hat, gelten weiter. Tools, die an Maschinen oder in der physischen Welt handeln, werden noch nicht von selbst erkannt: Markieren Sie sie mit **Immer nachfragen** oder legen Sie eine Regel **Erst nachfragen** an.
 

@@ -138,6 +138,42 @@
     "local_account": "Fadenstack-Konto",
     "account_name": "Kontoname",
     "account_name_help": "Ihr Anmeldename bei {{provider}}, etwa mmuster oder m.muster@example.com",
+    "step_up": {
+      "title": "Erneut anmelden",
+      "intro": "Melden Sie sich erneut an, um die Freigaben in einem Chat abzuschalten. Auch wenn Sie hier angemeldet sind, braucht die App eine frische Anmeldung.",
+      "sign_in_again": "Erneut anmelden",
+      "agent": "Agent",
+      "device": "Gerät",
+      "what": "Freigaben in einem Chat abschalten: Werkzeuge laufen ohne Rückfrage; Regeln und „Erst fragen“ gelten weiter; jeder Aufruf wird aufgezeichnet.",
+      "longest": "Höchstens {{minutes}} Minuten pro Chat",
+      "signed_in_as": "Erneut angemeldet als {{account}}",
+      "decide_before": "Entscheiden bis {{time}}",
+      "approve": "Genehmigen",
+      "deny": "Ablehnen",
+      "approved": "Genehmigt. Zurück zur App: Sie schaltet Bypass ein.",
+      "denied": "Abgelehnt. Bypass bleibt aus.",
+      "expired": "Diese Anmeldung ist beendet. In der App neu starten.",
+      "error": {
+        "wrong_credentials": "Das sind nicht die Anmeldedaten des Kontos, das die App verwendet.",
+        "use_sign_in_provider": "Ihre Organisation meldet Sie mit einer eigenen Anmeldung an: deren Schaltfläche verwenden.",
+        "too_many_tries": "Zu viele Versuche. {{seconds}} Sekunden warten.",
+        "sign_in_too_old": "Die Anmeldung ist älter als 5 Minuten. Erneut anmelden.",
+        "sign_in_first": "Zuerst erneut anmelden.",
+        "opened_elsewhere": "Diese Anmeldung läuft in einem anderen Browser weiter.",
+        "expired": "Diese Anmeldung ist beendet. In der App neu starten.",
+        "provider_unavailable": "Der Anmeldedienst ist gerade nicht erreichbar. Gleich noch einmal versuchen.",
+        "not_offered": "Diese Anmeldung wird hier nicht angeboten.",
+        "other": "Die Anmeldung hat nicht geklappt. Noch einmal versuchen."
+      },
+      "refused": {
+        "not_fresh": "Der Anmeldedienst hat keine frische Anmeldung bestätigt. Erneut anmelden.",
+        "wrong_account": "Das ist nicht das Konto, das die App verwendet.",
+        "expired": "Diese Anmeldung ist beendet. In der App neu starten.",
+        "provider_error": "Die Anmeldung hat nicht geklappt. Erneut versuchen; scheitert sie weiter, der Administration Bescheid sagen.",
+        "provider_unavailable": "Der Anmeldedienst ist gerade nicht erreichbar. Gleich noch einmal versuchen.",
+        "other": "Die Anmeldung hat nicht geklappt."
+      }
+    },
     "refused": {
       "account_disabled": "Dieses Konto ist abgeschaltet. Wenden Sie sich an die Administration.",
       "account_not_verified": "Die E-Mail-Adresse dieses Kontos ist noch nicht bestätigt.",
@@ -921,6 +957,7 @@
     "search_placeholder": "Einstellungen suchen...",
     "no_results": "Keine passenden Einstellungen gefunden.",
     "protected_help": "Eine Änderung braucht den Root-Modus: Aktivieren Sie ihn in der oberen Leiste.",
+    "protected_narrowing_help": "Das Einschalten braucht den Root-Modus; das Ausschalten nicht.",
     "generate_secret": "Sicheres Token erzeugen",
     "secret_generated": "Sicheres Token wurde erzeugt.",
     "secret_generate_failed": "Sicheres Token konnte nicht erzeugt werden.",
@@ -989,6 +1026,7 @@
       "retention": "Aufbewahrung",
       "bypass": "Bypass",
       "grants": "Zeitfreigaben",
+      "evidence": "Nachweise",
       "vendor_links": "Links zu fadenstack.com"
     },
     "current_value": "(aktuell: {{value}})",
@@ -4771,6 +4809,14 @@
       "side_gateway": "Gateway",
       "flag_gateway_only": "Vom Gateway erfasst, vom Gerät nicht gemeldet",
       "device_only_title": "Vom Gerät gemeldet, vom Gateway nicht erfasst",
+      "signed_in_again": "Erneut angemeldet: {{method}} · {{time}}",
+      "signed_in_again_provider": "Erneut angemeldet: {{method}} ({{provider}}) · {{time}}",
+      "step_up_method": {
+        "password": "Passwort",
+        "oidc": "OpenID Connect",
+        "saml": "SAML",
+        "ldap": "Verzeichnis"
+      },
       "calls_reason": "Begründung der Person",
       "calls_unavailable": "Der Server konnte die Orte und Argumente gerade nicht anzeigen.",
       "calls_place": "Ort",

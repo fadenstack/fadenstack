@@ -47,6 +47,21 @@ const shortName = (identifier: string) => {
 
 const places = (g: Grant) => (g.scope.targets ?? []).flatMap((target) => target.identifiers);
 
+/** "Signed in again: password · 10:15": how the person signed in again before a Bypass grant. */
+function SignedInAgain({ method, provider, at }: { method: string; provider?: string | null; at?: string | null }) {
+  const { t } = useTranslation();
+  const values = {
+    method: t(`governance.grants.step_up_method.${method}`, { defaultValue: method }),
+    provider,
+    time: formatDateTime(at),
+  };
+  return (
+    <Typography variant="caption" color="text.secondary" sx={{ display: "block", overflowWrap: "anywhere" }}>
+      {provider ? t("governance.grants.signed_in_again_provider", values) : t("governance.grants.signed_in_again", values)}
+    </Typography>
+  );
+}
+
 /** A block of JSON or text that stays small: about ten lines, then it scrolls. */
 const scrollBox = {
   fontFamily: "monospace",
@@ -99,6 +114,9 @@ export function GrantCallsDialog({ grantId, onClose }: { grantId: string; onClos
                 {calls.reason}
               </Typography>
             </Stack>
+          )}
+          {calls?.step_up && (
+            <SignedInAgain method={calls.step_up.method} provider={calls.step_up.provider} at={calls.step_up.at} />
           )}
           {calls?.evidence === "unavailable" && <Alert severity="warning">{t("governance.grants.calls_unavailable")}</Alert>}
           {loading && <CircularProgress size={24} aria-label={t("common.loading")} />}
@@ -253,7 +271,14 @@ export function GrantsTable() {
     {
       key: "kind",
       label: t("governance.grants.kind"),
-      render: (g) => <Chip size="small" variant="outlined" label={t(`governance.grants.kind_value.${g.kind}`)} />,
+      render: (g) => (
+        <>
+          <Chip size="small" variant="outlined" label={t(`governance.grants.kind_value.${g.kind}`)} />
+          {g.step_up_method && (
+            <SignedInAgain method={g.step_up_method} provider={g.step_up_provider} at={g.step_up_at} />
+          )}
+        </>
+      ),
       width: 150,
     },
     {

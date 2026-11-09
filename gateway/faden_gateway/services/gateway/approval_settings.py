@@ -1,13 +1,13 @@
 """The approval settings the gateway follows: Bypass, the longest grant, how long Bypass evidence is kept.
 
-Whether Bypass may be chosen, the longest grant in the installation, and the retention of Bypass evidence
-(sdk/38 §5; sdk/09 L-57, L-65; sdk/40 A3).
+Whether Bypass may be chosen, the longest grant in the installation, the retention of Bypass evidence, and how
+much of a covered call's result is kept (sdk/38 §5; sdk/09 L-57, L-60, L-65; sdk/40 A3, A3.5).
 
 Core has one tenant per installation, so the tenant's settings are the backend's system settings
 (``system_setting_value``, keys ``approvals.*``, ``{"value": ...}``). Each worker reads them at most every 30
 seconds, on the paths that need them (a chat in Bypass, a Bypass grant, the profile) and at each run of the
 rollup job. A worker that cannot read them keeps what it read last; before its first read it has the defaults,
-and Bypass is off (ASVS 5.0 V8.3.1: fail closed). Without a backend database the defaults hold.
+and Bypass is off (ASVS 5.0 16.5.3: no fail-open). Without a backend database the defaults hold.
 
 When a read finds Bypass off, the running Bypass grants end, recorded as ended by the kill switch (L-59): an
 admin who turns Bypass off stops every Bypass session within half a minute, and no call is covered meanwhile
@@ -35,6 +35,9 @@ TTL_SEC = 30.0
 #: (default, smallest, largest), as the backend's registry allows them.
 LONGEST_GRANT_MINUTES = (grants.DEFAULT_LONGEST_MINUTES, 15, 720)
 BYPASS_RETENTION_DAYS = (365, 90, 1095)
+#: 0: the outcome and an error's text only; at most 2,000 characters, a summary and not the result (owner,
+#: 2026-11-09: the length is a setting; the upper bound is ours, sdk/40 A3.5).
+RESULT_SUMMARY_CHARS = (grants.RESULT_CHARS, 0, 2000)
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +50,8 @@ class ApprovalSettings:
     longest_grant_minutes: int = grants.DEFAULT_LONGEST_MINUTES
     #: How long a Bypass grant and its calls are kept after it ended (L-65).
     bypass_retention_days: int = 365
+    #: How much of a covered call's result a grant at the level ``results`` keeps (L-60); 0: the outcome only.
+    result_summary_chars: int = grants.RESULT_CHARS
 
 
 def _bounded(value: Any, default: int, low: int, high: int) -> int:
@@ -79,6 +84,7 @@ def from_values(values: dict[str, Any]) -> ApprovalSettings:
         bypass_allowed=values.get("bypass_allowed") is True,
         longest_grant_minutes=_bounded(values.get("longest_grant_minutes"), *LONGEST_GRANT_MINUTES),
         bypass_retention_days=_bounded(values.get("bypass_retention_days"), *BYPASS_RETENTION_DAYS),
+        result_summary_chars=_bounded(values.get("result_summary_chars"), *RESULT_SUMMARY_CHARS),
     )
 
 

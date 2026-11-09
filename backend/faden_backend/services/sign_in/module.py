@@ -109,11 +109,11 @@ async def provider(key: str) -> ProviderPublic | None:
     return next((p for p in await _listed() if p.key == key), None)
 
 
-async def start(key: str, return_url: str) -> SignInStart:
-    """Where to send the browser to sign in with *key*."""
+async def start(key: str, return_url: str, *, fresh: bool = False) -> SignInStart:
+    """Where to send the browser to sign in with *key*; *fresh*: the provider authenticates anew (``contract``)."""
     response = await request("POST", "/api/v1/sign-in/start", json=StartRequest(
-        provider=key, return_url=return_url,
-    ).model_dump())
+        provider=key, return_url=return_url, fresh=fresh,
+    ).model_dump(exclude_defaults=True))
     try:
         return SignInStart.model_validate(response.json())
     except (ValueError, ValidationError) as exc:

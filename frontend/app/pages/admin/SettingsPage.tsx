@@ -90,9 +90,10 @@ function isMailerSettingKey(key: string): boolean {
   return key.startsWith("faden_mailer.");
 }
 
-/** A setting's description, and for a protected one that changing it needs root mode. */
-function describe(item: SystemSettingSchemaItem, rootModeNote: string): string {
-  return item.protected ? `${item.description} ${rootModeNote}`.trim() : item.description;
+/** A setting's description, and for a protected one that changing it needs root mode (turning it on only, if it has narrowing values). */
+function describe(item: SystemSettingSchemaItem, rootModeNote: string, narrowingNote: string): string {
+  if (!item.protected) return item.description;
+  return `${item.description} ${(item.narrowing_values ?? []).length > 0 ? narrowingNote : rootModeNote}`.trim();
 }
 
 /** The usage settings have their own tab (Usage and privacy), with their ranges and what they mean. */
@@ -409,7 +410,7 @@ export default function SettingsPage() {
                                     variant="caption"
                                     color="text.secondary"
                                   >
-                                    {describe(item, t("settings.protected_help"))}
+                                    {describe(item, t("settings.protected_help"), t("settings.protected_narrowing_help"))}
                                   </Typography>
                                 </Box>
                               }
@@ -429,7 +430,7 @@ export default function SettingsPage() {
                                   item.type,
                                 )
                               }
-                              helperText={describe(item, t("settings.protected_help"))}
+                              helperText={describe(item, t("settings.protected_help"), t("settings.protected_narrowing_help"))}
                             />
                           ) : item.type === "enum" ? (
                             <TextField
@@ -445,7 +446,7 @@ export default function SettingsPage() {
                                   item.type,
                                 )
                               }
-                              helperText={describe(item, t("settings.protected_help"))}
+                              helperText={describe(item, t("settings.protected_help"), t("settings.protected_narrowing_help"))}
                             >
                               {(item.enum_values ?? []).map((v) => (
                                 <MenuItem key={v} value={v}>
@@ -469,7 +470,7 @@ export default function SettingsPage() {
                                   item.type,
                                 )
                               }
-                              helperText={`${describe(item, t("settings.protected_help"))}${item.is_secret && secretMasked[item.key] ? ` ${t("settings.current_value", { value: secretMasked[item.key] })}` : ""}`}
+                              helperText={`${describe(item, t("settings.protected_help"), t("settings.protected_narrowing_help"))}${item.is_secret && secretMasked[item.key] ? ` ${t("settings.current_value", { value: secretMasked[item.key] })}` : ""}`}
                             />
                           )}
                           <Chip

@@ -34,7 +34,7 @@ from starlette import status
 from faden_gateway.db.dao.gateway_dao import GatewayDAO
 from faden_gateway.db.models.gateway import AgentClientEvent
 from faden_gateway.services.extensions import GrantContext, registry
-from faden_gateway.services.gateway import agent_manifests, approval_settings, grants, tool_classes
+from faden_gateway.services.gateway import agent_manifests, approval_settings, grants, step_up, tool_classes
 from faden_gateway.services.gateway import governance as gov
 from faden_gateway.services.gateway.agents import (
     AgentLookupError,
@@ -76,6 +76,9 @@ CONVERSATION_HEADER = "x-faden-conversation-id"
 CLIENT_SUPPORTS_HEADER = "x-faden-client-supports"
 #: The client shows Bypass with its confirmation and marker, and makes its grant (sdk/40 A3).
 SUPPORTS_BYPASS = "tool_mode.bypass"
+#: The client can have the person sign in again in the browser before it switches Bypass on (sdk/41). Bypass is
+#: offered only to clients that name both: one that cannot do the step-up could never make the grant.
+SUPPORTS_STEP_UP = "bypass.step_up"
 
 
 def client_supports(request: Request) -> frozenset[str]:
@@ -85,16 +88,20 @@ def client_supports(request: Request) -> frozenset[str]:
 
 
 async def tool_mode_ceiling(
-    request: Request, auth: AuthContext, profile: Any,
+    request: Request, auth: AuthContext, profile: Any, *, strict: bool = False,
 ) -> tool_classes.ToolMode | None:
-    """The EE ceilings' narrowest for this person and agent; ``None``: none registered or none applies."""
+    """The EE ceilings' narrowest for this person and agent; ``None``: none registered or none applies.
+
+    With *strict*, a ceiling that cannot be read raises ``tool_classes.CeilingUnavailableError`` instead of
+    counting as Read only.
+    """
     groups: tuple[str, ...] = ()
     resolver = getattr(request.app.state, "group_membership_resolver", None)
     if registry.tool_mode_ceilings and resolver is not None:
         groups = tuple(await resolver.resolve(auth.user_id) or ())
     return await tool_classes.ceiling(registry.tool_mode_ceilings, tool_classes.CeilingContext(
         tenant_id=auth.tenant_id, user_id=auth.user_id, agent_id=profile.id, groups=groups,
-    ))
+    ), strict=strict)
 
 
 async def grant_limits(
@@ -459,14 +466,19 @@ async def agent_profile(
     top = tool_classes.limited(ceiling, highest)
     found = await approval_settings.current(dao.session.bind)
     # Bypass only to clients that announce it (sdk/40 §3 rule 5) and only where it may be chosen; any other
-    # client sees Auto as the highest level, as before.
-    supports_bypass = SUPPORTS_BYPASS in client_supports(request)
+    # client sees Auto as the highest level, as before. Since the second sign-in (sdk/41), only to clients that
+    # also announce the step-up: an older one sees the block, but never Bypass allowed.
+    supported = client_supports(request)
+    supports_bypass = SUPPORTS_BYPASS in supported
+    supports_step_up = SUPPORTS_STEP_UP in supported
     # The grant limits of extensions narrow the longest grant; one that fails leaves no grant to offer (0).
     try:
         limits: grants.Limits | None = await grant_limits(request, auth, profile)
     except grants.LimitsUnavailableError:
         limits = None
-    offered = supports_bypass and limits is not None and bypass_offered(profile, ceiling, found)
+    offered = (
+        supports_bypass and supports_step_up and limits is not None and bypass_offered(profile, ceiling, found)
+    )
     bypass = tool_classes.ToolMode.BYPASS
     shown_max = highest if highest is not bypass or offered else tool_classes.ToolMode.AUTO
     longest = grants.longest(profile, limits.longest(found.longest_grant_minutes)) if limits is not None else 0
@@ -482,6 +494,9 @@ async def agent_profile(
         approvals["bypass"] = {
             "allowed": offered, "longest_minutes": longest,
             "evidence": limits.evidence("bypass") if limits is not None else grants.EVIDENCE["bypass"],
+            # Switching it on needs a fresh sign-in in the browser (sdk/41): where the app starts one, and how
+            # old it may be. There is no setting to switch it off.
+            "step_up": {"required": True, "max_age": step_up.MAX_AGE_S, "start": step_up.START},
         }
     return {
         "object": "agent.profile",

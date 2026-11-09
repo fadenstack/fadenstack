@@ -197,6 +197,7 @@
 "How do I block or allow tools?" = "tool-rules"
 "Who can see what ran under Bypass?" = "bypass"
 "How do I allow or switch off Bypass?" = "bypass"
+"Why does Bypass ask me to sign in again?" = "bypass"
 "What do people see when a request is stopped?" = "what-people-see-when-something-is-stopped"
 
 ["administer/content-marking.md"]

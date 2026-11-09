@@ -138,6 +138,42 @@
     "local_account": "Cuenta de Fadenstack",
     "account_name": "Nombre de cuenta",
     "account_name_help": "Tu nombre de inicio de sesión en {{provider}}, como jperez o jperez@example.com",
+    "step_up": {
+      "title": "Volver a iniciar sesión",
+      "intro": "Vuelve a iniciar sesión para desactivar las aprobaciones en un chat. Aunque ya hayas iniciado sesión aquí, la aplicación necesita un inicio de sesión nuevo.",
+      "sign_in_again": "Volver a iniciar sesión",
+      "agent": "Agente",
+      "device": "Dispositivo",
+      "what": "Desactivar las aprobaciones en un chat: las herramientas se ejecutan sin preguntar; las reglas y «Preguntar primero» siguen vigentes; cada llamada queda registrada.",
+      "longest": "Como máximo {{minutes}} minutos por chat",
+      "signed_in_as": "Sesión iniciada de nuevo como {{account}}",
+      "decide_before": "Decide antes de {{time}}",
+      "approve": "Aprobar",
+      "deny": "Denegar",
+      "approved": "Aprobado. Vuelve a la aplicación: activará Bypass.",
+      "denied": "Denegado. Bypass sigue desactivado.",
+      "expired": "Este inicio de sesión ha terminado. Vuelve a empezar en la aplicación.",
+      "error": {
+        "wrong_credentials": "Estos no son los datos de acceso de la cuenta que usa la aplicación.",
+        "use_sign_in_provider": "Tu organización te inicia sesión con su propio acceso: usa su botón.",
+        "too_many_tries": "Demasiados intentos. Espera {{seconds}} segundos.",
+        "sign_in_too_old": "Tu inicio de sesión tiene más de 5 minutos. Vuelve a iniciar sesión.",
+        "sign_in_first": "Primero vuelve a iniciar sesión.",
+        "opened_elsewhere": "Este inicio de sesión continúa en otro navegador.",
+        "expired": "Este inicio de sesión ha terminado. Vuelve a empezar en la aplicación.",
+        "provider_unavailable": "No se puede contactar con el proveedor de inicio de sesión ahora. Inténtalo de nuevo en un momento.",
+        "not_offered": "Este inicio de sesión no se ofrece aquí.",
+        "other": "El inicio de sesión no ha funcionado. Inténtalo de nuevo."
+      },
+      "refused": {
+        "not_fresh": "El proveedor de inicio de sesión no confirmó un inicio de sesión nuevo. Vuelve a iniciar sesión.",
+        "wrong_account": "Esa no es la cuenta que usa la aplicación.",
+        "expired": "Este inicio de sesión ha terminado. Vuelve a empezar en la aplicación.",
+        "provider_error": "El inicio de sesión no ha funcionado. Inténtalo de nuevo; si sigue fallando, avisa a un administrador.",
+        "provider_unavailable": "No se puede contactar con el proveedor de inicio de sesión ahora. Inténtalo de nuevo en un momento.",
+        "other": "El inicio de sesión no ha funcionado."
+      }
+    },
     "refused": {
       "account_disabled": "Esta cuenta está desactivada. Pide ayuda a un administrador.",
       "account_not_verified": "La dirección de correo de esta cuenta aún no está confirmada.",
@@ -921,6 +957,7 @@
     "search_placeholder": "Buscar ajustes...",
     "no_results": "Ningun ajuste coincide con la busqueda.",
     "protected_help": "Cambiarlo requiere el modo root: actívelo en la barra superior.",
+    "protected_narrowing_help": "Activarlo requiere el modo Root; desactivarlo no.",
     "generate_secret": "Generar Token Seguro",
     "secret_generated": "Token seguro generado.",
     "secret_generate_failed": "No se pudo generar el token seguro.",
@@ -989,6 +1026,7 @@
       "retention": "Conservación",
       "bypass": "Bypass",
       "grants": "Autorizaciones",
+      "evidence": "Pruebas",
       "vendor_links": "Enlaces a fadenstack.com"
     },
     "current_value": "(actual: {{value}})",
@@ -4771,6 +4809,14 @@
       "side_gateway": "Gateway",
       "flag_gateway_only": "Registrada por el gateway, no notificada por el dispositivo",
       "device_only_title": "Notificadas por el dispositivo, no registradas por el gateway",
+      "signed_in_again": "Sesión iniciada de nuevo: {{method}} · {{time}}",
+      "signed_in_again_provider": "Sesión iniciada de nuevo: {{method}} ({{provider}}) · {{time}}",
+      "step_up_method": {
+        "password": "contraseña",
+        "oidc": "OpenID Connect",
+        "saml": "SAML",
+        "ldap": "directorio"
+      },
       "calls_reason": "Motivo de la persona",
       "calls_unavailable": "El servidor no pudo mostrar ahora los lugares y argumentos.",
       "calls_place": "Lugar",

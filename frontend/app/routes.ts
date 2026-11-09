@@ -10,6 +10,8 @@ export default [
   route("/login", "routes/login.tsx"),
   route("/forgot-password", "routes/forgot-password.tsx"),
   route("/reset-password", "routes/reset-password.tsx"),
+  // The second sign-in before Bypass is switched on in a chat app; opened by the app, no console sign-in.
+  route("/step-up", "routes/step-up.tsx"),
   // Checking a picture or file without an account, when an administrator
   // offers it; otherwise the page says it is not offered here.
   route("/check", "routes/check.tsx"),

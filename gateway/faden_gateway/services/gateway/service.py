@@ -2614,7 +2614,8 @@ class GatewayService:
             and m.get("tool_call_id")
         }
         if results:
-            await grants.note_client_results(self.dao.session.bind, self._grant_owner(req, auth), results)
+            chars = (await approval_settings.current(self.dao.session.bind)).result_summary_chars
+            await grants.note_client_results(self.dao.session.bind, self._grant_owner(req, auth), results, chars)
 
     @staticmethod
     def _keep_for_result(req: _Prepared, call: dict[str, Any], covered: grants.Covered | None) -> None:
@@ -4233,11 +4234,14 @@ class GatewayService:
         """
         if not req.grant_results:
             return
+        # How much of a result is kept is the installation's setting (``approvals.result_summary_chars``).
+        chars = (await approval_settings.current(self.dao.session.bind)).result_summary_chars
         for (row, _), answer in zip(done, scanned, strict=True):
             record_id = req.grant_results.get(str(answer.get("tool_call_id") or ""))
             if record_id is not None:
                 await grants.note_result(
                     self.dao.session.bind, record_id, error=bool(row.get("is_error")), text=answer.get("content"),
+                    chars=chars,
                 )
 
     async def _scan_tool_results(self, req: _Prepared, answers: list[dict[str, Any]]) -> list[dict[str, Any]]:

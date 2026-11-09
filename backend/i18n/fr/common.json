@@ -138,6 +138,42 @@
     "local_account": "Compte Fadenstack",
     "account_name": "Nom de compte",
     "account_name_help": "Votre identifiant chez {{provider}}, par exemple jdupont ou jdupont@example.com",
+    "step_up": {
+      "title": "Se reconnecter",
+      "intro": "Reconnectez-vous pour désactiver les validations dans un chat. Même si vous êtes connecté ici, l'application a besoin d'une connexion récente.",
+      "sign_in_again": "Se reconnecter",
+      "agent": "Agent",
+      "device": "Appareil",
+      "what": "Désactiver les validations dans un chat : les outils s'exécutent sans demander ; les règles et « Demander d'abord » restent en vigueur ; chaque appel est enregistré.",
+      "longest": "Au plus {{minutes}} minutes par chat",
+      "signed_in_as": "Reconnecté en tant que {{account}}",
+      "decide_before": "Décidez avant {{time}}",
+      "approve": "Approuver",
+      "deny": "Refuser",
+      "approved": "Approuvé. Retournez dans l'application : elle active Bypass.",
+      "denied": "Refusé. Bypass reste désactivé.",
+      "expired": "Cette connexion est terminée. Relancez-la dans l'application.",
+      "error": {
+        "wrong_credentials": "Ce ne sont pas les identifiants du compte que l'application utilise.",
+        "use_sign_in_provider": "Votre organisation vous connecte avec son propre service : utilisez son bouton.",
+        "too_many_tries": "Trop de tentatives. Attendez {{seconds}} secondes.",
+        "sign_in_too_old": "Votre connexion date de plus de 5 minutes. Reconnectez-vous.",
+        "sign_in_first": "Reconnectez-vous d'abord.",
+        "opened_elsewhere": "Cette connexion se poursuit dans un autre navigateur.",
+        "expired": "Cette connexion est terminée. Relancez-la dans l'application.",
+        "provider_unavailable": "Le fournisseur de connexion est injoignable pour le moment. Réessayez dans un instant.",
+        "not_offered": "Cette connexion n'est pas proposée ici.",
+        "other": "La connexion n'a pas fonctionné. Réessayez."
+      },
+      "refused": {
+        "not_fresh": "Le fournisseur de connexion n'a pas confirmé une connexion récente. Reconnectez-vous.",
+        "wrong_account": "Ce n'est pas le compte que l'application utilise.",
+        "expired": "Cette connexion est terminée. Relancez-la dans l'application.",
+        "provider_error": "La connexion n'a pas fonctionné. Réessayez ; si cela échoue encore, prévenez un administrateur.",
+        "provider_unavailable": "Le fournisseur de connexion est injoignable pour le moment. Réessayez dans un instant.",
+        "other": "La connexion n'a pas fonctionné."
+      }
+    },
     "refused": {
       "account_disabled": "Ce compte est désactivé. Demandez à un administrateur.",
       "account_not_verified": "L'adresse e-mail de ce compte n'est pas encore confirmée.",
@@ -916,6 +952,7 @@
     "search_placeholder": "Rechercher des paramètres…",
     "no_results": "Aucun paramètre ne correspond à votre recherche.",
     "protected_help": "Le modifier nécessite le mode Root : activez-le dans la barre du haut.",
+    "protected_narrowing_help": "L'activer demande le mode Root ; le désactiver non.",
     "generate_secret": "Générer un jeton sécurisé",
     "secret_generated": "Jeton sécurisé généré.",
     "secret_generate_failed": "Échec de la génération du jeton sécurisé.",
@@ -984,6 +1021,7 @@
       "retention": "Conservation",
       "bypass": "Bypass",
       "grants": "Autorisations",
+      "evidence": "Preuves",
       "vendor_links": "Liens vers fadenstack.com"
     },
     "current_value": "(actuel : {{value}})",
@@ -4771,6 +4809,14 @@
       "side_gateway": "Gateway",
       "flag_gateway_only": "Enregistré par le gateway, non signalé par l'appareil",
       "device_only_title": "Signalés par l'appareil, non enregistrés par le gateway",
+      "signed_in_again": "Reconnecté : {{method}} · {{time}}",
+      "signed_in_again_provider": "Reconnecté : {{method}} ({{provider}}) · {{time}}",
+      "step_up_method": {
+        "password": "mot de passe",
+        "oidc": "OpenID Connect",
+        "saml": "SAML",
+        "ldap": "annuaire"
+      },
       "calls_reason": "Motif de la personne",
       "calls_unavailable": "Le serveur n'a pas pu afficher les lieux et arguments pour le moment.",
       "calls_place": "Lieu",

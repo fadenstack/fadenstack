@@ -25,7 +25,7 @@ from faden_backend.db.models.containers import AuditEvent, AuditResult
 from faden_backend.db.models.users import User, current_active_user
 from faden_backend.services.chat.gateway_client import EvidenceUnavailable, GatewayChatClient, evidence_grant
 
-#: The gateway's tables, as its migrations leave them (gateway migrations gr4nts, gr4ntx, byp4ss).
+#: The gateway's tables, as its migrations leave them (gateway migrations gr4nts, gr4ntx, byp4ss, st3pup).
 _GRANT_TABLE = """
 CREATE TABLE approval_grant (
     id uuid PRIMARY KEY, kind varchar(16) NOT NULL, tenant_id varchar(128) NOT NULL, user_id varchar(128) NOT NULL,
@@ -34,7 +34,8 @@ CREATE TABLE approval_grant (
     max_calls integer, calls_used integer NOT NULL DEFAULT 0, status varchar(16) NOT NULL DEFAULT 'active',
     paused_at timestamptz, revoked_at timestamptz, revoked_by varchar(16), policy_version varchar(64),
     evidence_level varchar(16) NOT NULL DEFAULT 'decisions', shown_text_hash varchar(64),
-    client_version varchar(64), reason text
+    client_version varchar(64), reason text, step_up_method varchar(16), step_up_provider varchar(64),
+    step_up_at timestamptz, step_up_id uuid
 )"""
 _CALL_TABLE = """
 CREATE TABLE approval_grant_call (
@@ -183,8 +184,15 @@ async def test_a_bypass_session_shows_its_flags_in_the_list(
     client: AsyncClient, gateway_db: AsyncSession, admin: User,
 ) -> None:
     grant = await _bypass_session(gateway_db)
+    await gateway_db.execute(
+        text("UPDATE approval_grant SET step_up_method = 'oidc', step_up_provider = 'entra', "
+             "step_up_at = clock_timestamp() WHERE id = :id"),
+        {"id": uuid.UUID(grant)},
+    )
     [shown] = (await client.get("/api/admin/governance/grants")).json()["data"]
     assert (shown["id"], shown["kind"], shown["flags"]) == (grant, "bypass", 2)
+    # How and when the person signed in again to switch it on (sdk/41, L-59).
+    assert (shown["step_up_method"], shown["step_up_provider"], bool(shown["step_up_at"])) == ("oidc", "entra", True)
 
 
 class _Gateway:

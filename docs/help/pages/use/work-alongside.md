@@ -83,9 +83,12 @@ organisations leave it off. See [Bypass](tools.md#bypass) for how it works every
 
 1. Select the tool mode in the status bar (or in the chat) and choose **Bypass**.
 2. The card **Switch approvals off in this chat?** shows in the chat. It says what will no longer be asked, what
-   still asks, what your organisation's server records, and **For how long**: the shortest time is preselected.
+   still asks, what your organisation's server records, and **For how long**: 30 minutes are preselected.
    Under **Why (optional)** you may say why; your administrators see it.
 3. Select **Switch Bypass on**. Enter and Esc never switch it on, and **Not now** allows nothing.
+4. Your browser opens Fadenstack's page **Sign in again**. Sign in there again, even if you are signed in already,
+   compare the code with the one on the card, and select **Approve**. The card waits meanwhile; **Open the page again**
+   opens it once more. One sign-in covers switching Bypass on in other chats for 5 minutes.
 
 Bypass starts only once your organisation's server has confirmed it. When you are offline, or the server refuses, the
 card says **Bypass is not on** and why, and the chat stays in its mode.
@@ -108,13 +111,18 @@ While it runs:
 | The chat's header, in the window and in the avatar's bubble | **Bypass on · 12 min left**, what is recorded, and **Stop** |
 | The avatar | The minutes left, in a warning frame |
 | The title bar | **Bypass on · 12 min left**, with **Stop** |
-| The avatar's and the tray's menus | **Stop Bypass** |
+| The avatar's and the tray's menus | Each chat that runs in Bypass, with its time left, and **Stop Bypass** |
+| The list of chats | **Bypass · 12 min left** under each chat that runs in it |
 | The chat's **Settings**, under **Approvals** | **Bypass in a chat**, the time left and what is recorded, with **Revoke** |
 
 - **Stop** ends it at once and stops the reply that is being written; the chat goes back to the mode it had before.
 - It cannot be extended: when the time is up, it ends. For more time, choose **Bypass** again and answer the card.
-- Choosing another mode, starting a new chat or opening another one ends it as well.
-- Quitting the app ends it, and it never comes back when you start the app again.
+- Choosing another mode in the chat ends it. Starting a new chat or opening another does not: it keeps running in its
+  own chat, and the title bar says how many chats run in Bypass. **Stop** in the title bar or the menus ends all of them.
+- Quitting the app pauses it; its time runs on. Start the app again within 30 minutes and it resumes, with no new card
+  or sign-in. Later, or if your organisation narrowed Bypass meanwhile, it ends and the app says why.
+- When it has ended, the line that says so offers **Switch on again**: the card and the sign-in follow. The assistant
+  is told that its tools ask again; it cannot switch Bypass on itself.
 
 ??? info "Why Bypass can end early"
     When Bypass ends, the band in the chat goes and a line says why: **you ended it** (Stop, Revoke, another mode, or
