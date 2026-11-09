@@ -138,6 +138,42 @@
     "local_account": "Fadenstack account",
     "account_name": "Account name",
     "account_name_help": "Your {{provider}} sign-in name, such as jdoe or jdoe@example.com",
+    "step_up": {
+      "title": "Sign in again",
+      "intro": "Sign in again to switch approvals off in a chat. Even if you are signed in here, the app needs a fresh sign-in.",
+      "sign_in_again": "Sign in again",
+      "agent": "Agent",
+      "device": "Device",
+      "what": "Switch approvals off in one chat: tools run without asking; rules and 'Ask first' still apply; every call is recorded.",
+      "longest": "For at most {{minutes}} minutes per chat",
+      "signed_in_as": "Signed in again as {{account}}",
+      "decide_before": "Decide before {{time}}",
+      "approve": "Approve",
+      "deny": "Deny",
+      "approved": "Approved. Go back to the app: it switches Bypass on.",
+      "denied": "Denied. Bypass stays off.",
+      "expired": "This sign-in has ended. Start it again in the app.",
+      "error": {
+        "wrong_credentials": "These are not the sign-in details of the account the app uses.",
+        "use_sign_in_provider": "Your organisation signs you in with its own sign-in: use its button.",
+        "too_many_tries": "Too many tries. Wait {{seconds}} seconds.",
+        "sign_in_too_old": "Your sign-in is older than 5 minutes. Sign in again.",
+        "sign_in_first": "Sign in again first.",
+        "opened_elsewhere": "This sign-in continues in another browser.",
+        "expired": "This sign-in has ended. Start it again in the app.",
+        "provider_unavailable": "The sign-in provider cannot be reached now. Try again in a moment.",
+        "not_offered": "This sign-in is not offered here.",
+        "other": "The sign-in did not work. Try again."
+      },
+      "refused": {
+        "not_fresh": "The sign-in provider did not confirm a fresh sign-in. Sign in again.",
+        "wrong_account": "That is not the account the app uses.",
+        "expired": "This sign-in has ended. Start it again in the app.",
+        "provider_error": "The sign-in did not work. Try again; if it keeps failing, tell an administrator.",
+        "provider_unavailable": "The sign-in provider cannot be reached now. Try again in a moment.",
+        "other": "The sign-in did not work."
+      }
+    },
     "refused": {
       "account_disabled": "This account is switched off. Ask an administrator.",
       "account_not_verified": "This account's e-mail address is not confirmed yet.",
@@ -916,6 +952,7 @@
     "search_placeholder": "Search settings...",
     "no_results": "No settings match your search.",
     "protected_help": "Changing it needs root mode: switch it on in the top bar.",
+    "protected_narrowing_help": "Turning it on needs Root Mode; turning it off does not.",
     "generate_secret": "Generate Secure Token",
     "secret_generated": "Secure token generated.",
     "secret_generate_failed": "Failed to generate secure token.",
@@ -984,6 +1021,7 @@
       "retention": "Retention",
       "bypass": "Bypass",
       "grants": "Grants",
+      "evidence": "Evidence",
       "vendor_links": "Links to fadenstack.com"
     },
     "current_value": "(current: {{value}})",
@@ -4766,6 +4804,14 @@
       "side_gateway": "Gateway",
       "flag_gateway_only": "Recorded by the gateway, not reported by the device",
       "device_only_title": "Reported by the device, not recorded by the gateway",
+      "signed_in_again": "Signed in again: {{method}} · {{time}}",
+      "signed_in_again_provider": "Signed in again: {{method}} ({{provider}}) · {{time}}",
+      "step_up_method": {
+        "password": "password",
+        "oidc": "OpenID Connect",
+        "saml": "SAML",
+        "ldap": "directory"
+      },
       "calls_reason": "The person's reason",
       "calls_unavailable": "The server could not show the places and arguments right now.",
       "calls_place": "Place",

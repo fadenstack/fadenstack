@@ -1178,6 +1178,12 @@ class ApprovalGrant(Base):
     client_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
     #: The person's own words on why, if they gave any (Bypass); encrypted: it may name anyone.
     reason: Mapped[str | None] = mapped_column(EncryptedText("grant-evidence"), nullable=True)
+    #: How the person signed in again to switch Bypass on (sdk/41; L-59): ``password``, ``oidc``, ``saml`` or
+    #: ``ldap``, the provider's key for the last three, when (the backend's clock), and the step-up it came from.
+    step_up_method: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    step_up_provider: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    step_up_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    step_up_id: Mapped[uuid.UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True)
 
 
 class ApprovalGrantCall(Base):

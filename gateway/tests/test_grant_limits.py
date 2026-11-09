@@ -197,7 +197,10 @@ async def test_a_limit_cuts_the_grant_at_issue_at_extend_and_in_the_profile_and_
     fastapi_app.state.agent_directory.invalidate()
     profile = await _profile_of(client, **SUPPORTS)
     assert profile["approvals"]["longest_grant_minutes"] == 45
-    assert profile["approvals"]["bypass"] == {"allowed": True, "longest_minutes": 45, "evidence": "results"}
+    assert profile["approvals"]["bypass"] == {
+        "allowed": True, "longest_minutes": 45, "evidence": "results",
+        "step_up": {"required": True, "max_age": 300, "start": "/api/agent-tokens/step-ups"},
+    }
     r = await client.post(GRANTS, headers=_auth(), json={"kind": "time", "tools": ["update_page"], "minutes": 90})
     assert r.status_code == 201, r.text
     made = r.json()

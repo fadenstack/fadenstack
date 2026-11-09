@@ -268,17 +268,27 @@ class CeilingContext:
 ToolModeCeiling = Callable[[CeilingContext], Awaitable["ToolMode | str | None"]]
 
 
-async def ceiling(ceilings: Iterable[ToolModeCeiling], ctx: CeilingContext) -> ToolMode | None:
+class CeilingUnavailableError(RuntimeError):
+    """A ceiling failed or answered no mode, where the caller asked to be told rather than get ``read_only``."""
+
+
+async def ceiling(
+    ceilings: Iterable[ToolModeCeiling], ctx: CeilingContext, *, strict: bool = False,
+) -> ToolMode | None:
     """The narrowest of the registered ceilings; ``None`` when there is none.
 
     A ceiling that fails, or answers something that is not a mode, counts as
-    ``read_only``: a broken restriction must not widen what tools may do.
+    ``read_only``: a broken restriction must not widen what tools may do. With
+    *strict* it raises :class:`CeilingUnavailableError` instead, for a caller
+    that must tell "not allowed" from "cannot be checked" (a Bypass resuming).
     """
     found: list[ToolMode] = []
     for each in ceilings:
         try:
             answer = await each(ctx)
-        except Exception:
+        except Exception as exc:
+            if strict:
+                raise CeilingUnavailableError(str(exc)) from exc
             logger.exception("A tool mode ceiling failed; read_only applies")
             found.append(ToolMode.READ_ONLY)
             continue
@@ -286,6 +296,9 @@ async def ceiling(ceilings: Iterable[ToolModeCeiling], ctx: CeilingContext) -> T
             continue
         mode = parse_mode(str(answer))
         if mode is None:
+            if strict:
+                msg = f"A tool mode ceiling answered {answer!r}"
+                raise CeilingUnavailableError(msg)
             logger.error("A tool mode ceiling answered %r; read_only applies", answer)
             mode = ToolMode.READ_ONLY
         found.append(mode)

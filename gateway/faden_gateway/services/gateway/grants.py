@@ -16,7 +16,8 @@ is Bypass, what its mode would ask about -- any class, still never past the floo
 it is recorded with its arguments (L-60), whether it would have asked or not (:func:`record`). At the end of
 each turn the device reports the calls it ran under it, and the gateway flags any difference (:func:`report`,
 L-61). A delegated callee never uses it (L-58). It ends when the installation turns Bypass off
-(:func:`end_bypass`) and is deleted with its calls after the retention (:func:`purge_bypass`, L-65).
+(:func:`end_bypass`) and is deleted with its calls after the retention (:func:`purge_bypass`, L-65). It is made
+only with the proof of a fresh sign-in (``step_up.py``, sdk/41), which it records (:class:`SteppedUp`).
 """
 
 from __future__ import annotations
@@ -59,7 +60,8 @@ EVIDENCE = {"time": "decisions", "work": "calls", "bypass": "calls"}
 #: The evidence levels, from the least recorded: the call; its arguments too; and its outcome and a summary of
 #: its result (L-60).
 EVIDENCE_LEVELS = ("decisions", "calls", "results")
-#: How much of a result a ``results`` grant keeps, after the gateway's PII masking (L-60).
+#: How much of a result a ``results`` grant keeps, after the gateway's PII masking (L-60), unless the installation
+#: says otherwise (``approvals.result_summary_chars``); an error keeps this much always.
 RESULT_CHARS = 500
 #: How long after a covered call of the client's tool its result is looked for in the next request.
 RESULT_WINDOW = timedelta(hours=1)
@@ -383,22 +385,31 @@ async def record(bind: AsyncEngine, owner: Owner, call: Call) -> uuid.UUID | Non
 # -- the results of covered calls (L-60, the start of L-61's own sight) ------------------------
 
 
-def summary(text: Any) -> str:
-    """What a ``results`` grant keeps of a result: its first :data:`RESULT_CHARS` characters."""
-    return str(text or "")[:RESULT_CHARS]
+def summary(text: Any, chars: int = RESULT_CHARS, *, error: bool = False) -> str | None:
+    """What a ``results`` grant keeps of a result: its first *chars* characters (``approvals.result_summary_chars``).
+
+    An error keeps its first :data:`RESULT_CHARS` characters whatever *chars* says; with *chars* 0 a result that
+    is no error keeps nothing (the outcome alone). Python counts characters, never halves of one.
+    """
+    if error:
+        return str(text or "")[:RESULT_CHARS]
+    return str(text or "")[:chars] if chars > 0 else None
 
 
-async def note_result(bind: AsyncEngine, record_id: uuid.UUID, *, error: bool, text: Any) -> bool:
+async def note_result(
+    bind: AsyncEngine, record_id: uuid.UUID, *, error: bool, text: Any, chars: int = RESULT_CHARS,
+) -> bool:
     """Keep a covered gateway call's outcome and the start of its result; whether its record was there.
 
     *text* is the result as the model gets it, after the gateway's PII masking; for a failed call, its error.
-    Only for a record of a ``results`` grant. A failure is logged: the call has run, and its record stays.
+    Only for a record of a ``results`` grant; *chars* is how much of a result is kept. A failure is logged: the
+    call has run, and its record stays.
     """
     try:
         async with autocommit(bind) as conn:
             done = await conn.execute(
                 update(ApprovalGrantCall).where(ApprovalGrantCall.id == record_id).values(
-                    outcome="error" if error else "ok", result=summary(text), result_at=_clock(),
+                    outcome="error" if error else "ok", result=summary(text, chars, error=error), result_at=_clock(),
                 ),
             )
             return bool(done.rowcount)
@@ -412,13 +423,15 @@ def client_outcome(text: str) -> str:
     return "error" if text.lstrip().lower().startswith("error") else "ok"
 
 
-async def note_client_results(bind: AsyncEngine, owner: Owner, results: Mapping[str, str]) -> int:
+async def note_client_results(
+    bind: AsyncEngine, owner: Owner, results: Mapping[str, str], chars: int = RESULT_CHARS,
+) -> int:
     """The gateway's own sight of the client's results: *results* maps a tool call id to its message text.
 
     The device sends a tool's result in its next request. The owner's covered client calls of the last hour
     with those ids get ``result_at`` (the gateway saw the result come back, sdk/09 L-61), and those of a
-    ``results`` grant also its outcome and the start of the text, which is after the request's egress scan
-    (L-60). Each record is noted once. How many were noted; a failure is logged and notes nothing.
+    ``results`` grant also its outcome and the start of the text (*chars* of it), which is after the request's
+    egress scan (L-60). Each record is noted once. How many were noted; a failure is logged and notes nothing.
     """
     ids = [str(call_id)[:128] for call_id in results if call_id]
     if not ids:
@@ -439,7 +452,8 @@ async def note_client_results(bind: AsyncEngine, owner: Owner, results: Mapping[
                 text = results.get(row.call_id, "")
                 values: dict[str, Any] = {"result_at": _clock()}
                 if row.evidence_level == "results":
-                    values |= {"outcome": client_outcome(text), "result": summary(text)}
+                    outcome = client_outcome(text)
+                    values |= {"outcome": outcome, "result": summary(text, chars, error=outcome == "error")}
                 await conn.execute(
                     update(ApprovalGrantCall)
                     .where(ApprovalGrantCall.id == row.id, ApprovalGrantCall.result_at.is_(None))
@@ -616,16 +630,27 @@ def limit(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class SteppedUp:
+    """How and when the person signed in again to switch Bypass on (sdk/41), as the grant records it."""
+
+    id: uuid.UUID
+    method: str
+    provider: str | None
+    at: datetime
+
+
 async def issue(
     session: AsyncSession, owner: Owner, granted: Granted, *, shown_text_hash: str | None = None,
     client_version: str | None = None, reason: str | None = None, evidence_level: str | None = None,
+    step_up: SteppedUp | None = None,
 ) -> ApprovalGrant:
     """Store a grant; it starts and ends by the database's clock. Committed.
 
     The stored row is the record of the switch-on that the device waits for (sdk/09 L-59): who, which device,
-    agent and version, conversation, scope, expiry, what allowed it, the client and the person's reason.
-    *evidence_level*: what its covered calls leave behind (:data:`EVIDENCE_LEVELS`); core's default for the
-    kind without one.
+    agent and version, conversation, scope, expiry, what allowed it, the client, the person's reason and, for
+    Bypass, how and when they signed in again (*step_up*). *evidence_level*: what its covered calls leave behind
+    (:data:`EVIDENCE_LEVELS`); core's default for the kind without one.
     """
     grant = (await session.execute(
         insert(ApprovalGrant).values(
@@ -636,6 +661,10 @@ async def issue(
             calls_used=0, status="active", policy_version=granted.policy_version,
             evidence_level=evidence_level or EVIDENCE[granted.kind], shown_text_hash=shown_text_hash,
             client_version=client_version, reason=reason,
+            step_up_method=step_up.method if step_up else None,
+            step_up_provider=step_up.provider if step_up else None,
+            step_up_at=step_up.at if step_up else None,
+            step_up_id=step_up.id if step_up else None,
         ).returning(ApprovalGrant),
     )).scalar_one()
     await session.commit()
@@ -720,11 +749,26 @@ async def pause(session: AsyncSession, grant_id: uuid.UUID, owner: Owner) -> App
 
 
 async def resume(session: AsyncSession, grant_id: uuid.UUID, owner: Owner) -> ApprovalGrant | None:
-    """Resume a paused, unexpired grant of the owner's device. ``None``: none to resume."""
+    """Resume a paused, unexpired grant of the owner's device. ``None``: none to resume.
+
+    For a Bypass grant the caller first checks that Bypass may still be chosen (:func:`end_paused` otherwise).
+    """
     return await _change(
         session, grant_id,
         _device_owned(owner) & (ApprovalGrant.status == "paused") & (ApprovalGrant.expires_at > _clock()),
         {"status": "active", "paused_at": None},
+    )
+
+
+async def end_paused(session: AsyncSession, grant_id: uuid.UUID, owner: Owner, *, by: str) -> ApprovalGrant | None:
+    """End a paused grant of the owner's device that may not resume, recorded as ended *by*; ``None``: none.
+
+    A Bypass grant whose resume found Bypass no longer allowed: the installation's switch (``kill_switch``), or
+    the agent's level, a ceiling or the organisation's Bypass list (``limit``; ASVS 5.0 8.3.2).
+    """
+    return await _change(
+        session, grant_id, _device_owned(owner) & (ApprovalGrant.status == "paused"),
+        {"status": "revoked", "revoked_at": func.now(), "revoked_by": by},
     )
 
 
@@ -1054,6 +1098,14 @@ def as_dict(grant: ApprovalGrant, now: datetime) -> dict[str, Any]:
         "revoked_by": grant.revoked_by,
         #: What its covered calls leave on the server (``EVIDENCE_LEVELS``), for the device to say.
         "evidence_level": grant.evidence_level,
+        #: How and when the person signed in again to switch Bypass on (sdk/41); ``None`` for other grants.
+        "step_up": (
+            {
+                "method": grant.step_up_method, "provider": grant.step_up_provider,
+                "at": grant.step_up_at.isoformat() if grant.step_up_at else None,
+            }
+            if grant.step_up_method else None
+        ),
     }
 
 

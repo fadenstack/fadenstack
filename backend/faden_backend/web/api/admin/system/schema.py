@@ -40,6 +40,8 @@ class SettingsSchemaItemDTO(BaseModel):
     apply_scope: str
     service_targets: list[str]
     protected: bool
+    #: The values a protected setting takes without Root Mode: they only narrow (Bypass off).
+    narrowing_values: list[object] = []
     enum_values: list[str]
     #: The range of a number setting, both ends included; ``None``: open on that side.
     min_value: int | None = None

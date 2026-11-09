@@ -39,6 +39,13 @@ class SettingDefinition:
     max_value: int | None = None
     #: A further check of a value of the right type; raises ``ValueError`` when it is not one.
     check: Callable[[object], None] | None = None
+    #: For a ``protected`` setting: the values that only narrow what it allows, which need no Root Mode (an
+    #: administrator can always turn a risk off; turning it on keeps the protection).
+    narrowing_values: tuple[object, ...] = ()
+
+    def needs_root_mode(self, value: object) -> bool:
+        """Whether setting *value* (validated) needs Root Mode: a protected setting, unless *value* only narrows."""
+        return self.protected and value not in self.narrowing_values
 
 
 def check_time_zone(value: object) -> None:
@@ -182,10 +189,11 @@ APPROVAL_SETTINGS: list[SettingDefinition] = [
     _approvals(
         "approvals.bypass_allowed", "bool", "bypass", "Allow Bypass",
         "Lets a person switch approvals off for one conversation with an agent whose highest level is "
-        "Bypass: destructive and unclassified tools then run without asking, every call is recorded on the "
-        "server, and rules and 'Ask first' still hold (sdk/09 L-57). Off: nobody can choose Bypass, and "
-        "running Bypass sessions end within half a minute. Needs Root Mode to change.",
-        False, protected=True,
+        "Bypass, after signing in again in the browser: destructive and unclassified tools then run without "
+        "asking, every call is recorded on the server, and rules and 'Ask first' still hold (sdk/09 L-57). "
+        "Off: nobody can choose Bypass, and running Bypass sessions end within half a minute. Turning it on "
+        "needs Root Mode; turning it off does not.",
+        False, protected=True, narrowing_values=(False,),
     ),
     _approvals(
         "approvals.longest_grant_minutes", "int", "grants", "Longest grant (minutes)",
@@ -198,6 +206,13 @@ APPROVAL_SETTINGS: list[SettingDefinition] = [
         "How long a Bypass session and every call recorded under it are kept after it ended, for incident "
         "analysis (sdk/09 L-65). 90 to 1095 days.",
         365, min_value=90, max_value=1095,
+    ),
+    _approvals(
+        "approvals.result_summary_chars", "int", "evidence", "Result summary (characters)",
+        "Where a grant records results, how much of each covered call's result is kept, after personal data "
+        "is masked (sdk/09 L-60). 0: whether it worked and an error's text only. 0 to 2000; an error keeps "
+        "its first 500 characters.",
+        500, min_value=0, max_value=2000,
     ),
 ]
 

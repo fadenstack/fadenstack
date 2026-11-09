@@ -176,6 +176,7 @@
 "Wie sperre oder erlaube ich Tools?" = "tool-rules"
 "Wer kann sehen, was unter Bypass lief?" = "bypass"
 "Wie erlaube ich Bypass oder schalte es aus?" = "bypass"
+"Warum verlangt Bypass eine erneute Anmeldung?" = "bypass"
 "Was sehen Benutzer, wenn eine Anfrage gestoppt wird?" = "what-people-see-when-something-is-stopped"
 
 ["administer/content-marking.md"]

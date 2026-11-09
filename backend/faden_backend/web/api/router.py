@@ -14,6 +14,8 @@ from faden_backend.web.api.node_files import router as node_files_router
 from faden_backend.web.api.provenance.public import router as public_provenance_router
 from faden_backend.web.api.provenance.views import router as provenance_router
 from faden_backend.web.api.skills.views import router as skills_router
+from faden_backend.web.api.step_up import app_router as step_up_app_router
+from faden_backend.web.api.step_up import page_router as step_up_page_router
 from faden_backend.web.api.usage import router as usage_router
 
 api_router = APIRouter()
@@ -34,6 +36,9 @@ api_router.include_router(skills_router, tags=["skills"])
 api_router.include_router(provenance_router)
 api_router.include_router(public_provenance_router)
 api_router.include_router(agents_router)
+# The second sign-in before Bypass (sdk/41): the app's start and poll, and the browser page's routes.
+api_router.include_router(step_up_app_router)
+api_router.include_router(step_up_page_router)
 api_router.include_router(agent_tokens_router)
 # Every signed-in person's own usage (the administrators' view is /admin/usage).
 api_router.include_router(usage_router, prefix="/usage", tags=["usage"])

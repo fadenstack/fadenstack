@@ -15,8 +15,11 @@
   under the grant; the gateway compares them with its own records and flags any difference (sdk/09 L-61).
 
 A ``bypass`` grant (sdk/40 A3) is made only where Bypass may be chosen -- the installation's switch, the
-agent's highest level, no lower ceiling (L-57) -- for one conversation. Its row is the record the device waits
-for before it relies on Bypass (L-59).
+agent's highest level, no lower ceiling (L-57) -- for one conversation, and only with the proof of a fresh
+sign-in in ``x-faden-step-up`` (sdk/41, ``services/gateway/step_up.py``): without it 401 with an RFC 9470
+challenge, ``bypass_step_up_required``. Its row is the record the device waits for before it relies on Bypass
+(L-59), with how and when the person signed in. A paused Bypass grant resumes without a new sign-in, but only
+while Bypass may still be chosen; otherwise it ends.
 
 The grant limits an extension registers (``registry.grant_limits``) narrow the longest grant at issue and at
 extend, and set what a grant's covered calls leave behind; one that fails makes and extends no grant (503
@@ -30,14 +33,15 @@ lists, pauses and resumes one. The gateway checks and counts every covered call 
 from __future__ import annotations
 
 import uuid
+from dataclasses import replace
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from faden_gateway.db.dao.gateway_dao import GatewayDAO
-from faden_gateway.services.gateway import approval_settings, grants
+from faden_gateway.services.gateway import approval_settings, grants, step_up
 from faden_gateway.services.gateway.agents import AgentRequest
 from faden_gateway.services.gateway.auth import AuthContext, get_auth_context
 from faden_gateway.services.gateway.errors import GatewayError
@@ -85,10 +89,19 @@ class GrantRequest(BaseModel):
     conversation: bool = False
     #: The SHA-256 of the text the card showed the person.
     shown_text_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
-    #: The person's own words on why (Bypass, optional; sdk/09 L-59).
+    #: The person's own words on why (Bypass, optional; sdk/09 L-59). 500 characters, never half of one: a lone
+    #: UTF-16 surrogate cannot be stored, so it is refused here (422) rather than failing at the database.
     reason: str | None = Field(default=None, max_length=500)
     #: The client as it names itself, e.g. ``Fadenstack.Agents/0.3.0`` (L-59).
     client_version: str | None = Field(default=None, max_length=64)
+
+    @field_validator("reason")
+    @classmethod
+    def _whole_characters(cls, value: str | None) -> str | None:
+        if value is not None and any(0xD800 <= ord(ch) <= 0xDFFF for ch in value):
+            msg = "The reason holds half a character (a lone surrogate); cut it at a character's end."
+            raise ValueError(msg)
+        return value
 
 
 def _device(caller: tuple[AuthContext, AgentRequest]) -> tuple[AuthContext, AgentRequest, str]:
@@ -176,10 +189,25 @@ async def issue_grant(
             status_code=403 if refused else 422, code=exc.code, message=str(exc),
             error_type="permission_error" if refused else "invalid_request_error",
         ) from exc
+    stepped_up = None
+    if granted.kind == "bypass":
+        # Only once Bypass may be chosen at all: nobody signs in again for a refusal. Then the proof of a fresh
+        # sign-in, or the challenge (sdk/41; ASVS 5.0 7.5.3).
+        proof = step_up.verify(
+            request.headers.get(step_up.HEADER), tenant_id=auth.tenant_id, user_id=auth.user_id,
+            agent_id=agent.agent.id, device_id=device_id,
+        )
+        if proof.max_minutes is not None and granted.minutes > proof.max_minutes:
+            # Never longer than the browser page said the person approved.
+            cut = granted.cut if "minutes" in granted.cut else [*granted.cut, "minutes"]
+            granted = replace(granted, minutes=proof.max_minutes, cut=cut)
+        stepped_up = grants.SteppedUp(
+            id=proof.id, method=proof.method, provider=proof.provider, at=proof.signed_in_at,
+        )
     grant = await grants.issue(
         dao.session, _owner(auth, agent, device_id, agent.conversation_id if bound else None), granted,
         shown_text_hash=body.shown_text_sha256, client_version=body.client_version, reason=body.reason,
-        evidence_level=limits.evidence_level,
+        evidence_level=limits.evidence_level, step_up=stepped_up,
     )
     now = await grants.server_now(dao.session)
     return JSONResponse(
@@ -270,13 +298,42 @@ async def pause_grant(
 
 @router.post("/v1/agents/{agent}/grants/{grant_id}/resume", response_model=None)
 async def resume_grant(
+    request: Request,
     grant_id: str,
     caller: Annotated[tuple[AuthContext, AgentRequest], Depends(agent_request)],
     dao: Annotated[GatewayDAO, Depends()],
 ) -> JSONResponse:
-    """Resume a paused grant of this device, if it has not ended meanwhile."""
+    """Resume a paused grant of this device, if it has not ended meanwhile.
+
+    A Bypass grant resumes (after the app's pause; owner, 2026-11-09) without a new confirmation or sign-in, but
+    only while Bypass may still be chosen: the installation's switch, the agent's highest level, the ceilings
+    with the organisation's Bypass list, and the grant limits, all read now. Where it may not, the grant ends,
+    recorded as ended by the kill switch or by a limit, and the answer is 403 ``bypass_not_allowed``; where they
+    cannot be read, it stays paused and the answer is 503 (ASVS 5.0 8.3.2: applied now; 16.5.3: no fail-open).
+    """
     auth, agent, device_id = _device(caller)
-    grant = await grants.resume(dao.session, _grant_id(grant_id), _owner(auth, agent, device_id))
+    owner = _owner(auth, agent, device_id)
+    wanted = await grants.find(dao.session, _grant_id(grant_id), owner)
+    if wanted is not None and wanted.kind == "bypass" and wanted.status == "paused":
+        found = await approval_settings.current(dao.session.bind)
+        await _limits(request, auth, agent, "bypass")
+        try:
+            ceiling = await tool_mode_ceiling(request, auth, agent.agent, strict=True)
+        except Exception as exc:  # a ceiling (or the person's teams) that cannot be read lets nothing resume
+            raise GatewayError(
+                status_code=503, error_type="server_error", code="grant_limits_unavailable",
+                message="Whether Bypass is still allowed cannot be checked right now, so it stays paused.",
+            ) from exc
+        if not bypass_offered(agent.agent, ceiling, found):
+            ended = await grants.end_paused(
+                dao.session, wanted.id, owner, by="limit" if found.bypass_allowed else "kill_switch",
+            )
+            raise GatewayError(
+                status_code=403, error_type="permission_error", code="bypass_not_allowed",
+                message="Bypass is no longer allowed here, so it ended instead of resuming.",
+                extra={"grant": grants.as_dict(ended, await grants.server_now(dao.session))} if ended else None,
+            )
+    grant = await grants.resume(dao.session, _grant_id(grant_id), owner)
     return await _answer(dao, grant)
 
 

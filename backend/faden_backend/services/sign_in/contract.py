@@ -25,6 +25,7 @@ module is reached at ``settings.auth_service_url`` with ``Authorization: Bearer 
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from enum import StrEnum
 from typing import Literal
 
@@ -52,10 +53,17 @@ class ProviderPublic(BaseModel):
 
 
 class StartRequest(BaseModel):
-    """Begin a sign-in with *provider*; the answer is to come back to *return_url*."""
+    """Begin a sign-in with *provider*; the answer is to come back to *return_url*.
+
+    ``fresh``: the provider must authenticate the person anew, whatever session it holds -- OIDC ``prompt=login``
+    and ``max_age=0``, SAML ``ForceAuthn`` -- and the identity must say when it did (``authenticated_at``). For
+    the second sign-in before a highly sensitive operation (switching Bypass on, sdk/41; ASVS 5.0 7.5.3). Sent
+    only when true, so a module that does not know it sees the request as before.
+    """
 
     provider: str
     return_url: str
+    fresh: bool = False
 
 
 class SignInStart(BaseModel):
@@ -107,6 +115,10 @@ class ExternalIdentity(BaseModel):
     provisioned_only: bool = False
     #: How long this sign-in lasts at most; the shorter of this and the backend's own lifetime applies.
     session_lifetime_s: int | None = Field(default=None, ge=60)
+    #: When the provider authenticated the person, as it says and the module checked (OIDC ``auth_time``, SAML
+    #: ``AuthnInstant``); set for a ``fresh`` sign-in, where the backend refuses an answer without it (ASVS 5.0
+    #: 6.8.4: the recentness of the authentication comes from the provider).
+    authenticated_at: datetime | None = None
 
 
 class Refusal(StrEnum):
@@ -127,6 +139,8 @@ class Refusal(StrEnum):
     LICENSE = "license"
     NOT_OFFERED = "not_offered"
     NOT_PROVISIONED = "not_provisioned"
+    #: A ``fresh`` sign-in the provider did not show as one (no time, or one before it was asked; sdk/41).
+    NOT_FRESH = "not_fresh"
 
 
 class SignInAnswer(BaseModel):

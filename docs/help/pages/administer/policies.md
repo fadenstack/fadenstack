@@ -280,9 +280,11 @@ on it lets people make grants within the core limits again.
 
 **Alerts by mail.** With [mail](mail.md) set up, administrators and the addresses under its **Alerts** get a mail:
 
-- when someone switches Bypass on: who, which agent and version, on which device, from when until when, and the
-  reason they gave, if any;
-- when the report of a Bypass session's device differs from what the server recorded: once per session.
+- once a day, as one digest, for every switch-on since the last digest: who, which agent and version, on which
+  device, from when until when, how and when they signed in again, and the reason they gave, if any. It goes out
+  at 07:00 in the installation's time zone (the one set under the usage settings; UTC unless set). A day without
+  switch-ons sends none;
+- when the report of a Bypass session's device differs from what the server recorded: at once, once per session.
 
 ### Agent actions {#agent-actions}
 
@@ -336,7 +338,7 @@ back.
 **Allow it**
 
 1. Start **Root Mode**, which changing these settings needs.
-2. Open **Settings → Approvals** and turn on **Allow Bypass** (`approvals.bypass_allowed`).
+2. Open **Settings → Approvals** and turn on **Allow Bypass** (`approvals.bypass_allowed`). Turning it on needs Root Mode; turning it off does not. Each change is in the audit trail with its old and new value and whether Root Mode was on.
 3. In the agent's version, set **Approval levels → At most** to **Bypass** (see [Tools and approvals](agents.md#tools-and-approvals)). Such a version can be published only while Bypass is allowed.
 
 The **Starts in** level can never be Bypass, so no conversation starts in it. A [tool mode limit](#tool-mode-limits) below Bypass (<span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span>) removes the choice.
@@ -347,6 +349,16 @@ The **Starts in** level can never be Bypass, so no conversation starts in it. A 
 |---|---|---|
 | **Longest grant (minutes)** (`approvals.longest_grant_minutes`) | 120 (15 to 720) | The longest any grant may last: for a time, for a stretch of work, or Bypass. An agent's own longest grant may only be shorter. |
 | **Keep Bypass records (days)** (`approvals.bypass_retention_days`) | 365 (90 to 1095) | Bypass sessions and their calls are deleted this long after they ended. |
+| **Result summary (characters)** (`approvals.result_summary_chars`) | 500 (0 to 2000) | Where a grant records results, how much of each covered call's result is kept after personal data is masked. 0 keeps only whether it worked and an error's text. An error always keeps its first 500 characters. |
+
+**The second sign-in.** To switch Bypass on, a person signs in again in the browser. This cannot be switched off. **Active grants** (and, for holders of `approvals_auditor`, a session's calls) show how and when the person signed in again: password, OpenID Connect, SAML or directory, with the provider's name. Check this with your sign-in provider before you allow Bypass:
+
+- An OpenID Connect provider is asked with `prompt=login` and `max_age=0` and must answer with `auth_time`.
+- A SAML provider is asked with `ForceAuthn`, and its assertion's `AuthnInstant` must be later than the request.
+- A provider that answers from an older session is refused: "The sign-in provider did not confirm a fresh sign-in".
+- A directory (LDAP) asks for the password again.
+
+Apps that cannot do the second sign-in (older SDK versions) are not offered Bypass.
 
 **What Bypass does not skip.** Hidden and refused tools stay so. **Deny** rules, **Ask first** rules and tools the agent's author marked **Always ask** still apply. Tools that act on machines or the physical world are not recognised on their own yet: mark them **Always ask** or give them an **Ask first** rule.
 

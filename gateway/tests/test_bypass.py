@@ -9,6 +9,7 @@ and the evidence goes after its retention.
 
 from __future__ import annotations
 
+import time
 import uuid
 from collections.abc import Iterator
 from dataclasses import replace
@@ -16,6 +17,7 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
 
+import jwt as pyjwt
 import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
@@ -29,10 +31,13 @@ from faden_gateway.db.models.gateway import (
     ApprovalGrantChange,
     ApprovalGrantFlag,
 )
-from faden_gateway.services.gateway import approval_settings, grants
+from faden_gateway.services.gateway import approval_settings, grants, step_up
 from faden_gateway.services.gateway import tool_classes as tc
 from faden_gateway.web.api.v1.agents import client_supports
 from tests.test_agent_routes import (  # noqa: F401 - backend: the fixture
+    AGENT_ID,
+    TEST_JWT_SECRET,
+    USER,
     _agent_token,
     _Backend,
     _profile,
@@ -57,7 +62,23 @@ from tests.test_grants import (  # noqa: F401 - db_session, engine: the fixtures
 BYPASS = tc.ToolMode.BYPASS
 ON = approval_settings.ApprovalSettings(bypass_allowed=True)
 OFF = approval_settings.ApprovalSettings(bypass_allowed=False)
-SUPPORTS = {"x-faden-client-supports": "tool_mode.bypass"}
+#: A client that shows Bypass and can have the person sign in again for it (sdk/41).
+SUPPORTS = {"x-faden-client-supports": "tool_mode.bypass, bypass.step_up"}
+
+
+def _proof(*, age_s: float = 10, secret: str = TEST_JWT_SECRET, **claims: Any) -> str:
+    """A step-up proof as the backend signs it, for the caller of ``_auth()`` (sdk/41)."""
+    signed_in = int(time.time() - age_s)
+    body: dict[str, Any] = {
+        "typ": step_up.TOKEN_TYPE, "aud": step_up.AUDIENCE, "jti": str(uuid.uuid4()), "ten": "tenant-a",
+        "usr": USER, "agt": AGENT_ID, "did": "device-7", "method": "password", "auth_time": signed_in,
+        "iat": signed_in, "exp": signed_in + step_up.MAX_AGE_S, "max_minutes": 120, **claims,
+    }
+    return pyjwt.encode(body, step_up.key(secret), algorithm="HS256")
+
+
+def _stepped_up(**claims: Any) -> dict[str, str]:
+    return {step_up.HEADER: _proof(**claims)}
 
 
 @pytest.fixture(autouse=True)
@@ -195,8 +216,10 @@ def test_a_client_names_what_it_supports_in_one_header() -> None:
     assert client_supports(request) == frozenset({"tool_mode.bypass", "other"})  # type: ignore[arg-type]
 
 
-async def _bypass(client: AsyncClient, **body: Any) -> Any:
-    return await client.post(GRANTS, headers={**_auth(), **SUPPORTS}, json={"kind": "bypass", "minutes": 30, **body})
+async def _bypass(client: AsyncClient, *, proof: dict[str, str] | None = None, **body: Any) -> Any:
+    """A Bypass grant asked for with a fresh step-up proof, unless *proof* says otherwise (``{}``: none)."""
+    headers = {**_auth(), **SUPPORTS, **(_stepped_up() if proof is None else proof)}
+    return await client.post(GRANTS, headers=headers, json={"kind": "bypass", "minutes": 30, **body})
 
 
 @pytest.mark.anyio

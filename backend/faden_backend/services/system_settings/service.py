@@ -77,6 +77,8 @@ class SystemSettingsService:
                 "apply_scope": item.apply_scope.value,
                 "service_targets": list(item.service_targets),
                 "protected": item.protected,
+                # The values a protected setting takes without Root Mode (it only narrows then).
+                "narrowing_values": list(item.narrowing_values),
                 "enum_values": list(item.enum_values),
                 "min_value": item.min_value,
                 "max_value": item.max_value,
@@ -135,11 +137,11 @@ class SystemSettingsService:
         if defn is None:
             msg = f"Unknown setting key: {key}"
             raise KeyError(msg)
-        if defn.protected and not root_mode_active:
+        # Validated first, so a value that only narrows is told from one that widens (``narrowing_values``).
+        validated = validate_value(defn, value)
+        if defn.needs_root_mode(validated) and not root_mode_active:
             msg = f"Setting '{key}' requires active root mode."
             raise PermissionError(msg)
-
-        validated = validate_value(defn, value)
 
         if defn.is_secret:
             ciphertext = self._crypto.encrypt(str(validated))

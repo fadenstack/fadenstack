@@ -147,7 +147,7 @@ def _refuse_unconfirmed_switch_off(key: str, value: object) -> None:
 
 #: The settings whose every change is recorded with its old and new value (M08: the person-level switch, k,
 #: granularity, retention), as ``/api/admin/usage/settings`` records them.
-_RECORDED_WITH_VALUES = "usage."
+_RECORDED_WITH_VALUES = ("usage.", "approvals.")
 
 
 async def _values_before(service: SystemSettingsService, keys: list[str]) -> dict[str, object]:
@@ -188,7 +188,8 @@ async def system_settings_update(
 ) -> SettingUpdateResponse:
     """Update one setting and run immediate apply when required.
 
-    A ``usage.*`` setting is recorded with its old and new value (``from``, ``to``).
+    A ``usage.*`` or ``approvals.*`` setting is recorded with its old and new value (``from``, ``to``), and
+    with whether Root Mode was on: turning Bypass off needs none, so the record says it was done without.
     """
     _refuse_unconfirmed_switch_off(key, body.value)
     before = await _values_before(service, [key])
@@ -213,14 +214,14 @@ async def system_settings_update(
         "apply_job_id": str(result.job_id),
     }
     if key in before:
-        metadata |= {"from": before[key], "to": await service.value_of(key)}
+        metadata |= {"from": before[key], "to": await service.value_of(key), "root_mode": root_mode_active}
     await audit_action(
         action="system.settings.update",
         target_type="system_setting",
         target_id=key,
         result=AuditResult.ALLOW if result.apply_status == "success" else AuditResult.DENY,
         actor_id=user.id,
-        severity="high" if root_mode_active else "normal",
+        severity="high" if root_mode_active or key.startswith("approvals.") else "normal",
         audit_dao=audit_dao,
         metadata_json=json.dumps(metadata, ensure_ascii=False),
     )

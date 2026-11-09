@@ -77,9 +77,14 @@ Es steht nur zur Verfügung, wenn Ihr Administrator es erlaubt hat, der Agent es
 
 1. Wählen Sie im Tool-Modus des Agenten **Bypass**.
 2. Lesen Sie die Bestätigung. Sie sagt, wonach nicht mehr gefragt wird, was weiter fragt, was der Server festhält und wie lange. Sie können einen Grund angeben; Ihre Administration sieht ihn.
-3. Bestätigen Sie. Bypass beginnt erst, wenn der Server es festgehalten hat: Sind Sie offline oder lehnt der Server ab, gibt es kein Bypass, und Sie werden darüber informiert.
+3. Wählen Sie auf der Karte **Bypass einschalten**. Ihr Browser öffnet die Fadenstack-Seite **Erneut anmelden**. Melden Sie sich dort erneut an, auch wenn Sie schon in der Konsole angemeldet sind: mit Ihrem Passwort oder mit der Anmeldung Ihrer Organisation, die Sie erneut fragt (mit ihrem Multi-Faktor-Schritt, falls sie einen hat). Die Seite zeigt, was Sie genehmigen: den Agenten, das Gerät, „Freigaben in einem Chat abschalten“ und die längste Zeit. Wählen Sie **Genehmigen** oder **Ablehnen**.
+4. Die Anwendung wartet so lange. Ihre Karte bittet Sie, sich im Browser erneut anzumelden, und zeigt einen Code; vergleichen Sie ihn mit dem Code auf der Seite. **Seite erneut öffnen** öffnet die Seite noch einmal.
 
-Solange es läuft, zeigt eine Markierung die Restzeit. Wählen Sie **Stoppen**, um es sofort zu beenden. Auch das Verlassen von Bypass beendet es, ebenso das Ende der Zeit.
+Bypass beginnt erst, wenn Sie genehmigt haben und der Server es festgehalten hat: Sind Sie offline, lehnt der Server ab, wählen Sie **Ablehnen** oder antwortet niemand innerhalb von 10 Minuten, gibt es kein Bypass, und Sie werden darüber informiert.
+
+Solange es läuft, zeigt eine Markierung die Restzeit. Wählen Sie **Stoppen**, um es sofort zu beenden. Auch das Verlassen von Bypass beendet es, ebenso das Ende der Zeit. Das Feld für den Grund nimmt bis zu 500 Zeichen auf.
+
+Bypass bleibt bei seinem Chat. Ein neuer Chat oder der Wechsel zu einem anderen beendet es nicht. Die Chatliste zeigt, welche Chats in Bypass laufen und wie viel Zeit bleibt; öffnen Sie einen solchen Chat, erscheint sein Band wieder.
 
 Bypass überspringt Fragen, nie Regeln. Diese fragen weiter oder werden abgelehnt:
 
@@ -90,6 +95,9 @@ Bypass überspringt Fragen, nie Regeln. Diese fragen weiter oder werden abgelehn
 ??? info "Mehr zu Bypass"
     - Eine neue Unterhaltung erbt Bypass nie, ebenso wenig ein Agent, an den Sie delegieren, oder einer, der Arbeit von Ihrem Agenten übernimmt. Das Modell, ein Tool, ein Skill oder ein anderer Agent kann es nicht für Sie einschalten.
     - Die längste Zeit legt Ihr Administrator fest.
+    - Eine Anmeldung gilt 5 Minuten lang auch für das Einschalten von Bypass in anderen Chats mit derselben Anwendung auf demselben Computer.
+    - Beendet sich die Anwendung, pausiert ein laufendes Bypass, und seine Zeit läuft weiter. Starten Sie die Anwendung innerhalb von 30 Minuten wieder, läuft es weiter, ohne neue Karte und ohne neue Anmeldung. Später ist es beendet, und die Anwendung sagt, warum. Hat Ihre Organisation Bypass inzwischen eingeschränkt, endet es, statt weiterzulaufen.
+    - Endet Bypass, erfährt der Agent, dass Tools wieder nachfragen. Er darf das sagen und vorschlagen, Bypass wieder einzuschalten, kann es aber nicht selbst tun. Nur Sie können es: Wählen Sie **Wieder einschalten** in der Zeile, die sagt, dass es endete. Die Karte und die erneute Anmeldung folgen.
     - Bypass wird nicht verlängert. Ist seine Zeit um, endet es; mehr Zeit ist ein neues Bypass, erneut bestätigt.
     - Jeder Aufruf, der unter Bypass läuft, wird auf dem Server festgehalten: das Tool und die Zeit und, sofern Ihre Organisation nicht weniger festhält, seine Argumente, mit maskierten personenbezogenen Daten. Ihre Organisation kann auch eine kurze Zusammenfassung jedes Ergebnisses aufbewahren. Die Bestätigung sagt, was gilt. Lesende und schreibende Aufrufe sind eingeschlossen. Ihr Gerät meldet nach jeder Runde außerdem, was es ausgeführt hat, und der Server kennzeichnet jeden Unterschied. Nur Personen, die Ihre Organisation als Freigabe-Prüfer benannt hat, können diese Aufzeichnungen lesen, und jeder Blick wird ebenfalls festgehalten.
     - Schaltet Ihr Administrator Bypass aus, wirkt es sofort wie **Automatisch**, und laufendes Bypass endet. Beendet der Server ein Bypass (seine Zeit, ein Administrator, Bypass ausgeschaltet), verschwindet die Markierung, und die Anwendung sagt, warum.
