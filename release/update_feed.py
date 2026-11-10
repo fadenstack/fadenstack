@@ -414,12 +414,15 @@ def main(argv: list[str] | None = None) -> int:
                 raise BuildError("No signing key: set APPS_FEED_SIGNING_KEY or pass --key-file")
             signature = sign((args.folder / APPS_INDEX).read_bytes(), secret, release_feed.APPS_TRUSTED_KEYS)
             (args.folder / APPS_SIG).write_text(json.dumps(signature) + "\n", encoding="utf-8", newline="\n")
-            print(f"{args.folder / APPS_SIG}: signed with {signature['key_id']}")
+            # Nothing that came out of the key is printed here (not even its public id): apps-verify names the key,
+            # from the signature file it checks.
+            print(f"{args.folder / APPS_SIG}: signed")
         elif args.cmd == "apps-verify":
-            found = release_feed.verify_apps((args.folder / APPS_INDEX).read_bytes(),
-                                             (args.folder / APPS_SIG).read_bytes())
+            raw_sig = (args.folder / APPS_SIG).read_bytes()
+            found = release_feed.verify_apps((args.folder / APPS_INDEX).read_bytes(), raw_sig)
             release_feed.not_expired_apps(found)
-            print(f"valid until {found.expires.isoformat()}: {len(found.apps)} apps "
+            key_id = json.loads(raw_sig).get("key_id", "?")
+            print(f"valid, signed with {key_id}, until {found.expires.isoformat()}: {len(found.apps)} apps "
                   f"({', '.join(a.id for a in found.apps) or 'none'})")
         elif args.cmd == "keygen":
             key = Ed25519PrivateKey.generate()
