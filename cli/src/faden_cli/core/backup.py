@@ -1001,6 +1001,34 @@ def restore_tls(backup_dir: Path, install_dir: Path, files: list[str]) -> list[s
     return restored
 
 
+def install_release(env_file: object) -> str:
+    """The release the install runs: ``VERSION`` in its ``.env``, or ``""`` when it names none."""
+    if not env_file or not Path(str(env_file)).is_file():
+        return ""
+    from faden_cli.core.env_gen import read_env_file  # noqa: PLC0415
+
+    return read_env_file(Path(str(env_file))).get("VERSION", "").strip()
+
+
+def describe_release(manifest: dict) -> str:
+    """Which release a backup holds, as a restore says it: ``release`` beside ``faden_version``.
+
+    An upgrade takes its backup with the new CLI, before anything changes: ``faden_version`` is then the
+    release being installed, the data are the one before. A manifest from before 0.7.0 records only the CLI.
+    """
+    taken_by = manifest.get("faden_version") or "unknown"
+    release = str(manifest.get("release") or "").strip()
+    if release:
+        return f"Backup of release {release}, taken by faden {taken_by}"
+    note = (
+        f"Backup taken by faden {taken_by}; the manifest does not record the install's release "
+        "(backups taken before 0.7.0 do not)"
+    )
+    if manifest.get("kind") == "upgrade":
+        note += f": an upgrade's backup holds the release before that upgrade, older than {taken_by}"
+    return note
+
+
 def write_manifest(
     backup_dir: Path,
     *,
@@ -1010,10 +1038,13 @@ def write_manifest(
     migration_heads: dict[str, str],
     tls_material: list[str] | None = None,
     kind: str = DEFAULT_KIND,
+    release: str = "",
 ) -> Path:
     """Write ``manifest.json`` with file checksums and metadata.
 
     *kind* says what made the backup (see :data:`BACKUP_KINDS`), so retention only counts its own kind.
+    *release* is the release the install ran (``.env`` ``VERSION``), recorded beside the CLI's own version: an
+    upgrade's backup is taken by the new CLI and holds the old release's data.
     """
     db_entries: dict[str, dict] = {}
     for db, dump_file in databases.items():
@@ -1028,6 +1059,7 @@ def write_manifest(
         "version": 1,
         "created_at": datetime.now(tz=timezone.utc).isoformat(timespec="seconds"),
         "faden_version": __version__,
+        "release": release,
         "kind": kind,
         "databases": db_entries,
         "env_snapshot": env_snapshot,
@@ -1245,6 +1277,7 @@ def create_backup(
         migration_heads=heads,
         tls_material=result.tls_material,
         kind=kind,
+        release=install_release(ctx.env_file),
     )
 
     # 7. Encrypt, when the install has a backup key (faden backup key create): the manifest too

@@ -11,7 +11,7 @@ her; die Wiederherstellung wird noch getestet (siehe [Wiederherstellen](#restore
 | Jede Datenbank im Postgres des Servers | Ja | Benutzer, Einstellungen, Provider, Maschinen, Cluster, Bereitstellungen, Chats, das Anfrageprotokoll |
 | `.env` | Ja, außer mit `--db-only` | Sie enthält den Schlüssel, mit dem die Chats verschlüsselt sind, und die Schlüssel, die gespeicherte Geheimnisse verschlüsseln (das Hugging-Face-Token, geheime Einstellungen, die Zugangsdaten der MCP-Server). Eine Datenbank, die ohne ihre `.env` wiederhergestellt wird, enthält Chats und Geheimnisse, die niemand lesen kann |
 | Zertifikatsmaterial (`tls/`, `tls-ca/`) | Ja, außer mit `--db-only` | Das ausgelieferte Zertifikat und die eigene Zertifizierungsstelle des Servers mit ihrem privaten Schlüssel. Damit ist ein neu aufgesetzter Server einer, dem die Maschinen weiterhin vertrauen |
-| Migrationsversionen und Prüfsummen | Ja | `faden restore` prüft die Datenbank-Dumps, die Volume-Archive und die Zertifikatsdateien, bevor es etwas ändert |
+| Das Release, Migrationsversionen und Prüfsummen | Ja | Das Release, das die Installation ausführte, und die `faden`-Version, mit der die Sicherung angelegt wurde; `faden restore` zeigt beide. Es prüft die Datenbank-Dumps, die Volume-Archive und die Zertifikatsdateien, bevor es etwas ändert |
 | Dateien, die in die Wissensdatenbank hochgeladen wurden | Mit `--include-volumes` | Ohne diese Option enthält die Sicherung nur den daraus gelesenen Text, nicht die Dateien selbst. Ist `FADEN_DATA_DIR` gesetzt, liest die Sicherung den Ordner `knowledge` (und eine Wiederherstellung schreibt ihn) |
 | Dateien, die an Chats angehängt wurden | Mit `--include-volumes` | Ohne diese Option liegt nur der daraus gelesene Text in der Datenbank, nicht die Dateien selbst. Ist `FADEN_DATA_DIR` gesetzt, liest die Sicherung den Ordner `chat-files` (und eine Wiederherstellung schreibt ihn) |
 | Modelle | Nein | Sie lassen sich erneut herunterladen. Bewahren Sie eine Kopie der Modelle auf, die Sie importiert statt heruntergeladen haben |
@@ -172,8 +172,11 @@ anzutasten.
 Die Wiederherstellung wird noch getestet: Probieren Sie sie zuerst an einer Kopie des Servers aus (siehe
 [Wiederherstellen](#restore)).
 
-1. Installieren Sie mit `faden deploy` einen neuen Server mit demselben Release, mit dem die Sicherung angelegt
-   wurde (`faden restore --verify-only` zeigt es an).
+1. Installieren Sie mit `faden deploy` einen neuen Server mit dem Release, das die Sicherung enthält.
+   `faden restore --verify-only` zeigt es als **Backup of release …** an (`release` in der `manifest.json` der
+   Sicherung). Eine Sicherung, die vor 0.7.0 angelegt wurde, nennt nur die `faden`-Version, mit der sie angelegt
+   wurde, und sagt das; bei der Sicherung eines Upgrades ist das das Release, das installiert wird, während die
+   Daten die des Releases davor sind.
 2. Kopieren Sie die Sicherung darauf und führen Sie `faden restore` mit ihrem Pfad aus, bei einer verschlüsselten
    Sicherung mit dem Wiederherstellungsschlüssel. Der neue Server verschlüsselt seine eigenen Sicherungen für den
    Schlüssel, den sein `faden deploy` angelegt hat.

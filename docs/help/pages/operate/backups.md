@@ -11,7 +11,7 @@ when you install.
 | Every database on the server's Postgres | Yes | Users, settings, providers, machines, clusters, deployments, chats, the request log |
 | `.env` | Yes, unless `--db-only` | It holds the key the chats are encrypted with and the keys that seal stored secrets (the Hugging Face token, secret settings, the MCP servers' credentials). A database restored without its `.env` has chats and secrets nobody can read |
 | Certificate material (`tls/`, `tls-ca/`) | Yes, unless `--db-only` | The served certificate and the server's own certificate authority with its private key. With them, a rebuilt server is one the machines still trust |
-| Migration versions and checksums | Yes | `faden restore` checks the database dumps, the volume archives and the certificate files before it changes anything |
+| The release, migration versions and checksums | Yes | The release the install ran and the `faden` version that took the backup, which `faden restore` shows. It checks the database dumps, the volume archives and the certificate files before it changes anything |
 | Files uploaded to the knowledge base | With `--include-volumes` | Without it, only the text read from them is in the backup, not the files themselves. With `FADEN_DATA_DIR` set, the backup reads (and a restore writes) its `knowledge` folder |
 | Files attached to chats | With `--include-volumes` | Without it, only the text read from them is in the database, not the files themselves. With `FADEN_DATA_DIR` set, the backup reads (and a restore writes) its `chat-files` folder |
 | Models | No | They can be downloaded again. Keep a copy of models you imported rather than downloaded |
@@ -161,8 +161,10 @@ certificate files are complete and unchanged, without touching the install.
 
 Restoring is still being tested: try it on a copy of the server first (see [Restore](#restore)).
 
-1. Install a new server with the same release the backup was taken with (`faden restore --verify-only` shows it),
-   using `faden deploy`.
+1. Install a new server with the release the backup holds, using `faden deploy`. `faden restore --verify-only`
+   shows it as **Backup of release …** (`release` in the backup's `manifest.json`). A backup taken before
+   0.7.0 records only the `faden` version that took it, and says so; for an upgrade's backup that is the release
+   being installed, while the data are those of the release before it.
 2. Copy the backup onto it and run `faden restore` with its path, and the recovery key if the backup is
    encrypted. The new server encrypts its own backups to the key its `faden deploy` made.
 3. If the new server has another address, run the install line from its console on each machine again, so the

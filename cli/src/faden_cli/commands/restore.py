@@ -18,6 +18,7 @@ import click
 from faden_cli.core import backup_crypto, backup_key, maintenance
 from faden_cli.core.backup import (
     RestoreResult,
+    describe_release,
     read_manifest,
     restore_backup,
     verify_backup,
@@ -119,7 +120,7 @@ def _restore_cmd(
 
     # ── Show backup info ──────────────────────────────────────
     console.print(f"  Backup date:    {manifest.get('created_at', 'unknown')}")
-    console.print(f"  faden version: {manifest.get('faden_version', 'unknown')}")
+    console.print(f"  Release:        {describe_release(manifest)}")
     db_names = list(manifest.get("databases", {}).keys())
     console.print(f"  Databases:      {', '.join(db_names)}")
     if manifest.get("env_snapshot"):
