@@ -25,6 +25,21 @@
 series: []
 
 releases:
+  - version: 0.7.0rc1
+    channel: preview
+    date: ""
+    severity: normal
+    summary: >-
+      Approval levels for agents: deny wins, approvals for a time or a stretch of work held by the server, and Bypass
+      behind a second sign-in, off unless an administrator allows it. A Preview release.
+    highlights:
+      - "Tool rules: a deny always wins, then Ask first. Allow rules have no effect any more: check yours before upgrading (Agents → Governance → Tool rules)."
+      - "Each agent has a default and a highest level; a person may allow an agent for a time or a stretch of work, and administrators see and revoke running approvals."
+      - "Bypass, off by default: switching it on needs a fresh sign-in in the browser, and every call under it is recorded."
+      - "The gateway's default is up to eight workers when nothing sets FADEN_GATEWAY_WORKERS_COUNT; on servers faden manages, faden tune sizes it from the server's budget."
+    upgrade_from: 0.4.0
+    components:
+      agent: 0.2.12
   - version: 0.6.0
     channel: stable
     date: ""
