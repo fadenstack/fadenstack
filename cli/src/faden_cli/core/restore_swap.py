@@ -24,7 +24,7 @@ from __future__ import annotations
 import re
 import subprocess
 import time
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import BinaryIO
@@ -229,7 +229,12 @@ def database_need(dumps: dict[str, int], live: dict[str, int]) -> tuple[int, dic
 
 
 def restore_beside(
-    dumps: dict[str, Path], live: dict[str, int], log: BinaryIO, docker: str = "docker"
+    dumps: dict[str, Path],
+    live: dict[str, int],
+    log: BinaryIO,
+    docker: str = "docker",
+    *,
+    started: Callable[[str, str], None] | None = None,
 ) -> list[str]:
     """Restore each dump (database name → dump file) into a new ``<db>__restore``; the copies made.
 
@@ -238,10 +243,15 @@ def restore_beside(
     over too (a dump without ``--create`` holds none of them). ``pg_restore`` runs with ``--verbose`` into *log*.
     Any exit code but 0 is a failure: every copy made so far is dropped and :class:`RestoreFailed` says which
     database failed and where its output is. The live databases are not touched.
+
+    *started* (database, copy) is called as each database's restore begins, so what was printed before a
+    failure names only the databases that were started.
     """
     made: list[str] = []
     for db, path in dumps.items():
         copy = db + RESTORE_SUFFIX
+        if started is not None:
+            started(db, copy)
         log.write(f"\n===== {db}: pg_restore into {copy} =====\n".encode())
         log.flush()
         try:

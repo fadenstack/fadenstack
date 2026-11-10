@@ -1460,9 +1460,7 @@ def prepare_restore(
     not_in_backup = sorted(
         db for db in live if db not in ignore and db not in names and not db.endswith((rs.RESTORE_SUFFIX, rs.OLD_SUFFIX))
     )
-    for db in names:
-        info(f"  Restoring {db} into {db}{rs.RESTORE_SUFFIX}")
-    rs.restore_beside(dumps, live, log)
+    rs.restore_beside(dumps, live, log, started=lambda db, copy: info(f"  Restoring {db} into {copy}"))
     return Prepared(names, live, not_in_backup, volumes, dropped=copies)
 
 
