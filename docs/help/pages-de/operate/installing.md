@@ -280,6 +280,9 @@ faden module enable pii mcp skills
 faden up
 ```
 
+`faden up` kehrt zurück, sobald alle Dienste laufen und gesund sind; die Module sind dann bereit für Chats. PII lädt
+zuerst sein Modell: Auf einem Server ohne GPU dauert das etwa eine halbe Minute.
+
 Mit `faden module disable pii` und anschließend `faden up` entfernen Sie ein Modul wieder. `faden up` stoppt und entfernt die Container des Moduls. Seine Daten bleiben erhalten.
 
 Ein Modul ist von Anfang an eingeschaltet: `provenance` kennzeichnet die Inhalte, die Fadenstack erzeugt, als
@@ -388,7 +391,7 @@ von einem Detektor auf einen anderen.
 |---|---|
 | `faden status` | Alle Dienste: ob sie laufen und – wo es eine Prüfung gibt – ob sie gesund sind |
 | `faden logs -f faden-backend` | Das Log eines Dienstes mitverfolgen (ohne Namen: alle Dienste) |
-| `faden up` / `faden down` | Die Dienste starten oder stoppen; die Daten bleiben erhalten |
+| `faden up` / `faden down` | Die Dienste starten und warten, bis sie gesund sind (`--no-wait` kehrt sofort zurück), oder sie stoppen; die Daten bleiben erhalten |
 | `faden doctor` | Host, Ports und Zertifikat prüfen |
 | `faden config show` | Wo die Installation liegt und wie das Werkzeug eingerichtet ist |
 | `faden admin reset-password --email alex@example.com` | Ein neues Passwort für einen Benutzer setzen, der sich nicht anmelden kann. Es ändert nur die Anmeldung an der Konsole, nicht Grafana, Langfuse oder RabbitMQ |

@@ -262,6 +262,9 @@ faden module enable pii mcp skills
 faden up
 ```
 
+`faden up` returns once every service is running and healthy, so the modules are ready for chats when it is done.
+PII loads its model first: on a server without a GPU that takes about half a minute.
+
 `faden module disable pii`, then `faden up`, takes one away again. `faden up` stops and removes the module's containers. Its data is kept.
 
 One module is on from the start: `provenance` marks the content Fadenstack generates as AI-generated and checks such
@@ -364,7 +367,7 @@ Keep the model directory selected by the installer: `--pii-model-dir` must point
 |---|---|
 | `faden status` | Every service, running or not, and healthy where it has a check |
 | `faden logs -f faden-backend` | Follow one service's log (all services without a name) |
-| `faden up` / `faden down` | Start or stop the services; the data stays |
+| `faden up` / `faden down` | Start the services and wait until they are healthy (`--no-wait` returns at once), or stop them; the data stays |
 | `faden doctor` | Check the host, the ports and the certificate |
 | `faden config show` | Where the install is and how the tool is set up |
 | `faden admin reset-password --email alex@example.com` | Set a new password for a user who cannot sign in. It changes the console sign-in only, not Grafana, Langfuse or RabbitMQ |

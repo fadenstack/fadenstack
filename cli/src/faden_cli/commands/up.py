@@ -6,10 +6,31 @@ import sys
 
 import click
 
-from faden_cli.core.compose import build_context_from_config, report_inactive_modules, up as compose_up
+from faden_cli.core.compose import (
+    ComposeContext,
+    build_context_from_config,
+    ps as compose_ps,
+    report_inactive_modules,
+    up as compose_up,
+)
 from faden_cli.core.console import console, success, error
 from faden_cli.core.env_gen import write_env_file, default_env_vars
 from faden_cli.core.settings import load_config
+
+#: How long `faden up` waits for the services to be healthy: as `faden upgrade` waits after starting them.
+WAIT_SECONDS = 180
+
+
+def _not_healthy(ctx: ComposeContext) -> list[str]:
+    """The services not running and healthy (one-off migrators that ended with 0 aside), as `faden restore` reads them."""
+    found: list[str] = []
+    for row in compose_ps(ctx):
+        state, health = (row.state or row.status or "").lower(), (row.health or "").lower()
+        if state == "exited" and row.exit_code == 0:
+            continue
+        if state != "running" or health in ("unhealthy", "starting"):
+            found.append(f"{row.service or row.name} ({health or state})")
+    return found
 
 
 @click.command("up")
@@ -17,6 +38,18 @@ from faden_cli.core.settings import load_config
 @click.option("--build", "do_build", is_flag=True, help="Build images before starting.")
 @click.option("--pull/--no-pull", default=False, help="Pull images before starting.")
 @click.option("--env-gen/--no-env-gen", "gen_env", default=False, help="Regenerate .env file before starting.")
+@click.option(
+    "--wait/--no-wait",
+    default=True,
+    help="Return once the services are running and healthy (default), as `faden upgrade` and `faden restore` do.",
+)
+@click.option(
+    "--wait-timeout",
+    type=click.IntRange(min=10),
+    default=WAIT_SECONDS,
+    show_default=True,
+    help="Seconds to wait for the services to be healthy.",
+)
 @click.argument("services", nargs=-1)
 def up_cmd(
     *,
@@ -24,11 +57,16 @@ def up_cmd(
     do_build: bool,
     pull: bool,
     gen_env: bool,
+    wait: bool,
+    wait_timeout: int,
     services: tuple[str, ...],
 ) -> None:
-    """Start Fadenstack infrastructure and services.
+    """Start Fadenstack infrastructure and services, and wait until they are healthy.
 
     Optionally pass SERVICE names to start only specific containers.
+
+    It waits because a service that has just started may not answer yet: a module just switched on
+    (`faden module enable pii`) loads its model first, and a chat sent in that time was refused.
     """
     cfg = load_config()
 
@@ -61,19 +99,27 @@ def up_cmd(
 
     keep_company_files(ctx.env_file, ctx)
 
+    waiting = wait and detach  # compose waits for detached services only
     returncode = compose_up(
         ctx,
         detach=detach,
         build=do_build,
-        pull=pull,
+        pull="always" if pull else "",
         services=list(services) if services else None,
+        wait=waiting,
+        timeout=wait_timeout if waiting else 0,
     )
 
     if returncode == 0:
-        success("Services started successfully.")
+        success("Services started and healthy." if waiting else "Services started successfully.")
         # Only when everything was started: naming services is a partial start.
         if not services:
             report_inactive_modules(ctx)
     else:
+        if waiting and (sick := _not_healthy(ctx)):
+            error(
+                f"Not running and healthy within {wait_timeout} s: {', '.join(sick)}. `faden status` shows the "
+                "services, `faden logs <service>` why."
+            )
         error(f"docker compose up exited with code {returncode}.")
         sys.exit(returncode)
