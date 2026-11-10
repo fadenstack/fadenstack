@@ -116,6 +116,8 @@ website where it was clicked (for example `ref=console-about`) and the release l
 count how its software is used. It carries nothing about you, your organisation or this server, opens in a new tab,
 and does not pass on the address of the page you came from. Nothing is sent unless you click one.
 
+The download links on **Apps** go to the site where an app is published (GitHub, the Chrome Web Store or the Nextcloud app store). That site sees your address (IP), as with any link; the links send no referrer, so it does not learn your organisation's server address. The server itself reads the public list of Fadenstack apps once a day, as it does the list of releases, and sends nothing about itself (see [Apps](apps.md)).
+
 <span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span> With Enterprise, administrators can take the console's links away (the sign-in page, **About Fadenstack**, the
 release notes on **Updates**): **Settings → Branding → Show links to fadenstack.com**.
 

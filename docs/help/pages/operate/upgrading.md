@@ -25,6 +25,9 @@ release is out, the administrators see it:
 
 Nothing is installed by itself: you run the commands, as described below.
 
+The same daily check also reads the list of Fadenstack apps (the desktop agent, the Office add-ins, the Nextcloud
+app and the Chrome extension) in the same way: see [Fadenstack apps](apps.md).
+
 ![The banner on the console's pages: a newer release fixes security problems, with See updates](../images/operate/update-banner.png)
 
 ### When a release is out

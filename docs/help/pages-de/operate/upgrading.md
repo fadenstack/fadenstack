@@ -27,6 +27,9 @@ Administratoren:
 
 Nichts wird von selbst installiert: Sie führen die Befehle aus, wie unten beschrieben.
 
+Dieselbe tägliche Prüfung liest auf dieselbe Weise auch die Liste der Fadenstack-Apps (Desktop-Agent,
+Office-Add-ins, Nextcloud-App und Chrome-Erweiterung): siehe [Fadenstack-Apps](apps.md).
+
 ![Der Hinweisbalken auf den Seiten der Konsole: Eine neuere Version behebt Sicherheitsprobleme, mit Zu den Updates](../images/operate/update-banner.png)
 
 ### Wenn ein Release erschienen ist {#when-a-release-is-out}
