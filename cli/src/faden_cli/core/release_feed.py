@@ -134,7 +134,8 @@ def _signed_json(index: bytes, signature: bytes, trusted: dict[str, str]) -> Any
         sig = json.loads(signature)
         key_id = str(sig["key_id"])
         raw_sig = base64.b64decode(sig["signature"], validate=True)
-    except (ValueError, KeyError, TypeError, binascii.Error) as exc:
+    # RecursionError: a signature file nested deeply enough stops json.loads (it is read before anything verifies).
+    except (ValueError, KeyError, TypeError, binascii.Error, RecursionError) as exc:
         raise FeedError("The feed's signature file is not readable.") from exc
     key = trusted.get(key_id)
     if key is None:
@@ -371,9 +372,10 @@ APPS_TRUSTED_KEYS: dict[str, str] = {
 }
 
 #: Where the app list's links may lead: https on one of these hosts, nowhere else (OWASP ASVS 5.0 13.2.4: links
-#: an install shows are not taken from just anywhere). On GitHub only under the Fadenstack organisation.
+#: an install shows are not taken from just anywhere). On GitHub only under the Fadenstack organisation, in the
+#: stores only their listings.
 LINK_HOSTS = ("fadenstack.com", "help.fadenstack.com", "github.com", "chromewebstore.google.com", "apps.nextcloud.com")
-LINK_PATHS = {"github.com": "/fadenstack/"}
+LINK_PATHS = {"github.com": "/fadenstack/", "chromewebstore.google.com": "/detail/", "apps.nextcloud.com": "/apps/"}
 
 #: The apps the console knows how to connect to the server (what it can fill in for them); an app of another kind
 #: is listed with its links only.
@@ -397,10 +399,19 @@ def apps_url(feed_url: str) -> str:
 
 
 def safe_link(url: Any) -> str:
-    """*url* when it is an https link to an allowed place (:data:`LINK_HOSTS`); else ``""``."""
-    from urllib.parse import urlsplit  # noqa: PLC0415
+    """*url* when it is an https link to an allowed place (:data:`LINK_HOSTS`, :data:`LINK_PATHS`); else ``""``.
+
+    The path is checked as a browser will follow it: a browser resolves ``.`` and ``..`` segments (also written
+    ``%2e``) and reads ``\\`` as ``/`` in an https link, so ``github.com/fadenstack/../other`` would lead out of
+    the organisation. Any of them refuses the link, rather than resolving it here. OWASP ASVS 5.0: 1.2.2 (only a
+    safe protocol); the allowlist of protocol, host, path and port in the shape 1.3.6 and 13.2.4 give for a
+    server's own requests, here for the links it shows.
+    """
+    from urllib.parse import unquote, urlsplit  # noqa: PLC0415
 
     text = str(url or "").strip()
+    if "\\" in text or any(c.isspace() or ord(c) < 32 for c in text):
+        return ""
     try:
         parts = urlsplit(text)
         port = parts.port
@@ -409,7 +420,7 @@ def safe_link(url: Any) -> str:
     host = (parts.hostname or "").lower()
     if parts.scheme != "https" or port is not None or parts.username or parts.password or host not in LINK_HOSTS:
         return ""
-    if any(c.isspace() or ord(c) < 32 for c in text):
+    if any(segment in (".", "..") for segment in unquote(parts.path).split("/")):
         return ""
     prefix = LINK_PATHS.get(host)
     if prefix and not parts.path.startswith(prefix):
@@ -426,6 +437,15 @@ def localized(texts: dict[str, str], lang: str | None) -> str:
         if texts.get(key):
             return texts[key]
     return next(iter(texts.values()))
+
+
+def _items(raw: Any, limit: int | None = None) -> list[Any]:
+    """*raw* when it is a list (its first *limit* items), else nothing: a field of another type is left out.
+
+    The app list is signed with a key of its own; a list signed with it but shaped wrongly must not stop the
+    server's other work (the update check reads it in the same pass as the release feed).
+    """
+    return list(raw[:limit] if limit is not None else raw) if isinstance(raw, list) else []
 
 
 def _texts(raw: Any, limit: int) -> dict[str, str]:
@@ -541,8 +561,10 @@ def parse_apps(data: Any) -> AppCatalogue:
         stamps[key] = stamp if stamp.tzinfo is not None else stamp.replace(tzinfo=UTC)
     if stamps["expires"] <= stamps["generated_at"]:
         raise FeedError("The app list expires before it was made.")
+    if not isinstance(data.get("apps", []), list):
+        raise FeedError("The app list's apps are not a list.")
     apps: list[App] = []
-    for raw in data.get("apps") or []:
+    for raw in _items(data.get("apps")):
         app = _app(raw)
         if app is not None and all(a.id != app.id for a in apps):
             apps.append(app)
@@ -555,14 +577,14 @@ def _app(raw: Any) -> App | None:
     name = _texts(raw.get("name"), _TEXT_LIMITS["name"])
     if not name:
         return None
-    releases = [r for r in (_app_release(x) for x in raw.get("releases") or []) if r is not None]
+    releases = [r for r in (_app_release(x) for x in _items(raw.get("releases"))) if r is not None]
     releases.sort(key=lambda r: r.parsed, reverse=True)
     unique: list[AppRelease] = []
     for r in releases:
         if not unique or unique[-1].parsed != r.parsed:
             unique.append(r)
     supported: dict[str, date] = {}
-    for s in raw.get("series") or []:
+    for s in _items(raw.get("series")):
         try:
             supported[str(s["series"])] = date.fromisoformat(str(s["supported_until"]))
         except (KeyError, TypeError, ValueError):
@@ -575,9 +597,7 @@ def _app(raw: Any) -> App | None:
         name=name,
         description=_texts(raw.get("description"), _TEXT_LIMITS["description"]),
         page=safe_link(raw.get("page")),
-        reports_as=tuple(
-            str(n)[:100] for n in (raw.get("reports_as") or [])[:10] if isinstance(n, str) and n.strip()
-        ),
+        reports_as=tuple(str(n)[:100] for n in _items(raw.get("reports_as"), 10) if isinstance(n, str) and n.strip()),
         connect=connect if connect in CONNECT_KINDS else None,
         agents={
             str(role): str(slug)
@@ -615,10 +635,10 @@ def _app_release(raw: Any) -> AppRelease | None:
                 str(f.get("severity", ""))[:16],
                 " ".join(str(f.get("summary", "")).split())[:400],
             )
-            for f in raw.get("fixes") or []
+            for f in _items(raw.get("fixes"))
             if isinstance(f, dict)
         ),
-        files=tuple(f for f in (_app_file(x) for x in raw.get("files") or []) if f is not None),
+        files=tuple(f for f in (_app_file(x) for x in _items(raw.get("files"))) if f is not None),
     )
 
 

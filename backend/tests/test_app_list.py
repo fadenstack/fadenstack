@@ -407,6 +407,7 @@ async def test_connection_files_are_filled_in_for_this_server_and_hold_no_secret
     )
     assert resp.status_code == status.HTTP_200_OK, resp.text
     assert resp.headers["content-disposition"] == 'attachment; filename="policy.json"'
+    assert resp.headers["x-content-type-options"] == "nosniff"
     policy = resp.json()
     assert policy["serverUrl"] == "https://ai.example.de"
     assert policy["agents"]["word"] == "word-assistant" and policy["agents"]["excel"] == "excel-assistant"
@@ -421,6 +422,197 @@ async def test_connection_files_are_filled_in_for_this_server_and_hold_no_secret
 
     wrong = fastapi_app.url_path_for("admin_updates_app_connect", app_id="office", kind="nextcloud-occ")
     assert (await client.get(wrong)).status_code == status.HTTP_404_NOT_FOUND
+
+
+# -- The app part never undoes the release check beside it (check.check_apps) ----------------------------------
+
+CORE_KEY = Ed25519PrivateKey.generate()
+CORE_PUBLIC = base64.b64encode(
+    CORE_KEY.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw),
+).decode()
+FEED_URL = "https://fadenstack.com/updates/v1/index.json"
+APPS_URL = "https://fadenstack.com/updates/v1/apps.json"
+
+
+def core_feed() -> tuple[bytes, bytes]:
+    """A release feed with a security release after this install's 0.7.0: its check queues one mail."""
+    index = json.dumps({
+        "schema": 1, "product": "fadenstack", "generated_at": "2026-11-24T10:00:00Z",
+        "releases": [
+            {"version": "0.7.0", "channel": "stable", "severity": "normal", "summary": "s"},
+            {"version": "0.7.1", "channel": "stable", "severity": "security", "summary": "s"},
+        ],
+    }).encode()
+    signature = json.dumps({"key_id": "core-test", "signature": base64.b64encode(CORE_KEY.sign(index)).decode()})
+    return index, signature.encode()
+
+
+def signed_apps(data: dict[str, Any]) -> tuple[bytes, bytes]:
+    index = json.dumps(data).encode()
+    return index, json.dumps({"key_id": "apps-test", "signature": base64.b64encode(KEY.sign(index)).decode()}).encode()
+
+
+@pytest.fixture
+def both(served: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    """The release feed and the app list, each at its URL; ``asked`` records each fetch."""
+    monkeypatch.setattr(release_feed, "TRUSTED_KEYS", {"core-test": CORE_PUBLIC})
+
+    async def fetch(url: str, *, etag: str | None) -> tuple[bytes, bytes, str | None] | None:
+        served["asked"].append((url, etag))
+        if url == FEED_URL:
+            return (*core_feed(), '"c1"')
+        return (*served["apps"], '"a1"')
+
+    monkeypatch.setattr(check, "fetch", fetch)
+    return served
+
+
+@pytest.fixture
+def one_transaction(dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch) -> Any:
+    """The pass's session factory over the test's session; its commit stays inside the test's transaction."""
+
+    async def nothing(*_a: Any, **_k: Any) -> None:
+        return None
+
+    monkeypatch.setattr(dbsession, "commit", dbsession.flush)
+    monkeypatch.setattr("faden_backend.services.system_settings.runtime_mapping.refresh_runtime_values", nothing)
+    return _factory(dbsession)
+
+
+async def _alerts(dbsession: AsyncSession, fingerprint: str) -> int:
+    await dbsession.flush()
+    rows = (await dbsession.execute(select(NotificationOutbox))).scalars().all()
+    return sum(1 for m in rows if (m.payload_json or {}).get("fingerprint") == fingerprint)
+
+
+async def test_an_error_in_the_app_part_never_undoes_the_release_check(
+    dbsession: AsyncSession, both: dict[str, Any], one_transaction: Any, monkeypatch: pytest.MonkeyPatch,
+    mail_on: object,
+) -> None:
+    read_apps = apps.check_now
+
+    async def broken(*_a: Any, **_k: Any) -> None:
+        raise RuntimeError("the app part broke")
+
+    monkeypatch.setattr(apps, "check_now", broken)
+    assert await check.run_pass(one_transaction, now=NOW)
+    feed = await check.load_state(dbsession)
+    assert feed is not None and (feed.error, feed.succeeded_at) == (None, NOW)  # the release check is kept
+    assert await _alerts(dbsession, "release:0.7.1") == 1  # and its notice, once
+    row = await apps.load_state(dbsession)
+    assert row is not None and row.index_text is None
+    assert row.error == "The app list could not be read (RuntimeError). The server's log has the details."
+
+    # The app list is read again on its own after RETRY_AFTER, as a failed feed would be; the feed is not due, and
+    # its notice is not sent again.
+    monkeypatch.setattr(apps, "check_now", read_apps)
+    assert not await check.run_pass(one_transaction, now=NOW + timedelta(hours=1))
+    asked = len(both["asked"])
+    assert await check.run_pass(one_transaction, now=NOW + check.RETRY_AFTER)
+    assert [url for url, _ in both["asked"][asked:]] == [APPS_URL]
+    row = await apps.load_state(dbsession)
+    assert row is not None and row.error is None and apps.stored(row) is not None
+    assert await _alerts(dbsession, "release:0.7.1") == 1
+
+
+async def test_a_database_error_in_the_app_part_undoes_that_part_only(
+    dbsession: AsyncSession, both: dict[str, Any], one_transaction: Any, monkeypatch: pytest.MonkeyPatch,
+    mail_on: object,
+) -> None:
+    """After the list was kept, a failing statement: the savepoint takes back the list, never the release check."""
+    from sqlalchemy import text  # noqa: PLC0415
+
+    async def failing_notify(session: AsyncSession, *_a: Any) -> int:
+        await session.execute(text("SELECT 1 / 0"))
+        return 0
+
+    monkeypatch.setattr(apps, "notify", failing_notify)
+    assert await check.run_pass(one_transaction, now=NOW)
+    feed = await check.load_state(dbsession)
+    assert feed is not None and feed.error is None and await _alerts(dbsession, "release:0.7.1") == 1
+    row = await apps.load_state(dbsession)
+    assert row is not None and apps.stored(row) is None  # the list kept inside the failed part is taken back
+    assert row.error is not None and row.error.startswith("The app list could not be read (")
+
+
+async def test_a_signed_app_list_shaped_wrongly_is_the_app_lists_error_only(
+    dbsession: AsyncSession, both: dict[str, Any], one_transaction: Any, mail_on: object,
+) -> None:
+    both["apps"] = signed_apps({
+        "schema": 1, "product": "fadenstack-apps", "generated_at": "2026-11-24T10:00:00Z",
+        "expires": "2026-12-08T10:00:00Z", "apps": 1,
+    })
+    assert await check.run_pass(one_transaction, now=NOW)
+    feed = await check.load_state(dbsession)
+    assert feed is not None and feed.error is None and await _alerts(dbsession, "release:0.7.1") == 1
+    row = await apps.load_state(dbsession)
+    assert row is not None and row.error == "The app list's apps are not a list."
+
+
+async def test_check_now_keeps_the_release_check_when_the_app_part_fails(
+    fastapi_app: FastAPI, client: AsyncClient, dbsession: AsyncSession, both: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch, mail_on: object,
+) -> None:
+    admin = await _user(dbsession, superuser=True)
+    fastapi_app.dependency_overrides[current_active_user] = lambda: admin
+    monkeypatch.setattr(fastapi_app.state, "llm_graph_trace_session_factory", None, raising=False)
+
+    async def broken(*_a: Any, **_k: Any) -> None:
+        raise RuntimeError("the app part broke")
+
+    monkeypatch.setattr(apps, "check_now", broken)
+    resp = await client.post(fastapi_app.url_path_for("admin_updates_check"))
+    assert resp.status_code == status.HTTP_200_OK, resp.text
+    feed = await check.load_state(dbsession)
+    assert feed is not None and feed.error is None and await _alerts(dbsession, "release:0.7.1") == 1
+    row = await apps.load_state(dbsession)
+    assert row is not None and row.error is not None and "RuntimeError" in row.error
+
+
+async def test_one_mail_per_app_security_release_not_per_release(
+    dbsession: AsyncSession, served: dict[str, Any], mail_on: object,
+) -> None:
+    """A normal release after a security one brings no news about security: no second mail; the next one does."""
+    state = await apps.check_now(dbsession, now=NOW)
+    assert await apps.notify(dbsession, state, seen("0.1.9")) == 1  # 0.1.10, security
+    served["apps"] = publish(
+        nextcloud(rel("0.1.9"), rel("0.1.10", severity="security"), rel("0.1.11")), generated_at="2026-11-25T10:00:00Z",
+    )
+    state = await apps.check_now(dbsession, now=NOW + timedelta(hours=1))
+    assert state.error is None and await apps.notify(dbsession, state, seen("0.1.9")) == 0
+    served["apps"] = publish(
+        nextcloud(rel("0.1.9"), rel("0.1.10", severity="security"), rel("0.1.11"), rel("0.1.12", severity="security")),
+        generated_at="2026-11-25T11:00:00Z",
+    )
+    state = await apps.check_now(dbsession, now=NOW + timedelta(hours=2))
+    assert await apps.notify(dbsession, state, seen("0.1.9")) == 1
+    await dbsession.flush()
+    mails = (await dbsession.execute(select(NotificationOutbox))).scalars().all()
+    subjects = sorted(m.payload_json["subject"] for m in mails if m.payload_json.get("fingerprint", "").startswith("app-"))
+    assert subjects == [
+        "Fadenstack for Nextcloud 0.1.10: security update", "Fadenstack for Nextcloud 0.1.12: security update",
+    ]
+
+
+async def test_a_version_reported_in_another_spelling_keeps_its_last_sighting(
+    dbsession: AsyncSession, served: dict[str, Any],
+) -> None:
+    state = await apps.check_now(dbsession, now=NOW)
+    # The latest sighting under the other spelling: by the reported text alone it would be lost.
+    reported = {"fadenstack_agent": [apps.Seen("0.1.9", NOW - timedelta(days=2)), apps.Seen("v0.1.9", NOW)]}
+    view = apps.admin_view(state, reported, gateway_ok=True, lang="en", now=NOW)
+    nextcloud = next(a for a in view["apps"] if a["id"] == "nextcloud")
+    assert nextcloud["in_use"] == [{"version": "0.1.9", "last_seen": NOW}]
+
+
+def test_the_commands_quote_what_they_fill_in() -> None:
+    catalogue = release_feed.parse_apps(json.loads(publish(nextcloud(rel("0.1.10")))[0]))
+    app = catalogue.app("nextcloud")
+    assert app is not None
+    found = apps.connect_file(app, "nextcloud-occ", origin="https://ai.example.de", own_ca=False)
+    assert found is not None and "--value=https://ai.example.de\n" in found.content  # nothing to quote: as it is
+    odd = apps.connect_file(app, "nextcloud-occ", origin="https://ai.example.de/x;touch y", own_ca=False)
+    assert odd is not None and "--value='https://ai.example.de/x;touch y'\n" in odd.content
 
 
 async def test_an_uploaded_app_list_that_does_not_verify_is_refused(

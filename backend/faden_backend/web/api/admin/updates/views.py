@@ -65,12 +65,9 @@ async def post_check(
     """Read the release list and the app list now (also when the daily check is off: an administrator asked)."""
     await _current_settings(session)
     now = datetime.now(UTC)
-    state = await check.check_now(session, now=now)
-    if state.error is None:
-        await check.notify(session, state)
-    apps_state = await apps.check_now(session, now=now)
-    if apps_state.error is None:
-        await apps.notify(session, apps_state, await check.apps_in_use(_gateway_factory(request), now))
+    await check.check_feed(session, now=now)
+    # Apart from the release check: an error in the app list's part never undoes it (check.check_apps).
+    await check.check_apps(session, now=now, gateway_factory=_gateway_factory(request))
     await session.commit()
     return await overview.overview(session, getattr(request.app.state, "docker", None), now)
 
@@ -197,7 +194,8 @@ async def get_app_connect_file(
 ) -> Response:
     """A file that connects the app to this server (an IT policy, the commands to run): nothing secret in it.
 
-    Served as an attachment under a fixed name, never rendered (OWASP ASVS 5.0 3.2.1, 5.4.1, 5.4.2).
+    Served as an attachment under a fixed name, never rendered, its type not guessed (``nosniff`` here too, not
+    only from nginx: a console reached without it): OWASP ASVS 5.0 3.2.1, 3.4.4, 5.4.1, 5.4.2.
     """
     await _current_settings(session)
     catalogue = apps.stored(await apps.load_state(session))
@@ -213,5 +211,6 @@ async def get_app_connect_file(
         headers={
             "Content-Disposition": f'attachment; filename="{found.filename}"',
             "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
         },
     )

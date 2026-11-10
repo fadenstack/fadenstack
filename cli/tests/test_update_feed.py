@@ -145,6 +145,14 @@ def bad_release(**extra: object) -> dict:
                              "sha256": "b" * 64, "size": 5}]), "not a link installs show"),
         (bad_release(files=[{"platform": "nextcloud", "kind": "tarball", "url": TARBALL, "sha256": "b" * 64}]),
          "size"),
+        (bad_release(files=[{"platform": "nextcloud", "kind": "tarball", "sha256": "b" * 64, "size": 5,
+                             "url": "https://github.com/fadenstack/../attacker/x.tgz"}]), "not a link installs show"),
+        # What a reader would drop or cut without a word: each refused when the list is built.
+        (app_entry(store_id="not an id; rm -rf"), r"store_id: installs would read ''"),
+        (app_entry(name={"en": "N" * 81}), r"name: installs would read"),
+        (app_entry(reports_as=[f"App {i}" for i in range(11)]), r"reports_as: installs would read"),
+        (bad_release(files=[{"platform": "nextcloud", "kind": "tarball", "url": TARBALL, "sha256": "b" * 64,
+                             "size": 5 * 1024**3}]), r"releases: installs would read"),
     ],
 )
 def test_app_entries_installs_could_not_show_are_refused(bad: dict, message: str) -> None:

@@ -119,6 +119,18 @@ def test_the_release_feed_is_not_an_app_list() -> None:
         "javascript:alert(1)",
         "https://fadenstack.com/a b",
         "",
+        # Out of the organisation as a browser follows it: dot segments (also percent-encoded) and backslashes.
+        "https://github.com/fadenstack/../attacker/tool/releases/download/v1/setup.exe",
+        "https://github.com/fadenstack/%2e%2e/attacker/tool/releases/download/v1/setup.exe",
+        "https://github.com/fadenstack/.%2E/attacker/x.zip",
+        "https://github.com/fadenstack/fadenstack-apps/../../attacker/x.zip",
+        "https://github.com/fadenstack/./fadenstack-apps/x.zip",
+        "https://github.com/fadenstack/..\\attacker/x.zip",
+        "https://github.com\\@evil.example/fadenstack/x.zip",
+        "https://fadenstack.com@evil.example/agents/",
+        # The stores only with their listings.
+        "https://chromewebstore.google.com/category/extensions",
+        "https://apps.nextcloud.com/developer/apps/new",
     ],
 )
 def test_links_only_to_allowed_places(url: str) -> None:
@@ -147,6 +159,37 @@ def test_a_file_without_an_allowed_link_or_a_checksum_is_left_out() -> None:
     found = catalogue(app("desktop", release("0.2.0", files=files)))
     kept = found.apps[0].releases[0].files
     assert [(f.platform, f.kind, f.sha256, f.size) for f in kept] == [("linux-x64", "deb", SHA, None)]
+
+
+def test_a_list_signed_but_shaped_wrongly_leaves_the_fields_out() -> None:
+    """Wrongly typed lists in a signed app list are left out, never an error the reader does not expect.
+
+    The server reads the app list in the same pass as the release feed: a list signed with the app list's own key
+    must not be able to stop that pass (it raised TypeError before).
+    """
+    found = catalogue(
+        app("nextcloud", releases=1, series=1, reports_as={"Nextcloud Files": 1}),
+        app("office", release("0.3.0", files=1, fixes=1)),
+        app("desktop", reports_as="Desktop"),
+    )
+    nextcloud, office, desktop = found.apps
+    assert (nextcloud.releases, nextcloud.supported_until, nextcloud.reports_as) == ((), {}, ())
+    assert (office.releases[0].files, office.releases[0].fixes) == ((), ())
+    assert desktop.reports_as == ()
+
+
+def test_an_app_list_whose_apps_are_not_a_list_is_refused() -> None:
+    index = json.dumps({"schema": 1, "product": "fadenstack-apps", "generated_at": "2026-11-20T10:00:00Z",
+                        "expires": "2026-12-04T10:00:00Z", "apps": 1}).encode()
+    with pytest.raises(rf.FeedError, match="not a list"):
+        rf.verify_apps(index, signed(index), KEYS)
+
+
+def test_a_signature_file_nested_too_deeply_is_not_readable() -> None:
+    """The signature file is parsed before anything is verified: a deep nesting is refused as unreadable."""
+    index = catalogue_bytes(app())
+    with pytest.raises(rf.FeedError, match="not readable"):
+        rf.verify_apps(index, b"[" * 100_000 + b"]" * 100_000, KEYS)
 
 
 def test_a_bad_page_link_is_dropped_but_the_app_stays() -> None:

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import shlex
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
@@ -108,6 +109,17 @@ async def check_now(session: AsyncSession, *, now: datetime | None = None) -> Re
         log.info("App list: %s", state.error)
     await session.flush()
     return state
+
+
+async def record_failure(session: AsyncSession, exc: BaseException, *, now: datetime) -> None:
+    """Keep that reading the app list failed in a way :func:`check_now` does not expect; the list before it stays.
+
+    The administrator sees the kind of error only, its details are in the log (OWASP ASVS 5.0 16.5.1).
+    """
+    state = await _state_for_update(session)
+    state.checked_at = now
+    state.error = f"The app list could not be read ({type(exc).__name__}). The server's log has the details."
+    await session.flush()
 
 
 async def store_upload(session: AsyncSession, index: bytes, signature: bytes, *, now: datetime | None = None) -> None:
@@ -214,7 +226,13 @@ def admin_view(
     apps = []
     for found in assessments(catalogue, seen, today=today):
         app = found.app
-        last_seen = {s.version: s.last_seen for s in versions_of(app, seen)}
+        # By the version as the assessment names it (``v0.1.9`` and ``0.1.9`` are one version), the latest sighting.
+        last_seen: dict[str, datetime] = {}
+        for s in versions_of(app, seen):
+            parsed = release_feed.parse_version(s.version)
+            if parsed is not None:
+                key = str(parsed)
+                last_seen[key] = max(last_seen.get(key, s.last_seen), s.last_seen)
         apps.append({
             **_app_head(app, lang),
             "offered": app.id in offered,
@@ -276,9 +294,13 @@ async def notify(session: AsyncSession, state: ReleaseFeedState, seen: dict[str,
     notified = list(state.notified_json or [])
     queued = 0
     for found in assessments(stored(state), seen):
-        if found.latest is None or found.severity not in ("security", "critical") or not found.outdated:
+        # The releases newer than a version in use that fix security problems, newest first.
+        fixing = [r for r in found.newer if r.severity in ("security", "critical")]
+        if found.latest is None or not fixing or not found.outdated:
             continue
-        mark = f"{found.app.id}:{found.latest.version}"
+        # Marked by the newest security release, not the newest release: a normal release after a security one
+        # brings no news about security, and must not mail it again.
+        mark = f"{found.app.id}:{fixing[0].version}"
         if mark in notified:
             continue
         notified.append(mark)
@@ -290,7 +312,6 @@ async def notify(session: AsyncSession, state: ReleaseFeedState, seen: dict[str,
 
         name = release_feed.localized(found.app.name, "en")
         urgent = found.severity == "critical"
-        fixing = [r for r in found.newer if r.severity in ("security", "critical")]
         details = "\n".join([
             f"People here run {name} {', '.join(found.outdated)}. The newest release is {found.latest.version}.",
             *(f"{r.version} ({r.severity}): {release_feed.localized(r.summary, 'en')}" for r in fixing),
@@ -299,10 +320,10 @@ async def notify(session: AsyncSession, state: ReleaseFeedState, seen: dict[str,
             "Have the people who use it install the newest release. The console shows the same under Updates, Apps.",
         ]).strip()
         if await NotificationService(session).maybe_enqueue_admin_alert(
-            subject=f"{name} {found.latest.version}: {'critical update' if urgent else 'security update'}",
+            subject=f"{name} {fixing[0].version}: {'critical update' if urgent else 'security update'}",
             severity="critical" if urgent else "warning",
             fingerprint=f"app-release:{mark}",
-            summary=f"{name} versions in use here have security problems fixed in {found.latest.version}.",
+            summary=f"{name} versions in use here have security problems fixed in {fixing[0].version}.",
             details=details,
             source="update_check",
         ):
@@ -356,12 +377,13 @@ def connect_file(app: release_feed.App, kind: str, *, origin: str, own_ca: bool)
         return ConnectFile("policy.json", "application/json", json.dumps(policy, indent=2) + "\n")
     if kind == "nextcloud-occ":
         agent = app.agents.get("default", "nextcloud-assistant")
+        # Lines for a shell: each value quoted for it (an address or a slug needs none, and stays as it is).
         lines = [
             "# Connect the Fadenstack app in Nextcloud to this server. Run on the Nextcloud server,",
             "# as the web server's user (www-data on Debian and Ubuntu), in Nextcloud's folder.",
             "php occ app:enable fadenstack_agent",
-            f"php occ config:app:set fadenstack_agent server_url --value={origin}",
-            f"php occ config:app:set fadenstack_agent agent --value={agent}",
+            f"php occ config:app:set fadenstack_agent server_url --value={shlex.quote(origin)}",
+            f"php occ config:app:set fadenstack_agent agent --value={shlex.quote(agent)}",
             "php occ config:app:set fadenstack_agent integration_enabled --value=1",
         ]
         return ConnectFile("connect-nextcloud.sh", "text/plain", "\n".join(lines) + "\n")

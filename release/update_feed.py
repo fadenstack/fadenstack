@@ -215,7 +215,8 @@ def _link(where: str, url: object, *, required: bool = False) -> str:
     if release_feed.safe_link(text) != text:
         raise BuildError(
             f"{where}: {text!r} is not a link installs show (https on {', '.join(release_feed.LINK_HOSTS)}; "
-            "GitHub only under github.com/fadenstack/)"
+            "GitHub only under github.com/fadenstack/, the stores only their listings; no . or .. in the path, "
+            "no backslash)"
         )
     return text
 
@@ -334,13 +335,81 @@ def build_apps(source: dict, *, valid_days: int = APPS_VALID_DAYS, now: datetime
         "expires": (made + timedelta(days=valid_days)).isoformat().replace("+00:00", "Z"),
         "apps": apps,
     }
-    # What installs will read: every app, release and file must come through.
+    # What installs will read: every app, release and file must come through, each field as built (a store id the
+    # reader refuses, a text it cuts, a link it drops would otherwise go missing on every server without a word).
     read = release_feed.parse_apps(catalogue)
-    built = [(a["id"], len(a["releases"]), sum(len(r["files"]) for r in a["releases"])) for a in apps]
-    kept = [(a.id, len(a.releases), sum(len(r.files) for r in a.releases)) for a in read.apps]
-    if built != kept:
-        raise BuildError(f"installs would not read the whole list: built {built}, read {kept}")
+    built_apps = [_as_built(a) for a in apps]
+    read_apps = [_as_read(a) for a in read.apps]
+    if [a["id"] for a in built_apps] != [a["id"] for a in read_apps]:
+        raise BuildError(
+            f"installs would not read every app: built {[a['id'] for a in built_apps]}, "
+            f"read {[a['id'] for a in read_apps]}"
+        )
+    for built, kept in zip(built_apps, read_apps, strict=True):
+        for key, value in built.items():
+            if kept[key] != value:
+                raise BuildError(f"{built['id']}.{key}: installs would read {kept[key]!r}, not {value!r}")
     return catalogue
+
+
+def _as_built(app: dict) -> dict:
+    """An app of the list being built, in the shape :func:`_as_read` gives what installs read."""
+    return {
+        "id": app["id"],
+        "name": app["name"],
+        "description": app["description"],
+        "page": app["page"],
+        "reports_as": list(app["reports_as"]),
+        "connect": app["connect"],
+        "agents": app["agents"],
+        "store": app["store"],
+        "store_id": app["store_id"],
+        "series": {s["series"]: s["supported_until"] for s in app["series"]},
+        "releases": [
+            {
+                "version": r["version"],
+                "channel": r["channel"],
+                "date": r["date"],
+                "severity": r["severity"],
+                "summary": r["summary"],
+                "notes_url": r["notes_url"],
+                "requires_server": r["requires_server"],
+                "fixes": [(x["id"], x["severity"], x["summary"]) for x in r["fixes"]],
+                "files": [(f["platform"], f["kind"], f["url"], f["sha256"], f["size"]) for f in r["files"]],
+            }
+            for r in app["releases"]
+        ],
+    }
+
+
+def _as_read(app: release_feed.App) -> dict:
+    """An app as installs read it (release_feed.parse_apps)."""
+    return {
+        "id": app.id,
+        "name": app.name,
+        "description": app.description,
+        "page": app.page,
+        "reports_as": list(app.reports_as),
+        "connect": app.connect,
+        "agents": app.agents,
+        "store": app.store,
+        "store_id": app.store_id,
+        "series": {k: v.isoformat() for k, v in app.supported_until.items()},
+        "releases": [
+            {
+                "version": r.version,
+                "channel": r.channel,
+                "date": r.date,
+                "severity": r.severity,
+                "summary": r.summary,
+                "notes_url": r.notes_url,
+                "requires_server": r.requires_server,
+                "fixes": [(x.id, x.severity, x.summary) for x in r.fixes],
+                "files": [(f.platform, f.kind, f.url, f.sha256, f.size) for f in r.files],
+            }
+            for r in app.releases
+        ],
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
