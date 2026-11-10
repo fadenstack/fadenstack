@@ -59,12 +59,18 @@ async def _rabbitmq() -> Dependency:
     )
 
 
+#: Grafana's health in an install: the compose service, served under /grafana (GF_SERVER_SERVE_FROM_SUB_PATH).
+GRAFANA_HEALTH_IN_INSTALL = "http://faden-grafana:3000/grafana/api/health"
+
+
 async def _grafana() -> Dependency:
-    if not settings.grafana_url:
-        return Dependency("grafana", "unknown")
+    # An install sets no FADEN_BACKEND_GRAFANA_URL (it names Grafana's address for the browser, where one
+    # differs from the console's own /grafana): the probe asks Grafana on the compose network. It returned
+    # "unknown" instead, which the dashboard showed as "Down: grafana" while Grafana ran.
+    target = str(settings.grafana_url) if settings.grafana_url else GRAFANA_HEALTH_IN_INSTALL
     try:
         async with httpx.AsyncClient(verify=default_httpx_verify(), timeout=2.0) as client:
-            resp = await client.get(str(settings.grafana_url))
+            resp = await client.get(target)
         return Dependency(
             "grafana", "up" if resp.status_code < 500 else "degraded", f"http {resp.status_code}"
         )

@@ -421,6 +421,10 @@ services:
       FORWARDED_ALLOW_IPS: "*"
       FADEN_GATEWAY_RELOAD: "false"
       FADEN_GATEWAY_ENVIRONMENT: ${FADEN_GATEWAY_ENVIRONMENT:-production}
+      # Seconds each worker's LiteLLM keeps a model server's address (aiohttp's DNS cache; LiteLLM reads this
+      # name once at start, default 300). A provider container that restarts may get another address: with
+      # 300 every chat to it failed for up to five minutes ("The model failed to answer").
+      AIOHTTP_TTL_DNS_CACHE: "30"
       # JWT secret is read from backend DB at startup (faden_gateway.jwt_secret system setting).
       # These two env vars enable that path; no static JWT_SECRET env var is needed.
       FADEN_GATEWAY_BACKEND_DB_BASE: faden_backend

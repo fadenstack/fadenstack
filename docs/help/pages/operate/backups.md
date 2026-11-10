@@ -11,7 +11,7 @@ when you install.
 | Every database on the server's Postgres | Yes | Users, settings, providers, machines, clusters, deployments, chats, the request log |
 | `.env` | Yes, unless `--db-only` | It holds the key the chats are encrypted with and the keys that seal stored secrets (the Hugging Face token, secret settings, the MCP servers' credentials). A database restored without its `.env` has chats and secrets nobody can read |
 | Certificate material (`tls/`, `tls-ca/`) | Yes, unless `--db-only` | The served certificate and the server's own certificate authority with its private key. With them, a rebuilt server is one the machines still trust |
-| Migration versions and checksums | Yes | `faden restore` checks the database dumps, the volume archives and the certificate files before it changes anything |
+| The release, migration versions and checksums | Yes | The release the install ran and the `faden` version that took the backup, which `faden restore` shows. It checks the database dumps, the volume archives and the certificate files before it changes anything |
 | Files uploaded to the knowledge base | With `--include-volumes` | Without it, only the text read from them is in the backup, not the files themselves. With `FADEN_DATA_DIR` set, the backup reads (and a restore writes) its `knowledge` folder |
 | Files attached to chats | With `--include-volumes` | Without it, only the text read from them is in the database, not the files themselves. With `FADEN_DATA_DIR` set, the backup reads (and a restore writes) its `chat-files` folder |
 | Models | No | They can be downloaded again. Keep a copy of models you imported rather than downloaded |
@@ -118,10 +118,7 @@ encrypted ones exist.
 ## Restore
 
 !!! warning "Under testing"
-    Restoring is being tested. It puts back the data: the databases, the `.env`, the certificate material, and
-    volumes if the backup holds them. It does not put back the deployment files or the release the backup was
-    taken with. While it runs, the services are stopped and the console shows the maintenance page (as in an
-    upgrade), which reloads itself once the platform is back. Try a restore on a copy of the server before you rely on one.
+    Restoring is being tested. Try a restore on a copy of the server before you rely on one.
 
 ```bash
 faden restore ~/fadenstack/backups/<time>
@@ -129,16 +126,45 @@ faden restore ~/fadenstack/backups/<time>
 
 It asks for confirmation (`-y` skips it). An encrypted backup asks for the recovery key first.
 
+**Each database the backup holds becomes exactly the backup's.** What came after the backup goes, including tables
+a newer release added. The databases are restored beside the live ones first, while the install keeps running;
+only when every copy is complete are the services stopped and the copies put in their place. If anything fails
+before that, nothing has changed. If the services do not become healthy afterwards, everything goes back as it was
+before the restore.
+
 ??? info "What the restore does, in order"
     1. opens an encrypted backup with the recovery key, into a folder inside it that only you can read and that is
        deleted when the restore ends;
-    2. shows the backup's date, the tool version it was taken with, and what it holds;
-    3. checks the database dumps, the volume archives and the certificate files against the checksums in the backup, and stops if one
-       does not match;
+    2. shows the backup's date, the release it holds and the `faden` version that took it, and what it holds;
+    3. checks the database dumps, the volume archives and the certificate files against the checksums in the
+       backup, and stops if one does not match;
     4. asks for confirmation (`-y` skips it);
-    5. puts up the maintenance page, stops every service except the front door (nginx), restores every database
-       and, unless told otherwise, the `.env` and the certificate material;
-    6. starts everything again and takes the maintenance page down, also when the restore fails.
+    5. checks there is room for a copy of the databases and of the volumes it replaces (see below), and stops if
+       there is not;
+    6. restores every database of the backup into a new one beside the live one (`<name>__restore`), while the
+       install keeps running. pg_restore's whole output goes to `~/fadenstack/logs/restore-<time>.log`. An error
+       stops the restore here: the copies are dropped, the live databases and the services were not touched;
+    7. puts up the maintenance page, stops every service except the front door (nginx) and Postgres, and swaps the
+       names in one step: each live database becomes `<name>__old`, each copy takes its name;
+    8. keeps a copy of the `.env`, the volumes the backup holds and the certificate files, then puts in the
+       backup's (unless told otherwise);
+    9. starts everything. Once every service is healthy (within three minutes), it drops the `__old` databases and
+       the kept copies, takes the maintenance page down and says **Restore complete**;
+    10. if they do not become healthy, it stops them, puts the databases before the restore back in their place,
+        and the `.env`, the volumes and the certificate files too, starts that, and ends with an error that names the
+        services that were not healthy and anything that could not be put back.
+
+| A restore replaces | A restore keeps |
+|---|---|
+| Every database the backup holds, exactly as it was backed up | Databases the backup does not hold, such as one of a module switched on after the backup |
+| The `.env` (not with `--db-only` or `--skip-env`) | The release the install runs: its programs and deployment files |
+| The certificate material (not with `--db-only`) | Models, runtime images and the machines |
+| The volumes the backup holds (a backup with `--include-volumes`) | The volumes the backup does not hold |
+
+**Room it needs.** Where Postgres keeps its data, room for a copy of each database: as much as the database takes
+now, or ten times its dump where that is more, plus 1 GB or a tenth, whichever is more, kept free. For a backup
+with volumes, room for a copy of those volumes beside the install as well. Otherwise the restore says how much it
+needs and changes nothing.
 
 | Option | What it does |
 |---|---|
@@ -152,6 +178,13 @@ It asks for confirmation (`-y` skips it). An encrypted backup asks for the recov
     A restore replaces the current databases. Everything done since the backup is lost: chats, users, settings,
     machines approved since.
 
+| You see | What it means |
+|---|---|
+| **`Not enough room for the restore ...`** | Nothing changed. Free the space it names, or restore on a server with more room. |
+| **`The restore failed: pg_restore failed for <database>`** | Nothing changed; the install runs as before. The log it names holds pg_restore's whole output. |
+| **`The restored install did not become healthy ...`** | Everything went back as it was before the restore and is running again. Read `faden logs <service>` for the services it names. |
+| **`An earlier restore left <name>__old ...`** | A restore stopped after the swap and before it could drop the databases from before it. Check them; the message gives the command to drop them, then run the restore again. |
+
 ### Check a backup
 
 Run `faden restore --verify-only` on a copy of a backup now and then. It tells you whether the database dumps, the volume archives and the
@@ -161,8 +194,10 @@ certificate files are complete and unchanged, without touching the install.
 
 Restoring is still being tested: try it on a copy of the server first (see [Restore](#restore)).
 
-1. Install a new server with the same release the backup was taken with (`faden restore --verify-only` shows it),
-   using `faden deploy`.
+1. Install a new server with the release the backup holds, using `faden deploy`. `faden restore --verify-only`
+   shows it as **Backup of release …** (`release` in the backup's `manifest.json`). A backup taken before
+   0.7.0 records only the `faden` version that took it, and says so; for an upgrade's backup that is the release
+   being installed, while the data are those of the release before it.
 2. Copy the backup onto it and run `faden restore` with its path, and the recovery key if the backup is
    encrypted. The new server encrypts its own backups to the key its `faden deploy` made.
 3. If the new server has another address, run the install line from its console on each machine again, so the
