@@ -759,6 +759,30 @@
       "release_mismatch": {
         "title": "运行其他版本的部分：{{count}}",
         "detail": "未运行 {{release}}：{{names}}。“更新”页面列出了每个部分运行的版本。"
+      },
+      "app_update_security": {
+        "title": "{{app}} {{version}} 修复了安全问题：这里在用 {{current}}",
+        "detail": "请让大家安装新版本。“更新”页面列出了文件。"
+      },
+      "app_update_critical": {
+        "title": "{{app}} {{version}} 是关键更新：这里在用 {{current}}",
+        "detail": "请让大家尽快安装新版本。“更新”页面列出了文件。"
+      },
+      "app_update_available": {
+        "title": "{{app}} {{version}} 已发布：这里在用 {{current}}",
+        "detail": "“更新”页面列出了文件。"
+      },
+      "app_unsupported": {
+        "title": "{{app}} {{version}} 已不再支持：这里应当更新",
+        "detail": "它不再获得修复。“更新”页面列出了最新版本。"
+      },
+      "app_new": {
+        "title": "新：{{app}} {{version}}",
+        "detail": "请在“更新”页面向用户提供它。"
+      },
+      "app_list_expired": {
+        "title": "应用列表自 {{since}} 起未续期：应用的安全版本可能缺失",
+        "detail": "请检查此服务器到 fadenstack.com 的连接，或您的镜像。“更新”页面显示应用列表。"
       }
     },
     "integrations": {
@@ -1030,7 +1054,8 @@
       "bypass": "绕过",
       "grants": "授权",
       "evidence": "凭证",
-      "vendor_links": "指向 fadenstack.com 的链接"
+      "vendor_links": "指向 fadenstack.com 的链接",
+      "apps": "应用"
     },
     "current_value": "（当前：{{value}}）",
     "appearance": {
@@ -5050,6 +5075,60 @@
       "unsupported_plain": "Fadenstack {{current}} 已不再受支持。请安装更新的版本。",
       "open": "查看更新",
       "dismiss": "隐藏至下一版本"
+    },
+    "apps": {
+      "title": "应用",
+      "subtitle": "Fadenstack 应用、这里运行的版本，以及您向用户提供哪些应用。",
+      "check_now_label": "立即检查：应用列表",
+      "checked": "应用列表已检查 {{ago}}",
+      "never_checked": "尚未读取应用列表",
+      "list_date": "{{date}} 的应用列表",
+      "list_uploaded": "{{date}} 的应用列表，手动上传",
+      "check_error": "无法读取应用列表：{{error}}",
+      "news_off": "应用动态已关闭：不会通知新应用和新版本。使用中应用的安全通知仍会发送。",
+      "in_use_unknown": "目前无法得知这里运行的应用版本。",
+      "empty": "应用列表中还没有应用。请立即检查或上传列表。",
+      "offer": "向所有人提供",
+      "no_release": "列表中还没有版本。",
+      "security_alert": "这里在用的版本存在安全问题，已在 {{version}} 中修复。请让大家安装。",
+      "in_use": "此处在用",
+      "in_use_none": "过去 {{days}} 天内未发现",
+      "last_seen": "最后发现 {{ago}}",
+      "outdated": "已过时",
+      "unsupported": "已不再支持：{{versions}}",
+      "server_too_old": "此服务器需要 Fadenstack {{version}} 或更高版本。",
+      "connect": {
+        "no_secrets": "这些文件不含密码或令牌：每个人用自己的账户登录。",
+        "download": "下载",
+        "close": "关闭",
+        "office-policy": {
+          "button": "Office 策略文件",
+          "title": "{{app}} 的 Office 策略",
+          "steps": "在每台电脑上把 policy.json 放到 %PROGRAMDATA%\\Fadenstack\\Office\\，例如通过组策略或 Intune。",
+          "ca": "此服务器有自己的证书颁发机构：还要把此服务器的证书放到 %PROGRAMDATA%\\Fadenstack\\Office\\fadenstack-ca.crt。",
+          "ca_link": "下载证书"
+        },
+        "nextcloud-occ": {
+          "button": "Nextcloud 命令",
+          "title": "{{app}} 的 Nextcloud 命令",
+          "steps": "在 Nextcloud 服务器上，以网络服务器用户的身份，在 Nextcloud 文件夹中运行这些命令。"
+        },
+        "chrome-policy": {
+          "button": "Chrome 策略文件",
+          "title": "{{app}} 的 Chrome 策略",
+          "steps": "在 Linux 上，把文件放到 /etc/opt/chrome/policies/managed/。在 Windows 和 macOS 上，通过组策略、Intune 或配置描述文件设置相同的值。"
+        }
+      },
+      "upload": {
+        "title": "此服务器没有网络？上传应用列表",
+        "body": "在有网络的电脑上，从发布列表的地址下载 apps.json 和 apps.json.sig。原样复制这两个文件并上传到这里。使用列表前会先检查签名。",
+        "choose_index": "选择 apps.json",
+        "choose_signature": "选择 apps.json.sig",
+        "upload": "上传",
+        "uploaded": "应用列表已上传。"
+      },
+      "expired": "应用列表自 {{date}} 起未续期。较新的应用版本（包括安全修复）可能缺失：请检查此服务器到 fadenstack.com 的连接，或您的镜像。",
+      "valid_until": "有效期至 {{date}}"
     }
   },
   "pii_policy.form.unavailable": "PII 服务不可用。这些选项不能确认保护已生效。",
@@ -5627,6 +5706,43 @@
         "other": "这将超出某个预算本周期的额度。如需更多，请联系管理员或该预算的负责人。"
       },
       "until": "将于 {{when}} 重新开始。"
+    }
+  },
+  "apps": {
+    "menu": "应用",
+    "title": "应用",
+    "back_to_chat": "返回聊天",
+    "loading": "正在加载应用",
+    "new": "新",
+    "preview": "预览版",
+    "new_tab": "（在新标签页中打开）",
+    "copy": "复制",
+    "copied": "已复制",
+    "latest": "最新版本：{{version}},{{date}}",
+    "supported_until": "支持至 {{date}}",
+    "release_notes": "发行说明",
+    "app_page": "网站",
+    "store": "应用商店",
+    "files": {
+      "title": "下载",
+      "none": "没有可下载的文件。",
+      "sha256": "SHA-256",
+      "copy_hash": "复制 SHA-256",
+      "download": "下载"
+    },
+    "my": {
+      "intro": "管理员提供的、用于配合 Fadenstack 工作的应用。",
+      "intro_server": "用于配合 {{server}} 工作的应用。",
+      "server": "服务器地址：",
+      "copy_address": "复制地址",
+      "empty": "这里还没有提供任何应用。管理员可以在“更新”页面提供应用。"
+    },
+    "connect": {
+      "title": "如何连接",
+      "desktop": "安装并启动应用。出现提示时输入此服务器的地址，然后用应用显示的代码登录。",
+      "office": "通常由 IT 部门安装并连接加载项。否则，在加载项窗格要求时输入此服务器的地址，然后登录。",
+      "nextcloud": "由 Nextcloud 管理员启用该应用。然后在 Nextcloud 中打开 Fadenstack 并登录。",
+      "chrome": "安装扩展。在其第一个界面输入此服务器的地址，然后登录。"
     }
   }
 }

@@ -25,6 +25,7 @@ export default [
     // first message went out -- ten requests competing with the reply.
     route("/chat/:sessionId?", "pages/chat/ChatPage.tsx"),
     // The skills a user owns, is shared or can see -- outside the admin pages.
+    route("/apps", "pages/apps/MyAppsPage.tsx"),
     route("/skills", "pages/skills/MySkillsPage.tsx"),
     route("/skills/:id", "pages/skills/MySkillPage.tsx"),
     // The agents a user looks after (maintainers, agents permissions) -- the

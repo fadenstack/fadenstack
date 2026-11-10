@@ -10,7 +10,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as about from "~/api/about";
 import { ApiError } from "~/api/http";
-import { updatesApi, type ReleaseInfo, type UpdatesOverview } from "~/api/updates";
+import {
+  updatesApi,
+  type AppEntry,
+  type AppRelease,
+  type AppsOverview,
+  type ReleaseInfo,
+  type UpdatesOverview,
+} from "~/api/updates";
 import { clearDashboardQueries } from "~/lib/dashboardQuery";
 import { getAppTheme } from "~/theme";
 import UpdatesPage, { overviewStatus } from "./UpdatesPage";
@@ -92,7 +99,75 @@ function view() {
   );
 }
 
+const appRelease: AppRelease = {
+  version: "1.4.0",
+  channel: "stable",
+  date: "2026-11-01",
+  severity: "security",
+  summary: "Fixes a sign-in problem.",
+  notes_url: "https://fadenstack.com/apps/desktop/notes",
+  requires_server: null,
+  fixes: [],
+  files: [
+    {
+      platform: "windows",
+      kind: "msi",
+      url: "https://fadenstack.com/dl/desktop-1.4.0.msi",
+      sha256: "a".repeat(64),
+      size: 52_428_800,
+    },
+  ],
+};
+
+function appsOverview(apps: AppEntry[] = [], overrides: Partial<AppsOverview> = {}): AppsOverview {
+  return {
+    check: {
+      enabled: true,
+      url: "https://fadenstack.com/updates/v1/apps.json",
+      source: "url",
+      checked_at: "2026-11-02T12:00:00Z",
+      succeeded_at: "2026-11-02T12:00:00Z",
+      list_generated_at: "2026-11-01T10:00:00Z",
+      expires: "2026-11-09T10:00:00Z",
+      expired: false,
+      error: null,
+    },
+    news: true,
+    in_use_days: 30,
+    in_use_known: true,
+    vendor_links: true,
+    own_ca: false,
+    apps,
+    ...overrides,
+  };
+}
+
+function desktopApp(overrides: Partial<AppEntry> = {}): AppEntry {
+  return {
+    id: "desktop",
+    name: "Fadenstack Desktop",
+    description: "The desktop agent.",
+    page: "https://fadenstack.com/apps/desktop",
+    store: "https://store.example.com/desktop",
+    connect: "desktop",
+    agents: {},
+    offered: false,
+    new: true,
+    latest: appRelease,
+    in_use: [{ version: "1.2.0", last_seen: "2026-11-01T08:00:00Z" }],
+    outdated: ["1.2.0"],
+    severity: "security",
+    newer: [appRelease],
+    unsupported: [],
+    supported_until: "2027-06-30",
+    server_too_old: false,
+    connect_files: ["office-policy"],
+    ...overrides,
+  };
+}
+
 beforeEach(() => {
+  vi.spyOn(updatesApi, "apps").mockResolvedValue(appsOverview());
   vi.mocked(about.aboutInfo).mockRejectedValue(new Error("not asked"));
   vi.spyOn(updatesApi, "notice").mockResolvedValue({
     current: "0.4.1",
@@ -210,6 +285,70 @@ describe("UpdatesPage", () => {
     view();
     expect(await screen.findByText("Not allowed.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+  });
+
+  it("shows the apps with a security alert, safe links, and offers an app to people", async () => {
+    vi.spyOn(updatesApi, "overview").mockResolvedValue(overview());
+    vi.spyOn(updatesApi, "apps").mockResolvedValue(appsOverview([desktopApp()], { news: false, in_use_known: false }));
+    const put = vi
+      .spyOn(updatesApi, "setAppOffered")
+      .mockResolvedValue(appsOverview([desktopApp({ offered: true })]));
+    view();
+
+    const item = await screen.findByTestId("app-desktop");
+    expect(within(item).getByText("Fadenstack Desktop")).toBeInTheDocument();
+    expect(within(item).getByText("New")).toBeInTheDocument();
+    expect(within(item).getByText("In use here")).toBeInTheDocument();
+    expect(screen.getByTestId("app-alert-desktop")).toHaveTextContent(
+      "Versions in use here have security problems fixed in 1.4.0. Have people install it.",
+    );
+    expect(screen.getByTestId("apps-news-off")).toBeInTheDocument();
+    expect(screen.getByTestId("apps-in-use-unknown")).toBeInTheDocument();
+    expect(item.querySelector("img")).toBeNull();
+
+    const links = within(item).getAllByRole("link");
+    expect(links.length).toBeGreaterThanOrEqual(4);
+    for (const link of links) {
+      expect(link.getAttribute("rel") ?? "").toContain("noreferrer");
+      expect(link).toHaveAttribute("referrerpolicy", "no-referrer");
+      expect(link).toHaveAttribute("target", "_blank");
+    }
+
+    fireEvent.click(within(item).getByRole("checkbox", { name: /Offer to people/ }));
+    await waitFor(() => expect(put).toHaveBeenCalledWith("desktop", true, expect.any(String)));
+    await waitFor(() => expect(within(screen.getByTestId("app-desktop")).getByRole("checkbox")).toBeChecked());
+  });
+
+  it("warns when the app list has expired, and shows its end date quietly while valid", async () => {
+    vi.spyOn(updatesApi, "overview").mockResolvedValue(overview());
+    const valid = appsOverview([desktopApp()]);
+    const expired = appsOverview([desktopApp()]);
+    expired.check = { ...expired.check, expired: true };
+    const spy = vi.spyOn(updatesApi, "apps").mockResolvedValue(valid);
+    view();
+    expect(await screen.findByTestId("apps-status")).toHaveTextContent(/valid until/);
+    expect(screen.queryByTestId("apps-expired")).toBeNull();
+
+    spy.mockResolvedValue(expired);
+    fireEvent.click(screen.getByTestId("apps-check-now"));
+    const alert = await screen.findByTestId("apps-expired");
+    expect(alert).toHaveTextContent("The app list has not been renewed since");
+    expect(alert).toHaveTextContent("security fixes included");
+  });
+
+  it("opens an app's connect file with its steps", async () => {
+    vi.spyOn(updatesApi, "overview").mockResolvedValue(overview());
+    vi.spyOn(updatesApi, "apps").mockResolvedValue(appsOverview([desktopApp()], { own_ca: true }));
+    vi.spyOn(updatesApi, "connectFile").mockResolvedValue('{"server":"https://faden.example"}');
+    view();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Office policy file" }));
+    expect(await screen.findByTestId("connect-file")).toHaveTextContent('{"server":"https://faden.example"}');
+    expect(screen.getByTestId("connect-ca")).toHaveTextContent("fadenstack-ca.crt");
+    expect(screen.getByRole("link", { name: "Download" })).toHaveAttribute(
+      "href",
+      "/api/admin/updates/apps/desktop/connect/office-policy",
+    );
   });
 
   it("leaves out the release notes where the server switched the vendor's links off", async () => {

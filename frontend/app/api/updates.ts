@@ -6,7 +6,7 @@
  * The release list is read from fadenstack.com once a day (Settings > Updates),
  * on "Check now", or uploaded by hand on a server without internet.
  */
-import { json, requester } from "./http";
+import { json, query, readError, requester, segment } from "./http";
 
 const request = requester("/api/admin/updates");
 
@@ -104,6 +104,93 @@ export function currentRelease(overview: Pick<UpdatesOverview, "current">): stri
   return typeof overview.current === "string" ? overview.current : overview.current.release;
 }
 
+/* ── The Fadenstack apps ──────────────────────────────────────────── */
+
+export type AppChannel = "stable" | "preview";
+export type ConnectFileKind = "office-policy" | "nextcloud-occ" | "chrome-policy";
+export type AppConnect = "desktop" | "office" | "nextcloud" | "chrome";
+
+export interface AppReleaseFile {
+  platform: string;
+  kind: string;
+  url: string;
+  sha256: string;
+  size: number | null;
+}
+
+/** One release of an app. Every text in it is already in the requested language: show it as plain text only. */
+export interface AppRelease {
+  version: string;
+  channel: AppChannel;
+  /** YYYY-MM-DD */
+  date: string;
+  severity: "normal" | "security" | "critical";
+  summary: string;
+  /** "" = none. */
+  notes_url: string;
+  requires_server: string | null;
+  fixes: ReleaseFix[];
+  files: AppReleaseFile[];
+}
+
+export interface AppInUse {
+  version: string;
+  last_seen: string;
+}
+
+export interface AppEntry {
+  id: string;
+  name: string;
+  description: string;
+  page: string;
+  store: string;
+  connect: AppConnect | null;
+  agents: Record<string, string>;
+  offered: boolean;
+  new: boolean;
+  latest: AppRelease | null;
+  in_use: AppInUse[];
+  outdated: string[];
+  severity: UpdateSeverity;
+  newer: AppRelease[];
+  unsupported: string[];
+  supported_until: string | null;
+  server_too_old: boolean;
+  connect_files: ConnectFileKind[];
+}
+
+export interface AppListCheck {
+  enabled: boolean;
+  url: string;
+  source: "url" | "upload" | null;
+  checked_at: string | null;
+  succeeded_at: string | null;
+  list_generated_at: string | null;
+  /** Until when the list is valid; it is signed with an end date and renewed daily. */
+  expires: string | null;
+  /** The list was not renewed in time: newer releases, security fixes included, may be missing. */
+  expired: boolean;
+  error: string | null;
+}
+
+export interface AppsOverview {
+  check: AppListCheck;
+  /** Whether news about apps is on (Settings > Updates); security notices come either way. */
+  news: boolean;
+  in_use_days: number;
+  /** False when the gateway could not say which versions run here. */
+  in_use_known: boolean;
+  vendor_links: boolean;
+  /** This server has its own certificate authority: Office needs its certificate too. */
+  own_ca: boolean;
+  apps: AppEntry[];
+}
+
+/** The address of an app's connect file; the download link uses the same one. */
+export function connectFileUrl(id: string, kind: ConnectFileKind): string {
+  return `/api/admin/updates/apps/${segment(id)}/connect/${segment(kind)}`;
+}
+
 export const updatesApi = {
   overview() {
     return request<UpdatesOverview>("");
@@ -121,5 +208,27 @@ export const updatesApi = {
     form.append("index", index);
     form.append("signature", signature);
     return request<UpdatesOverview>("/feed", { method: "POST", body: form });
+  },
+  /** The app list with what runs here; texts in *lang*. */
+  apps(lang: string) {
+    return request<AppsOverview>(`/apps${query({ lang })}`);
+  },
+  /** Keep an app list copied by hand: apps.json and apps.json.sig. */
+  uploadAppFeed(index: File, signature: File, lang: string) {
+    const form = new FormData();
+    form.append("index", index);
+    form.append("signature", signature);
+    return request<AppsOverview>(`/apps/feed${query({ lang })}`, { method: "POST", body: form });
+  },
+  /** Offer an app to people, or stop offering it. */
+  setAppOffered(id: string, offered: boolean, lang: string) {
+    return request<AppsOverview>(`/apps/${segment(id)}/offered${query({ lang })}`, json("PUT", { offered }));
+  },
+  /** The text of an app's connect file. */
+  async connectFile(id: string, kind: ConnectFileKind): Promise<string> {
+    // Raw text, as the file will be saved: not parsed when it is JSON.
+    const res = await fetch(connectFileUrl(id, kind), { credentials: "include" });
+    if (!res.ok) throw await readError(res);
+    return res.text();
   },
 };

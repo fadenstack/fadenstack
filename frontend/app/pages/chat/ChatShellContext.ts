@@ -22,6 +22,8 @@ export interface ChatShell {
   onLogout: () => void;
   /** Open the user's skills page; no entry when skills are off. */
   onSkills?: () => void;
+  /** Open the Apps page (desktop agent, add-ins, ...); everyone signed in has it. */
+  onApps?: () => void;
   /** Open the agents the user looks after; no entry without the right to. */
   onAgents?: () => void;
   /** Open the content check; no entry without the right to or while the provenance module is off. */

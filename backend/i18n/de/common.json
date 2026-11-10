@@ -759,6 +759,30 @@
       "release_mismatch": {
         "title": "Bestandteile mit anderer Version: {{count}}",
         "detail": "Nicht auf {{release}}: {{names}}. Die Seite Updates zeigt, was jeder Bestandteil ausführt."
+      },
+      "app_update_security": {
+        "title": "{{app}} {{version}} behebt Sicherheitsprobleme: Hier läuft {{current}}",
+        "detail": "Lassen Sie die neue Version installieren. Die Seite „Updates“ listet die Dateien."
+      },
+      "app_update_critical": {
+        "title": "{{app}} {{version}} ist ein kritisches Update: Hier läuft {{current}}",
+        "detail": "Lassen Sie die neue Version bald installieren. Die Seite „Updates“ listet die Dateien."
+      },
+      "app_update_available": {
+        "title": "{{app}} {{version}} ist erschienen: Hier läuft {{current}}",
+        "detail": "Die Seite „Updates“ listet die Dateien."
+      },
+      "app_unsupported": {
+        "title": "{{app}} {{version}} wird nicht mehr unterstützt: Hier sollte aktualisiert werden",
+        "detail": "Sie erhält keine Korrekturen mehr. Die Seite „Updates“ nennt die neueste Version."
+      },
+      "app_new": {
+        "title": "Neu: {{app}} {{version}}",
+        "detail": "Bieten Sie sie auf der Seite „Updates“ allen an."
+      },
+      "app_list_expired": {
+        "title": "Die App-Liste wurde seit dem {{since}} nicht erneuert: Sicherheitsversionen von Apps können fehlen",
+        "detail": "Prüfen Sie die Verbindung dieses Servers zu fadenstack.com oder Ihren Spiegel. Die Seite „Updates“ zeigt die App-Liste."
       }
     },
     "integrations": {
@@ -1030,7 +1054,8 @@
       "bypass": "Bypass",
       "grants": "Zeitfreigaben",
       "evidence": "Nachweise",
-      "vendor_links": "Links zu fadenstack.com"
+      "vendor_links": "Links zu fadenstack.com",
+      "apps": "Apps"
     },
     "current_value": "(aktuell: {{value}})",
     "appearance": {
@@ -5050,6 +5075,60 @@
       "unsupported_plain": "Fadenstack {{current}} wird nicht mehr unterstützt. Installieren Sie eine neuere Version.",
       "open": "Zu den Updates",
       "dismiss": "Bis zur nächsten Version ausblenden"
+    },
+    "apps": {
+      "title": "Apps",
+      "subtitle": "Die Fadenstack-Apps, welche Versionen hier laufen und welche Apps Sie allen anbieten.",
+      "check_now_label": "Jetzt prüfen: App-Liste",
+      "checked": "App-Liste geprüft {{ago}}",
+      "never_checked": "App-Liste noch nicht gelesen",
+      "list_date": "App-Liste vom {{date}}",
+      "list_uploaded": "App-Liste vom {{date}}, von Hand hochgeladen",
+      "check_error": "Die App-Liste konnte nicht gelesen werden: {{error}}",
+      "news_off": "Neuigkeiten zu Apps sind aus: neue Apps und neue Versionen werden nicht gemeldet. Sicherheitshinweise zu Apps im Einsatz kommen weiterhin.",
+      "in_use_unknown": "Welche Versionen der Apps hier laufen, ist derzeit nicht bekannt.",
+      "empty": "Die App-Liste enthält noch keine Apps. Prüfen Sie jetzt oder laden Sie sie hoch.",
+      "offer": "Allen anbieten",
+      "no_release": "Noch keine Version in der Liste.",
+      "security_alert": "Hier eingesetzte Versionen haben Sicherheitsprobleme, die in {{version}} behoben sind. Lassen Sie sie installieren.",
+      "in_use": "Hier im Einsatz",
+      "in_use_none": "In den letzten {{days}} Tagen nicht gesehen",
+      "last_seen": "zuletzt gesehen {{ago}}",
+      "outdated": "veraltet",
+      "unsupported": "Nicht mehr unterstützt: {{versions}}",
+      "server_too_old": "Benötigt auf diesem Server Fadenstack {{version}} oder neuer.",
+      "connect": {
+        "no_secrets": "Die Dateien enthalten kein Passwort und keinen Token: Jede Person meldet sich mit ihrem eigenen Konto an.",
+        "download": "Herunterladen",
+        "close": "Schließen",
+        "office-policy": {
+          "button": "Office-Richtliniendatei",
+          "title": "Office-Richtlinie für {{app}}",
+          "steps": "Legen Sie policy.json auf jedem Computer in %PROGRAMDATA%\\Fadenstack\\Office\\ ab, zum Beispiel per Gruppenrichtlinie oder Intune.",
+          "ca": "Dieser Server hat eine eigene Zertifizierungsstelle: Legen Sie auch das Zertifikat dieses Servers unter %PROGRAMDATA%\\Fadenstack\\Office\\fadenstack-ca.crt ab.",
+          "ca_link": "Zertifikat herunterladen"
+        },
+        "nextcloud-occ": {
+          "button": "Nextcloud-Befehle",
+          "title": "Nextcloud-Befehle für {{app}}",
+          "steps": "Führen Sie diese Befehle auf dem Nextcloud-Server als Benutzer des Webservers im Nextcloud-Ordner aus."
+        },
+        "chrome-policy": {
+          "button": "Chrome-Richtliniendatei",
+          "title": "Chrome-Richtlinie für {{app}}",
+          "steps": "Unter Linux legen Sie die Datei in /etc/opt/chrome/policies/managed/ ab. Unter Windows und macOS setzen Sie dieselben Werte per Gruppenrichtlinie, Intune oder Konfigurationsprofil."
+        }
+      },
+      "upload": {
+        "title": "Kein Internet auf diesem Server? App-Liste hochladen",
+        "body": "Laden Sie auf einem Computer mit Internet apps.json und apps.json.sig von der Adresse der Release-Liste herunter. Kopieren Sie beide Dateien unverändert und laden Sie sie hier hoch. Die Signatur wird geprüft, bevor die Liste verwendet wird.",
+        "choose_index": "apps.json wählen",
+        "choose_signature": "apps.json.sig wählen",
+        "upload": "Hochladen",
+        "uploaded": "App-Liste hochgeladen."
+      },
+      "expired": "Die App-Liste wurde seit dem {{date}} nicht erneuert. Neuere App-Versionen, auch Sicherheitskorrekturen, können fehlen: Prüfen Sie die Verbindung dieses Servers zu fadenstack.com oder Ihren Spiegel.",
+      "valid_until": "gültig bis {{date}}"
     }
   },
   "pii_policy.form.unavailable": "Der PII-Dienst ist nicht verfügbar. Diese Optionen bestätigen keinen aktiven Schutz.",
@@ -5627,6 +5706,43 @@
         "other": "Das würde ein Budget für diesen Zeitraum überschreiten. Wenden Sie sich für mehr an die Administration oder an die verantwortliche Person des Budgets."
       },
       "until": "Es beginnt am {{when}} neu."
+    }
+  },
+  "apps": {
+    "menu": "Apps",
+    "title": "Apps",
+    "back_to_chat": "Zurück zum Chat",
+    "loading": "Apps werden geladen",
+    "new": "Neu",
+    "preview": "Vorschau",
+    "new_tab": "(öffnet in einem neuen Tab)",
+    "copy": "Kopieren",
+    "copied": "Kopiert",
+    "latest": "Aktuell: {{version}}, {{date}}",
+    "supported_until": "Unterstützt bis {{date}}",
+    "release_notes": "Versionshinweise",
+    "app_page": "Webseite",
+    "store": "Store",
+    "files": {
+      "title": "Downloads",
+      "none": "Keine Download-Dateien.",
+      "sha256": "SHA-256",
+      "copy_hash": "SHA-256 kopieren",
+      "download": "Herunterladen"
+    },
+    "my": {
+      "intro": "Apps Ihrer Administration für die Arbeit mit Fadenstack.",
+      "intro_server": "Apps für die Arbeit mit {{server}}.",
+      "server": "Serveradresse:",
+      "copy_address": "Adresse kopieren",
+      "empty": "Hier werden noch keine Apps angeboten. Eine Administratorin oder ein Administrator kann sie auf der Seite „Updates“ anbieten."
+    },
+    "connect": {
+      "title": "So verbinden Sie es",
+      "desktop": "Installieren und starten Sie die App. Geben Sie auf Nachfrage die Adresse dieses Servers ein und melden Sie sich mit dem Code an, den die App anzeigt.",
+      "office": "Meist installiert und verbindet Ihre IT die Add-ins. Andernfalls geben Sie die Adresse dieses Servers ein, wenn der Bereich des Add-ins danach fragt, und melden Sie sich an.",
+      "nextcloud": "Die Nextcloud-Administration schaltet die App ein. Öffnen Sie dann Fadenstack in Nextcloud und melden Sie sich an.",
+      "chrome": "Installieren Sie die Erweiterung. Geben Sie die Adresse dieses Servers auf ihrem ersten Bildschirm ein und melden Sie sich an."
     }
   }
 }
