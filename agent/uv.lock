@@ -24,6 +24,7 @@ resolution-markers = [
 constraints = [
     { name = "aiohttp", specifier = ">=3.14.4" },
     { name = "pillow", specifier = ">=13.0.0" },
+    { name = "pyasn1", specifier = ">=0.6.5" },
 ]
 
 [[package]]
