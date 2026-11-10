@@ -10,6 +10,11 @@ Once a day the server reads a second public, signed file beside the release list
 - **The switch** **Check for new releases** (`updates.check_enabled`) covers both lists.
 - **Without internet access,** see [A server without internet access](#a-server-without-internet-access).
 
+The list is signed anew every day and expires 14 days after it was signed. A list that has expired is not taken in.
+When the list the server keeps expires because no newer one arrived, the Apps section and **Needs attention** say so:
+newer app releases, security fixes included, may be missing. Check the server's connection to fadenstack.com, or
+your mirror. This protects against a list being held back, for example by a mirror that is no longer updated.
+
 ## Apps in use
 
 Each app reports its name and version to the server when it starts. The server counts the versions it has seen in the last 30 days. No names of people are shown.
@@ -34,10 +39,11 @@ The app list adds items to **Needs attention** on the dashboard. Each can be mut
 |---|---|---|
 | A security release of an app | An older version of the app is in use here | As a warning; as critical for a critical release |
 | An app version past the end of its support | That version is in use here | Always, while the app list exists |
+| The app list has not been renewed | The kept list is past its expiry | Always, as a warning |
 | A new release of an app | The app is in use here | Only with **News about Fadenstack apps** |
 | A new app | It was first released in the last 30 days, and nobody here uses it or is offered it | Only with **News about Fadenstack apps** |
 
-**News about Fadenstack apps** (`updates.app_news`) is under **Settings**, **Updates**. It is on by default. The two security items do not depend on it.
+**News about Fadenstack apps** (`updates.app_news`) is under **Settings**, **Updates**. It is on by default. The first three items do not depend on it.
 
 ### E-mail
 

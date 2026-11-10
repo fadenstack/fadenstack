@@ -111,8 +111,12 @@ def app_entry(**extra: object) -> dict:
 
 
 def test_the_app_list_is_built_and_read_back_whole() -> None:
-    catalogue = update_feed.build_apps({"apps": [app_entry()]})
+    from datetime import UTC, datetime
+
+    catalogue = update_feed.build_apps({"apps": [app_entry()]}, now=datetime(2026, 11, 20, 10, 0, 0, 123, tzinfo=UTC))
     assert catalogue["product"] == "fadenstack-apps"
+    # It expires two weeks after it is made; the release repository signs it anew every day.
+    assert (catalogue["generated_at"], catalogue["expires"]) == ("2026-11-20T10:00:00Z", "2026-12-04T10:00:00Z")
     release = catalogue["apps"][0]["releases"][0]
     assert release["notes_url"] == "https://fadenstack.com/agents/nextcloud/#v0.1.10"
     assert release["files"][0]["url"] == TARBALL
@@ -146,6 +150,12 @@ def bad_release(**extra: object) -> dict:
 def test_app_entries_installs_could_not_show_are_refused(bad: dict, message: str) -> None:
     with pytest.raises(update_feed.BuildError, match=message):
         update_feed.build_apps({"apps": [bad]})
+
+
+@pytest.mark.parametrize("days", [0, 91])
+def test_an_app_list_expires_within_a_sensible_time(days: int) -> None:
+    with pytest.raises(update_feed.BuildError, match="valid_days"):
+        update_feed.build_apps({"apps": []}, valid_days=days)
 
 
 def test_an_app_listed_twice_is_refused() -> None:

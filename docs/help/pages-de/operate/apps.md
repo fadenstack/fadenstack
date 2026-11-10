@@ -10,6 +10,12 @@ Einmal am Tag liest der Server eine zweite öffentliche, signierte Datei neben d
 - **Der Schalter** **Check for new releases** (`updates.check_enabled`) gilt für beide Listen.
 - **Ohne Internetzugang** siehe [Ein Server ohne Internetzugang](#a-server-without-internet-access).
 
+Die Liste wird jeden Tag neu signiert und läuft 14 Tage nach ihrer Signatur ab. Eine abgelaufene Liste wird nicht
+übernommen. Läuft die Liste ab, die der Server aufbewahrt, weil keine neuere ankam, sagen das der Bereich Apps und
+**Handlungsbedarf**: Neuere App-Releases, auch Sicherheitskorrekturen, fehlen dann womöglich. Prüfen Sie die
+Verbindung des Servers zu fadenstack.com oder Ihren Spiegel. Das schützt davor, dass eine Liste zurückgehalten wird,
+etwa von einem Spiegel, der nicht mehr aktualisiert wird.
+
 ## Apps im Einsatz {#apps-in-use}
 
 Jede App meldet dem Server beim Start ihren Namen und ihre Version. Der Server zählt die Versionen, die er in den letzten 30 Tagen gesehen hat. Namen von Personen werden nicht angezeigt.
@@ -34,10 +40,11 @@ Die App-Liste fügt **Handlungsbedarf** im Dashboard Einträge hinzu. Jeder läs
 |---|---|---|
 | Ein Sicherheitsrelease einer App | Eine ältere Version der App ist hier im Einsatz | Als Warnung; als kritisch bei einem kritischen Release |
 | Eine App-Version nach dem Ende ihres Supports | Diese Version ist hier im Einsatz | Immer, solange es die App-Liste gibt |
+| Die App-Liste wurde nicht erneuert | Die aufbewahrte Liste ist abgelaufen | Immer, als Warnung |
 | Ein neues Release einer App | Die App ist hier im Einsatz | Nur mit **News about Fadenstack apps** |
 | Eine neue App | Sie ist in den letzten 30 Tagen zum ersten Mal erschienen, und niemand hier nutzt sie oder bekommt sie angeboten | Nur mit **News about Fadenstack apps** |
 
-**News about Fadenstack apps** (`updates.app_news`) steht unter **Einstellungen**, **Updates**. Der Schalter ist standardmäßig an. Die beiden Sicherheitseinträge hängen nicht davon ab.
+**News about Fadenstack apps** (`updates.app_news`) steht unter **Einstellungen**, **Updates**. Der Schalter ist standardmäßig an. Die ersten drei Einträge hängen nicht davon ab.
 
 ### E-Mail {#e-mail}
 

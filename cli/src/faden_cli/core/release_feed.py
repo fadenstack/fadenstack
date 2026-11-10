@@ -510,6 +510,10 @@ class AppCatalogue:
     """A verified app list."""
 
     generated_at: datetime
+    #: Past this, the list is not believed to be current (TUF's ``expires``, against a freeze attack: a mirror or
+    #: someone in the path serving a valid but old list for ever, so a security release is never seen). The list
+    #: is signed anew every day; an expired one is shown, with a warning, never taken in.
+    expires: datetime
     apps: tuple[App, ...]
 
     def app(self, app_id: str) -> App | None:
@@ -528,18 +532,21 @@ def parse_apps(data: Any) -> AppCatalogue:
         raise FeedError("The app list is not a JSON object.")
     if data.get("schema") != SCHEMA or data.get("product") != APPS_PRODUCT:
         raise FeedError(f"Not a Fadenstack app list of schema {SCHEMA}.")
-    try:
-        generated_at = datetime.fromisoformat(str(data["generated_at"]).replace("Z", "+00:00"))
-    except (KeyError, ValueError) as exc:
-        raise FeedError("The app list has no valid generated_at.") from exc
-    if generated_at.tzinfo is None:
-        generated_at = generated_at.replace(tzinfo=UTC)
+    stamps: dict[str, datetime] = {}
+    for key in ("generated_at", "expires"):
+        try:
+            stamp = datetime.fromisoformat(str(data[key]).replace("Z", "+00:00"))
+        except (KeyError, ValueError) as exc:
+            raise FeedError(f"The app list has no valid {key}.") from exc
+        stamps[key] = stamp if stamp.tzinfo is not None else stamp.replace(tzinfo=UTC)
+    if stamps["expires"] <= stamps["generated_at"]:
+        raise FeedError("The app list expires before it was made.")
     apps: list[App] = []
     for raw in data.get("apps") or []:
         app = _app(raw)
         if app is not None and all(a.id != app.id for a in apps):
             apps.append(app)
-    return AppCatalogue(generated_at=generated_at, apps=tuple(apps))
+    return AppCatalogue(generated_at=stamps["generated_at"], expires=stamps["expires"], apps=tuple(apps))
 
 
 def _app(raw: Any) -> App | None:
@@ -629,10 +636,24 @@ def _app_file(raw: Any) -> AppFile | None:
 
 
 def not_older_apps(catalogue: AppCatalogue, seen: datetime | None) -> None:
-    """Refuse an app list older than one already accepted, as for the feed."""
+    """Refuse an app list older than one already accepted, as for the feed (a rollback)."""
     if seen is not None and catalogue.generated_at < seen:
         raise FeedError(
             f"The app list is older ({catalogue.generated_at.isoformat()}) than one already seen ({seen.isoformat()})."
+        )
+
+
+def apps_expired(catalogue: AppCatalogue, now: datetime | None = None) -> bool:
+    """The app list is past its ``expires``: it was not renewed in time (a freeze, or the list held back)."""
+    return (now or datetime.now(UTC)) >= catalogue.expires
+
+
+def not_expired_apps(catalogue: AppCatalogue, now: datetime | None = None) -> None:
+    """Refuse an app list that has already expired when it is read: it is not taken in."""
+    if apps_expired(catalogue, now):
+        raise FeedError(
+            f"The app list expired on {catalogue.expires.isoformat()}: it was not renewed, so newer releases may be "
+            "missing. Check the connection to fadenstack.com, or the mirror."
         )
 
 

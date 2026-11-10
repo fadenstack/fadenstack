@@ -72,9 +72,12 @@ def rel(version: str, **extra: Any) -> dict[str, Any]:
     }
 
 
-def publish(*app_list: dict[str, Any], generated_at: str = "2026-11-24T10:00:00Z") -> tuple[bytes, bytes]:
+def publish(
+    *app_list: dict[str, Any], generated_at: str = "2026-11-24T10:00:00Z", expires: str = "2026-12-08T10:00:00Z",
+) -> tuple[bytes, bytes]:
     index = json.dumps({
-        "schema": 1, "product": "fadenstack-apps", "generated_at": generated_at, "apps": list(app_list),
+        "schema": 1, "product": "fadenstack-apps", "generated_at": generated_at, "expires": expires,
+        "apps": list(app_list),
     }).encode()
     signature = json.dumps({"key_id": "apps-test", "signature": base64.b64encode(KEY.sign(index)).decode()}).encode()
     return index, signature
@@ -152,6 +155,29 @@ async def test_an_older_list_does_not_replace_the_kept_one(dbsession: AsyncSessi
     served["apps"] = publish(nextcloud(rel("0.1.0")), generated_at="2026-11-01T10:00:00Z")
     state = await apps.check_now(dbsession, now=NOW + timedelta(days=1))
     assert state.error is not None and "older" in state.error
+
+
+async def test_a_list_already_expired_is_not_taken_in(dbsession: AsyncSession, served: dict[str, Any]) -> None:
+    """A valid but old list, served on and on (a stale mirror, a list held back), is refused once it expires."""
+    served["apps"] = publish(office(), generated_at="2026-11-01T10:00:00Z", expires="2026-11-15T10:00:00Z")
+    state = await apps.check_now(dbsession, now=NOW)
+    assert state.error is not None and "expired on 2026-11-15" in state.error
+    assert apps.stored(state) is None
+
+
+async def test_a_kept_list_that_expires_is_shown_with_a_warning(
+    dbsession: AsyncSession, served: dict[str, Any],
+) -> None:
+    await apps.check_now(dbsession, now=NOW)
+    later = datetime(2026, 12, 9, tzinfo=UTC)  # past the list's expiry: not renewed since
+    state = await apps.load_state(dbsession)
+    view = apps.admin_view(state, {}, gateway_ok=True, lang="en", now=later)
+    assert view["check"]["expired"] is True and [a["id"] for a in view["apps"]] == ["nextcloud", "office"]
+    facts = _Facts(dbsession, [])
+    facts.now = later
+    items = {i.code: i for i in await attention.app_releases(facts)}  # type: ignore[arg-type]
+    assert (items["app_list_expired"].severity, items["app_list_expired"].params) == ("warning", {"since": "2026-12-08"})
+    assert not apps.admin_view(state, {}, gateway_ok=True, lang="en", now=NOW)["check"]["expired"]
 
 
 async def test_an_upload_is_kept_like_a_fetched_list(dbsession: AsyncSession) -> None:

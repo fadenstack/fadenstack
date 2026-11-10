@@ -642,6 +642,12 @@ async def app_releases(facts: Facts) -> list[Item]:
     today = facts.now.date()
     link = "/admin/updates#apps"
     items: list[Item] = []
+    if release_feed.apps_expired(catalogue, facts.now):
+        # Not renewed in time: a security release may be held back from this server (always shown, like security).
+        items.append(Item(
+            f"app_list_expired:{catalogue.expires.date().isoformat()}", "app_list_expired", "warning", "platform",
+            {"since": catalogue.expires.date().isoformat()}, catalogue.expires, link,
+        ))
     for found in apps.assessments(catalogue, seen, today=today):
         app, latest = found.app, found.latest
         params = {"app": release_feed.localized(app.name, "en")}

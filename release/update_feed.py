@@ -44,7 +44,7 @@ import json
 import os
 import re
 import sys
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import yaml
@@ -220,8 +220,20 @@ def _link(where: str, url: object, *, required: bool = False) -> str:
     return text
 
 
-def build_apps(source: dict) -> dict:
-    """The app list for *source* (apps.yaml). Refuses anything installs would leave out, so nothing goes missing."""
+#: How long a signed app list is believed: it is signed anew every day (the release repository's schedule), so this
+#: leaves two weeks for a broken signing run before servers warn that the list was not renewed (TUF's expiry,
+#: against a list held back).
+APPS_VALID_DAYS = 14
+
+
+def build_apps(source: dict, *, valid_days: int = APPS_VALID_DAYS, now: datetime | None = None) -> dict:
+    """The app list for *source* (apps.yaml). Refuses anything installs would leave out, so nothing goes missing.
+
+    It expires *valid_days* after it is made: a list nobody renews stops being believed.
+    """
+    if not 1 <= valid_days <= 90:
+        raise BuildError("valid_days is 1 to 90: servers must notice a list that is not renewed")
+    made = (now or datetime.now(UTC)).replace(microsecond=0)
     apps = []
     seen: set[str] = set()
     for raw in source.get("apps") or []:
@@ -318,7 +330,8 @@ def build_apps(source: dict) -> dict:
     catalogue = {
         "schema": release_feed.SCHEMA,
         "product": release_feed.APPS_PRODUCT,
-        "generated_at": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "generated_at": made.isoformat().replace("+00:00", "Z"),
+        "expires": (made + timedelta(days=valid_days)).isoformat().replace("+00:00", "Z"),
         "apps": apps,
     }
     # What installs will read: every app, release and file must come through.
@@ -351,6 +364,8 @@ def main(argv: list[str] | None = None) -> int:
     p_abuild = sub.add_parser("apps-build", help="apps.yaml -> apps.json (the app list)")
     p_abuild.add_argument("--source", type=Path, required=True)
     p_abuild.add_argument("--out", type=Path, required=True)
+    p_abuild.add_argument("--valid-days", type=int, default=APPS_VALID_DAYS,
+                          help=f"days until the list expires (default {APPS_VALID_DAYS}; it is signed anew daily)")
     p_asign = sub.add_parser("apps-sign", help="write apps.json.sig")
     p_asign.add_argument("folder", type=Path)
     p_asign.add_argument("--key-file", type=Path, help="default: $APPS_FEED_SIGNING_KEY")
@@ -386,7 +401,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{args.out}: notes for {args.version}")
         elif args.cmd == "apps-build":
             source = yaml.safe_load(args.source.read_text(encoding="utf-8")) or {}
-            catalogue = build_apps(source)
+            catalogue = build_apps(source, valid_days=args.valid_days)
             args.out.mkdir(parents=True, exist_ok=True)
             (args.out / APPS_INDEX).write_text(json.dumps(catalogue, indent=2, ensure_ascii=False) + "\n",
                                                encoding="utf-8", newline="\n")
@@ -403,7 +418,9 @@ def main(argv: list[str] | None = None) -> int:
         elif args.cmd == "apps-verify":
             found = release_feed.verify_apps((args.folder / APPS_INDEX).read_bytes(),
                                              (args.folder / APPS_SIG).read_bytes())
-            print(f"valid: {len(found.apps)} apps ({', '.join(a.id for a in found.apps) or 'none'})")
+            release_feed.not_expired_apps(found)
+            print(f"valid until {found.expires.isoformat()}: {len(found.apps)} apps "
+                  f"({', '.join(a.id for a in found.apps) or 'none'})")
         elif args.cmd == "keygen":
             key = Ed25519PrivateKey.generate()
             raw = key.private_bytes(

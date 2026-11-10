@@ -50,8 +50,14 @@ def app(app_id: str = "nextcloud", *releases: dict, **extra: object) -> dict:
     }
 
 
-def catalogue_bytes(*apps: dict, generated_at: str = "2026-11-20T10:00:00Z", product: str = "fadenstack-apps") -> bytes:
-    return json.dumps({"schema": 1, "product": product, "generated_at": generated_at, "apps": list(apps)}).encode()
+def catalogue_bytes(
+    *apps: dict, generated_at: str = "2026-11-20T10:00:00Z", expires: str | None = "2026-12-04T10:00:00Z",
+    product: str = "fadenstack-apps",
+) -> bytes:
+    data = {"schema": 1, "product": product, "generated_at": generated_at, "apps": list(apps)}
+    if expires is not None:
+        data["expires"] = expires
+    return json.dumps(data).encode()
 
 
 def signed(index: bytes, key: Ed25519PrivateKey = KEY, key_id: str = "apps") -> bytes:
@@ -175,6 +181,26 @@ def test_localized_falls_back_to_the_language_then_english() -> None:
     assert rf.localized(texts, "fr") == "Hello"
     assert rf.localized({"de": "Hallo"}, "fr") == "Hallo"
     assert rf.localized({}, "de") == ""
+
+
+@pytest.mark.parametrize(
+    ("expires", "message"),
+    [(None, "no valid expires"), ("soon", "no valid expires"), ("2026-11-19T10:00:00Z", "expires before")],
+)
+def test_a_list_without_a_sound_expiry_is_refused(expires: str | None, message: str) -> None:
+    """Every app list expires: a list that never does could be served for ever (a freeze attack)."""
+    index = catalogue_bytes(app(), expires=expires)
+    with pytest.raises(rf.FeedError, match=message):
+        rf.verify_apps(index, signed(index), KEYS)
+
+
+def test_an_expired_list_is_told_and_refused_when_read() -> None:
+    found = catalogue(app())
+    assert not rf.apps_expired(found, datetime(2026, 12, 4, 9, 59, tzinfo=UTC))
+    assert rf.apps_expired(found, datetime(2026, 12, 4, 10, 0, tzinfo=UTC))
+    rf.not_expired_apps(found, datetime(2026, 12, 1, tzinfo=UTC))
+    with pytest.raises(rf.FeedError, match="expired on 2026-12-04"):
+        rf.not_expired_apps(found, datetime(2026, 12, 5, tzinfo=UTC))
 
 
 def test_an_older_app_list_than_one_seen_is_refused() -> None:

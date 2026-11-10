@@ -76,6 +76,7 @@ def _keep(
     state: ReleaseFeedState, index: bytes, signature: bytes, *, source: str, url: str | None, now: datetime,
 ) -> release_feed.AppCatalogue:
     catalogue = release_feed.verify_apps(index, signature)
+    release_feed.not_expired_apps(catalogue, now)
     release_feed.not_older_apps(catalogue, state.generated_at)
     state.index_text = index.decode()
     state.signature_text = signature.decode()
@@ -237,6 +238,9 @@ def admin_view(
             "succeeded_at": state.succeeded_at if state else None,
             "list_generated_at": state.generated_at if state else None,
             "error": state.error if state else None,
+            # Not renewed by its expiry: shown still, with a warning (a freeze: newer releases may be missing).
+            "expires": catalogue.expires if catalogue else None,
+            "expired": catalogue is not None and release_feed.apps_expired(catalogue, now),
         },
         "news": settings.updates_app_news,
         "in_use_days": IN_USE_DAYS,
