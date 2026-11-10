@@ -14,6 +14,20 @@
 #   base-image — the platform base image to build FROM (optional): the base just
 #               built from this commit, rather than the Dockerfile's default
 #               base:latest, which moves on releases only.
+#   title, description — this image's own name and what it is (plain text, at
+#               most 512 characters, no "#": metadata-action reads "#" as a
+#               comment). GHCR shows the description on the package's page.
+#   licenses  — SPDX expression (default Apache-2.0, the repository's licence).
+#
+# Labels and annotations: metadata-action fills the OCI keys from the repository
+# (its description and the title "fadenstack" for every image); the title,
+# description and licenses here replace them, both as the image's labels and as
+# annotations on the image manifest and on the image index. With `sbom: true` the
+# push is an OCI index (the image and its attestation), and GHCR reads a
+# multi-platform image's description from the index's annotations, not from a
+# label. The same three keys are LABELs in each Dockerfile's published stage, for
+# images built outside this workflow (cli/tests/test_image_labels.py keeps them
+# equal to docker-publish.yml).
 #
 # Tags: the branch (`main`), the commit (short and full SHA), and for a release
 # tag v<version> (or core-v<version>) the version, its minor, and `latest`.
@@ -55,6 +69,16 @@ on:
         required: false
         type: string
         default: ""
+      title:
+        required: true
+        type: string
+      description:
+        required: true
+        type: string
+      licenses:
+        required: false
+        type: string
+        default: Apache-2.0
 
 permissions:
   contents: read
@@ -82,11 +106,40 @@ jobs:
             echo "final=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # GHCR takes at most 512 characters of plain text; a newline would split the
+      # key=value lists below, and metadata-action drops what follows a "#".
+      - name: The image's description fits
+        shell: bash
+        env:
+          TITLE: ${{ inputs.title }}
+          DESCRIPTION: ${{ inputs.description }}
+        run: |
+          if [ -z "$TITLE" ] || [ -z "$DESCRIPTION" ]; then
+            echo "::error::Every image needs its own title and description"; exit 1
+          fi
+          if [ "${#DESCRIPTION}" -gt 512 ]; then
+            echo "::error::The description has ${#DESCRIPTION} characters; GHCR takes 512"; exit 1
+          fi
+          case "$TITLE$DESCRIPTION" in
+            *$'\n'*|*'#'*) echo "::error::No newline or # in the title or description"; exit 1 ;;
+          esac
+
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
+        env:
+          # The annotations output for the image manifest and for the index (default: manifest only).
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
         with:
           images: ${{ inputs.registry }}/${{ inputs.service }}
+          labels: |
+            org.opencontainers.image.title=${{ inputs.title }}
+            org.opencontainers.image.description=${{ inputs.description }}
+            org.opencontainers.image.licenses=${{ inputs.licenses }}
+          annotations: |
+            org.opencontainers.image.title=${{ inputs.title }}
+            org.opencontainers.image.description=${{ inputs.description }}
+            org.opencontainers.image.licenses=${{ inputs.licenses }}
           # With the default (auto), every type=match tag would also move `latest`, a
           # release candidate's too; the raw tag below decides instead.
           flavor: |
@@ -126,5 +179,6 @@ jobs:
           sbom: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
