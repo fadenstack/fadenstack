@@ -21,10 +21,10 @@ import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, BinaryIO
 
 from faden_cli import __version__
-from faden_cli.core import backup_crypto
+from faden_cli.core import backup_crypto, restore_swap
 from faden_cli.core.compose import ComposeContext, up as compose_up
 from faden_cli.core.console import console, error, info, success, warning
 from faden_cli.core.private_files import PRIVATE_DIR, open_private, private_dir, write_private
@@ -198,47 +198,25 @@ def dump_databases(
     return results
 
 
-def restore_databases(
-    backup_dir: Path,
-    manifest: dict,
-) -> list[str]:
-    """Restore databases from custom-format dumps.
+def dump_files(backup_dir: Path, manifest: dict) -> dict[str, Path]:
+    """Each database of the backup and its dump file, in the manifest's order.
 
-    Returns the list of database names that were successfully restored.
+    Every one is restored, whatever its migration head (an empty one: a module's database, ``rag``,
+    ``langfuse``). A dump the manifest names that is not there refuses the restore before anything changes.
     """
-    docker = _docker_bin()
-    restored: list[str] = []
-    db_section = manifest.get("databases", {})
-
-    for db, meta in db_section.items():
-        dump_file = meta.get("file", f"{db}.dump")
-        dump_path = backup_dir / dump_file
-        if not dump_path.exists():
-            warning(f"  Dump file missing for {db}: {dump_file}")
-            continue
-
-        info(f"  Restoring database: {db}")
-
-        # Read the dump file and pipe it into pg_restore via stdin.
-        dump_bytes = dump_path.read_bytes()
-        proc = subprocess.run(  # noqa: S603
-            [
-                docker, "exec", "-i", POSTGRES_CONTAINER,
-                "pg_restore", "-U", "postgres",
-                "--clean", "--if-exists", "-d", db,
-            ],
-            input=dump_bytes,
-            capture_output=True,
-            check=False,
-        )
-        # pg_restore may return non-zero for harmless warnings
-        # (e.g. "role does not exist" during --clean).
-        stderr = proc.stderr.decode("utf-8", errors="replace").strip()
-        if proc.returncode != 0 and "ERROR" in stderr.upper():
-            warning(f"  pg_restore warnings for {db}: {stderr[:200]}")
-        restored.append(db)
-
-    return restored
+    found: dict[str, Path] = {}
+    for db, meta in (manifest.get("databases") or {}).items():
+        name = str((meta or {}).get("file") or f"{db}.dump")
+        # A file of the backup folder itself, never a path out of it (ASVS 5.0 5.3.2).
+        if Path(name).name != name or name in {".", ".."} or "\\" in name:
+            raise restore_swap.RestoreRefused(
+                f"The manifest names {name!r} as the dump of {db}: not a file of the backup. Nothing was changed."
+            )
+        path = backup_dir / name
+        if not path.is_file():
+            raise restore_swap.RestoreRefused(f"The dump of {db} is missing from the backup ({path.name}). Nothing was changed.")
+        found[db] = path
+    return found
 
 
 # ── Migration heads ───────────────────────────────────────────────
@@ -880,12 +858,20 @@ def snapshot_volumes(
 
 
 def restore_volumes(
-    backup_dir: Path, manifest: dict, *, data_dir: str = "", ctx: object | None = None
+    backup_dir: Path,
+    manifest: dict,
+    *,
+    data_dir: str = "",
+    ctx: object | None = None,
+    failed: list[str] | None = None,
 ) -> list[str]:
     """Restore volume archives from a backup.
 
-    Returns list of volume names that were restored.
+    Returns list of volume names that were restored. A volume that could not be restored (its archive missing
+    or changed, the copy failing) is warned about and, when *failed* is given, added to it; one the install has
+    no volume for is only warned about.
     """
+    failures = failed if failed is not None else []
     docker = _docker_bin()
     project = _compose_project(docker)
     archives = manifest.get("volumes", [])
@@ -896,6 +882,7 @@ def restore_volumes(
         archive_path = backup_dir / archive
         if not archive_path.exists():
             warning(f"  Volume archive missing: {archive}")
+            failures.append(archive.removesuffix(".tar.gz"))
             continue
         # Checked here as well as when the backup is verified: the volume is emptied before the archive is
         # written in, so an archive that changed since must not get that far.
@@ -904,6 +891,7 @@ def restore_volumes(
             problem = _volume_archive_error(backup_dir, archive, recorded)
             if problem:
                 warning(f"  {problem}; {archive} not restored")
+                failures.append(archive.removesuffix(".tar.gz"))
                 continue
         # Derive volume name from archive filename (e.g. "minio_data.tar.gz" → "minio_data")
         vol = archive.removesuffix(".tar.gz")
@@ -931,6 +919,7 @@ def restore_volumes(
         if proc.returncode != 0:
             stderr = proc.stderr.decode("utf-8", errors="replace").strip()
             warning(f"  Volume restore failed for {vol}: {stderr[:200]}")
+            failures.append(vol)
             continue
         restored.append(vol)
 
@@ -1317,59 +1306,273 @@ def _recipient(ctx: ComposeContext, result: BackupResult) -> X25519PublicKey | N
         return None
 
 
-def restore_backup(
-    ctx: ComposeContext,
-    *,
-    backup_dir: Path,
-    db_only: bool = False,
-    skip_env: bool = False,
-) -> RestoreResult:
-    """Full restore orchestration.
+# ── Restore: beside the live install, then swapped in ─────────────
+#
+# The databases are restored beside the live ones while the install runs (core/restore_swap.py), then swapped in
+# with the services stopped. What else a restore replaces -- .env, the volumes, the certificate material and
+# RabbitMQ's users -- is kept first, so a restore whose services do not come back healthy puts all of it back.
 
-    1. Read and verify manifest
-    2. Ensure postgres is running
-    3. Restore databases
-    4. Restore .env
-    5. Restore volumes
-    """
-    result = RestoreResult()
 
-    manifest = read_manifest(backup_dir)
-    if manifest is None:
-        result.ok = False
-        result.errors.append("No manifest.json found in backup directory.")
-        return result
+@dataclass
+class Prepared:
+    """What a restore found and made before anything the install runs on changed."""
 
-    # Verify checksums
-    check_errors = verify_backup(backup_dir, manifest)
-    if check_errors:
-        result.ok = False
-        result.errors.extend(check_errors)
-        return result
+    names: list[str]
+    #: The server's databases when the restore began, with their sizes.
+    live: dict[str, int]
+    #: The install's databases the backup does not hold: left as they are.
+    not_in_backup: list[str]
+    #: The volumes the backup replaces (the ones this install has).
+    volumes: list[str]
+    #: Copies an earlier, interrupted restore had left, dropped before this one began.
+    dropped: list[str] = field(default_factory=list)
 
-    # 1. Ensure postgres is running
-    info("Ensuring PostgreSQL is running…")
-    compose_up(ctx, services=["postgres"], detach=True, wait=True, timeout=60)
 
-    # 2. Restore databases
-    console.print("\n[bold cyan]Restoring databases…[/bold cyan]")
-    result.databases_restored = restore_databases(backup_dir, manifest)
+def restore_stamp() -> str:
+    """The time a restore names its log and its folder of kept files by."""
+    return datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
-    # 3. Restore .env
-    if not db_only and not skip_env and manifest.get("env_snapshot") and ctx.env_file:
-        console.print("\n[bold cyan]Restoring .env…[/bold cyan]")
-        result.env_restored = restore_env(backup_dir, Path(str(ctx.env_file)))
 
-    # 4. Restore volumes
-    if not db_only and manifest.get("volumes"):
-        console.print("\n[bold cyan]Restoring Docker volumes…[/bold cyan]")
-        result.volumes_restored = restore_volumes(backup_dir, manifest, data_dir=data_dir_of(ctx.env_file), ctx=ctx)
+def restore_log_path(install: Path, stamp: str) -> Path:
+    """``<install>/logs/restore-<time>.log``: pg_restore's whole output, readable by its owner only (it can
+    quote rows of the databases; ASVS 5.0 14.2.4, 16.2.5)."""
+    return private_dir(install / "logs") / f"restore-{stamp}.log"
 
-    # 5. The certificate material, so the machines still trust this server
-    if not db_only and manifest.get("tls_material") and ctx.project_dir:
-        console.print("\n[bold cyan]Restoring the certificate material…[/bold cyan]")
-        result.tls_restored = restore_tls(
-            backup_dir, Path(str(ctx.project_dir)), list(manifest["tls_material"])
+
+def volumes_replaced(manifest: dict, ctx: ComposeContext) -> list[str]:
+    """The volumes a restore of *manifest* writes over: those in the backup this install has."""
+    docker = _docker_bin()
+    project = _compose_project(docker)
+    data_dir = data_dir_of(ctx.env_file)
+    names: list[str] = []
+    for archive in manifest.get("volumes") or []:
+        vol = str(archive).removesuffix(".tar.gz")
+        if vol not in _NEVER_RESTORED and _volume_source(docker, project, vol, data_dir) is not None:
+            names.append(vol)
+    return names
+
+
+def _volume_bytes(volumes: list[str], ctx: ComposeContext) -> int:
+    """What *volumes* hold now (``du``): the room their copies before the restore take, at most."""
+    if not volumes:
+        return 0
+    docker = _docker_bin()
+    project = _compose_project(docker)
+    data_dir = data_dir_of(ctx.env_file)
+    image = _volume_image(docker, ctx)
+    total = 0
+    for vol in volumes:
+        source = _volume_source(docker, project, vol, data_dir)
+        if source is None:
+            continue
+        proc = subprocess.run(  # noqa: S603
+            _helper(docker, image, "du -sk /data", mount=f"{source}:/data:ro"), capture_output=True, check=False
         )
+        first = proc.stdout.decode("utf-8", errors="replace").split()
+        if proc.returncode != 0 or not first or not first[0].isdigit():
+            raise restore_swap.RestoreRefused(f"How much the volume {vol} holds could not be read. Nothing was changed.")
+        total += int(first[0]) * 1024
+    return total
 
-    return result
+
+def _host_free(path: Path) -> tuple[str, int]:
+    """The filesystem *path* is on (as ``df`` names it, where there is a ``df``) and its free bytes."""
+    free = shutil.disk_usage(path).free
+    df = shutil.which("df")
+    if not df:
+        return "", free
+    proc = subprocess.run([df, "-Pk", str(path)], capture_output=True, check=False)  # noqa: S603
+    lines = proc.stdout.decode("utf-8", errors="replace").strip().splitlines()
+    return (lines[-1].split()[0] if proc.returncode == 0 and len(lines) >= 2 else ""), free
+
+
+def disk_need(
+    dumps: dict[str, Path], live: dict[str, int], volumes: list[str], ctx: ComposeContext, work_parent: Path
+) -> restore_swap.DiskNeed:
+    """Room for a copy of every database of the backup beside the live ones, and for a copy of the volumes it
+    replaces (kept until the restore is healthy); see :mod:`faden_cli.core.restore_swap`."""
+    total, detail = restore_swap.database_need({db: path.stat().st_size for db, path in dumps.items()}, live)
+    filesystem, free = restore_swap.data_free()
+    host_filesystem, host_free = _host_free(work_parent)
+    return restore_swap.DiskNeed(
+        databases=total,
+        volumes=_volume_bytes(volumes, ctx),
+        reserve=max(restore_swap.RESERVE_BYTES, total // 10),
+        data_free=free,
+        data_filesystem=filesystem,
+        host_free=host_free,
+        host_filesystem=host_filesystem,
+        detail=detail,
+    )
+
+
+def prepare_restore(
+    ctx: ComposeContext,
+    backup_dir: Path,
+    manifest: dict,
+    log: BinaryIO,
+    *,
+    db_only: bool,
+    work_parent: Path,
+) -> Prepared:
+    """Everything a restore does before it changes what the install runs on; Postgres must be running.
+
+    The names checked; copies an interrupted restore left (``<db>__restore``) dropped; an old database one left
+    (``<db>__old``, the database before that restore) refuses; the room checked; then every database restored
+    beside the live one. :class:`~faden_cli.core.restore_swap.RestoreRefused` or ``RestoreFailed`` when it
+    cannot be done: then nothing the install runs on was changed, and no copy is left.
+    """
+    rs = restore_swap
+    dumps = dump_files(backup_dir, manifest)
+    names = list(dumps)
+    if not names:
+        raise rs.RestoreRefused("The backup holds no database. Nothing was changed.")
+    rs.check_names(names)
+    live = rs.databases()
+    copies, olds = rs.leftovers(names, live)
+    if olds:
+        drops = " ".join(f'-c "DROP DATABASE {rs.quote(name)};"' for name in olds)
+        raise rs.RestoreRefused(
+            f"An earlier restore left {', '.join(olds)}: the database(s) as they were before that restore. "
+            "Check them, and drop them once they are not needed: "
+            f"docker exec {rs.container()} psql -U postgres {drops}. Nothing was changed."
+        )
+    if copies:
+        left = rs.drop(copies)
+        if left:
+            raise rs.RestoreRefused(
+                f"An earlier restore left {', '.join(copies)}, and they could not be dropped: {'; '.join(left)}. "
+                "Nothing was changed."
+            )
+        info(f"  Dropped what an interrupted restore had left: {', '.join(copies)}")
+        live = rs.databases()
+    volumes = [] if db_only else volumes_replaced(manifest, ctx)
+    need = disk_need(dumps, live, volumes, ctx, work_parent)
+    if problems := need.problems():
+        raise rs.RestoreRefused(
+            "Not enough room for the restore, which keeps a copy of what it replaces until the restored install "
+            f"is healthy: {'; '.join(problems)}. Free that much (or restore on a server with more room). "
+            "Nothing was changed."
+        )
+    reserved = rs.human(need.databases + need.reserve + (need.volumes if need.shared else 0))
+    info(f"  Room: {rs.human(need.data_free)} free, {reserved} needed.")
+    ignore = {"postgres", "template0", "template1"}
+    not_in_backup = sorted(
+        db for db in live if db not in ignore and db not in names and not db.endswith((rs.RESTORE_SUFFIX, rs.OLD_SUFFIX))
+    )
+    for db in names:
+        info(f"  Restoring {db} into {db}{rs.RESTORE_SUFFIX}")
+    rs.restore_beside(dumps, live, log)
+    return Prepared(names, live, not_in_backup, volumes, dropped=copies)
+
+
+class FilesNotKept(RuntimeError):
+    """What a restore replaces could not be kept first; nothing of it was replaced yet."""
+
+
+@dataclass
+class Kept:
+    """What a restore replaced beside the databases, kept so it can go back: the bytes of the files, ``None``
+    for a file the install did not have, and the volumes' archives in *work_dir*."""
+
+    work_dir: Path
+    env_path: Path | None = None
+    env: bytes | None = None
+    rabbitmq_path: Path | None = None
+    rabbitmq: bytes | None = None
+    rabbitmq_mode: int = 0o644
+    install_dir: Path | None = None
+    tls: dict[str, bytes | None] = field(default_factory=dict)
+    volumes: list[str] = field(default_factory=list)
+
+    def discard(self) -> None:
+        """Remove the kept copies (the restore is healthy, or they went back)."""
+        shutil.rmtree(self.work_dir, ignore_errors=True)
+
+
+#: Where RabbitMQ's users are written from .env (``faden deploy`` and ``faden upgrade`` write it the same way).
+RABBITMQ_DEFINITIONS = Path("rabbitmq") / "definitions.json"
+
+
+def keep_before_restore(
+    ctx: ComposeContext,
+    manifest: dict,
+    work_dir: Path,
+    *,
+    db_only: bool,
+    skip_env: bool,
+    volumes: list[str],
+) -> Kept:
+    """Keep what a restore of *manifest* will replace, before it does; owner-only in *work_dir*.
+
+    ``.env`` and RabbitMQ's users (written from it) when the backup's ``.env`` goes in; the certificate files
+    the backup holds; an archive of each volume it replaces, every one of them, or :class:`FilesNotKept`.
+    """
+    private_dir(work_dir)
+    kept = Kept(work_dir=work_dir)
+    install = Path(str(ctx.project_dir)) if ctx.project_dir else None
+    if not db_only and not skip_env and manifest.get("env_snapshot") and ctx.env_file:
+        kept.env_path = Path(str(ctx.env_file))
+        kept.env = kept.env_path.read_bytes() if kept.env_path.is_file() else None
+        if kept.env is not None:
+            write_private(work_dir / ".env.before", kept.env)
+        if install is not None:
+            kept.rabbitmq_path = install / RABBITMQ_DEFINITIONS
+            if kept.rabbitmq_path.is_file():
+                kept.rabbitmq = kept.rabbitmq_path.read_bytes()
+                kept.rabbitmq_mode = kept.rabbitmq_path.stat().st_mode & 0o777
+    if not db_only and manifest.get("tls_material") and install is not None:
+        kept.install_dir = install
+        for rel in manifest["tls_material"]:
+            if rel in TLS_MATERIAL:
+                path = install / rel
+                kept.tls[rel] = path.read_bytes() if path.is_file() else None
+    if volumes:
+        made = snapshot_volumes(work_dir, volumes=volumes, data_dir=data_dir_of(ctx.env_file), ctx=ctx)
+        missing = sorted(set(volumes) - {archive.removesuffix(".tar.gz") for archive in made})
+        if missing:
+            raise FilesNotKept(f"The volumes {', '.join(missing)} could not be copied before the restore.")
+        kept.volumes = made
+    return kept
+
+
+def put_back(kept: Kept, ctx: ComposeContext) -> list[str]:
+    """Put back what :func:`keep_before_restore` kept; what could not go back, one line each (empty: all did)."""
+    problems: list[str] = []
+    if kept.env_path is not None:
+        try:
+            if kept.env is None:
+                kept.env_path.unlink(missing_ok=True)
+            else:
+                write_private(kept.env_path, kept.env)
+        except OSError as exc:
+            problems.append(f".env: {exc} (the install's own is in {kept.work_dir / '.env.before'})")
+    if kept.rabbitmq_path is not None:
+        try:
+            if kept.rabbitmq is None:
+                kept.rabbitmq_path.unlink(missing_ok=True)
+            else:
+                kept.rabbitmq_path.write_bytes(kept.rabbitmq)
+                kept.rabbitmq_path.chmod(kept.rabbitmq_mode)
+        except OSError as exc:
+            problems.append(f"{RABBITMQ_DEFINITIONS}: {exc}")
+    for rel, data in kept.tls.items():
+        path = (kept.install_dir or Path(".")) / rel
+        try:
+            if data is None:
+                path.unlink(missing_ok=True)
+            else:
+                write_private(path, data, mode=_tls_mode(rel))
+        except OSError as exc:
+            problems.append(f"{rel}: {exc}")
+    if kept.volumes:
+        failed: list[str] = []
+        restore_volumes(
+            kept.work_dir, {"volumes": kept.volumes}, data_dir=data_dir_of(ctx.env_file), ctx=ctx, failed=failed
+        )
+        problems.extend(
+            f"the volume {vol}: still the backup's (its content before the restore: "
+            f"{kept.work_dir / (vol + '.tar.gz')})"
+            for vol in failed
+        )
+    return problems

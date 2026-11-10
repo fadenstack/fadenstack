@@ -124,12 +124,8 @@ wie sie sind, und werden wie bisher wiederhergestellt; löschen Sie sie, sobald 
 ## Wiederherstellen {#restore}
 
 !!! warning "Wird noch getestet"
-    Die Wiederherstellung wird noch getestet. Sie bringt die Daten zurück: die Datenbanken, die `.env`, das
-    Zertifikatsmaterial und Volumes, wenn die Sicherung welche enthält. Die Dateien der Installation und das
-    Release, mit dem die Sicherung angelegt wurde, bringt sie nicht zurück. Während sie läuft, sind die Dienste
-    gestoppt und die Konsole zeigt die Wartungsseite (wie bei einem Upgrade), die sich neu lädt, sobald die
-    Plattform wieder da ist. Probieren Sie eine
-    Wiederherstellung an einer Kopie des Servers aus, bevor Sie sich auf eine verlassen.
+    Die Wiederherstellung wird noch getestet. Probieren Sie eine Wiederherstellung an einer Kopie des Servers aus,
+    bevor Sie sich auf eine verlassen.
 
 ```bash
 faden restore ~/fadenstack/backups/<time>
@@ -138,16 +134,47 @@ faden restore ~/fadenstack/backups/<time>
 Der Befehl fragt nach einer Bestätigung (`-y` überspringt sie). Eine verschlüsselte Sicherung fragt zuerst nach
 dem Wiederherstellungsschlüssel.
 
+**Jede Datenbank, die die Sicherung enthält, wird genau die der Sicherung.** Was nach der Sicherung hinzukam, ist
+danach weg, auch Tabellen, die ein neueres Release angelegt hat. Die Datenbanken werden zuerst neben den laufenden
+wiederhergestellt, während die Installation weiterläuft; erst wenn jede Kopie vollständig ist, werden die Dienste
+gestoppt und die Kopien an ihre Stelle gesetzt. Schlägt vorher etwas fehl, hat sich nichts geändert. Werden die
+Dienste danach nicht gesund, kommt alles so zurück, wie es vor der Wiederherstellung war.
+
 ??? info "Was die Wiederherstellung tut, der Reihe nach"
     1. öffnet eine verschlüsselte Sicherung mit dem Wiederherstellungsschlüssel, in einen Ordner in ihr, den nur Sie
        lesen können und der am Ende der Wiederherstellung gelöscht wird;
-    2. zeigt das Datum der Sicherung, die Version des Werkzeugs, mit der sie angelegt wurde, und was sie enthält;
-    3. prüft die Datenbank-Dumps, die Volume-Archive und die Zertifikatsdateien gegen die Prüfsummen in der Sicherung und bricht ab,
-       wenn eine nicht passt;
+    2. zeigt das Datum der Sicherung, das Release, das sie enthält, die `faden`-Version, mit der sie angelegt wurde,
+       und was sie enthält;
+    3. prüft die Datenbank-Dumps, die Volume-Archive und die Zertifikatsdateien gegen die Prüfsummen in der
+       Sicherung und bricht ab, wenn eine nicht passt;
     4. fragt nach einer Bestätigung (`-y` überspringt sie);
-    5. schaltet die Wartungsseite ein, stoppt alle Dienste außer dem Eingangstor (nginx), stellt jede Datenbank
-       und, sofern nicht anders angegeben, die `.env` und das Zertifikatsmaterial wieder her;
-    6. startet alles wieder und nimmt die Wartungsseite wieder weg, auch wenn die Wiederherstellung fehlschlägt.
+    5. prüft, ob Platz für eine Kopie der Datenbanken und der Volumes ist, die sie ersetzt (siehe unten), und bricht
+       sonst ab;
+    6. stellt jede Datenbank der Sicherung in eine neue neben der laufenden wieder her (`<name>__restore`), während
+       die Installation weiterläuft. Die ganze Ausgabe von pg_restore steht in
+       `~/fadenstack/logs/restore-<time>.log`. Ein Fehler beendet die Wiederherstellung hier: Die Kopien werden
+       gelöscht, die laufenden Datenbanken und die Dienste wurden nicht angetastet;
+    7. schaltet die Wartungsseite ein, stoppt alle Dienste außer dem Eingangstor (nginx) und Postgres und tauscht die
+       Namen in einem Schritt: Jede laufende Datenbank wird zu `<name>__old`, jede Kopie bekommt ihren Namen;
+    8. bewahrt eine Kopie der `.env`, der Volumes, die die Sicherung enthält, und der Zertifikatsdateien auf und setzt
+       dann die der Sicherung ein (sofern nicht anders angegeben);
+    9. startet alles. Sobald jeder Dienst gesund ist (innerhalb von drei Minuten), löscht sie die `__old`-Datenbanken
+       und die aufbewahrten Kopien, nimmt die Wartungsseite weg und meldet **Restore complete**;
+    10. werden sie nicht gesund, stoppt sie sie, setzt die Datenbanken von vor der Wiederherstellung wieder an ihre
+        Stelle, ebenso die `.env`, die Volumes und die Zertifikatsdateien, startet das und endet mit einem Fehler,
+        der die nicht gesunden Dienste nennt und alles, was nicht zurückgesetzt werden konnte.
+
+| Eine Wiederherstellung ersetzt | Eine Wiederherstellung behält |
+|---|---|
+| Jede Datenbank, die die Sicherung enthält, genau so, wie sie gesichert wurde | Datenbanken, die die Sicherung nicht enthält, etwa die eines Moduls, das nach der Sicherung eingeschaltet wurde |
+| Die `.env` (nicht mit `--db-only` oder `--skip-env`) | Das Release, das die Installation ausführt: seine Programme und Dateien der Installation |
+| Das Zertifikatsmaterial (nicht mit `--db-only`) | Modelle, Runtime-Images und die Maschinen |
+| Die Volumes, die die Sicherung enthält (eine Sicherung mit `--include-volumes`) | Die Volumes, die die Sicherung nicht enthält |
+
+**Benötigter Platz.** Dort, wo Postgres seine Daten ablegt, Platz für eine Kopie jeder Datenbank: so viel, wie die
+Datenbank jetzt belegt, oder das Zehnfache ihres Dumps, wenn das mehr ist, und dazu 1 GB oder ein Zehntel, je
+nachdem, was mehr ist, als Reserve. Bei einer Sicherung mit Volumes außerdem Platz für eine Kopie dieser Volumes
+neben der Installation. Sonst nennt die Wiederherstellung, wie viel sie braucht, und ändert nichts.
 
 | Option | Was sie tut |
 |---|---|
@@ -160,6 +187,13 @@ dem Wiederherstellungsschlüssel.
 !!! warning
     Eine Wiederherstellung ersetzt die aktuellen Datenbanken. Alles, was seit der Sicherung geschehen ist, geht
     verloren: Chats, Benutzer, Einstellungen, seitdem genehmigte Maschinen.
+
+| Sie sehen | Was es bedeutet |
+|---|---|
+| **`Not enough room for the restore ...`** | Nichts wurde geändert. Machen Sie den genannten Platz frei, oder stellen Sie auf einem Server mit mehr Platz wieder her. |
+| **`The restore failed: pg_restore failed for <database>`** | Nichts wurde geändert; die Installation läuft wie zuvor. Das genannte Log enthält die ganze Ausgabe von pg_restore. |
+| **`The restored install did not become healthy ...`** | Alles ist so zurückgesetzt, wie es vor der Wiederherstellung war, und läuft wieder. Lesen Sie `faden logs <service>` für die genannten Dienste. |
+| **`An earlier restore left <name>__old ...`** | Eine Wiederherstellung hat nach dem Tausch aufgehört, bevor sie die Datenbanken von vorher löschen konnte. Prüfen Sie diese; die Meldung nennt den Befehl, um sie zu löschen. Führen Sie dann die Wiederherstellung erneut aus. |
 
 ### Eine Sicherung prüfen {#check-a-backup}
 
