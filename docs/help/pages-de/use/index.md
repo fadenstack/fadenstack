@@ -14,6 +14,7 @@ Fadenstack ist der eigene KI-Assistent Ihrer Organisation. Sie chatten im Browse
 | **Fragen zu den Dokumenten Ihrer Organisation stellen**: Das Modell kann die Wissensdatenbank durchsuchen, die Ihr Administrator befüllt hat | [Wissen](knowledge.md) |
 | **In Chrome arbeiten** mit dem Browser-Agenten, der die Seite liest, auf der Sie gerade sind | [Der Browser-Agent](browser-agent.md) |
 | **In Office arbeiten** mit den Add-ins für Word, Excel, PowerPoint und Outlook | [Office-Add-ins](office-add-ins.md) |
+| **Die Desktop-App nutzen**: der Assistent auf Ihrem Computer, mit seinen Aktualisierungen und Ihren Daten darauf | [Die Desktop-App](desktop-app.md) |
 | **Eine Desktop-App anmelden**, mit einem Code, den Sie im Browser genehmigen, ohne Ihr Passwort in die App einzugeben | [Eine Desktop-App anmelden](sign-in-an-app.md) |
 | **Den Assistenten mit Ihnen zusammenarbeiten lassen**, in der Desktop-App, an Orten, die Sie nennen, eine Zeit lang, ohne Nachfrage bei jedem Schritt | [Mit Ihnen zusammenarbeiten](work-alongside.md) |
 | **Inhalte prüfen**: herausfinden, ob ein Text, ein Bild oder eine Datei die Kennzeichnung KI-generierter Inhalte trägt | [Inhalte prüfen](checking-content.md) |

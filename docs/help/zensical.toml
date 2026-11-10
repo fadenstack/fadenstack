@@ -16,6 +16,7 @@ nav = [
     { "The browser agent" = "use/browser-agent.md" },
     { "Office add-ins" = "use/office-add-ins.md" },
     { "Sign in a desktop app" = "use/sign-in-an-app.md" },
+    { "The desktop app" = "use/desktop-app.md" },
     { "Working alongside you" = "use/work-alongside.md" },
     { "Checking content" = "use/checking-content.md" },
     { "Your account" = "use/account.md" },

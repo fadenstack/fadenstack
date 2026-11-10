@@ -52,6 +52,12 @@
 "Where does my data from Office go?" = "where-your-data-goes"
 "How do I change the language of the Office pane?" = "language-and-settings"
 
+["use/desktop-app.md"]
+"Where do I download the desktop app?" = "get-the-app"
+"How does the desktop app update?" = "updates"
+"Where does the desktop app keep my data, and how do I remove it?" = "your-data"
+"How do I uninstall the desktop app?" = "remove-the-app"
+
 ["use/sign-in-an-app.md"]
 "How do I sign in a desktop app?" = "approve-the-sign-in"
 "The app shows a code: where do I enter it?" = "approve-the-sign-in"
