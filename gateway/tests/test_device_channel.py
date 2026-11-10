@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 import uuid
 from collections.abc import AsyncIterator
 from typing import Any
@@ -300,12 +301,26 @@ async def test_a_call_to_a_device_on_another_worker(hubs: tuple[DeviceHub, Devic
 @pytest.mark.anyio
 @pytest.mark.parametrize("across", [False, True], ids=["same worker", "across workers"])
 async def test_waiting_for_a_person_extends_the_deadline(across: bool, hubs: tuple[DeviceHub, DeviceHub]) -> None:
+    """The device says it waits for its person: the calling worker's deadline moves, and the call waits past its own.
+
+    No fixed race with the relay: the test waits until the calling worker has the extension (across workers it
+    comes through Redis, which a slow runner took longer than the call's own 0.3 s for), then passes the call's own
+    deadline and finds it still waiting.
+    """
     a, b = hubs
+    caller = a if across else b
+    own = 1.0  # the call's own timeout, before the person's time is known
     ws, task = await _connect(b)
-    call = _call(a if across else b, timeout=0.3)
+    call = _call(caller, timeout=own)
     await ws.heard()
+    waiting = caller._waiting["call_1"]  # noqa: SLF001 -- what the calling worker waits on
     ws.say(type="tool_call_approval_pending", call_id="call_1", timeout_s=5)
-    await asyncio.sleep(0.6)  # twice the timeout
+    within = time.monotonic() + 5  # the hub's clock (Waiting.started, .deadline)
+    while waiting.deadline - waiting.started < own + 1:  # the person's 5 s, not the call's own 1 s
+        assert not call.done(), "the call ended before the person's time reached the calling worker"
+        assert time.monotonic() < within, "the person's time never reached the calling worker"
+        await asyncio.sleep(0.01)
+    await asyncio.sleep(max(0.0, waiting.started + own + 0.2 - time.monotonic()))  # past the call's own deadline
     assert not call.done(), "still waiting for the person"
     ws.say(type="tool_call_result", call_id="call_1", status="ok", result="approved and done")
     assert (await call).content == "approved and done"
