@@ -30,7 +30,10 @@ export default function PlatformHealthWidget({ refreshToken }: WidgetProps) {
   const o = overview.data;
   const down = deps.data?.items.filter((i) => i.status !== "up") ?? [];
   const enabledModules = services.filter((s) => s.enabled);
-  const healthyModules = enabledModules.filter((s) => s.status === "healthy");
+  // Of the modules switched on, healthy is what its probe says, or -- for one without a probe of its own (Chat
+  // runs in the backend; a container module without a health address) -- running, which "configured" means
+  // for a module switched on. Counting only "healthy" showed an install with nothing wrong as "2 / 3".
+  const healthyModules = enabledModules.filter((s) => s.status === "healthy" || s.status === "configured");
 
   const overallTone: Tone = !o ? "offline" : o.system_badge === "red" ? "error" : o.system_badge === "yellow" ? "degraded" : "ok";
   const pgPct =
@@ -116,7 +119,8 @@ export default function PlatformHealthWidget({ refreshToken }: WidgetProps) {
             ) : (
               <Typography variant="body2" sx={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
                 {fmtInt(o.postgres_connections, i18n.language)}
-                <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
+                {/* A space of text, not a margin: the margin looked like one, but the text read "61of 250". */}{" "}
+                <Typography component="span" variant="caption" color="text.secondary">
                   {o.postgres_max_connections
                     ? t("dashboard.health.of_connections", { max: fmtInt(o.postgres_max_connections, i18n.language) })
                     : t("dashboard.health.connections")}
