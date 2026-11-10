@@ -53,7 +53,7 @@ The agent's page opens. Its list status is **Draft**, **Published** or **Retired
 
 | Tab | What it holds |
 |---|---|
-| **Definition** | The version people get: **Instructions**, **Model**, **Knowledge** (collections it may search), **Server tools** (**What a chat gets**, **Only these**, or **None**), **Local MCP servers**, **Host tools** (the application's tools and their classes), **Appearance** (greeting and suggested prompts) and **Privacy**. |
+| **Definition** | The version people get: **Instructions**, **Model**, **Knowledge** (collections it may search), **Server tools** (**What a chat gets**, **Only these**, or **None**), **Local MCP servers**, **Host tools** (the application's tools and their classes), **Approval levels** (the tool mode conversations start in, and the highest), **Appearance** (greeting and suggested prompts) and **Privacy**. |
 | **Versions** | Every version. **Publish** one, **Roll back** to an earlier one, see the **Changes**. |
 | **Access** | **Who may use it**, the **Excluded people** <span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span> and its **Maintainers** (with Enterprise: **Maintainers and auditors** <span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span>). **Check someone's access** says whether a person may use the agent, and why. |
 | **Activity** | Usage over a time range (requests, errors, tokens, users, conversations: counts only, never content), shown only when at least five people used the agent in the range; the owner of a personal agent sees its figures all the same. What the applications reported (tools that ran, approvals), and the **Signed-in devices**. It names nobody but you. |
@@ -182,10 +182,29 @@ Each tool an application brings has a class, which the agent's version sets:
 | **Destructive** | Always asks. |
 | **Unclassified** | Always asks. |
 
-People pick the tool mode in the panel, per conversation; every conversation starts in **Ask**. The
+People pick the tool mode in the panel, per conversation. Under **Approval levels** the version says where every
+conversation starts (**Starts in**, **Ask** unless you change it) and the highest mode people may pick
+(**At most**, **Auto** unless you change it); the start is never above the highest, and your organisation's limits
+narrow both. **Bypass** can be the highest level only while an administrator allows it in **Settings → Approvals**, and a version that has it can be published only then; it can never be where conversations start. See [Bypass](policies.md#bypass). A research agent, for example, might start in **Read only** and go at most to **Ask**. The
 application can make a class stricter, never looser. Your [tool rules](policies.md#tool-rules) apply to agents
-as well as chats. Two examples: the Outlook add-in never sends mail itself, it opens drafts for the person;
+as well as chats.
+
+Under **Host tools**, the version can also say how each tool asks (**Approval**):
+
+| Approval | What it does |
+|---|---|
+| **As the tool mode says** | The table above decides. |
+| **Always ask** | Asks every time; nothing the person allowed before, for the chat or always, answers it. Use it for tools that decide about people (GDPR Art. 22) or act on the physical world. |
+| **Ask** | Asks even where the tool mode would run the tool; the person may allow it for the chat or always. |
+| **Never ask** | A read or write tool runs without asking in **Ask** and **Auto**. A version where a destructive or unclassified tool has it is not published. |
+
+None of them shows a tool the tool mode hides. Until Fadenstack can mark tools that act on the physical world,
+such as a machine or a door, give them **Always ask**, or set an "Ask first" [tool rule](policies.md#tool-rules). Two examples: the Outlook add-in never sends mail itself, it opens drafts for the person;
 and the browser agent never reads or fills password fields, nor card fields the site marks as such.
+
+Under **Place** a tool can say which of its arguments names where a call acts (a JSON pointer such as `/path`) and
+what kind of place it is: document, folder, website, app or desk. A grant for a stretch of work, which a person can
+give an agent for a while, covers the tool's calls only in the places it names. A tool without a place keeps asking.
 
 ## When an application brings new tools
 

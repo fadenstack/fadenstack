@@ -27,6 +27,12 @@ USAGE_READ = {"usage": ["read"]}
 #: 32(4); M06).
 USAGE_PEOPLE_AUDIT = ("usage.people", "audit")
 USAGE_AUDITOR_ROLE = "usage_auditor"
+#: The calls recorded under a person's grants, Bypass sessions above all: tools, places, arguments and results
+#: (sdk/09 L-64, L-65). Only the
+#: role ``approvals_auditor`` has it, nobody has that role at install, and superuser status does not give
+#: it; it is checked by the role grant itself. Every read is in the audit trail.
+APPROVALS_EVIDENCE_AUDIT = ("approvals.evidence", "audit")
+APPROVALS_AUDITOR_ROLE = "approvals_auditor"
 
 # Default roles and their permission scopes
 _DEFAULT_ROLES: dict[str, dict[str, list[str]]] = {
@@ -214,6 +220,11 @@ _DEFAULT_ROLES: dict[str, dict[str, list[str]]] = {
     USAGE_AUDITOR_ROLE: {
         USAGE_PEOPLE_AUDIT[0]: [USAGE_PEOPLE_AUDIT[1]],
         **USAGE_READ,
+        **CONTENT_CHECK,
+    },
+    # What ran under someone's Bypass session, for incident analysis (L-64, L-65); nobody has it at install.
+    APPROVALS_AUDITOR_ROLE: {
+        APPROVALS_EVIDENCE_AUDIT[0]: [APPROVALS_EVIDENCE_AUDIT[1]],
         **CONTENT_CHECK,
     },
     "default_user": {

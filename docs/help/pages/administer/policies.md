@@ -179,15 +179,27 @@ found something, not a measurement of how much personal data was successfully re
 
 2. Give it a **Name** (for you) and a **Tool pattern**: a tool name, or a pattern with `*`, such as
    `mcp.github.*`, `knowledge_search` or `*`.
-3. Choose the **Action**: **Deny**, **Ask first** (the person approves each call) or **Allow**. A rule also
-   covers the tools an agent's app runs itself, such as the browser and Office agents' tools: the app asks every
-   time, whatever the person allowed before, and an app that cannot ask is not offered the tool.
+3. Choose the **Action**: **Deny** or **Ask first** (the person approves each call). A rule also covers the
+   tools an agent's app runs itself, such as the browser and Office agents' tools: the app asks every time,
+   whatever the person allowed before, and an app that cannot ask is not offered the tool.
 4. Write the **Message to the user**: what people are told when the rule applies.
-5. Set the **Priority**. Lower is tried first, and the first rule that matches decides, so a rule with a
-   lower number can make an exception to a broader one.
+5. Set the **Priority**. It orders rules with the same action: when several of them match, the one with the
+   lowest number gives the message.
 6. Save it. Rules apply at once.
 
 Without rules, tools run as the tool mode says.
+
+### When several rules match {#when-several-rules-match}
+
+**Deny** wins over **Ask first**, whatever their priority. To leave some tools out of a **Deny** rule, make its
+pattern narrower: deny `mcp.github.delete_*` rather than `mcp.github.*`. To let a tool run without asking, give
+it a tool class (see [Tool classes and tool modes](#tool-classes-and-tool-modes)).
+
+### Allow rules from earlier versions {#allow-rules}
+
+In earlier versions an **Allow** placed before a **Deny** or **Ask first** rule (a lower priority number) let the
+tool through. From this release a Deny or Ask first always wins, and Allow changes nothing. Rules made with it are
+listed as **No effect**: change them to **Deny** or **Ask first**, or delete them.
 
 ### Tool classes and tool modes
 
@@ -207,8 +219,8 @@ People pick a tool mode per chat, and the class decides what runs:
 | **Ask** (every chat starts here) | runs | asks | asks | asks |
 | **Auto** | runs | runs | asks | asks |
 
-No mode runs a destructive or unclassified tool without asking. To let a tool run in **Auto**, classify it
-as **read** or **write**.
+No mode up to **Auto** runs a destructive or unclassified tool without asking. To let a tool run in **Auto**, classify it
+as **read** or **write**. A fifth mode, [Bypass](#bypass), is off unless you allow it.
 Fadenstack's own tools (the knowledge base search, the time, the tool search) are read tools.
 
 ### Tool mode limits {#tool-mode-limits}
@@ -226,6 +238,85 @@ Without a valid Enterprise licence the limits cannot be applied, so tools in eve
 licence is back; a notice for administrators says so. **Lift** on that notice gives every chat the mode each
 person picks again; the limits are kept, and apply again once the licence is valid.
 
+### Approval limits {#approval-limits}
+
+<span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span>
+
+With Enterprise, **Agents → Governance → Approval limits** sets, for **Everyone**, **A team**, **An agent** or
+**A person**, how long a [grant](#running-grants) may last and what the server keeps of the calls it covers. Choose
+who it is **For**, pick the team, agent or person, give a **Longest grant (minutes)** (15 to 720), an **Evidence
+level**, or both, and select **Set limit**. Several limits can apply to one grant: the shortest longest grant and
+the most recorded level win. The agent's own longest grant and **Longest grant (minutes)** in **Settings →
+Approvals** still apply; the shortest of all of them counts.
+
+| Evidence level | What the server keeps of each covered call |
+|---|---|
+| **Decisions** | The tool, the time, which side ran it, and which grant covered it |
+| **Calls** | That, and its place and arguments after personal data is masked |
+| **Results** | That, and whether it worked: the error, or the first 500 characters of its result after personal data is masked |
+
+Without a limit, grants for a time keep **Decisions**, and working alongside and Bypass keep **Calls**. A level you
+set replaces that, also for Bypass. Places, arguments and results are kept encrypted on the server.
+
+A grant takes its longest time and its level when it is made. A **shorter** limit takes effect at once: running
+grants it covers that would last longer end at their start plus the new limit, and each such change is recorded
+beside the grant. A longer limit, a removed limit or a changed level leaves running grants as they are.
+
+**Bypass for.** Below the limits, **Bypass for** names whom Bypass is for, on two sides, each on its own: people
+(persons and teams) and agents. Once a side names anyone, only those on it may use Bypass: a person must be named or
+be in a named team, and when agents are named too, the chat's agent must be one of them. Everyone it does not name
+gets **Auto** at most. The list only narrows: the installation must still allow [Bypass](#bypass), and the agent's
+highest level must be **Bypass**.
+
+- **A side stays restricted when its entries go**, removed here or deleted with their team, person or agent. A
+  side with nobody left names nobody, so Bypass is for nobody on it, until you select **Bypass for any person** (or
+  **Bypass for any agent**), which lifts the side and takes its entries off the list.
+- **A narrower list ends the running Bypass sessions** of the chats it no longer names, at once, and says how many:
+  the first entry of a side, an entry removed, a side restricted. A wider list ends nothing.
+
+Every change is recorded in the audit log. Without a valid Enterprise licence the limits and the list cannot be
+applied, so no grant is made while any exist: each call asks. A notice for administrators says so, and **Lift**
+on it lets people make grants within the core limits again.
+
+**Alerts by mail.** With [mail](mail.md) set up, administrators and the addresses under its **Alerts** get a mail:
+
+- once a day, as one digest, for every switch-on since the last digest: who, which agent and version, on which
+  device, from when until when, how and when they signed in again, and the reason they gave, if any. It goes out
+  at 07:00 in the installation's time zone (the one set under the usage settings; UTC unless set). A day without
+  switch-ons sends none;
+- when the report of a Bypass session's device differs from what the server recorded: at once, once per session.
+
+### Agent actions {#agent-actions}
+
+<span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span>
+
+**Agents → Governance → Agent actions** shows what agents did and how each call was allowed, newest first:
+
+| State | Meaning |
+|---|---|
+| **Asked** | The server asked the person and has no answer recorded |
+| **Once**, **For this chat**, **Always** | The person allowed it, for this call, for the chat, or always (**Approved** from an app that does not say which) |
+| **Declined**, **Expired** | The person said no, or did not answer in time |
+| **Blocked** | A rule refused the call |
+| **Grant**, **Bypass** | A grant or a Bypass session covered it, without a question |
+| **Without asking** | The server ran it without a question: the chat's tool mode allowed it |
+| **Ran** | The device reported running it; a question it asked first is its own row |
+
+Each row shows the time, the person, the agent and the version in effect then, the tool, the device, the turn, the
+model, and whether the row is the server's record or the device's report. Search by person, agent, device,
+workspace and time (at most 31 days; the last day by default). A workspace is a document, a folder or a site: the
+search finds the calls a grant covered there. **Calls** opens a grant's calls with their places, arguments and
+results, as far as the grant kept them. **Export (CloudEvents)** downloads the same rows as
+[CloudEvents](https://cloudevents.io/) in JSON Lines, one event per line, for a SIEM to read in; nothing is sent
+anywhere by itself.
+
+Only people with the role `approvals_auditor` can open the actions and the export. Every search, export and refused
+attempt is recorded in the audit log.
+
+!!! note "Works council (Germany)"
+    The actions are records per person, so using them needs an agreement with the works council (BetrVG §87(1)
+    no. 6). They are kept for analysing incidents, not for judging performance.
+
 ### Decisions
 
 ![Agents → Governance on the Decisions tab: filters for Stage, Outcome and Agent, and three tool decisions, Approval required, Expired and Approved, each with what the user was told](../images/administer/governance-decisions-top.png)
@@ -235,6 +326,52 @@ person picks again; the limits are kept, and apply again once the licence is val
 **Expired**), what the person was told, the user, the agent and the request. The refused text itself is never
 stored: only a keyed fingerprint, so the same text refused twice shows the same value, and nobody can read it
 back.
+
+### Running grants {#running-grants}
+
+**Agents → Governance → Active grants** lists the grants that are running. A grant is what a person gives one agent on one of their devices, for a while: either one tool (**For a time**), or reading and writing in named places (**Working alongside**), so that what would otherwise ask runs without asking. It never covers destructive or unclassified tools, and never what an **Ask first** rule or a tool marked **Always ask** covers. Each row shows the person, the agent, what it covers, the time left and the number of calls used. **Revoke** ends one from the agent's next call; a call already running finishes. People can end their own in the agent's **Settings → Approvals**. A grant also ends at its time, and when the agent gets a new version.
+
+### Bypass {#bypass}
+
+**Bypass** is a fifth tool mode above **Auto**, for long repetitive work a person trusts: in one conversation, destructive and unclassified tools run without asking, for a chosen time. It is off by default. People switch it on in the agent's app, see [Tools in the chat](../use/tools.md#bypass).
+
+**Allow it**
+
+1. Start **Root Mode**, which changing these settings needs.
+2. Open **Settings → Approvals** and turn on **Allow Bypass** (`approvals.bypass_allowed`). Turning it on needs Root Mode; turning it off does not. Each change is in the audit trail with its old and new value and whether Root Mode was on.
+3. In the agent's version, set **Approval levels → At most** to **Bypass** (see [Tools and approvals](agents.md#tools-and-approvals)). Such a version can be published only while Bypass is allowed.
+
+The **Starts in** level can never be Bypass, so no conversation starts in it. A [tool mode limit](#tool-mode-limits) below Bypass (<span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span>) removes the choice.
+
+**Settings → Approvals** also holds:
+
+| Setting | Default | What it does |
+|---|---|---|
+| **Longest grant (minutes)** (`approvals.longest_grant_minutes`) | 120 (15 to 720) | The longest any grant may last: for a time, for a stretch of work, or Bypass. An agent's own longest grant may only be shorter. |
+| **Keep Bypass records (days)** (`approvals.bypass_retention_days`) | 365 (90 to 1095) | Bypass sessions and their calls are deleted this long after they ended. |
+| **Result summary (characters)** (`approvals.result_summary_chars`) | 500 (0 to 2000) | Where a grant records results, how much of each covered call's result is kept after personal data is masked. 0 keeps only whether it worked and an error's text. An error always keeps its first 500 characters. |
+
+**The second sign-in.** To switch Bypass on, a person signs in again in the browser. This cannot be switched off. **Active grants** (and, for holders of `approvals_auditor`, a session's calls) show how and when the person signed in again: password, OpenID Connect, SAML or directory, with the provider's name. Check this with your sign-in provider before you allow Bypass:
+
+- An OpenID Connect provider is asked with `prompt=login` and `max_age=0` and must answer with `auth_time`.
+- A SAML provider is asked with `ForceAuthn`, and its assertion's `AuthnInstant` must be later than the request.
+- A provider that answers from an older session is refused: "The sign-in provider did not confirm a fresh sign-in".
+- A directory (LDAP) asks for the password again.
+
+Apps that cannot do the second sign-in (older SDK versions) are not offered Bypass.
+
+**What Bypass does not skip.** Hidden and refused tools stay so. **Deny** rules, **Ask first** rules and tools the agent's author marked **Always ask** still apply. Tools that act on machines or the physical world are not recognised on their own yet: mark them **Always ask** or give them an **Ask first** rule.
+
+**What is recorded.** Every call that runs under Bypass is recorded on the server: the tool, the time and its arguments after personal data is masked, reads and writes alike. At the end of each turn the person's device reports the calls it ran, and the server compares; any difference is flagged. Bypass itself is recorded before it takes effect, and without the server's confirmation there is no Bypass.
+
+**Watch and stop it.** **Agents → Governance → Active grants** lists running Bypass sessions, with any differences, and **Revoke** ends one (see [Running grants](#running-grants)).
+
+**Switch it off.** Turning **Allow Bypass** off makes Bypass act as **Auto** at once (within half a minute on every server worker) and ends running Bypass sessions, recorded as ended by the switch.
+
+**Who may read what ran.** Only people with the role `approvals_auditor`. Nobody has it at install, and being an administrator is not enough. Every read and every refused attempt is in the audit trail. The console's list shows the tool, the time, which side ran it (device or server), whether the device reported it, differences, and, as far as the grant kept them, the place, the arguments and the result. They stay encrypted on the server and are decrypted only for the read. With Enterprise, [Agent actions](#agent-actions) searches them across sessions.
+
+!!! note "Works council (Germany)"
+    Records per person need an agreement with the works council (BetrVG §87(1) no. 6). The records are for analysing incidents, not for judging performance.
 
 ## What people see when something is stopped
 
@@ -260,6 +397,7 @@ Applications using the API get the same outcomes as errors they can handle; the 
 | The prompt | | Content policies on the prompt <span class="fs-planned">Planned</span> |
 | The answer | | Content policies on the answer <span class="fs-planned">Planned</span> |
 | Tools | Tool rules, tool classes, tool modes | Tool mode limits for everyone, a team, an agent or a person; content policies on tool arguments <span class="fs-planned">Planned</span> |
-| The record | Decisions, without the text | An auditor's view with policy names, and exports <span class="fs-planned">Planned</span> |
+| Grants | Grants for a time, working alongside, Bypass; the installation's longest grant | Approval limits for everyone, a team, an agent or a person; whom Bypass is for; alerts by mail |
+| The record | Decisions, without the text; the calls of a grant for auditors | Agent actions for auditors, with an export as CloudEvents; policy names <span class="fs-planned">Planned</span> |
 
 Content policies will refuse a prompt, an answer or a tool call by what it says.

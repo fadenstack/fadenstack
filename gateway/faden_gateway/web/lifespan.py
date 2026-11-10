@@ -210,11 +210,13 @@ def _setup_gateway_observability(app: FastAPI) -> None:
 def _setup_tenant_restrictions(app: FastAPI) -> None:
     """Restrictions an extension keeps on the tenant: while nothing enforces one, core fails closed.
 
-    For tool mode ceilings: a ceiling of ``read_only`` on every chat (after the plugin's own ceilings).
+    For tool mode ceilings: a ceiling of ``read_only`` on every chat (after the plugin's own ceilings). For
+    grant limits: a limit that makes no grant (after the plugin's own limits).
     """
     app.state.tenant_restrictions = tenant_restrictions.from_settings(settings, extension_registry)
     if app.state.tenant_restrictions is not None:
         extension_registry.tool_mode_ceilings.append(app.state.tenant_restrictions.tool_mode_ceiling)
+        extension_registry.grant_limits.append(app.state.tenant_restrictions.grant_limit)
 
 
 def _setup_service_registry(app: FastAPI) -> None:

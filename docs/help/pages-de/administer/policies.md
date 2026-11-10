@@ -194,16 +194,30 @@ Die Erkennungsrate ist der Anteil der Prüfungen mit einem Fund, nicht der Antei
 
 2. Geben Sie unter **Name** eine Bezeichnung (für Sie) und unter **Tool-Muster** einen Tool-Namen oder ein
    Muster mit `*` ein, z. B. `mcp.github.*`, `knowledge_search` oder `*`.
-3. Wählen Sie die **Aktion**: **Sperren**, **Erst nachfragen** (der Benutzer gibt jeden Aufruf frei) oder **Erlauben**.
+3. Wählen Sie die **Aktion**: **Sperren** oder **Erst nachfragen** (der Benutzer gibt jeden Aufruf frei).
    Eine Regel gilt auch für die Tools, die die App eines Agenten selbst ausführt, etwa die Tools des Browser- und
    der Office-Agenten: Die App fragt jedes Mal, egal was der Benutzer vorher erlaubt hat, und einer App, die nicht
    fragen kann, wird das Tool nicht angeboten.
 4. Schreiben Sie die **Nachricht an den Nutzer**: Das wird Benutzern mitgeteilt, wenn die Regel greift.
-5. Legen Sie die **Priorität** fest. Niedrigere Werte werden zuerst geprüft, und die erste passende Regel
-   entscheidet. So kann eine Regel mit einer niedrigeren Zahl eine Ausnahme von einer allgemeineren Regel bilden.
+5. Legen Sie die **Priorität** fest. Sie ordnet Regeln mit derselben Aktion: Passen mehrere davon, liefert die mit
+   der niedrigsten Zahl die Nachricht.
 6. Speichern Sie die Regel. Regeln greifen sofort.
 
 Ohne Regeln laufen Tools so, wie es der Tool-Modus vorgibt.
+
+### Wenn mehrere Regeln passen {#when-several-rules-match}
+
+**Sperren** gewinnt vor **Erst nachfragen**, unabhängig von der Priorität. Um einige Tools von einer Regel
+**Sperren** auszunehmen, fassen Sie deren Muster enger: Sperren Sie `mcp.github.delete_*` statt `mcp.github.*`.
+Soll ein Tool ohne Nachfrage laufen, geben Sie ihm eine Tool-Klasse (siehe
+[Tool-Klassen und Tool-Modi](#tool-classes-and-tool-modes)).
+
+### Regeln „Erlauben“ aus früheren Versionen {#allow-rules}
+
+In früheren Versionen ließ eine Regel **Erlauben**, die vor einer Regel **Sperren** oder **Erst nachfragen** stand
+(mit einer niedrigeren Zahl als Priorität), das Tool durch. Ab dieser Version gewinnt Sperren oder Erst nachfragen
+immer, und Erlauben ändert nichts. Damit angelegte Regeln stehen in der Liste als **Ohne Wirkung**: Ändern Sie sie
+auf **Sperren** oder **Erst nachfragen**, oder löschen Sie sie.
 
 ### Tool-Klassen und Tool-Modi {#tool-classes-and-tool-modes}
 
@@ -224,8 +238,8 @@ Benutzer wählen pro Chat einen Tool-Modus, und die Klasse entscheidet, was läu
 | **Fragen** (damit beginnt jeder Chat) | läuft | fragt nach | fragt nach | fragt nach |
 | **Automatisch** | läuft | läuft | fragt nach | fragt nach |
 
-Kein Modus führt ein zerstörendes oder nicht eingestuftes Tool aus, ohne nachzufragen. Damit ein Tool in
-**Automatisch** läuft, stufen Sie es als **lesen** oder **schreiben** ein.
+Kein Modus bis **Automatisch** führt ein zerstörendes oder nicht eingestuftes Tool aus, ohne nachzufragen. Damit ein Tool in
+**Automatisch** läuft, stufen Sie es als **lesen** oder **schreiben** ein. Ein fünfter Modus, [Bypass](#bypass), ist aus, solange Sie ihn nicht erlauben.
 Die eigenen Tools von Fadenstack (die Suche in der Wissensdatenbank, die Uhrzeit, die Tool-Suche) sind lesende Tools.
 
 ### Grenzen für den Tool-Modus {#tool-mode-limits}
@@ -245,6 +259,96 @@ lesend, bis die Lizenz zurück ist; ein Hinweis für Administratoren sagt das. *
 jedem Chat wieder den Modus, den jede Person wählt; die Grenzen bleiben gespeichert und gelten wieder, sobald die
 Lizenz gültig ist.
 
+### Freigabe-Grenzen {#approval-limits}
+
+<span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span>
+
+Mit Enterprise legt **Agenten → Governance → Freigabe-Grenzen** für **Alle**, **Ein Team**, **Einen Agenten**
+oder **Eine Person** fest, wie lange eine [Freigabe auf Zeit](#running-grants) dauern darf und was der Server von
+den Aufrufen festhält, die sie abdeckt. Wählen Sie unter **Für**, für wen, wählen Sie das Team, den Agenten oder
+die Person, geben Sie eine **Längste Freigabe (Minuten)** (15 bis 720), eine **Nachweisstufe** oder beides an, und
+wählen Sie **Grenze setzen**. Für eine Freigabe können mehrere Grenzen gelten: Die kürzeste längste Freigabe und
+die Stufe, die am meisten festhält, gelten. Die eigene längste Freigabe des Agenten und **Longest grant (minutes)**
+unter **Einstellungen → Freigaben** gelten weiter; die kürzeste von allen zählt.
+
+| Nachweisstufe | Was der Server von jedem abgedeckten Aufruf festhält |
+|---|---|
+| **Entscheidungen** | Das Tool, die Zeit, welche Seite es ausführte und welche Freigabe es abdeckte |
+| **Aufrufe** | Dazu seinen Ort und seine Argumente, nachdem personenbezogene Daten maskiert wurden |
+| **Ergebnisse** | Dazu, ob er gelang: den Fehler oder die ersten 500 Zeichen seines Ergebnisses, nachdem personenbezogene Daten maskiert wurden |
+
+Ohne Grenze halten Freigaben für eine Zeit **Entscheidungen** fest, gemeinsames Arbeiten und Bypass **Aufrufe**.
+Eine Stufe, die Sie setzen, ersetzt das, auch für Bypass. Orte, Argumente und Ergebnisse liegen verschlüsselt auf
+dem Server.
+
+Eine Freigabe erhält ihre längste Dauer und ihre Stufe, wenn sie entsteht. Eine **kürzere** Grenze wirkt sofort:
+Laufende Freigaben, die sie abdeckt und die länger dauern würden, enden bei ihrem Beginn plus der neuen Grenze, und
+jede solche Änderung wird neben der Freigabe festgehalten. Eine längere Grenze, eine entfernte Grenze oder eine
+geänderte Stufe lässt laufende Freigaben, wie sie sind.
+
+**Bypass für.** Unter den Grenzen nennt **Bypass für**, für wen Bypass gilt, auf zwei Seiten, jede für sich:
+Personen (Personen und Teams) und Agenten. Sobald eine Seite jemanden nennt, dürfen nur die auf ihr Genannten Bypass
+nutzen: Eine Person muss genannt sein oder zu einem genannten Team gehören, und sind auch Agenten genannt, muss der
+Agent des Chats einer von ihnen sein. Wen die Liste nicht nennt, erhält höchstens **Automatisch**. Die Liste
+schränkt nur ein: Die Installation muss [Bypass](#bypass) weiterhin erlauben, und die höchste Stufe des Agenten muss
+**Bypass** sein.
+
+- **Eine Seite bleibt eingeschränkt, wenn ihre Einträge gehen**, ob hier entfernt oder mit ihrem Team, ihrer
+  Person oder ihrem Agenten gelöscht. Eine Seite, auf der niemand mehr steht, nennt niemanden, Bypass gilt dann
+  auf ihr für niemanden, bis Sie **Bypass für jede Person** (oder **Bypass für jeden Agenten**) wählen: Das hebt
+  die Einschränkung der Seite auf und nimmt ihre Einträge von der Liste.
+- **Eine engere Liste beendet laufende Bypass-Sitzungen** der Chats, die sie nicht mehr nennt, sofort, und sagt,
+  wie viele: der erste Eintrag einer Seite, ein entfernter Eintrag, eine eingeschränkte Seite. Eine weitere Liste
+  beendet nichts.
+
+Jede Änderung wird im Audit-Protokoll festgehalten. Ohne gültige Enterprise-Lizenz lassen sich die Grenzen und die
+Liste nicht anwenden, daher entsteht keine Freigabe, solange es welche gibt: Jeder Aufruf fragt nach. Ein Hinweis
+für Administratoren sagt das, und **Aufheben** darin erlaubt wieder Freigaben innerhalb der Grenzen von Core.
+
+**Warnungen per E-Mail.** Ist [E-Mail](mail.md) eingerichtet, erhalten Administratoren und die Adressen unter
+deren **Warnungen** eine E-Mail:
+
+- einmal am Tag, als eine Sammelmail, für jedes Einschalten seit der letzten: wer, mit welchem Agenten und welcher
+  Version, auf welchem Gerät, von wann bis wann, wie und wann die Person sich erneut angemeldet hat, und den Grund,
+  den sie angegeben hat, falls sie einen angegeben hat. Sie geht um 07:00 in der Zeitzone der Installation hinaus
+  (die unter den Nutzungs-Einstellungen gesetzte; UTC, wenn nichts gesetzt ist). Ein Tag ohne Einschalten sendet
+  keine;
+- wenn sich die Meldung des Geräts einer Bypass-Sitzung von dem unterscheidet, was der Server festgehalten hat:
+  sofort, einmal je Sitzung.
+
+### Agentenaktionen {#agent-actions}
+
+<span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span>
+
+**Agenten → Governance → Agentenaktionen** zeigt, was Agenten getan haben und wie jeder Aufruf erlaubt wurde, die
+neuesten zuerst:
+
+| Zustand | Bedeutung |
+|---|---|
+| **Gefragt** | Der Server hat die Person gefragt, eine Antwort ist nicht festgehalten |
+| **Einmal**, **Für diesen Chat**, **Immer** | Die Person hat es erlaubt, für diesen Aufruf, für den Chat oder immer (**Freigegeben** von einer Anwendung, die nicht sagt, wofür) |
+| **Abgelehnt**, **Abgelaufen** | Die Person hat abgelehnt oder nicht rechtzeitig geantwortet |
+| **Gesperrt** | Eine Regel hat den Aufruf abgelehnt |
+| **Freigabe**, **Bypass** | Eine Freigabe auf Zeit oder eine Bypass-Sitzung deckte ihn ab, ohne Rückfrage |
+| **Ohne Rückfrage** | Der Server führte ihn ohne Rückfrage aus: Der Tool-Modus des Chats erlaubte es |
+| **Ausgeführt** | Das Gerät hat gemeldet, dass es ihn ausgeführt hat; eine Rückfrage davor ist eine eigene Zeile |
+
+Jede Zeile zeigt die Zeit, die Person, den Agenten und die damals geltende Version, das Tool, das Gerät, die Runde,
+das Modell und ob die Zeile die Aufzeichnung des Servers oder die Meldung des Geräts ist. Suchen Sie nach Person,
+Agent, Gerät, Arbeitsbereich und Zeit (höchstens 31 Tage; standardmäßig der letzte Tag). Ein Arbeitsbereich ist
+ein Dokument, ein Ordner oder eine Website: Die Suche findet die Aufrufe, die eine Freigabe dort abdeckte.
+**Aufrufe** öffnet die Aufrufe einer Freigabe mit ihren Orten, Argumenten und Ergebnissen, soweit die Freigabe sie
+festhielt. **Exportieren (CloudEvents)** lädt dieselben Zeilen als [CloudEvents](https://cloudevents.io/) im
+Format JSON Lines herunter, ein Ereignis je Zeile, zum Einlesen in ein SIEM; von selbst wird nichts irgendwohin
+gesendet.
+
+Nur Personen mit der Rolle `approvals_auditor` können die Aktionen und den Export öffnen. Jede Suche, jeder Export
+und jeder abgelehnte Versuch steht im Audit-Protokoll.
+
+!!! note "Betriebsrat (Deutschland)"
+    Die Aktionen sind Aufzeichnungen je Person, ihre Nutzung braucht daher eine Vereinbarung mit dem Betriebsrat
+    (BetrVG §87 Abs. 1 Nr. 6). Sie dienen der Analyse von Vorfällen, nicht der Leistungsbeurteilung.
+
 ### Entscheidungen {#decisions}
 
 ![Agenten → Governance auf dem Reiter „Entscheidungen“: Filter für Phase, Ergebnis und Agent sowie drei Tool-Entscheidungen, Freigabe nötig, Abgelaufen und Freigegeben, jeweils mit dem, was der Nutzer erfuhr](../images/administer/governance-decisions-top.png)
@@ -254,6 +358,52 @@ Lizenz gültig ist.
 **Abgelehnt**, **Abgelaufen**), was dem Benutzer mitgeteilt wurde, den Benutzer, den Agenten und die Anfrage. Der
 abgelehnte Text selbst wird nie gespeichert, nur ein mit einem Schlüssel gebildeter Fingerabdruck: Derselbe Text,
 zweimal abgelehnt, zeigt denselben Wert, und niemand kann den Text daraus zurückgewinnen.
+
+### Laufende Freigaben auf Zeit {#running-grants}
+
+**Agenten → Governance → Freigaben auf Zeit** listet die Freigaben auf Zeit auf, die gerade laufen. Eine solche Freigabe erteilt ein Benutzer einem Agenten auf einem seiner Geräte für eine begrenzte Zeit: entweder für ein einzelnes Tool (**Für eine Zeit**) oder zum Lesen und Schreiben an benannten Orten (**Gemeinsam arbeiten**), sodass läuft, was sonst nachfragen würde. Sie gilt nie für zerstörende oder nicht klassifizierte Tools und nie für das, was eine Regel **Erst nachfragen** oder ein als **Immer nachfragen** markiertes Tool abdeckt. Jede Zeile zeigt die Person, den Agenten, was die Freigabe abdeckt, die Restzeit und die Zahl der genutzten Aufrufe. **Widerrufen** beendet eine Freigabe ab dem nächsten Aufruf des Agenten; ein Aufruf, der bereits läuft, läuft noch zu Ende. Benutzer können ihre eigenen in den **Einstellungen → Freigaben** des Agenten beenden. Eine Freigabe endet außerdem mit ihrer Zeit und sobald der Agent eine neue Version erhält.
+
+### Bypass {#bypass}
+
+**Bypass** ist ein fünfter Tool-Modus über **Automatisch**, für lange, sich wiederholende Arbeit, der eine Person vertraut: In einer Unterhaltung laufen zerstörende und nicht eingestufte Tools für eine gewählte Zeit ohne Nachfrage. Es ist standardmäßig aus. Benutzer schalten es in der Anwendung des Agenten ein, siehe [Tools im Chat](../use/tools.md#bypass).
+
+**Erlauben**
+
+1. Starten Sie den **Root-Modus**, den das Ändern dieser Einstellungen braucht.
+2. Öffnen Sie **Einstellungen → Freigaben** und schalten Sie **Allow Bypass** ein (`approvals.bypass_allowed`). Das Einschalten braucht den Root-Modus, das Ausschalten nicht. Jede Änderung steht im Audit-Protokoll mit altem und neuem Wert und der Angabe, ob der Root-Modus an war.
+3. Stellen Sie in der Version des Agenten unter **Freigabestufen → Höchstens** **Bypass** ein (siehe [Tools und Zustimmungen](agents.md#tools-and-approvals)). Eine solche Version lässt sich nur veröffentlichen, solange Bypass erlaubt ist.
+
+Die Stufe **Beginnt in** kann nie Bypass sein, daher beginnt keine Unterhaltung darin. Eine [Grenze für den Tool-Modus](#tool-mode-limits) unter Bypass (<span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span>) nimmt die Wahl weg.
+
+**Einstellungen → Freigaben** enthält außerdem:
+
+| Einstellung | Standard | Was sie bewirkt |
+|---|---|---|
+| **Longest grant (minutes)** (`approvals.longest_grant_minutes`) | 120 (15 bis 720) | Die längste Dauer jeder Freigabe: auf Zeit, für einen Arbeitsabschnitt oder Bypass. Die eigene längste Freigabe eines Agenten darf nur kürzer sein. |
+| **Keep Bypass records (days)** (`approvals.bypass_retention_days`) | 365 (90 bis 1095) | Bypass-Sitzungen und ihre Aufrufe werden so lange nach ihrem Ende gelöscht. |
+| **Result summary (characters)** (`approvals.result_summary_chars`) | 500 (0 bis 2000) | Wo eine Freigabe Ergebnisse festhält, wie viel vom Ergebnis jedes abgedeckten Aufrufs bleibt, nachdem personenbezogene Daten maskiert wurden. 0 hält nur fest, ob er gelang, und den Text eines Fehlers. Ein Fehler behält immer seine ersten 500 Zeichen. |
+
+**Die erneute Anmeldung.** Um Bypass einzuschalten, meldet sich eine Person im Browser erneut an. Das lässt sich nicht abschalten. **Freigaben auf Zeit** (und, für Inhaber von `approvals_auditor`, die Aufrufe einer Sitzung) zeigen, wie und wann die Person sich erneut angemeldet hat: Passwort, OpenID Connect, SAML oder Verzeichnis, mit dem Namen des Anbieters. Prüfen Sie das bei Ihrem Anmelde-Anbieter, bevor Sie Bypass erlauben:
+
+- Ein OpenID-Connect-Anbieter wird mit `prompt=login` und `max_age=0` gefragt und muss mit `auth_time` antworten.
+- Ein SAML-Anbieter wird mit `ForceAuthn` gefragt, und das `AuthnInstant` seiner Assertion muss später als die Anfrage liegen.
+- Ein Anbieter, der aus einer älteren Sitzung antwortet, wird abgelehnt: „Der Anmelde-Anbieter hat keine frische Anmeldung bestätigt“.
+- Ein Verzeichnis (LDAP) fragt erneut nach dem Passwort.
+
+Anwendungen, die die erneute Anmeldung nicht können (ältere SDK-Versionen), erhalten Bypass nicht angeboten.
+
+**Was Bypass nicht überspringt.** Ausgeblendete und abgelehnte Tools bleiben es. Regeln **Deny**, Regeln **Erst nachfragen** und Tools, die der Autor des Agenten mit **Immer nachfragen** markiert hat, gelten weiter. Tools, die an Maschinen oder in der physischen Welt handeln, werden noch nicht von selbst erkannt: Markieren Sie sie mit **Immer nachfragen** oder legen Sie eine Regel **Erst nachfragen** an.
+
+**Was festgehalten wird.** Jeder Aufruf unter Bypass wird auf dem Server festgehalten: das Tool, die Zeit und seine Argumente nach dem Maskieren personenbezogener Daten, lesend wie schreibend. Am Ende jeder Runde meldet das Gerät der Person die Aufrufe, die es ausgeführt hat, und der Server vergleicht; jeder Unterschied wird gekennzeichnet. Bypass selbst wird festgehalten, bevor es wirkt, und ohne Bestätigung des Servers gibt es kein Bypass.
+
+**Beobachten und beenden.** **Agenten → Governance → Freigaben auf Zeit** listet laufende Bypass-Sitzungen mit etwaigen Unterschieden, und **Widerrufen** beendet eine (siehe [Laufende Freigaben auf Zeit](#running-grants)).
+
+**Ausschalten.** Schalten Sie **Allow Bypass** aus, wirkt Bypass sofort wie **Automatisch** (innerhalb einer halben Minute auf jedem Server-Worker), und laufende Bypass-Sitzungen enden, festgehalten als durch den Schalter beendet.
+
+**Wer lesen darf, was lief.** Nur Personen mit der Rolle `approvals_auditor`. Bei der Installation hat sie niemand, und Administrator zu sein genügt nicht. Jedes Lesen und jeder abgelehnte Versuch steht im Audit-Protokoll. Die Liste der Konsole zeigt das Tool, die Zeit, welche Seite es ausführte (Gerät oder Server), ob das Gerät es gemeldet hat, Unterschiede und, soweit die Freigabe sie festhielt, den Ort, die Argumente und das Ergebnis. Sie bleiben auf dem Server verschlüsselt und werden nur für das Lesen entschlüsselt. Mit Enterprise durchsucht [Agentenaktionen](#agent-actions) sie über Sitzungen hinweg.
+
+!!! note "Betriebsrat (Deutschland)"
+    Aufzeichnungen je Person brauchen eine Vereinbarung mit dem Betriebsrat (BetrVG §87 Abs. 1 Nr. 6). Die Aufzeichnungen dienen der Analyse von Vorfällen, nicht der Leistungsbeurteilung.
 
 ## Was Benutzer sehen, wenn etwas gestoppt wird {#what-people-see-when-something-is-stopped}
 
@@ -279,6 +429,7 @@ Einzelheiten stehen auf der Website [Developers](https://developers.fadenstack.c
 | Die Eingabe | | Inhaltsrichtlinien für die Eingabe <span class="fs-planned">Geplant</span> |
 | Die Antwort | | Inhaltsrichtlinien für die Antwort <span class="fs-planned">Geplant</span> |
 | Tools | Tool-Regeln, Tool-Klassen, Tool-Modi | Grenzen für den Tool-Modus für alle, ein Team, einen Agenten oder eine Person; Inhaltsrichtlinien für Tool-Argumente <span class="fs-planned">Geplant</span> |
-| Die Aufzeichnung | Entscheidungen, ohne den Text | Eine Ansicht für Prüfer mit den Namen der Richtlinien sowie Exporte <span class="fs-planned">Geplant</span> |
+| Freigaben | Freigaben auf Zeit, gemeinsames Arbeiten, Bypass; die längste Freigabe der Installation | Freigabe-Grenzen für alle, ein Team, einen Agenten oder eine Person; für wen Bypass gilt; Warnungen per E-Mail |
+| Die Aufzeichnung | Entscheidungen, ohne den Text; die Aufrufe einer Freigabe für Prüfer | Agentenaktionen für Prüfer, mit einem Export als CloudEvents; die Namen der Richtlinien <span class="fs-planned">Geplant</span> |
 
 Inhaltsrichtlinien werden eine Eingabe, eine Antwort oder einen Tool-Aufruf anhand ihres Inhalts ablehnen.

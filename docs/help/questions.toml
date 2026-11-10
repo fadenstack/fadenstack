@@ -29,6 +29,7 @@
 ["use/tools.md"]
 "How do I switch tools on in the chat?" = "switch-tools-on"
 "Why does a tool ask me for approval?" = "approve-a-tool"
+"Can I switch approvals off for a long task?" = "bypass"
 "What are the tool modes?" = "choose-the-tool-mode"
 "What data do tools receive?" = "what-tools-receive"
 
@@ -175,6 +176,9 @@
 "How do I switch on personal data (PII) protection?" = "personal-data"
 "How do I change the privacy policy?" = "change-the-policy"
 "How do I block or allow tools?" = "tool-rules"
+"Who can see what ran under Bypass?" = "bypass"
+"How do I allow or switch off Bypass?" = "bypass"
+"Why does Bypass ask me to sign in again?" = "bypass"
 "What do people see when a request is stopped?" = "what-people-see-when-something-is-stopped"
 
 ["administer/content-marking.md"]

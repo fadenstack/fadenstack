@@ -25,11 +25,26 @@ def _default_workers() -> int:
     workers: in every run of 10-15 bursts of 8 requests, some bursts lost 2-7
     requests outright (no response in 60 s); one worker lost none. An async
     service loses nothing by running one worker in dev, and Linux deployments,
-    where sharing a socket works, keep the CPU-based default.
+    where sharing a socket works, keep the CPU-based default, up to eight: with
+    50 people each calling back to back, a covered tool call answers in p99
+    26-29 ms over eight workers and 94 ms over four (sdk/40 "Load from Linux",
+    owner 2026-11-07).
     """
     if sys.platform == "win32":
         return 1
-    return min(_CPU_COUNT, 4)
+    return min(_CPU_COUNT, 8)
+
+
+def _default_overflow(workers: int) -> int:
+    """The connections each worker opens on demand beyond its 5 kept ones.
+
+    Ten up to four workers (SQLAlchemy's default), three beyond: eight workers
+    then open at most 8 x (5 + 3) = 64, about what four opened before (60), so
+    the pools still fit the 100 a Postgres accepts by default beside the other
+    services. Three is measured: 8 workers of 5 + 3 answer in p99 25-29 ms;
+    of 3 + 5, whose extra connections open and close on every burst, 65-85 ms.
+    """
+    return 10 if workers <= 4 else 3
 
 TEMP_DIR = Path(gettempdir())
 
@@ -76,9 +91,10 @@ class Settings(BaseSettings):
     # its own pool, and all of them share one Postgres (max_connections 100
     # by default). Sized from the CPU count, one gateway worker on a
     # 64-thread host could open 384 connections and locked every other
-    # service out (2026-09-25). 5 kept + 10 on demand is SQLAlchemy's default.
+    # service out (2026-09-25). 5 kept + 10 on demand is SQLAlchemy's default;
+    # beyond four workers each opens 3 on demand (``_default_overflow``).
     db_pool_size: int = 5
-    db_max_overflow: int = 10
+    db_max_overflow: int = _default_overflow(_default_workers())
     db_url_override: str | None = None
     # PostgreSQL TLS — disable | prefer | require | verify-ca | verify-full
     db_ssl_mode: str = "disable"
@@ -214,6 +230,10 @@ class Settings(BaseSettings):
     #: How long a tool call that needs approval waits for the user (streamed
     #: answers to clients that asked for events); then it is refused.
     governance_approval_timeout_s: int = 300
+    #: Refuse an approval that names no scope for a call that takes ``once`` only (destructive, unclassified,
+    #: or asked for by a rule). One that names a scope is always checked; this is for clients that send none,
+    #: and stays off until every agent in use sends scopes.
+    approvals_require_answer_scope: bool = False
 
     # Optional module: Skills registry
     skills_service_url: str | None = None

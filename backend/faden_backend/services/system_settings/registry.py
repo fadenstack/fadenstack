@@ -39,6 +39,13 @@ class SettingDefinition:
     max_value: int | None = None
     #: A further check of a value of the right type; raises ``ValueError`` when it is not one.
     check: Callable[[object], None] | None = None
+    #: For a ``protected`` setting: the values that only narrow what it allows, which need no Root Mode (an
+    #: administrator can always turn a risk off; turning it on keeps the protection).
+    narrowing_values: tuple[object, ...] = ()
+
+    def needs_root_mode(self, value: object) -> bool:
+        """Whether setting *value* (validated) needs Root Mode: a protected setting, unless *value* only narrows."""
+        return self.protected and value not in self.narrowing_values
 
 
 def check_time_zone(value: object) -> None:
@@ -147,6 +154,64 @@ USAGE_SETTINGS: list[SettingDefinition] = [
         "The address of your privacy notice on usage metering (https). A person's own usage page links to "
         "it (M14). Empty: no link.",
         "", check=check_https_url,
+    ),
+]
+
+
+def _approvals(
+    key: str,
+    type_: SettingType,
+    group: str,
+    label: str,
+    description: str,
+    default: object,
+    **extra: object,
+) -> SettingDefinition:
+    """An ``approvals.*`` setting: read live by the backend and by each gateway worker every 30 s."""
+    return SettingDefinition(
+        key=key,
+        type=type_,
+        category="approvals",
+        group=group,
+        label=label,
+        description=description,
+        is_secret=False,
+        default=default,
+        apply_scope=SystemApplyScope.LIVE_RELOAD,
+        service_targets=(),
+        **extra,  # type: ignore[arg-type]
+    )
+
+
+#: The installation's limits on approvals (sdk/38 §5; sdk/09 L-57, L-65; sdk/40 A3). Core has one tenant per
+#: installation, so these are the tenant's. The gateway reads them (``approval_settings.py``).
+APPROVAL_SETTINGS: list[SettingDefinition] = [
+    _approvals(
+        "approvals.bypass_allowed", "bool", "bypass", "Allow Bypass",
+        "Lets a person switch approvals off for one conversation with an agent whose highest level is "
+        "Bypass, after signing in again in the browser: destructive and unclassified tools then run without "
+        "asking, every call is recorded on the server, and rules and 'Ask first' still hold (sdk/09 L-57). "
+        "Off: nobody can choose Bypass, and running Bypass sessions end within half a minute.",
+        False, protected=True, narrowing_values=(False,),
+    ),
+    _approvals(
+        "approvals.longest_grant_minutes", "int", "grants", "Longest grant (minutes)",
+        "The longest an approval for a time, a stretch of work or Bypass may run; an agent's own may only be "
+        "shorter. 15 to 720 minutes.",
+        120, min_value=15, max_value=720,
+    ),
+    _approvals(
+        "approvals.bypass_retention_days", "int", "retention", "Keep Bypass records (days)",
+        "How long a Bypass session and every call recorded under it are kept after it ended, for incident "
+        "analysis (sdk/09 L-65). 90 to 1095 days.",
+        365, min_value=90, max_value=1095,
+    ),
+    _approvals(
+        "approvals.result_summary_chars", "int", "evidence", "Result summary (characters)",
+        "Where a grant records results, how much of each covered call's result is kept, after personal data "
+        "is masked (sdk/09 L-60). 0: whether it worked and an error's text only. 0 to 2000; an error keeps "
+        "its first 500 characters.",
+        500, min_value=0, max_value=2000,
     ),
 ]
 
@@ -851,6 +916,7 @@ SETTINGS_REGISTRY: list[SettingDefinition] = [
         service_targets=(),
     ),
     *USAGE_SETTINGS,
+    *APPROVAL_SETTINGS,
 ]
 
 

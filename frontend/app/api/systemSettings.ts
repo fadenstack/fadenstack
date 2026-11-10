@@ -13,6 +13,8 @@ export interface SystemSettingSchemaItem {
   service_targets: string[];
   protected: boolean;
   enum_values: string[];
+  /** Values a protected setting may be moved to without root mode; absent from older servers. */
+  narrowing_values?: unknown[];
 }
 
 export interface SystemSettingValueItem {

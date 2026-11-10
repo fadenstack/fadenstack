@@ -323,7 +323,9 @@ export default function ModulesTab({ onOpenMail }: ModulesTabProps = {}) {
 
   /** A setting's description, and for a protected one that changing it needs root mode. */
   function describe(item: SystemSettingSchemaItem): string {
-    return item.protected ? `${item.description} ${t("settings.protected_help")}`.trim() : item.description;
+    if (!item.protected) return item.description;
+    const note = (item.narrowing_values ?? []).length > 0 ? "settings.protected_narrowing_help" : "settings.protected_help";
+    return `${item.description} ${t(note)}`.trim();
   }
 
   async function saveSetting(

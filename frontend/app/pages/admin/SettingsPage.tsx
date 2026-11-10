@@ -37,12 +37,13 @@ import {
   type SystemSettingSchemaItem,
 } from "~/api/systemSettings";
 
-type SettingsTab = "general" | "modules" | "mail" | "usage" | "appearance";
+type SettingsTab = "general" | "approvals" | "modules" | "mail" | "usage" | "appearance";
 
 function getCurrentTab(
   _pathname: string,
   tabQuery: string | null,
 ): SettingsTab {
+  if (tabQuery === "approvals") return "approvals";
   if (tabQuery === "modules") return "modules";
   if (tabQuery === "mail") return "mail";
   if (tabQuery === "usage") return "usage";
@@ -90,9 +91,15 @@ function isMailerSettingKey(key: string): boolean {
   return key.startsWith("faden_mailer.");
 }
 
-/** A setting's description, and for a protected one that changing it needs root mode. */
-function describe(item: SystemSettingSchemaItem, rootModeNote: string): string {
-  return item.protected ? `${item.description} ${rootModeNote}`.trim() : item.description;
+/** A setting's description, and for a protected one that changing it needs root mode (turning it on only, if it has narrowing values). */
+function describe(item: SystemSettingSchemaItem, rootModeNote: string, narrowingNote: string): string {
+  if (!item.protected) return item.description;
+  return `${item.description} ${(item.narrowing_values ?? []).length > 0 ? narrowingNote : rootModeNote}`.trim();
+}
+
+/** The approval settings (Bypass, grants, how long records are kept) have their own tab, Settings → Approvals. */
+function isApprovalSettingKey(key: string): boolean {
+  return key.startsWith("approvals.");
 }
 
 /** The usage settings have their own tab (Usage and privacy), with their ranges and what they mean. */
@@ -184,6 +191,7 @@ export default function SettingsPage() {
         !isPiiSettingKey(item.key) &&
         !isMailerSettingKey(item.key) &&
         !isUsageSettingKey(item.key) &&
+        !isApprovalSettingKey(item.key) &&
         item.category.toLowerCase() !== "modules",
     );
     const items = q
@@ -200,6 +208,16 @@ export default function SettingsPage() {
     }
     return groups;
   }, [schema, search]);
+
+  // The Approvals tab: its settings by group, in the order the server lists them.
+  const approvalGroups = useMemo(() => {
+    const groups = new Map<string, SystemSettingSchemaItem[]>();
+    for (const item of schema.filter((s) => isApprovalSettingKey(s.key))) {
+      const key = `${item.category}::${item.group}`;
+      groups.set(key, [...(groups.get(key) ?? []), item]);
+    }
+    return groups;
+  }, [schema]);
 
   function selectTab(nextTab: SettingsTab) {
     setTab(nextTab);
@@ -279,6 +297,189 @@ export default function SettingsPage() {
     }
   }
 
+  /** One group of settings as a card; under General its heading names the category too ("Auth / JWT"). */
+  function settingsCard(groupKey: string, items: SystemSettingSchemaItem[], withCategory: boolean) {
+    const [category, group] = groupKey.split("::");
+    return (
+      <Paper key={groupKey} sx={{ p: 2 }}>
+        <Typography variant="subtitle1">
+          {withCategory && (
+            <>
+              {t(`settings.categories.${category}`, {
+                defaultValue: toTitleCase(category.replaceAll("_", " ")),
+              })}{" "}
+              /{" "}
+            </>
+          )}
+          {t(`settings.groups.${group}`, {
+            defaultValue: toTitleCase(group.replaceAll("_", " ")),
+          })}
+        </Typography>
+        <Divider sx={{ my: 1 }} />
+        <Stack spacing={1.5}>
+          {items.map((item) => (
+            <Box key={item.key}>
+              <Stack
+                direction={{ xs: "column", md: "row" }}
+                spacing={1}
+                alignItems={{ xs: "stretch", md: "center" }}
+              >
+                {item.type === "bool" ? (
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={
+                          values[item.key] === true ||
+                          values[item.key] === "true"
+                        }
+                        onChange={(event) =>
+                          setValues((prev) => ({
+                            ...prev,
+                            [item.key]: event.target.checked,
+                          }))
+                        }
+                      />
+                    }
+                    label={
+                      <Box>
+                        <Typography variant="body2">
+                          {item.label}
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                        >
+                          {describe(item, t("settings.protected_help"), t("settings.protected_narrowing_help"))}
+                        </Typography>
+                      </Box>
+                    }
+                    sx={{ flexGrow: 1 }}
+                  />
+                ) : item.type === "int" ? (
+                  <TextField
+                    size="small"
+                    fullWidth
+                    type="number"
+                    label={item.label}
+                    value={asInputValue(values[item.key])}
+                    onChange={(event) =>
+                      setLocalValue(
+                        item.key,
+                        event.target.value,
+                        item.type,
+                      )
+                    }
+                    helperText={describe(item, t("settings.protected_help"), t("settings.protected_narrowing_help"))}
+                  />
+                ) : item.type === "enum" ? (
+                  <TextField
+                    size="small"
+                    fullWidth
+                    select
+                    label={item.label}
+                    value={asInputValue(values[item.key])}
+                    onChange={(event) =>
+                      setLocalValue(
+                        item.key,
+                        event.target.value,
+                        item.type,
+                      )
+                    }
+                    helperText={describe(item, t("settings.protected_help"), t("settings.protected_narrowing_help"))}
+                  >
+                    {(item.enum_values ?? []).map((v) => (
+                      <MenuItem key={v} value={v}>
+                        {v}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                ) : (
+                  <TextField
+                    size="small"
+                    fullWidth
+                    type={
+                      item.type === "secret" ? "password" : "text"
+                    }
+                    label={item.label}
+                    value={asInputValue(values[item.key])}
+                    onChange={(event) =>
+                      setLocalValue(
+                        item.key,
+                        event.target.value,
+                        item.type,
+                      )
+                    }
+                    helperText={`${describe(item, t("settings.protected_help"), t("settings.protected_narrowing_help"))}${item.is_secret && secretMasked[item.key] ? ` ${t("settings.current_value", { value: secretMasked[item.key] })}` : ""}`}
+                  />
+                )}
+                <Chip
+                  size="small"
+                  color={
+                    item.apply_scope === "live_reload"
+                      ? "success"
+                      : item.apply_scope === "service_restart"
+                        ? "warning"
+                        : "error"
+                  }
+                  label={item.apply_scope}
+                  onClick={
+                    item.apply_scope === "service_restart" &&
+                    item.service_targets?.length
+                      ? () =>
+                          navigate(
+                            `/admin/containers?highlight=${encodeURIComponent(item.service_targets[0])}`,
+                          )
+                      : undefined
+                  }
+                  sx={
+                    item.apply_scope === "service_restart" &&
+                    item.service_targets?.length
+                      ? { cursor: "pointer" }
+                      : undefined
+                  }
+                />
+                {item.type === "secret" && (
+                  <>
+                    <Tooltip title={t("settings.generate_secret")}>
+                      <IconButton
+                        size="small"
+                        color="primary"
+                        onClick={() => generateSecretForKey(item.key)}
+                      >
+                        <AutoFixHighIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title={t("common.copy")}>
+                      <IconButton
+                        size="small"
+                        color="primary"
+                        onClick={() =>
+                          void copySecretForKey(item.key)
+                        }
+                      >
+                        <ContentCopyIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </>
+                )}
+                <Button
+                  variant="contained"
+                  size="small"
+                  disabled={busyKey === item.key}
+                  onClick={() => void saveKey(item)}
+                >
+                  {busyKey === item.key
+                    ? t("common.loading")
+                    : t("common.save")}
+                </Button>
+              </Stack>
+            </Box>
+          ))}
+        </Stack>
+      </Paper>
+    );
+  }
+
   return (
     <Box
       sx={{
@@ -299,6 +500,7 @@ export default function SettingsPage() {
           allowScrollButtonsMobile
         >
           <Tab label={t("settings.general.title")} value="general" />
+          <Tab label={t("settings.approvals.title")} value="approvals" />
           <Tab
             label={t("settings.modules.title", { defaultValue: "Modules" })}
             value="modules"
@@ -362,183 +564,14 @@ export default function SettingsPage() {
               </Typography>
             )}
 
-            {[...filtered.entries()].map(([groupKey, items]) => {
-              const [category, group] = groupKey.split("::");
-              return (
-                <Paper key={groupKey} sx={{ p: 2 }}>
-                  <Typography variant="subtitle1">
-                    {t(`settings.categories.${category}`, {
-                      defaultValue: toTitleCase(category.replaceAll("_", " ")),
-                    })}{" "}
-                    /{" "}
-                    {t(`settings.groups.${group}`, {
-                      defaultValue: toTitleCase(group.replaceAll("_", " ")),
-                    })}
-                  </Typography>
-                  <Divider sx={{ my: 1 }} />
-                  <Stack spacing={1.5}>
-                    {items.map((item) => (
-                      <Box key={item.key}>
-                        <Stack
-                          direction={{ xs: "column", md: "row" }}
-                          spacing={1}
-                          alignItems={{ xs: "stretch", md: "center" }}
-                        >
-                          {item.type === "bool" ? (
-                            <FormControlLabel
-                              control={
-                                <Switch
-                                  checked={
-                                    values[item.key] === true ||
-                                    values[item.key] === "true"
-                                  }
-                                  onChange={(event) =>
-                                    setValues((prev) => ({
-                                      ...prev,
-                                      [item.key]: event.target.checked,
-                                    }))
-                                  }
-                                />
-                              }
-                              label={
-                                <Box>
-                                  <Typography variant="body2">
-                                    {item.label}
-                                  </Typography>
-                                  <Typography
-                                    variant="caption"
-                                    color="text.secondary"
-                                  >
-                                    {describe(item, t("settings.protected_help"))}
-                                  </Typography>
-                                </Box>
-                              }
-                              sx={{ flexGrow: 1 }}
-                            />
-                          ) : item.type === "int" ? (
-                            <TextField
-                              size="small"
-                              fullWidth
-                              type="number"
-                              label={item.label}
-                              value={asInputValue(values[item.key])}
-                              onChange={(event) =>
-                                setLocalValue(
-                                  item.key,
-                                  event.target.value,
-                                  item.type,
-                                )
-                              }
-                              helperText={describe(item, t("settings.protected_help"))}
-                            />
-                          ) : item.type === "enum" ? (
-                            <TextField
-                              size="small"
-                              fullWidth
-                              select
-                              label={item.label}
-                              value={asInputValue(values[item.key])}
-                              onChange={(event) =>
-                                setLocalValue(
-                                  item.key,
-                                  event.target.value,
-                                  item.type,
-                                )
-                              }
-                              helperText={describe(item, t("settings.protected_help"))}
-                            >
-                              {(item.enum_values ?? []).map((v) => (
-                                <MenuItem key={v} value={v}>
-                                  {v}
-                                </MenuItem>
-                              ))}
-                            </TextField>
-                          ) : (
-                            <TextField
-                              size="small"
-                              fullWidth
-                              type={
-                                item.type === "secret" ? "password" : "text"
-                              }
-                              label={item.label}
-                              value={asInputValue(values[item.key])}
-                              onChange={(event) =>
-                                setLocalValue(
-                                  item.key,
-                                  event.target.value,
-                                  item.type,
-                                )
-                              }
-                              helperText={`${describe(item, t("settings.protected_help"))}${item.is_secret && secretMasked[item.key] ? ` ${t("settings.current_value", { value: secretMasked[item.key] })}` : ""}`}
-                            />
-                          )}
-                          <Chip
-                            size="small"
-                            color={
-                              item.apply_scope === "live_reload"
-                                ? "success"
-                                : item.apply_scope === "service_restart"
-                                  ? "warning"
-                                  : "error"
-                            }
-                            label={item.apply_scope}
-                            onClick={
-                              item.apply_scope === "service_restart" &&
-                              item.service_targets?.length
-                                ? () =>
-                                    navigate(
-                                      `/admin/containers?highlight=${encodeURIComponent(item.service_targets[0])}`,
-                                    )
-                                : undefined
-                            }
-                            sx={
-                              item.apply_scope === "service_restart" &&
-                              item.service_targets?.length
-                                ? { cursor: "pointer" }
-                                : undefined
-                            }
-                          />
-                          {item.type === "secret" && (
-                            <>
-                              <Tooltip title={t("settings.generate_secret")}>
-                                <IconButton
-                                  size="small"
-                                  color="primary"
-                                  onClick={() => generateSecretForKey(item.key)}
-                                >
-                                  <AutoFixHighIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                              <Tooltip title={t("common.copy")}>
-                                <IconButton
-                                  size="small"
-                                  color="primary"
-                                  onClick={() =>
-                                    void copySecretForKey(item.key)
-                                  }
-                                >
-                                  <ContentCopyIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            </>
-                          )}
-                          <Button
-                            variant="contained"
-                            size="small"
-                            disabled={busyKey === item.key}
-                            onClick={() => void saveKey(item)}
-                          >
-                            {busyKey === item.key
-                              ? t("common.loading")
-                              : t("common.save")}
-                          </Button>
-                        </Stack>
-                      </Box>
-                    ))}
-                  </Stack>
-                </Paper>
-              );
-            })}
+            {[...filtered.entries()].map(([groupKey, items]) => settingsCard(groupKey, items, true))}
+          </Stack>
+        )}
+
+        {shownTab === "approvals" && (
+          <Stack spacing={2}>
+            {loading && <CircularProgress size={20} />}
+            {[...approvalGroups.entries()].map(([groupKey, items]) => settingsCard(groupKey, items, false))}
           </Stack>
         )}
 

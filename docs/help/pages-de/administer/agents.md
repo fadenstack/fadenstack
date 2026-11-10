@@ -56,7 +56,7 @@ Die Seite des Agenten öffnet sich. Sein Status in der Liste ist **Entwurf**, **
 
 | Reiter | Was er enthält |
 |---|---|
-| **Definition** | Die Version, die Benutzer erhalten: **Anweisungen**, **Modell**, **Wissen** (Sammlungen, die er durchsuchen darf), **Server-Tools** (**Wie im Chat**, **Nur diese** oder **Keine**), **Lokale MCP-Server**, **Host-Tools** (die Tools der Anwendung und ihre Klassen), **Darstellung** (Begrüßung und vorgeschlagene Prompts) und **Datenschutz**. |
+| **Definition** | Die Version, die Benutzer erhalten: **Anweisungen**, **Modell**, **Wissen** (Sammlungen, die er durchsuchen darf), **Server-Tools** (**Wie im Chat**, **Nur diese** oder **Keine**), **Lokale MCP-Server**, **Host-Tools** (die Tools der Anwendung und ihre Klassen), **Freigabestufen** (der Tool-Modus, in dem Unterhaltungen beginnen, und der höchste), **Darstellung** (Begrüßung und vorgeschlagene Prompts) und **Datenschutz**. |
 | **Versionen** | Jede Version. Mit **Veröffentlichen** eine Version veröffentlichen, mit **Zurücksetzen** zu einer früheren zurückkehren, unter **Änderungen** die Unterschiede sehen. |
 | **Zugriff** | **Wer ihn nutzen darf**, die Liste **Ausgeschlossene Personen** <span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span> und seine **Betreuer** (mit Enterprise: **Betreuer und Prüfer** <span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span>). **Zugriff prüfen** zeigt, ob eine Person den Agenten nutzen darf, und warum. |
 | **Aktivität** | Nutzung über einen Zeitraum (Anfragen, Fehler, Tokens, Benutzer, Unterhaltungen: nur Zahlen, nie Inhalte), nur, wenn mindestens fünf Personen den Agenten im Zeitraum genutzt haben; der Eigentümer eines persönlichen Agenten sieht dessen Zahlen trotzdem. Was die Anwendungen gemeldet haben (ausgeführte Tools, Zustimmungen) und **Angemeldete Geräte**. Der Reiter nennt niemanden außer Ihnen selbst. |
@@ -192,11 +192,32 @@ Jedes Tool, das eine Anwendung mitbringt, hat eine Klasse, die die Version des A
 | **Zerstörend** | Fragt immer nach. |
 | **Nicht eingestuft** | Fragt immer nach. |
 
-Benutzer wählen den Tool-Modus im Bereich des Agenten, pro Unterhaltung; jede Unterhaltung beginnt mit
-**Fragen**. Die Anwendung kann eine Klasse verschärfen, nie lockern. Ihre [Tool-Regeln](policies.md#tool-rules)
-gelten für Agenten ebenso wie für Chats. Zwei Beispiele: Das Outlook-Add-in sendet nie selbst E-Mails, es öffnet
+Benutzer wählen den Tool-Modus im Bereich des Agenten, pro Unterhaltung. Unter **Freigabestufen** legt die Version
+fest, wo jede Unterhaltung beginnt (**Beginnt in**, **Fragen**, solange Sie nichts ändern) und welchen Modus Benutzer
+höchstens wählen können (**Höchstens**, **Automatisch**, solange Sie nichts ändern); der Start liegt nie über dem
+höchsten, und die Grenzen Ihrer Organisation schränken beide ein. **Bypass** kann nur dann die höchste Stufe sein, wenn ein Administrator es unter **Einstellungen → Freigaben** erlaubt, und eine Version mit Bypass lässt sich nur dann veröffentlichen; Unterhaltungen können nie damit beginnen. Siehe [Bypass](policies.md#bypass). Ein Recherche-Agent etwa kann in **Nur lesen**
+beginnen und höchstens **Fragen** erlauben. Die Anwendung kann eine Klasse verschärfen, nie lockern. Ihre [Tool-Regeln](policies.md#tool-rules)
+gelten für Agenten ebenso wie für Chats.
+
+Unter **Host-Tools** kann die Version außerdem festlegen, wie jedes Tool nachfragt (**Freigabe**):
+
+| Freigabe | Was sie bewirkt |
+|---|---|
+| **Wie der Tool-Modus** | Die Tabelle oben entscheidet. |
+| **Immer nachfragen** | Fragt jedes Mal; nichts, was die Person vorher erlaubt hat, für den Chat oder immer, beantwortet die Frage. Für Tools, die über Personen entscheiden (DSGVO Art. 22) oder in der physischen Welt handeln. |
+| **Nachfragen** | Fragt auch dort, wo der Tool-Modus das Tool ausführen würde; die Person kann es für den Chat oder immer erlauben. |
+| **Nie nachfragen** | Ein Tool der Klasse Lesen oder Schreiben läuft in **Fragen** und **Automatisch** ohne Nachfrage. Eine Version, in der ein zerstörendes oder nicht eingestuftes Tool diese Freigabe hat, wird nicht veröffentlicht. |
+
+Keine davon zeigt ein Tool, das der Tool-Modus ausblendet. Solange Fadenstack Tools, die in der physischen Welt
+handeln, etwa an einer Maschine oder einer Tür, noch nicht kennzeichnen kann, geben Sie ihnen **Immer nachfragen**
+oder legen eine [Tool-Regel](policies.md#tool-rules) **Erst nachfragen** an. Zwei Beispiele: Das Outlook-Add-in sendet nie selbst E-Mails, es öffnet
 Entwürfe für die Person; und der Browser-Agent liest oder füllt nie Passwortfelder oder Kartenfelder, die die
 Website als solche kennzeichnet.
+
+Unter **Ort** kann ein Tool angeben, welches seiner Argumente nennt, wo ein Aufruf handelt (ein JSON-Pointer wie
+`/path`), und welche Art von Ort es ist: Dokument, Ordner, Website, App oder Schreibtisch. Eine Arbeitsfreigabe, die
+eine Person einem Agenten für eine Weile geben kann, deckt die Aufrufe des Tools nur an den Orten, die sie nennt. Ein
+Tool ohne Ort fragt weiterhin nach.
 
 ## Wenn eine Anwendung neue Tools mitbringt {#when-an-application-brings-new-tools}
 

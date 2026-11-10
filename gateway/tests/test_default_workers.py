@@ -18,10 +18,19 @@ def test_windows_runs_one_worker(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings_module._default_workers() == 1
 
 
-@pytest.mark.parametrize("cpus, expected", [(1, 1), (2, 2), (16, 4)])
-def test_elsewhere_it_follows_the_cpus(
+@pytest.mark.parametrize("cpus, expected", [(1, 1), (2, 2), (4, 4), (8, 8), (64, 8)])
+def test_elsewhere_it_follows_the_cpus_up_to_eight(
     monkeypatch: pytest.MonkeyPatch, cpus: int, expected: int
 ) -> None:
     monkeypatch.setattr(settings_module.sys, "platform", "linux")
     monkeypatch.setattr(settings_module, "_CPU_COUNT", cpus)
     assert settings_module._default_workers() == expected
+
+
+@pytest.mark.parametrize("workers, overflow, most", [(1, 10, 15), (4, 10, 60), (5, 3, 40), (8, 3, 64)])
+def test_more_workers_open_fewer_connections_each_so_the_pools_still_fit(
+    workers: int, overflow: int, most: int,
+) -> None:
+    """Eight workers open at most 64 connections, about what four opened before (60), within Postgres's 100."""
+    assert settings_module._default_overflow(workers) == overflow
+    assert workers * (5 + overflow) == most

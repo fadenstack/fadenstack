@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, model_validator
 
 from faden_backend.db.models.agents import AgentStatus, LocalMcpMode, PrincipalType
 
@@ -20,6 +20,18 @@ class HostTool(BaseModel):
     schema_sha256: str | None = Field(default=None, max_length=64)
     risk: str | None = Field(default=None, pattern=r"^(read|write|destructive)$")
     approval: str | None = Field(default=None, pattern=r"^(never|ask|always)$")
+    #: Where a call acts (sdk/38 §6, desktop 37 D4): the JSON pointer (RFC 6901) to the argument that names
+    #: the place, and the kind of place it is. A work grant covers a call only inside its places; a tool
+    #: without them is never covered by one.
+    target_argument: str | None = Field(default=None, max_length=256, pattern=r"^(/[^/]*)+$")
+    target_type: Literal["document", "folder", "site", "app", "desk"] | None = None
+
+    @model_validator(mode="after")
+    def _place_whole(self) -> HostTool:
+        if (self.target_argument is None) != (self.target_type is None):
+            msg = "A tool's place needs both the argument that names it and its kind."
+            raise ValueError(msg)
+        return self
 
 
 class AgentPii(BaseModel):
@@ -30,6 +42,40 @@ class AgentPii(BaseModel):
     #: Whether a conversation may switch the egress mode (redact, tokenize). Null follows the
     #: tenant's setting on the PII policy page; true or false decides for this agent.
     allow_mode_override: StrictBool | None = None
+
+
+#: The tool modes, from least to most (gateway ``tool_classes.ToolMode``). Bypass is only ever the highest
+#: level, never where a conversation starts (sdk/38 D2), and is published only while the installation allows
+#: it (``approvals.bypass_allowed``, checked at publish; sdk/38 §5).
+ToolLevel = Literal["off", "read_only", "ask", "auto"]
+HighestLevel = Literal["off", "read_only", "ask", "auto", "bypass"]
+_LEVEL_ORDER = ("off", "read_only", "ask", "auto", "bypass")
+
+
+class AgentApprovals(BaseModel):
+    """The agent's approval levels (sdk/38 §5, D1, D2): where its conversations start, and the most they use.
+
+    The author's statement of what the agent is safe for, part of its version. The tenant's ceilings narrow
+    both.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    default_level: ToolLevel = "ask"
+    max_level: HighestLevel = "auto"
+    #: Which standing approvals the agent's card may offer; ``None``: as the SDK offers today. From A2 on.
+    standing: list[Literal["chat", "time", "grant", "always"]] | None = None
+    #: The longest grant, in minutes; ``None``: the tenant's. Read from A2 on.
+    max_grant_minutes: int | None = Field(default=None, ge=15, le=1440)
+    #: The classes a grant may cover: never destructive or unclassified (sdk/38 §4.3). Read from A2 on.
+    grant_classes: list[Literal["read", "write"]] | None = None
+
+    @model_validator(mode="after")
+    def _default_within_max(self) -> AgentApprovals:
+        if _LEVEL_ORDER.index(self.default_level) > _LEVEL_ORDER.index(self.max_level):
+            msg = "The default level must not be above the highest level."
+            raise ValueError(msg)
+        return self
 
 
 class AgentVersionFields(BaseModel):
@@ -43,6 +89,7 @@ class AgentVersionFields(BaseModel):
     local_mcp_mode: LocalMcpMode = LocalMcpMode.DISABLE
     ui: dict[str, Any] = Field(default_factory=dict)
     pii: AgentPii = Field(default_factory=AgentPii)
+    approvals: AgentApprovals = Field(default_factory=AgentApprovals)
     extensions: dict[str, Any] = Field(default_factory=dict)
 
 

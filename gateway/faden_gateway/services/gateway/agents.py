@@ -26,7 +26,7 @@ import asyncpg
 
 from faden_gateway.services.extensions import ExtensionRegistry
 from faden_gateway.services.extensions import registry as default_registry
-from faden_gateway.services.gateway import access_epoch
+from faden_gateway.services.gateway import access_epoch, tool_classes
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ _AGENT_SQL = """
 SELECT a.id::text AS id, a.tenant_id, a.slug, a.name, a.status::text AS status,
        (a.published_version_id IS NOT NULL) AS published, a.restricted_by,
        v.version, v.instructions, v.model_alias, v.knowledge, v.server_tools,
-       v.host_tool_contract, v.local_mcp_mode::text AS local_mcp_mode, v.ui, v.pii, v.extensions,
+       v.host_tool_contract, v.local_mcp_mode::text AS local_mcp_mode, v.ui, v.pii, v.approvals, v.extensions,
        ARRAY(SELECT m.user_id::text FROM agent_members m
              WHERE m.agent_id = a.id AND m.role = 'maintainer') AS maintainers,
        ARRAY(SELECT g.principal_id::text FROM agent_grants g
@@ -127,6 +127,16 @@ def _tri_state(settings: Any, key: str) -> bool | None:
     return value if isinstance(value, bool) else None
 
 
+def _strings(value: Any) -> tuple[str, ...] | None:
+    """A stored list of names; anything but a list is unset (``None``)."""
+    return tuple(str(v) for v in value) if isinstance(value, list) else None
+
+
+def _minutes(value: Any) -> int | None:
+    """A stored number of minutes when it is a positive whole number; else unset."""
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else None
+
+
 @dataclass(frozen=True)
 class AgentProfile:
     """An agent and the version it serves."""
@@ -155,16 +165,49 @@ class AgentProfile:
     pii_allow_mode_override: bool | None = None
     #: Restrictions an extension keeps on the agent beyond its grants (``agents.restricted_by``).
     restricted_by: tuple[str, ...] = ()
+    #: The version's approval levels (``approvals``, sdk/38 §5): where its conversations start, and the most
+    #: they may use. As stored; :meth:`levels` reads them.
+    default_level: str = "ask"
+    max_level: str = "auto"
+    #: The standing approvals its card may offer (``chat``, ``time``, ``grant``, ``always``); ``None``: any.
+    standing: tuple[str, ...] | None = None
+    #: The longest grant in minutes; ``None``: the tenant's (``grants.DEFAULT_LONGEST_MINUTES`` until it has
+    #: one).
+    max_grant_minutes: int | None = None
+    #: The classes a grant may cover, within ``read`` and ``write``; ``None``: both.
+    grant_classes: tuple[str, ...] | None = None
+
+    def levels(self) -> tuple[tool_classes.ToolMode, tool_classes.ToolMode]:
+        """The level conversations start in, and the highest.
+
+        A highest level this gateway does not know counts as read-only: it narrows, never widens. A highest
+        level of Bypass holds only where the installation allows it (``tool_classes.effective``); no
+        conversation starts in Bypass (sdk/38 D2), so a start stored as Bypass is Ask.
+        """
+        modes = tool_classes
+        top = modes.parse_mode(self.max_level) or modes.ToolMode.READ_ONLY
+        start = modes.parse_mode(self.default_level) or modes.ToolMode(modes.DEFAULT_MODE)
+        if start is modes.ToolMode.BYPASS:
+            start = modes.ToolMode(modes.DEFAULT_MODE)
+        return modes.narrowest(start, top), top
 
     @property
     def host_tools(self) -> frozenset[str]:
         """The names of the tools the host application may declare."""
         return frozenset(str(t.get("name", "")) for t in self.host_tool_contract)
 
+    @property
+    def always_asked(self) -> frozenset[str]:
+        """The tools the agent's author marked ``approval: always``: asked about every time, a floor item."""
+        return frozenset(
+            str(t.get("name", "")) for t in self.host_tool_contract if t.get("approval") == "always"
+        )
+
     @classmethod
     def from_row(cls, row: Any) -> AgentProfile:
         instructions = row["instructions"] or ""
         server_tools = _json(row["server_tools"], None)
+        approvals = _json(row.get("approvals"), {}) or {}
         return cls(
             id=row["id"],
             tenant_id=row["tenant_id"],
@@ -187,6 +230,11 @@ class AgentProfile:
             instructions_sha256=hashlib.sha256(instructions.encode()).hexdigest(),
             pii_allow_mode_override=_tri_state(_json(row["pii"], {}), "allow_mode_override"),
             restricted_by=tuple(row.get("restricted_by") or ()),
+            default_level=str(approvals.get("default_level") or "ask"),
+            max_level=str(approvals.get("max_level") or "auto"),
+            standing=_strings(approvals.get("standing")),
+            max_grant_minutes=_minutes(approvals.get("max_grant_minutes")),
+            grant_classes=_strings(approvals.get("grant_classes")),
         )
 
 

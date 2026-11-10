@@ -39,6 +39,7 @@ from faden_backend.db.models.agents import (
 )
 from faden_backend.db.models.containers import AuditResult
 from faden_backend.db.models.users import User, current_active_user
+from faden_backend.services import approval_config
 from faden_backend.services.agents import access, app_review, app_templates, tokens
 from faden_backend.services.extensions import registry
 from faden_backend.services.principals import PrincipalOption, find_principals
@@ -167,10 +168,50 @@ def _check_extensions(extensions: dict[str, Any]) -> None:
             ) from exc
 
 
+def _check_approvals(contract: list[dict[str, Any]]) -> None:
+    """Refuse ``approval: never`` on a tool that is not ``read`` or ``write`` (sdk/38 §4.3, D7).
+
+    ``never`` lets the author spare the person a question the chat's mode would ask. For a destructive or
+    unclassified tool that question is the person's to answer, so such a version is not served. Checked at
+    publish, not when a draft is saved: an admin may reclassify a tool on the Apps tab first.
+    """
+    wrong = [
+        str(t.get("name")) for t in contract
+        if t.get("approval") == "never" and t.get("risk") not in ("read", "write")
+    ]
+    if wrong:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "'Never ask' (approval: never) is only for read and write tools. Change the class or the "
+                "approval of: " + ", ".join(wrong)
+            ),
+        )
+
+
+async def _check_bypass(session: Any, approvals: dict[str, Any] | None) -> None:
+    """Refuse a version whose highest level is Bypass while the installation does not allow it (sdk/38 §5).
+
+    Checked at publish, as ``approval: never``: a draft may hold it while an admin decides. Turning Bypass off
+    later leaves such versions published; the gateway then narrows them to Auto (sdk/09 L-57).
+    """
+    if (approvals or {}).get("max_level") != "bypass":
+        return
+    if not await approval_config.bypass_allowed(session):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Bypass is not allowed in this installation, so no agent may go up to it. An administrator "
+                "turns it on in Settings, Approvals (Root Mode); or choose Auto as the highest level."
+            ),
+        )
+
+
 def _version_fields(fields: AgentVersionFields) -> dict[str, Any]:
     _check_extensions(fields.extensions)
     data = fields.model_dump()
     data["host_tool_contract"] = [tool.model_dump(exclude_none=True) for tool in fields.host_tool_contract]
+    data["approvals"] = fields.approvals.model_dump(exclude_none=True)
     names = [tool["name"] for tool in data["host_tool_contract"]]
     if len(names) != len(set(names)):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Host tool names must be unique.")
@@ -454,6 +495,8 @@ async def _publish(dao: AgentsDAO, audit: AuditDAO, user: User, agent: Agent, ve
             status_code=status.HTTP_409_CONFLICT, detail="Restore the agent before publishing.",
         )
     _check_extensions(version.extensions)
+    _check_approvals(version.host_tool_contract or [])
+    await _check_bypass(dao.session, version.approvals)
     if version.published_at is None:
         version.published_at = datetime.now(UTC)
     agent.published_version_id = version.id

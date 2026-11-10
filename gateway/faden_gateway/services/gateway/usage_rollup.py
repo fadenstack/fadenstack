@@ -78,7 +78,7 @@ from faden_gateway.db.models.usage import (
     UsageHourly,
     UsageRollupState,
 )
-from faden_gateway.services.gateway import usage_settings
+from faden_gateway.services.gateway import approval_settings, usage_settings
 from faden_gateway.services.gateway.usage_settings import UsageSettings
 
 log = logging.getLogger(__name__)
@@ -399,6 +399,10 @@ async def rollup_loop(engine: AsyncEngine, *, interval_sec: float, first_delay_s
                 log.info("Usage rolled up from %s to %s", run.caught_up_from, run.backfilled_through)
             if run is not None and any(run.purged.values()):
                 log.info("Usage past its retention purged: %s", run.purged)
+            # Bypass: the kill switch for grants a worker missed, and evidence past its retention (L-65).
+            kept = await approval_settings.housekeeping(engine)
+            if any(kept.values()):
+                log.info("Bypass housekeeping: %s", kept)
         except Exception:
             log.warning("The usage rollup failed; it runs again in %s s", interval_sec, exc_info=True)
         await asyncio.sleep(interval_sec)

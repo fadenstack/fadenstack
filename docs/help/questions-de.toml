@@ -27,6 +27,7 @@
 ["use/tools.md"]
 "Wie schalte ich Tools im Chat ein?" = "switch-tools-on"
 "Warum fragt ein Tool nach meiner Freigabe?" = "approve-a-tool"
+"Kann ich Freigaben für eine lange Aufgabe ausschalten?" = "bypass"
 "Was sind die Tool-Modi?" = "choose-the-tool-mode"
 "Welche Daten bekommen Tools?" = "what-tools-receive"
 
@@ -173,6 +174,9 @@
 "Wie schalte ich den Schutz personenbezogener Daten (PII) ein?" = "personal-data"
 "Wie ändere ich die Datenschutz-Richtlinie?" = "change-the-policy"
 "Wie sperre oder erlaube ich Tools?" = "tool-rules"
+"Wer kann sehen, was unter Bypass lief?" = "bypass"
+"Wie erlaube ich Bypass oder schalte es aus?" = "bypass"
+"Warum verlangt Bypass eine erneute Anmeldung?" = "bypass"
 "Was sehen Benutzer, wenn eine Anfrage gestoppt wird?" = "what-people-see-when-something-is-stopped"
 
 ["administer/content-marking.md"]

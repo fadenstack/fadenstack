@@ -34,7 +34,7 @@ import json
 import logging
 import time
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated, Literal
 
 import jwt
@@ -49,6 +49,7 @@ from faden_backend.db.dao.audit_dao import AuditDAO
 from faden_backend.db.dependencies import get_db_session
 from faden_backend.db.models.containers import AuditResult
 from faden_backend.db.models.oauth import OAuthAccount
+from faden_backend.db.models.step_up import BypassStepUp
 from faden_backend.db.models.users import (
     SignInStrategy,
     User,
@@ -195,10 +196,13 @@ async def providers() -> list[ProviderPublic]:
 
 async def _begin(
     request: Request, key: str, *, link: User | None = None, back: str = PROFILES[0],
+    step_up_of: BypassStepUp | None = None,
 ) -> tuple[ProviderPublic, str, str] | Refusal:
     """The provider, where to send the browser and the binding cookie for a sign-in; or why it cannot start.
 
-    With *link*, the answer is to be linked to that account rather than sign anyone in.
+    With *link*, the answer is to be linked to that account rather than sign anyone in. With *step_up_of*, it is
+    the second sign-in before Bypass (sdk/41): the provider must authenticate anew (``fresh``), the answer signs
+    nobody in, and the binding names the step-up and the browser that opened it.
     """
     provider = await _offered(key)
     if isinstance(provider, Refusal):
@@ -210,7 +214,7 @@ async def _begin(
     if provider.posts_back and not _https(request) and settings.environment not in _DEV_ENVIRONMENTS:
         return Refusal.NEEDS_HTTPS
     try:
-        begun = await module.start(key, _return_url(request, provider))
+        begun = await module.start(key, _return_url(request, provider), fresh=step_up_of is not None)
     except module.ModuleRefusedError as exc:
         log.warning("Sign-in with %s could not start: %s", key, exc)
         return _refusal_named(exc.detail, Refusal.PROVIDER_ERROR)
@@ -224,6 +228,11 @@ async def _begin(
     }
     if link is not None:
         claims["link"], claims["back"] = str(link.id), back
+    if step_up_of is not None:
+        # ``iat`` is when the fresh sign-in was asked for: the provider's answer must be later.
+        claims["step_up"], claims["sb"] = str(step_up_of.id), step_up_of.browser_hash
+        step_up_of.sso_tx_hash = _hash(begun.transaction)
+        step_up_of.sso_asked_at = datetime.fromtimestamp(now, UTC)
     binding = jwt.encode(claims, settings.users_secret, algorithm="HS256")
     return provider, begun.redirect_url, binding
 
@@ -331,6 +340,14 @@ async def _finish(
     identity = await _identity(request, session, provider, transaction, params)
     if claims.get("link"):
         return await _finish_link(session, claims, identity, provider.key)
+    if claims.get("step_up") or not claims:
+        # A step-up's second sign-in (sdk/41) signs nobody in. Without a binding (a SAML answer over plain HTTP,
+        # development only) it is found by its transaction, else this is an ordinary sign-in.
+        from faden_backend.web.api.step_up.views import finish_sso  # noqa: PLC0415
+
+        stepped = await finish_sso(session, claims, identity, provider, _hash(transaction))
+        if stepped is not None:
+            return stepped
     if isinstance(identity, Refusal):
         return _to_login(identity)
     signed = await accounts.sign_in(session, identity)

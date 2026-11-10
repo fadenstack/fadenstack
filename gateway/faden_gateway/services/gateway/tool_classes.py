@@ -9,9 +9,21 @@ class, whether a tool runs, waits for the user, or is not offered at all:
     read_only   run     hidden  hidden       hidden
     ask         run     ask     ask          ask        <- every session starts here
     auto        run     run     ask          ask
+    bypass      run     run     ask*         ask*       <- * run under a Bypass grant
 
-There is no mode that runs an unknown or destructive tool unasked: an admin
-who wants that classifies the tool.
+No mode alone runs an unknown or destructive tool unasked. Bypass (sdk/38
+§4.1, sdk/09 §3.12) acts as Auto by itself; the calls Auto would ask about run
+only while the conversation holds a server grant ``kind: bypass``, which the
+gateway checks itself (``grants.py``; 39 F1). The level is reachable only where
+the installation allows it and the agent's highest level is Bypass
+(:func:`effective`); anywhere else a chosen Bypass is Auto.
+
+The agent's author may say more per tool, in its host tool contract
+(``approval``, 38 §4.3): ``always`` asks every time, and nothing the person
+allowed before answers it (a floor item); ``ask`` asks even where the mode
+would run the tool, though the person's "for this chat" or "always" may
+answer it; ``never`` runs a ``read`` or ``write`` tool the mode would ask
+about. None of them shows a tool the mode hides.
 
 Where a class comes from, first that applies: the tenant's classification
 rules (an admin's), the gateway's own tools (all read), the agent's host tool
@@ -32,7 +44,7 @@ import fnmatch
 import logging
 import time
 from collections.abc import Awaitable, Callable, Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import Any
 
@@ -66,6 +78,8 @@ class ToolMode(StrEnum):
     READ_ONLY = "read_only"
     ASK = "ask"
     AUTO = "auto"
+    #: Auto, plus what the conversation's Bypass grant covers (sdk/38 §4.1).
+    BYPASS = "bypass"
 
 
 class Decision(StrEnum):
@@ -76,7 +90,7 @@ class Decision(StrEnum):
     HIDDEN = "hidden"
 
 
-_ORDER = {ToolMode.OFF: 0, ToolMode.READ_ONLY: 1, ToolMode.ASK: 2, ToolMode.AUTO: 3}
+_ORDER = {ToolMode.OFF: 0, ToolMode.READ_ONLY: 1, ToolMode.ASK: 2, ToolMode.AUTO: 3, ToolMode.BYPASS: 4}
 
 _TABLE: dict[ToolMode, dict[ToolClass, Decision]] = {
     ToolMode.OFF: dict.fromkeys(ToolClass, Decision.HIDDEN),
@@ -93,13 +107,22 @@ _TABLE: dict[ToolMode, dict[ToolClass, Decision]] = {
         ToolClass.DESTRUCTIVE: Decision.ASK, ToolClass.UNKNOWN: Decision.ASK,
     },
 }
+# What Bypass runs beyond Auto is the grant's to cover, never the table's.
+_TABLE[ToolMode.BYPASS] = dict(_TABLE[ToolMode.AUTO])
 
 
 def decide(mode: ToolMode, tool: Classified) -> Decision:
-    """What *mode* does with *tool*."""
+    """What *mode* does with *tool*, with its author's ``approval`` on top (38 §4.3, D7)."""
     # if OPEN_WORLD_ENFORCED and tool.open_world: ...  -- a mode or an EE
     # policy on external calls goes here, when open_world is switched on.
-    return _TABLE[mode][tool.tool_class]
+    decision = _TABLE[mode][tool.tool_class]
+    if decision is Decision.HIDDEN:
+        return decision
+    if tool.approval in ("always", "ask"):
+        return Decision.ASK
+    if tool.approval == "never" and tool.tool_class in (ToolClass.READ, ToolClass.WRITE):
+        return Decision.RUN  # pre-approved by the author; never for a destructive or unclassified tool
+    return decision
 
 
 def narrowest(*modes: ToolMode | None) -> ToolMode:
@@ -124,6 +147,8 @@ class Classified:
     tool_class: ToolClass
     source: str  # "rule", "gateway", "agent", "annotations", "none"
     open_world: bool | None = None
+    #: The agent's author on asking: ``never``, ``ask`` or ``always`` (host tool contract); ``None``: unset.
+    approval: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -168,8 +193,15 @@ class Classifier:
     contract: Mapping[str, str] | None = None
     #: MCP tools' annotations, by qualified name.
     annotations: Mapping[str, Mapping[str, Any]] | None = None
+    #: The agent's host tool contract: name -> approval, for the tools that set one.
+    approvals: Mapping[str, str] | None = None
 
     def classify(self, name: str) -> Classified:
+        found = self._classify(name)
+        approval = (self.approvals or {}).get(name)
+        return replace(found, approval=approval) if approval else found
+
+    def _classify(self, name: str) -> Classified:
         rule = next((r for r in self.rules if fnmatch.fnmatchcase(name, r.pattern)), None)
         if rule is not None:
             if rule.tool_class == "annotations":
@@ -236,17 +268,27 @@ class CeilingContext:
 ToolModeCeiling = Callable[[CeilingContext], Awaitable["ToolMode | str | None"]]
 
 
-async def ceiling(ceilings: Iterable[ToolModeCeiling], ctx: CeilingContext) -> ToolMode | None:
+class CeilingUnavailableError(RuntimeError):
+    """A ceiling failed or answered no mode, where the caller asked to be told rather than get ``read_only``."""
+
+
+async def ceiling(
+    ceilings: Iterable[ToolModeCeiling], ctx: CeilingContext, *, strict: bool = False,
+) -> ToolMode | None:
     """The narrowest of the registered ceilings; ``None`` when there is none.
 
     A ceiling that fails, or answers something that is not a mode, counts as
-    ``read_only``: a broken restriction must not widen what tools may do.
+    ``read_only``: a broken restriction must not widen what tools may do. With
+    *strict* it raises :class:`CeilingUnavailableError` instead, for a caller
+    that must tell "not allowed" from "cannot be checked" (a Bypass resuming).
     """
     found: list[ToolMode] = []
     for each in ceilings:
         try:
             answer = await each(ctx)
-        except Exception:
+        except Exception as exc:
+            if strict:
+                raise CeilingUnavailableError(str(exc)) from exc
             logger.exception("A tool mode ceiling failed; read_only applies")
             found.append(ToolMode.READ_ONLY)
             continue
@@ -254,6 +296,9 @@ async def ceiling(ceilings: Iterable[ToolModeCeiling], ctx: CeilingContext) -> T
             continue
         mode = parse_mode(str(answer))
         if mode is None:
+            if strict:
+                msg = f"A tool mode ceiling answered {answer!r}"
+                raise CeilingUnavailableError(msg)
             logger.error("A tool mode ceiling answered %r; read_only applies", answer)
             mode = ToolMode.READ_ONLY
         found.append(mode)
@@ -276,20 +321,44 @@ class EffectiveMode:
         }
 
 
+def limited(top: ToolMode | None, limit: ToolMode | None) -> ToolMode | None:
+    """The ceiling *top* narrowed by an agent's highest level *limit*; Auto or above narrows nothing.
+
+    Bypass above Auto is narrowed in :func:`effective`, so the ceiling that clients without Bypass see stays
+    as it was.
+    """
+    if limit is None or limit in (ToolMode.AUTO, ToolMode.BYPASS):
+        return top
+    return narrowest(top, limit) if top is not None else limit
+
+
 async def effective(
     chosen: ToolMode | None, ceilings: Iterable[ToolModeCeiling], ctx: CeilingContext,
+    *, default: ToolMode | None = None, limit: ToolMode | None = None, bypass_allowed: bool = False,
 ) -> EffectiveMode:
-    """The user's (or the default) mode, narrowed by the ceilings."""
-    picked = chosen or ToolMode(DEFAULT_MODE)
-    top = await ceiling(ceilings, ctx)
-    return EffectiveMode(mode=narrowest(picked, top), chosen=picked, ceiling=top)
+    """The user's mode -- else *default*, the agent's level, else Ask -- narrowed by the ceilings and *limit*.
+
+    *limit* is the agent's highest level (sdk/38 §5): the narrowest of it and the EE ceilings applies. Bypass
+    stays Bypass only where the installation allows it (*bypass_allowed*, sdk/09 L-57) and the agent's highest
+    level is Bypass; anywhere else it is Auto.
+    """
+    picked = chosen or default or ToolMode(DEFAULT_MODE)
+    top = limited(await ceiling(ceilings, ctx), limit)
+    mode = narrowest(picked, top)
+    if mode is ToolMode.BYPASS and not (bypass_allowed and limit is ToolMode.BYPASS):
+        mode = ToolMode.AUTO
+    return EffectiveMode(mode=mode, chosen=picked, ceiling=top)
 
 
-def reason(mode: ToolMode, decision: Decision) -> str:
-    """What the user is told about a tool the mode keeps back."""
+def reason(mode: ToolMode, decision: Decision, approval: str | None = None) -> str:
+    """What the user is told about a tool the mode keeps back, or that its author has asked about."""
     if decision is Decision.HIDDEN:
         return {
             ToolMode.OFF: "Tools are off in this chat.",
             ToolMode.READ_ONLY: "Only read-only tools are allowed in this chat.",
         }.get(mode, "Not allowed in this chat's tool mode.")
+    if approval == "always":
+        return "This agent asks for your approval every time it uses this tool."
+    if approval == "ask":
+        return "This agent asks for your approval before it uses this tool."
     return "This tool needs your approval in this chat's tool mode."

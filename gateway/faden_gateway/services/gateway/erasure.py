@@ -26,6 +26,7 @@ from sqlalchemy import CursorResult, delete, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_gateway.db.models.gateway import (
+    ApprovalGrant,
     ChatAttachment,
     ChatMessage,
     ChatProject,
@@ -128,7 +129,7 @@ async def erase_attachment(session: AsyncSession, file_store: Any, attachment_id
 
 
 async def erase_user(session: AsyncSession, file_store: Any, user_id: str) -> Erased:
-    """Everything of one person: projects, chats, files, memory, and their usage (an account deleted).
+    """Everything of one person: projects, chats, files, memory, grants, and their usage (an account deleted).
 
     Their usage is their request-log rows (with their tool calls) and their person-level usage days
     (M12). The hourly and daily sums, which name no person, keep their totals: the rollup job recomputes
@@ -159,6 +160,8 @@ async def erase_user(session: AsyncSession, file_store: Any, user_id: str) -> Er
     await session.execute(delete(ChatAttachment).where(ChatAttachment.user_id == user_id))
     facts = await session.execute(delete(MemoryFact).where(MemoryFact.user_id == user_id))
     erased.memory_facts += facts.rowcount or 0
+    # Their grants, and with them the calls each covered (their arguments), as their tool calls above.
+    await session.execute(delete(ApprovalGrant).where(ApprovalGrant.user_id == user_id))
     return erased
 
 

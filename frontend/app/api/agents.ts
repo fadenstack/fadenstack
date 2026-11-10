@@ -9,6 +9,7 @@
  */
 import { json, query, requester, segment } from "./http";
 import { principalIds, type PrincipalOption, type PrincipalType } from "./principals";
+import type { ToolMode } from "./tools";
 
 const request = requester("/api/agents");
 
@@ -20,11 +21,18 @@ export type LocalMcpMode = "disable" | "allow";
 export type ToolRisk = "read" | "write" | "destructive";
 export type ToolApproval = "never" | "ask" | "always";
 
+/** What kind of place a tool's target argument names. */
+export type ToolPlaceType = "document" | "folder" | "site" | "app" | "desk";
+
 /** A tool the host application provides, as the agent expects it. */
 export interface HostTool {
   name: string;
   risk?: ToolRisk;
   approval?: ToolApproval;
+  /** JSON pointer (RFC 6901) to the call argument that says where the call acts, e.g. `/path`; with target_type. */
+  target_argument?: string;
+  /** What kind of place the target argument names; with target_argument. */
+  target_type?: ToolPlaceType;
   schema_sha256?: string;
 }
 
@@ -33,6 +41,22 @@ export interface HostTool {
 export interface AgentPii {
   /** Whether a conversation may switch the PII mode (redact, tokenize); null follows the tenant's setting. */
   allow_mode_override: boolean | null;
+}
+
+/** The tool modes plus Bypass, which an agent may only have as its highest level. */
+export type ApprovalLevel = ToolMode | "bypass";
+
+/**
+ * The agent's approval levels (sdk/38 §5): the tool mode its conversations start in, and the most they may use.
+ * The default is never above the highest; the tenant's ceilings narrow both.
+ */
+export interface AgentApprovals {
+  default_level: ApprovalLevel;
+  max_level: ApprovalLevel;
+  /** For grants (later); kept as stored. */
+  standing?: string[] | null;
+  max_grant_minutes?: number | null;
+  grant_classes?: string[] | null;
 }
 
 export interface AgentDefinition {
@@ -46,6 +70,7 @@ export interface AgentDefinition {
   /** What the SDKs show: `greeting`, `suggestions`. */
   ui: Record<string, unknown>;
   pii: AgentPii;
+  approvals: AgentApprovals;
   /** Enterprise settings; kept as they are. */
   extensions: Record<string, unknown>;
 }
