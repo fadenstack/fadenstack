@@ -6,9 +6,18 @@
     python release/update_feed.py keygen <folder>        # a new key pair, for a key change
     python release/update_feed.py notes --version 0.4.2 --out notes.md   # the GitHub release's text
 
+    python release/update_feed.py apps-build --source apps.yaml --out dist/apps   # the app list
+    APPS_FEED_SIGNING_KEY=... python release/update_feed.py apps-sign dist/apps
+    python release/update_feed.py apps-verify dist/apps
+
 ``build`` turns release/releases.yaml into ``index.json``; ``sign`` writes ``index.json.sig`` with
 the private key (raw Ed25519, base64: the secret UPDATE_FEED_SIGNING_KEY, or --key-file) and
 refuses a key the CLI does not ship; ``verify`` reads the result the way an install does.
+
+The ``apps-*`` commands do the same for the app list (``apps.json``: the desktop agent, the Office
+add-ins, the Nextcloud app, the Chrome extension, with their releases). Its source, ``apps.yaml``,
+lives in the apps' release repository, which runs these commands from a checkout of this one; it is
+signed with keys of its own (APPS_TRUSTED_KEYS; the secret APPS_FEED_SIGNING_KEY).
 
 The feed's format and its checks are the CLI's (cli/src/faden_cli/core/release_feed.py), so what
 is published here is what installs can read.
@@ -159,19 +168,166 @@ def notes(feed: dict, version: str) -> str:
     return "\n".join(lines) + "\n"
 
 
-def sign(index: bytes, private_key_b64: str) -> dict:
-    """The signature file for *index*, naming the trusted key the private key belongs to."""
+def sign(index: bytes, private_key_b64: str, keys: dict[str, str] | None = None) -> dict:
+    """The signature file for *index*, naming the trusted key the private key belongs to.
+
+    *keys*: the keys installs trust for this file (default: the feed's, ``TRUSTED_KEYS``).
+    """
+    trusted = release_feed.TRUSTED_KEYS if keys is None else keys
+    name = "TRUSTED_KEYS" if keys is None else "APPS_TRUSTED_KEYS"
     key = Ed25519PrivateKey.from_private_bytes(base64.b64decode(private_key_b64.strip()))
     public = base64.b64encode(
         key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
     ).decode()
-    key_id = next((kid for kid, pub in release_feed.TRUSTED_KEYS.items() if pub == public), None)
+    key_id = next((kid for kid, pub in trusted.items() if pub == public), None)
     if key_id is None:
         raise BuildError(
-            "This signing key is not one the CLI and backend trust (release_feed.TRUSTED_KEYS): "
-            f"installs would refuse the feed. Its public key: {public}"
+            f"This signing key is not one the CLI and backend trust for this file (release_feed.{name}): "
+            f"installs would refuse it. Its public key: {public}"
         )
     return {"key_id": key_id, "signature": base64.b64encode(key.sign(index)).decode()}
+
+
+APPS_INDEX = "apps.json"
+APPS_SIG = "apps.json.sig"
+_APP_ID = re.compile(r"[a-z][a-z0-9-]{0,39}")
+_SLUG = re.compile(r"[a-z0-9][a-z0-9-]{0,63}")
+_TOKEN = re.compile(r"[a-z0-9][a-z0-9._-]{0,39}")
+_SHA256 = re.compile(r"[0-9a-f]{64}")
+
+
+def _texts(where: str, raw: object, *, required: bool) -> dict[str, str]:
+    """A text in some languages, English first; refused when English is missing and *required*."""
+    if isinstance(raw, str):
+        raw = {"en": raw}
+    texts = {str(k): " ".join(str(v).split()) for k, v in (raw or {}).items() if str(v or "").strip()}  # type: ignore[union-attr]
+    if required and not texts.get("en"):
+        raise BuildError(f"{where}: an English text (en) is needed")
+    return texts
+
+
+def _link(where: str, url: object, *, required: bool = False) -> str:
+    text = str(url or "").strip()
+    if not text:
+        if required:
+            raise BuildError(f"{where}: a link is needed")
+        return ""
+    if release_feed.safe_link(text) != text:
+        raise BuildError(
+            f"{where}: {text!r} is not a link installs show (https on {', '.join(release_feed.LINK_HOSTS)}; "
+            "GitHub only under github.com/fadenstack/)"
+        )
+    return text
+
+
+def build_apps(source: dict) -> dict:
+    """The app list for *source* (apps.yaml). Refuses anything installs would leave out, so nothing goes missing."""
+    apps = []
+    seen: set[str] = set()
+    for raw in source.get("apps") or []:
+        app_id = str(raw.get("id", ""))
+        if not _APP_ID.fullmatch(app_id):
+            raise BuildError(f"{app_id!r}: an app id is lower case letters, digits and -, starting with a letter")
+        if app_id in seen:
+            raise BuildError(f"{app_id} is listed twice")
+        seen.add(app_id)
+        connect = raw.get("connect")
+        if connect is not None and connect not in release_feed.CONNECT_KINDS:
+            raise BuildError(f"{app_id}: connect must be one of {', '.join(release_feed.CONNECT_KINDS)}")
+        agents = {str(k): str(v) for k, v in (raw.get("agents") or {}).items()}
+        for role, slug in agents.items():
+            if not _TOKEN.fullmatch(role) or not _SLUG.fullmatch(slug):
+                raise BuildError(f"{app_id}: agents.{role}: {slug!r} is not an agent slug")
+        page = _link(f"{app_id}.page", raw.get("page"), required=True)
+        releases = []
+        versions: set[str] = set()
+        for rel in raw.get("releases") or []:
+            v = str(rel.get("version", ""))
+            parsed = release_feed.parse_version(v)
+            where = f"{app_id} {v}"
+            if parsed is None:
+                raise BuildError(f"{where}: not a release version")
+            if str(parsed) in versions:
+                raise BuildError(f"{where}: listed twice")
+            versions.add(str(parsed))
+            channel = rel.get("channel", "stable")
+            if channel not in release_feed.CHANNELS:
+                raise BuildError(f"{where}: channel must be one of {', '.join(release_feed.CHANNELS)}")
+            if parsed.is_prerelease and channel != "preview":
+                raise BuildError(f"{where}: a pre-release's channel is preview")
+            severity = rel.get("severity", "normal")
+            if severity not in release_feed.SEVERITIES[1:]:
+                raise BuildError(f"{where}: severity must be normal, security or critical")
+            when = str(rel.get("date") or "")
+            try:
+                date.fromisoformat(when)
+            except ValueError as exc:
+                raise BuildError(f"{where}: date must be YYYY-MM-DD") from exc
+            requires = rel.get("requires_server")
+            if requires is not None and release_feed.parse_version(str(requires)) is None:
+                raise BuildError(f"{where}: requires_server {requires!r} is not a release version")
+            files = []
+            for f in rel.get("files") or []:
+                fw = f"{where} file {f.get('url', '')}"
+                if not _TOKEN.fullmatch(str(f.get("platform", ""))) or not _TOKEN.fullmatch(str(f.get("kind", ""))):
+                    raise BuildError(f"{fw}: platform and kind are lower-case words (windows-x64, setup)")
+                if not _SHA256.fullmatch(str(f.get("sha256", ""))):
+                    raise BuildError(f"{fw}: sha256 is 64 lower-case hex digits")
+                size = f.get("size")
+                if not isinstance(size, int) or isinstance(size, bool) or size <= 0:
+                    raise BuildError(f"{fw}: size is the file's size in bytes")
+                files.append({
+                    "platform": str(f["platform"]),
+                    "kind": str(f["kind"]),
+                    "url": _link(fw, f.get("url"), required=True),
+                    "sha256": str(f["sha256"]),
+                    "size": size,
+                })
+            releases.append({
+                "version": str(parsed),
+                "channel": channel,
+                "date": when,
+                "severity": severity,
+                "summary": _texts(f"{where} summary", rel.get("summary"), required=True),
+                "notes_url": _link(f"{where} notes_url", rel.get("notes_url")) or f"{page}#v{parsed}",
+                "requires_server": str(requires) if requires is not None else None,
+                "fixes": [
+                    {"id": str(x["id"]), "severity": str(x.get("severity", "")), "summary": str(x.get("summary", ""))}
+                    for x in rel.get("fixes") or []
+                ],
+                "files": files,
+            })
+        releases.sort(key=lambda r: release_feed.parse_version(r["version"]), reverse=True)
+        series = [
+            {"series": str(s["series"]), "supported_until": date.fromisoformat(str(s["supported_until"])).isoformat()}
+            for s in raw.get("series") or []
+        ]
+        apps.append({
+            "id": app_id,
+            "name": _texts(f"{app_id}.name", raw.get("name"), required=True),
+            "description": _texts(f"{app_id}.description", raw.get("description"), required=False),
+            "page": page,
+            "reports_as": [str(n) for n in raw.get("reports_as") or []],
+            "connect": connect,
+            "agents": agents,
+            "store": _link(f"{app_id}.store", raw.get("store")),
+            "store_id": str(raw.get("store_id") or ""),
+            "series": series,
+            "releases": releases,
+        })
+    catalogue = {
+        "schema": release_feed.SCHEMA,
+        "product": release_feed.APPS_PRODUCT,
+        "generated_at": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "apps": apps,
+    }
+    # What installs will read: every app, release and file must come through.
+    read = release_feed.parse_apps(catalogue)
+    built = [(a["id"], len(a["releases"]), sum(len(r["files"]) for r in a["releases"])) for a in apps]
+    kept = [(a.id, len(a.releases), sum(len(r.files) for r in a.releases)) for a in read.apps]
+    if built != kept:
+        raise BuildError(f"installs would not read the whole list: built {built}, read {kept}")
+    return catalogue
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -192,6 +348,14 @@ def main(argv: list[str] | None = None) -> int:
     p_notes.add_argument("--version", required=True)
     p_notes.add_argument("--out", type=Path, required=True)
     p_notes.add_argument("--source", type=Path, default=RELEASES)
+    p_abuild = sub.add_parser("apps-build", help="apps.yaml -> apps.json (the app list)")
+    p_abuild.add_argument("--source", type=Path, required=True)
+    p_abuild.add_argument("--out", type=Path, required=True)
+    p_asign = sub.add_parser("apps-sign", help="write apps.json.sig")
+    p_asign.add_argument("folder", type=Path)
+    p_asign.add_argument("--key-file", type=Path, help="default: $APPS_FEED_SIGNING_KEY")
+    p_averify = sub.add_parser("apps-verify", help="read the app list as an install does")
+    p_averify.add_argument("folder", type=Path)
     args = parser.parse_args(argv)
 
     try:
@@ -220,6 +384,26 @@ def main(argv: list[str] | None = None) -> int:
             feed = build(source, version=args.version, agent=None, today=datetime.now(UTC).date())
             args.out.write_text(notes(feed, args.version), encoding="utf-8", newline="\n")
             print(f"{args.out}: notes for {args.version}")
+        elif args.cmd == "apps-build":
+            source = yaml.safe_load(args.source.read_text(encoding="utf-8")) or {}
+            catalogue = build_apps(source)
+            args.out.mkdir(parents=True, exist_ok=True)
+            (args.out / APPS_INDEX).write_text(json.dumps(catalogue, indent=2, ensure_ascii=False) + "\n",
+                                               encoding="utf-8", newline="\n")
+            print(f"{args.out / APPS_INDEX}: {len(catalogue['apps'])} apps")
+        elif args.cmd == "apps-sign":
+            secret = args.key_file.read_text(encoding="utf-8") if args.key_file else os.environ.get(
+                "APPS_FEED_SIGNING_KEY", ""
+            )
+            if not secret.strip():
+                raise BuildError("No signing key: set APPS_FEED_SIGNING_KEY or pass --key-file")
+            signature = sign((args.folder / APPS_INDEX).read_bytes(), secret, release_feed.APPS_TRUSTED_KEYS)
+            (args.folder / APPS_SIG).write_text(json.dumps(signature) + "\n", encoding="utf-8", newline="\n")
+            print(f"{args.folder / APPS_SIG}: signed with {signature['key_id']}")
+        elif args.cmd == "apps-verify":
+            found = release_feed.verify_apps((args.folder / APPS_INDEX).read_bytes(),
+                                             (args.folder / APPS_SIG).read_bytes())
+            print(f"valid: {len(found.apps)} apps ({', '.join(a.id for a in found.apps) or 'none'})")
         elif args.cmd == "keygen":
             key = Ed25519PrivateKey.generate()
             raw = key.private_bytes(
