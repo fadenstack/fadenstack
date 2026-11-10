@@ -56,7 +56,7 @@ beforeEach(() => {
 
 describe("Settings > protected settings", () => {
   it("names root mode only for turning on when the setting can be narrowed without it", async () => {
-    renderPage(<SettingsPage />, { path: "/admin/settings", initialPath: "/admin/settings?tab=general" });
+    renderPage(<SettingsPage />, { path: "/admin/settings", initialPath: "/admin/settings?tab=approvals" });
 
     expect(await screen.findByLabelText("Result summary length")).toBeInTheDocument();
     expect(screen.getByText("Turning it on needs Root Mode; turning it off does not.")).toBeInTheDocument();

@@ -964,6 +964,9 @@
     "secret_copied": "Secreto copiado al portapapeles.",
     "secret_copy_failed": "No se pudo copiar el secreto al portapapeles.",
     "secret_copy_empty": "Genera o ingresa un secreto antes de copiar.",
+    "approvals": {
+      "title": "Aprobaciones"
+    },
     "general": {
       "title": "General",
       "api_server": {

@@ -28,7 +28,7 @@ from starlette import status
 
 from faden_backend.db.models.containers import AuditEvent
 from faden_backend.db.models.oauth import OAuthAccount
-from faden_backend.db.models.step_up import BypassStepUp
+from faden_backend.db.models.step_up import BypassStepUp, BypassStepUpFailure
 from faden_backend.db.models.users import User
 from faden_backend.services.agents import step_up
 from faden_backend.services.sign_in import module
@@ -36,6 +36,7 @@ from faden_backend.services.sign_in.contract import (
     ExternalIdentity,
     ProviderKind,
     ProviderPublic,
+    Refusal,
     SignInAnswer,
     SignInStart,
 )
@@ -245,6 +246,8 @@ class _Module:
         self.provider = provider
         self.fresh: list[bool] = []
         self.identity: ExternalIdentity | None = None
+        #: The module refuses the answer: why, and its detail.
+        self.refusal: tuple[Refusal, str] | None = None
         monkeypatch.setattr(module, "public_providers", self._public)
         monkeypatch.setattr(module, "provider", self._provider)
         monkeypatch.setattr(module, "start", self._start)
@@ -262,6 +265,8 @@ class _Module:
         return SignInStart(redirect_url="https://idp.example/authorize", transaction="tx-" + "a" * 20)
 
     async def _finish(self, *_: Any) -> SignInAnswer:
+        if self.refusal:
+            return SignInAnswer(outcome="refused", refusal=self.refusal[0], detail=self.refusal[1])
         return SignInAnswer(outcome="identity", identity=self.identity)
 
     async def _password(self, *_: Any) -> SignInAnswer:
@@ -332,6 +337,52 @@ async def test_a_provider_sign_in_as_someone_else_or_unlinked_approves_nothing(
         assert back.headers["location"] == "/step-up?refused=wrong_account", subject
     links = (await dbsession.execute(select(OAuthAccount).where(OAuthAccount.account_id == "sub-unlinked"))).all()
     assert links == [], "a step-up links nothing"
+
+
+@pytest.mark.parametrize(("refusal", "detail"), [
+    (Refusal.NOT_FRESH, "before_asked"),
+    (Refusal.PROVIDER_ERROR, "replayed"),
+], ids=["not-fresh", "provider-error"])
+async def test_a_refusal_by_the_module_is_recorded_as_the_step_ups_as_cores_own_not_fresh(
+    refusal: Refusal, detail: str, oidc: _Module,
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession, secret: str,  # noqa: F811 - the fixtures
+) -> None:
+    """The row names the step-up, its agent and device, and neither counts as a wrong sign-in (ASVS 5.0 16.3.1)."""
+    person, tokens = await _app(client, dbsession, signed_in)
+    await _link(dbsession, person, "entra", "sub-1")
+    started = await _start(client, tokens)
+    await client.post(f"{PAGE}/begin", json={"code": started["user_code"]})
+
+    async def answered() -> str:
+        await client.post(f"{PAGE}/sso/entra")
+        back = await client.get(
+            "/api/auth/sso/entra/callback", params={"state": "tx-" + "a" * 20, "code": "c"}, follow_redirects=False,
+        )
+        return back.headers["location"]
+
+    oidc.identity = _identity("entra", "sub-1", datetime.now(UTC) - timedelta(minutes=10))
+    assert await answered() == "/step-up?refused=not_fresh", "core's own check"
+    oidc.refusal = (refusal, detail)
+    assert await answered() == f"/step-up?refused={refusal.value}", "the module's"
+
+    row = await _row(dbsession)
+    named = {"agent": str(row.agent_id), "device": str(row.device_id), "provider": "entra"}
+    rows = (await dbsession.execute(
+        select(AuditEvent).where(AuditEvent.action == "bypass_step_up.sign_in").order_by(AuditEvent.time),
+    )).scalars().all()
+    assert [(e.target_type, e.target_id, e.result, json.loads(e.metadata_json or "{}")) for e in rows] == [
+        ("bypass_step_up", str(row.id), "deny", {**named, "reason": "not_fresh"}),
+        ("bypass_step_up", str(row.id), "deny", {**named, "reason": refusal.value}),
+    ]
+    assert row.failed_sign_ins == 0, "neither is a wrong sign-in"
+    assert (await dbsession.execute(select(BypassStepUpFailure))).all() == []
+    module_rows = (await dbsession.execute(
+        select(AuditEvent).where(AuditEvent.action == "auth.sign_in.refused"),
+    )).scalars().all()
+    assert [json.loads(e.metadata_json or "{}") for e in module_rows] == [
+        {"provider": "entra", "reason": refusal.value, "detail": detail},
+    ], "the module's own record stays"
+    assert (await client.get(PAGE)).json()["state"] == "sign_in", "the person may sign in again"
 
 
 async def test_saml_and_the_directory_are_recorded_as_such(

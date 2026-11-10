@@ -324,24 +324,61 @@ zuerst), und jedes Modell auf dem Cluster lädt neu. Planen Sie ein Zeitfenster 
 ## Zurückgehen {#going-back}
 
 !!! warning "Wird noch getestet"
-    Das Zurückgehen nach einem Upgrade wird noch getestet und führt nur einen Teil des Weges zurück. Eine
-    Wiederherstellung bringt die Daten auf den Stand vor dem Upgrade, aber der Server bleibt auf dem neuen
-    Release: Seine Programme und die Dateien der Installation bleiben, wie das Upgrade sie hinterlassen hat, und
-    die Datenbanken werden beim Start der Dienste erneut auf das neue Release migriert. Zum früheren Release
-    selbst zurückzugehen ist noch nicht möglich. Der sichere Weg zurück ist ein Snapshot des ganzen Servers,
-    aufgenommen vor dem Upgrade: ein Snapshot der virtuellen Maschine oder ein Festplatten-Image.
+    Das Zurückgehen auf das Release vor einem Upgrade wird noch getestet. Der sichere Weg zurück ist weiterhin ein
+    Snapshot des ganzen Servers, aufgenommen vor dem Upgrade: ein Snapshot der virtuellen Maschine oder ein
+    Festplatten-Image.
 
-Jedes Upgrade hinterlässt eine Sicherung in `~/fadenstack/backups/<time>/`. Um die Daten auf den Stand vor dem
-Upgrade zurückzubringen, stellen Sie diese Sicherung wieder her:
+Jedes Upgrade hinterlässt eine Sicherung in `~/fadenstack/backups/<time>/` und nennt sie. Um auf das Release vor
+diesem (0.6.0) zurückzugehen, stellen Sie diese Sicherung mit dem `faden` jenes Releases wieder her, in drei
+Schritten. Alles, was nach der Sicherung geschehen ist, geht verloren: Chats, Nutzung, seitdem erteilte Freigaben.
 
-```bash
-faden restore ~/fadenstack/backups/<time>
-```
+1. **Löschen Sie die Tabellen, die dieses Release angelegt hat**, während Postgres läuft. Die Wiederherstellung
+   des früheren Releases ersetzt nur, was die Sicherung enthält; eine dieser Tabellen verweist auf die Konten und
+   die Agenten, die sie dann ebenfalls nicht ersetzen kann, und das nächste Upgrade bliebe an den übrigen Tabellen
+   stehen.
 
-Die Wiederherstellung spielt jede Datenbank, die `.env` und das Zertifikatsmaterial zurück und startet die
-Dienste neu. Alles, was nach der Sicherung geschehen ist, geht verloren. Ein Cluster, der nach der Sicherung
-erstellt wurde, läuft auf seinen Maschinen weiter; übernehmen Sie ihn, statt ihn neu zu erstellen (siehe
-[Cluster übernehmen](taking-over.md)). Mehr zur Wiederherstellung: [Sicherungen](backups.md#restore).
+    ```bash
+    docker exec faden-postgres psql -U postgres -v ON_ERROR_STOP=1 -d faden_backend -c "DROP TABLE bypass_step_up_failures, bypass_step_ups;"
+    docker exec faden-postgres psql -U postgres -v ON_ERROR_STOP=1 -d faden_gateway -c "DROP TABLE approval_grant_call, approval_grant_change, approval_grant_flag, approval_grant;"
+    ```
+
+    Mit Enterprise nennt der erste Befehl auch die Tabellen von Enterprise aus diesem Release:
+
+    ```bash
+    docker exec faden-postgres psql -U postgres -v ON_ERROR_STOP=1 -d faden_backend -c "DROP TABLE bypass_step_up_failures, bypass_step_ups, ee.bypass_sides, ee.bypass_for, ee.grant_limits, ee.approval_alerts;"
+    ```
+
+    Die Dienste, die noch laufen, können ab hier keine Freigaben auf Zeit und kein Bypass mehr lesen: Machen Sie
+    sofort weiter.
+
+2. **Installieren Sie das `faden` des früheren Releases**, so wie `faden` auf dem Server installiert ist
+   (`FADEN_CLI_INSTALLER` in der `.env` sagt, wie):
+
+    ```bash
+    pipx install --force fadenstack==0.6.0      # mit pipx installiert
+    uv tool install --force fadenstack==0.6.0   # mit uv installiert
+    faden --version
+    ```
+
+3. **Stellen Sie damit die Sicherung des Upgrades wieder her:**
+
+    ```bash
+    faden restore ~/fadenstack/backups/<time>
+    ```
+
+    Sie startet das frühere Release: Die `.env` der Sicherung nennt es (`VERSION`), und seine Images müssen auf dem
+    Server liegen oder in der Registry, die die `.env` nennt.
+
+| Die Wiederherstellung des früheren Releases ersetzt | Sie behält |
+|---|---|
+| Jede Tabelle, die die Sicherung enthält, in jeder Datenbank, die sie enthält, samt ihren Zeilen | Tabellen, die ein neueres Release angelegt hat (Schritt 1 löscht die dieses Releases) |
+| Die `.env` und das Zertifikatsmaterial | Die Dateien der Installation, wie das Upgrade sie geschrieben hat; das frühere Release startet mit ihnen |
+| Die Volumes, die die Sicherung enthält (eine Sicherung mit `--include-volumes`) | Datenbanken und Volumes, die die Sicherung nicht enthält, Modelle, Runtime-Images, die Maschinen |
+
+Ab diesem Release macht `faden restore` jede Datenbank genau zu der der Sicherung (siehe
+[Sicherungen](backups.md#restore)); die Wiederherstellung des früheren Releases tut das nicht, daher Schritt 1.
+Ein Cluster, der nach der Sicherung erstellt wurde, läuft auf seinen Maschinen weiter; übernehmen Sie ihn, statt
+ihn neu zu erstellen (siehe [Cluster übernehmen](taking-over.md)).
 
 ## Wenn es nicht funktioniert {#when-it-does-not-work}
 
@@ -351,6 +388,7 @@ erstellt wurde, läuft auf seinen Maschinen weiter; übernehmen Sie ihn, statt i
 | **`This CLI (<version>) is older than the install (<version>).`** | Das Werkzeug ist älter als das Release, mit dem die Installation läuft. Aktualisieren Sie zuerst das Werkzeug. |
 | **`<version> cannot upgrade straight to <version>: <version> has to come first.`** | Ein Release dazwischen lässt sich nicht überspringen. Installieren Sie das Werkzeug des genannten Releases, führen Sie `faden upgrade` aus, installieren Sie dann das neuere Werkzeug und führen Sie `faden upgrade` erneut aus. Die Meldung nennt die Befehle. |
 | **Updates** meldet, dass die Liste der Releases nicht gelesen werden konnte | Der Server hat kein Internet oder braucht einen Proxy. Siehe [Ein Server ohne Internetzugang](#a-server-without-internet-access). |
+| **`pg_restore warnings for faden_backend: ... cannot drop constraint user_pkey ...`** nach dem Zurückgehen | Schritt 1 von [Zurückgehen](#going-back) wurde ausgelassen: Die Wiederherstellung des früheren Releases konnte die Konten und die Agenten nicht ersetzen. Löschen Sie die Tabellen wie in Schritt 1, dann führen Sie dieselbe `faden restore` erneut aus. |
 | **`Backup failed — aborting upgrade.`** | Meist eine volle Festplatte oder ein Postgres, das nicht läuft. Schaffen Sie Platz, prüfen Sie `faden status` und führen Sie das Upgrade erneut aus. Verwenden Sie `--no-backup` nur, wenn Sie eine aktuelle Sicherung haben. |
 | **`Chat attachments could not be copied ...`** oder **`... exist in the data volume with other content ...`** | Eine Installation aus der Zeit vor Release 0.4.4 hält Chat-Anhänge im Gateway-Container, und das Upgrade muss sie in das Volume kopieren, bevor es den Container ersetzt. Das ging nicht, oder das Volume enthält schon eine Datei gleichen Namens mit anderem Inhalt. Es wurde nichts ersetzt und keine Datei überschrieben; die alten Dienste laufen weiter. Schaffen Sie Platz oder beheben Sie die Ursache, die die Meldung nennt (bei einer abweichenden Datei: verschieben Sie die unerwünschte aus dem Volume), und führen Sie `faden upgrade` erneut aus. |
 | **`Backend did not become healthy within 120 s.`** | Die Dienste wurden neu gestartet, aber die Konsolen-API antwortet noch nicht. Lesen Sie `faden logs faden-backend`. Die Wartungsseite wird trotzdem aufgehoben, damit erreichbar ist, was läuft. |

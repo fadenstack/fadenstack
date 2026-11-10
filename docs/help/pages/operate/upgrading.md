@@ -299,23 +299,58 @@ and every model on the cluster loads again. Plan a window for it.
 ## Going back
 
 !!! warning "Under testing"
-    Going back after an upgrade is being tested, and goes back only part of the way. A restore puts the data
-    back as it was before the upgrade, but the server stays on the new release: its programs and deployment
-    files stay as the upgrade left them, and the databases are migrated to the new release again when the
-    services start. Going back to the earlier release itself is not possible yet. The sure way back is a
-    snapshot of the whole server, taken before the upgrade: a virtual machine snapshot or a disk image.
+    Going back to the release before an upgrade is being tested. The sure way back is still a snapshot of the
+    whole server taken before the upgrade: a virtual machine snapshot or a disk image.
 
-Every upgrade leaves a backup in `~/fadenstack/backups/<time>/`. To put the data back as it was before the
-upgrade, restore that backup:
+Every upgrade leaves a backup in `~/fadenstack/backups/<time>/` and names it. To go back to the release before
+this one (0.6.0), restore that backup with that release's `faden`, in three steps. Everything done after the
+backup is lost: chats, usage, approvals given since.
 
-```bash
-faden restore ~/fadenstack/backups/<time>
-```
+1. **Drop the tables this release added**, while Postgres runs. The earlier release's restore replaces only what
+   the backup holds; one of these tables refers to the accounts and the agents, which it then cannot replace
+   either, and the next upgrade would stop at the tables left over.
 
-The restore puts back every database, the `.env` and the certificate material, and restarts the services.
-Anything done after the backup is lost. A cluster created after the backup keeps running on its machines; take it
-over instead of creating it again (see [Taking over clusters](taking-over.md)). More on restoring:
-[Backups](backups.md#restore).
+    ```bash
+    docker exec faden-postgres psql -U postgres -v ON_ERROR_STOP=1 -d faden_backend -c "DROP TABLE bypass_step_up_failures, bypass_step_ups;"
+    docker exec faden-postgres psql -U postgres -v ON_ERROR_STOP=1 -d faden_gateway -c "DROP TABLE approval_grant_call, approval_grant_change, approval_grant_flag, approval_grant;"
+    ```
+
+    With Enterprise, the first command names Enterprise's tables of this release too:
+
+    ```bash
+    docker exec faden-postgres psql -U postgres -v ON_ERROR_STOP=1 -d faden_backend -c "DROP TABLE bypass_step_up_failures, bypass_step_ups, ee.bypass_sides, ee.bypass_for, ee.grant_limits, ee.approval_alerts;"
+    ```
+
+    The services still running can no longer read grants or Bypass from here on: go on at once.
+
+2. **Install the earlier release's `faden`**, the way `faden` is installed on the server (`FADEN_CLI_INSTALLER` in
+   `.env` says which):
+
+    ```bash
+    pipx install --force fadenstack==0.6.0      # installed with pipx
+    uv tool install --force fadenstack==0.6.0   # installed with uv
+    faden --version
+    ```
+
+3. **Restore the upgrade's backup** with it:
+
+    ```bash
+    faden restore ~/fadenstack/backups/<time>
+    ```
+
+    It starts the earlier release: the backup's `.env` names it (`VERSION`), and its images must be on the server
+    or in the registry the `.env` names.
+
+| The earlier release's restore replaces | It keeps |
+|---|---|
+| Every table the backup holds, in each database it holds, and its rows | Tables a newer release added (step 1 drops this release's) |
+| `.env` and the certificate material | The deployment files as the upgrade wrote them; the earlier release starts with them |
+| The volumes the backup holds (a backup with `--include-volumes`) | Databases and volumes the backup does not hold, models, runtime images, the machines |
+
+From this release on, `faden restore` makes each database exactly the backup's (see
+[Backups](backups.md#restore)); the earlier release's restore does not, hence step 1. A cluster created after the
+backup keeps running on its machines; take it over instead of creating it again (see
+[Taking over clusters](taking-over.md)).
 
 ## When it does not work
 
@@ -325,6 +360,7 @@ over instead of creating it again (see [Taking over clusters](taking-over.md)). 
 | **`This CLI (<version>) is older than the install (<version>).`** | The tool is older than the release the install runs. Upgrade the tool first. |
 | **`<version> cannot upgrade straight to <version>: <version> has to come first.`** | A release in between cannot be skipped. Install the tool of the release named, run `faden upgrade`, then install the newer tool and run `faden upgrade` again. The message gives the commands. |
 | **Updates** says the release list could not be read | The server has no internet, or needs a proxy. See [A server without internet access](#a-server-without-internet-access). |
+| **`pg_restore warnings for faden_backend: ... cannot drop constraint user_pkey ...`** after going back | Step 1 of [Going back](#going-back) was left out: the earlier release's restore could not replace the accounts and the agents. Drop the tables as step 1 says, then run the same `faden restore` again. |
 | **`Backup failed — aborting upgrade.`** | Usually a full disk, or Postgres not running. Free space, check `faden status`, and run it again. Use `--no-backup` only if you have a current backup. |
 | **`Chat attachments could not be copied ...`** or **`... exist in the data volume with other content ...`** | An install from before release 0.4.4 keeps chat attachments inside the gateway container, and the upgrade must copy them into the volume before it replaces the container. It could not, or the volume already holds a file of the same name with other content. Nothing was replaced and no file was overwritten; the old services still run. Free disk space or fix the cause the message names (for a file that differs, move the one you do not want out of the volume), then run `faden upgrade` again. |
 | **`Backend did not become healthy within 120 s.`** | The services were restarted but the console API does not answer yet. Read `faden logs faden-backend`. The maintenance page is lifted anyway, so whatever runs can be reached. |

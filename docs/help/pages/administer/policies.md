@@ -197,9 +197,9 @@ it a tool class (see [Tool classes and tool modes](#tool-classes-and-tool-modes)
 
 ### Allow rules from earlier versions {#allow-rules}
 
-Earlier versions also offered **Allow**. It could not make an exception to a **Deny** or **Ask first** rule, and
-on its own it changed nothing, so new rules can no longer allow. Rules made with it are still listed, marked
-**No effect**: change them to **Deny** or **Ask first**, or delete them.
+In earlier versions an **Allow** placed before a **Deny** or **Ask first** rule (a lower priority number) let the
+tool through. From this release a Deny or Ask first always wins, and Allow changes nothing. Rules made with it are
+listed as **No effect**: change them to **Deny** or **Ask first**, or delete them.
 
 ### Tool classes and tool modes
 

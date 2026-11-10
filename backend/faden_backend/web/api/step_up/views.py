@@ -521,6 +521,11 @@ async def finish_sso(
     ):
         return _to_page("expired")
     if isinstance(identity, Refusal):
+        # Recorded as the step-up's, as core's own not_fresh below (ASVS 5.0 16.3.1); an answer the module
+        # refused is in auth.sign_in.refused too, with its detail. Not a wrong sign-in, as not_fresh is not.
+        await _audit(audit, "bypass_step_up.sign_in", row, result=AuditResult.DENY, reason=identity.value,
+                     provider=provider.key)
+        await session.commit()
         return _to_page(identity.value)
     if not step_up.fresh_from_provider(identity.authenticated_at, asked_at, now):
         await _audit(audit, "bypass_step_up.sign_in", row, result=AuditResult.DENY, reason="not_fresh",

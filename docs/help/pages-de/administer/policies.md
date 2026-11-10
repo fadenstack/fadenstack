@@ -214,10 +214,10 @@ Soll ein Tool ohne Nachfrage laufen, geben Sie ihm eine Tool-Klasse (siehe
 
 ### Regeln „Erlauben“ aus früheren Versionen {#allow-rules}
 
-Frühere Versionen boten auch **Erlauben** an. Es konnte keine Ausnahme von einer Regel **Sperren** oder **Erst
-nachfragen** bilden und änderte für sich allein nichts; neue Regeln können deshalb nicht mehr erlauben. Damit
-angelegte Regeln stehen weiter in der Liste, markiert mit **Ohne Wirkung**: Ändern Sie sie auf **Sperren** oder
-**Erst nachfragen**, oder löschen Sie sie.
+In früheren Versionen ließ eine Regel **Erlauben**, die vor einer Regel **Sperren** oder **Erst nachfragen** stand
+(mit einer niedrigeren Zahl als Priorität), das Tool durch. Ab dieser Version gewinnt Sperren oder Erst nachfragen
+immer, und Erlauben ändert nichts. Damit angelegte Regeln stehen in der Liste als **Ohne Wirkung**: Ändern Sie sie
+auf **Sperren** oder **Erst nachfragen**, oder löschen Sie sie.
 
 ### Tool-Klassen und Tool-Modi {#tool-classes-and-tool-modes}
 

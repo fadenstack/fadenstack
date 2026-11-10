@@ -191,8 +191,7 @@ APPROVAL_SETTINGS: list[SettingDefinition] = [
         "Lets a person switch approvals off for one conversation with an agent whose highest level is "
         "Bypass, after signing in again in the browser: destructive and unclassified tools then run without "
         "asking, every call is recorded on the server, and rules and 'Ask first' still hold (sdk/09 L-57). "
-        "Off: nobody can choose Bypass, and running Bypass sessions end within half a minute. Turning it on "
-        "needs Root Mode; turning it off does not.",
+        "Off: nobody can choose Bypass, and running Bypass sessions end within half a minute.",
         False, protected=True, narrowing_values=(False,),
     ),
     _approvals(

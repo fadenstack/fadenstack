@@ -959,6 +959,9 @@
     "secret_copied": "Secret copié dans le presse-papiers.",
     "secret_copy_failed": "Échec de la copie du secret dans le presse-papiers.",
     "secret_copy_empty": "Générez ou saisissez une valeur secrète avant de copier.",
+    "approvals": {
+      "title": "Approbations"
+    },
     "general": {
       "title": "Général",
       "api_server": {
