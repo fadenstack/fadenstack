@@ -231,13 +231,17 @@ async def notify(session: AsyncSession, state: ReleaseFeedState) -> bool:
     )
 
 
-async def run_pass(session_factory: Any, *, now: datetime | None = None) -> bool:
-    """One pass of the background check: read the feed when it is due. True when it was read.
+async def run_pass(session_factory: Any, *, now: datetime | None = None, gateway_factory: Any = None) -> bool:
+    """One pass of the background check: read the feed and the app list when due. True when they were read.
 
     Every uvicorn worker runs the loop; a transaction-scoped advisory lock lets
     one act, and the kept ``checked_at`` stops the others from reading it again.
+    The app list is read with the feed, and at once when it never was (an
+    install that just upgraded to a release that reads it). *gateway_factory*
+    opens the gateway's database, where the apps in use are read.
     """
     from faden_backend.services.system_settings.runtime_mapping import refresh_runtime_values  # noqa: PLC0415
+    from faden_backend.services.updates import apps  # noqa: PLC0415
 
     now = now or datetime.now(UTC)
     async with session_factory() as session:
@@ -248,10 +252,23 @@ async def run_pass(session_factory: Any, *, now: datetime | None = None) -> bool
             locked = (await session.execute(text(f"SELECT pg_try_advisory_xact_lock({_LOCK})"))).scalar()
             if not locked:
                 return False
-        if not due(await load_state(session), now):
+        if not due(await load_state(session), now) and await apps.load_state(session) is not None:
             return False
         state = await check_now(session, now=now)
         if state.error is None:
             await notify(session, state)
+        apps_state = await apps.check_now(session, now=now)
+        if apps_state.error is None:
+            await apps.notify(session, apps_state, await apps_in_use(gateway_factory, now))
         await session.commit()
         return True
+
+
+async def apps_in_use(gateway_factory: Any, now: datetime) -> dict[str, Any]:
+    """The app versions people ran lately (services/updates/apps.py), read in the gateway's database."""
+    from faden_backend.services.updates import apps  # noqa: PLC0415
+
+    if gateway_factory is None:
+        return {}
+    async with gateway_factory() as gateway:
+        return await apps.in_use(gateway, now)

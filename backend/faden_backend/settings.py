@@ -210,6 +210,10 @@ class Settings(BaseSettings):
     updates_feed_url: str = ""
     #: An HTTP(S) proxy for the feed only; empty: none (HTTPS_PROXY in the environment still applies).
     updates_proxy_url: str = ""
+    #: Tell administrators about new apps and app releases (security notices for apps in use come regardless).
+    updates_app_news: bool = True
+    #: The apps (ids of the app list, comma-separated) offered to people on their Apps page; empty: none.
+    updates_apps_offered: str = ""
     # What `faden deploy`/`upgrade` recorded in .env: the release the install
     # runs (VERSION) and how the CLI was installed, for the upgrade commands
     # the console shows. Empty for a source checkout.

@@ -185,7 +185,8 @@ async def test_the_background_pass_reads_only_when_due_and_switched_on(
     assert not await check.run_pass(_factory(dbsession), now=NOW + timedelta(hours=1))
     monkeypatch.setattr(settings, "updates_check_enabled", False)
     assert not await check.run_pass(_factory(dbsession), now=NOW + timedelta(days=2))
-    assert len(served["asked"]) == 1
+    # One pass read the feed, and the app list beside it.
+    assert [url for url, _ in served["asked"]] == [release_feed.FEED_URL, release_feed.apps_url(release_feed.FEED_URL)]
 
 
 class _Docker:
