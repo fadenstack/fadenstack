@@ -235,6 +235,34 @@ def test_a_pg_restore_failure_leaves_the_live_databases_and_no_copy(db: SimpleNa
     assert "error" in text.lower() and "faden_gateway: pg_restore exit code 1" in text
 
 
+def test_a_failure_names_only_the_databases_that_were_started(
+    db: SimpleNamespace, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Each "Restoring <db> into <db>__restore" is printed as that database's restore starts: a pg_restore
+    failure on the second of three names the first and the second, never the third, which never started."""
+    _backend_060(db)
+    _gateway_060(db)
+    db.sql("CREATE DATABASE rag")
+    db.sql("CREATE TABLE chunks (id int); INSERT INTO chunks VALUES (1);", "rag")
+    manifest = _backup(db, tmp_path / "b", ["faden_backend", "faden_gateway", "rag"])
+    dump = tmp_path / "b" / "faden_gateway.dump"
+    dump.write_bytes(dump.read_bytes()[: dump.stat().st_size * 2 // 3])
+    printed: list[str] = []
+    monkeypatch.setattr(backup, "info", printed.append)
+
+    with pytest.raises(restore_swap.RestoreFailed, match="pg_restore failed for faden_gateway"):
+        _prepare(tmp_path, tmp_path / "b", manifest)
+
+    restoring = [line.strip() for line in printed if "Restoring" in line]
+    assert restoring == [
+        "Restoring faden_backend into faden_backend__restore",
+        "Restoring faden_gateway into faden_gateway__restore",
+    ]
+    log = (tmp_path / "restore.log").read_text(encoding="utf-8")
+    assert "rag: pg_restore" not in log, "rag never started"
+    assert _databases(db) == ["faden_backend", "faden_gateway", "rag"], "no copy left"
+
+
 def test_every_database_of_the_backup_is_restored_also_with_an_empty_head(db: SimpleNamespace, tmp_path: Path) -> None:
     _backend_060(db)
     db.sql("CREATE DATABASE rag")
