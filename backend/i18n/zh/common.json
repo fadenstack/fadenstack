@@ -964,6 +964,9 @@
     "secret_copied": "密钥已复制到剪贴板。",
     "secret_copy_failed": "复制密钥到剪贴板失败。",
     "secret_copy_empty": "请先生成或输入密钥后再复制。",
+    "approvals": {
+      "title": "审批"
+    },
     "general": {
       "title": "通用",
       "api_server": {

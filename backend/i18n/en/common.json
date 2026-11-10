@@ -959,6 +959,9 @@
     "secret_copied": "Secret copied to clipboard.",
     "secret_copy_failed": "Failed to copy secret to clipboard.",
     "secret_copy_empty": "Generate or enter a secret value before copying.",
+    "approvals": {
+      "title": "Approvals"
+    },
     "general": {
       "title": "General",
       "api_server": {
