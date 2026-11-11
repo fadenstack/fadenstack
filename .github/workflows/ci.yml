@@ -73,6 +73,10 @@ jobs:
               - 'shared/**'
               - 'release/**'
               - '.github/workflows/ci.yml'
+              # cli/tests/test_image_labels.py: each image's description in the publish workflow and its Dockerfile
+              - '.github/workflows/docker-publish.yml'
+              - '.github/workflows/docker-build-reusable.yml'
+              - '**/Dockerfile'
             agent:
               - 'agent/**'
               - '.github/workflows/ci.yml'

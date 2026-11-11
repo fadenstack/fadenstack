@@ -18,6 +18,12 @@ COPY . .
 RUN --mount=type=cache,target=/root/.cache/uv \
   uv sync --locked --inexact --no-dev
 
+# What the image is, as GHCR shows it (the same as .github/workflows/docker-publish.yml; cli/tests/test_image_labels.py).
+LABEL org.opencontainers.image.title="Fadenstack PII" \
+  org.opencontainers.image.description="The Fadenstack PII module: finds personal data in text, such as names, e-mail addresses, phone numbers and places, so that the gateway can mask it before a request reaches a model. This image detects with Microsoft Presidio and spaCy's English model." \
+  org.opencontainers.image.source="https://github.com/fadenstack/fadenstack" \
+  org.opencontainers.image.licenses="Apache-2.0"
+
 CMD ["/usr/local/bin/python", "-m", "faden_pii"]
 
 FROM prod AS dev
@@ -42,7 +48,15 @@ FROM neural-base AS prod-cpu
 RUN --mount=type=cache,target=/root/.cache/uv \
   uv sync --locked --inexact --no-dev --extra onnx
 ENV FADEN_PII_BATCH_SHORT=8 FADEN_PII_BATCH_LONG=2
+LABEL org.opencontainers.image.title="Fadenstack PII (CPU)" \
+  org.opencontainers.image.description="The Fadenstack PII module, neural variant for CPUs: finds personal data in text, such as names, e-mail addresses, phone numbers and places, so that the gateway can mask it before a request reaches a model. It detects with a GLiNER model on ONNX Runtime, with spaCy models for English, German, French and Spanish." \
+  org.opencontainers.image.source="https://github.com/fadenstack/fadenstack" \
+  org.opencontainers.image.licenses="Apache-2.0"
 
 FROM neural-base AS prod-gpu
 RUN --mount=type=cache,target=/root/.cache/uv \
   uv sync --locked --inexact --no-dev --extra gliner2
+LABEL org.opencontainers.image.title="Fadenstack PII (GPU)" \
+  org.opencontainers.image.description="The Fadenstack PII module, neural variant for NVIDIA GPUs: finds personal data in text, such as names, e-mail addresses, phone numbers and places, so that the gateway can mask it before a request reaches a model. It detects with GLiNER2 on PyTorch, with spaCy models for English, German, French and Spanish." \
+  org.opencontainers.image.source="https://github.com/fadenstack/fadenstack" \
+  org.opencontainers.image.licenses="Apache-2.0"

@@ -29,4 +29,9 @@ COPY --from=production-dependencies-env /app/node_modules /app/node_modules
 COPY --from=build-env /app/build /app/build
 COPY --from=help-env /help-build/site /app/build/client/help
 WORKDIR /app
+# What the image is, as GHCR shows it (the same as .github/workflows/docker-publish.yml; cli/tests/test_image_labels.py).
+LABEL org.opencontainers.image.title="Fadenstack console" \
+      org.opencontainers.image.description="The Fadenstack console: the web interface for chat and for administering a Fadenstack installation, served by Node.js (React Router). It also serves the Help pages of its own release at /help, so they are there without internet access." \
+      org.opencontainers.image.source="https://github.com/fadenstack/fadenstack" \
+      org.opencontainers.image.licenses="Apache-2.0"
 CMD ["npm", "run", "start"]

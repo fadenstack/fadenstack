@@ -48,3 +48,11 @@ COPY requirements.txt /tmp/requirements.txt
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install --system --compile-bytecode --require-hashes -r /tmp/requirements.txt \
     && rm /tmp/requirements.txt
+
+# What the image is, as GHCR shows it. .github/workflows/docker-publish.yml sets the same title, description and
+# licence on the published image and its index; cli/tests/test_image_labels.py keeps the two equal. The services
+# built FROM this image set their own.
+LABEL org.opencontainers.image.title="Fadenstack base" \
+      org.opencontainers.image.description="The base image of the Fadenstack services: Python 3.13 on Debian bookworm (slim) with uv and gcc, and the Python packages the services share, installed from pinned, hash-checked requirements. The gateway, backend, PII, MCP, skills and provenance images are built on it. It runs no service of its own." \
+      org.opencontainers.image.source="https://github.com/fadenstack/fadenstack" \
+      org.opencontainers.image.licenses="Apache-2.0"

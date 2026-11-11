@@ -11,6 +11,13 @@
 # base image of the same commit (base:<sha>, built first).
 #   - Manual dispatch (choose which services to build)
 #
+# Each image's title and description are below, in its job: plain text, at most
+# 512 characters, what the image is. GHCR shows the description on the package's
+# page (the reusable workflow puts it on the image index). The same text is a
+# LABEL in the image's Dockerfile; cli/tests/test_image_labels.py keeps the two
+# equal. The three PII images share one package (ghcr.io/fadenstack/pii): its page
+# shows the text of the image pushed last.
+#
 # Prerequisites:
 #   1. Ensure the repo has packages:write permission (automatic with GITHUB_TOKEN)
 #   2. Images are published to ghcr.io/fadenstack/<service>
@@ -115,6 +122,11 @@ jobs:
       service: base
       context: shared/base
       registry: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}
+      title: Fadenstack base
+      description: >-
+        The base image of the Fadenstack services: Python 3.13 on Debian bookworm (slim) with uv and gcc, and the
+        Python packages the services share, installed from pinned, hash-checked requirements. The gateway, backend,
+        PII, MCP, skills and provenance images are built on it. It runs no service of its own.
 
   # ── Build each service ──────────────────────────────────────────────
   gateway:
@@ -136,6 +148,12 @@ jobs:
       target: prod
       base-image: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}/base:${{ github.sha }}
       registry: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}
+      title: Fadenstack gateway
+      description: >-
+        The Fadenstack LLM gateway: the OpenAI-compatible API through which the console's chat, apps and agents
+        reach the models. It routes each request to the provider or cluster that serves the model, applies the
+        installation's policies on the way (personal data masked by the PII module, tool rules and approvals) and
+        records usage.
 
   backend:
     needs: [changes, base]
@@ -158,6 +176,11 @@ jobs:
       # The runtime manifests the Dockerfile copies in.
       build-contexts: runtime_manifests=runtime-image
       registry: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}
+      title: Fadenstack backend
+      description: >-
+        The Fadenstack backend: the API behind the Fadenstack console. It keeps the installation's people, teams,
+        agents, model providers, clusters, machines and settings in PostgreSQL, talks to the node agents on the
+        machines, and runs the installation's background work, such as the daily update check.
 
   frontend:
     needs: changes
@@ -177,6 +200,11 @@ jobs:
       # Help, built into the image and served at /help.
       build-contexts: docs=docs
       registry: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}
+      title: Fadenstack console
+      description: >-
+        The Fadenstack console: the web interface for chat and for administering a Fadenstack installation, served
+        by Node.js (React Router). It also serves the Help pages of its own release at /help, so they are there
+        without internet access.
 
   pii:
     needs: [changes, base]
@@ -197,6 +225,11 @@ jobs:
       target: prod
       base-image: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}/base:${{ github.sha }}
       registry: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}
+      title: Fadenstack PII
+      description: >-
+        The Fadenstack PII module: finds personal data in text, such as names, e-mail addresses, phone numbers and
+        places, so that the gateway can mask it before a request reaches a model. This image detects with
+        Microsoft Presidio and spaCy's English model.
 
   pii-neural:
     needs: [changes, base]
@@ -208,7 +241,20 @@ jobs:
       (github.event.inputs.services == 'all' || contains(github.event.inputs.services, 'pii'))
     strategy:
       matrix:
-        variant: [cpu, gpu]
+        include:
+          - variant: cpu
+            title: Fadenstack PII (CPU)
+            description: >-
+              The Fadenstack PII module, neural variant for CPUs: finds personal data in text, such as names, e-mail
+              addresses, phone numbers and places, so that the gateway can mask it before a request reaches a model.
+              It detects with a GLiNER model on ONNX Runtime, with spaCy models for English, German, French and
+              Spanish.
+          - variant: gpu
+            title: Fadenstack PII (GPU)
+            description: >-
+              The Fadenstack PII module, neural variant for NVIDIA GPUs: finds personal data in text, such as names,
+              e-mail addresses, phone numbers and places, so that the gateway can mask it before a request reaches a
+              model. It detects with GLiNER2 on PyTorch, with spaCy models for English, German, French and Spanish.
     permissions:
       contents: read
       packages: write
@@ -220,6 +266,8 @@ jobs:
       tag-suffix: -${{ matrix.variant }}
       base-image: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}/base:${{ github.sha }}
       registry: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}
+      title: ${{ matrix.title }}
+      description: ${{ matrix.description }}
 
   mcp:
     needs: [changes, base]
@@ -240,6 +288,12 @@ jobs:
       target: prod
       base-image: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}/base:${{ github.sha }}
       registry: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}
+      title: Fadenstack MCP
+      description: >-
+        The Fadenstack MCP module: registers Model Context Protocol servers (stdio, SSE and streamable HTTP) and
+        offers their tools to chats and agents. It can check each tool call's arguments with the PII module and
+        mask or refuse personal data, as each server's setting says. Node.js is included for servers started
+        with npx.
 
   skills:
     needs: [changes, base]
@@ -260,3 +314,7 @@ jobs:
       target: prod
       base-image: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}/base:${{ github.sha }}
       registry: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}
+      title: Fadenstack skills
+      description: >-
+        The Fadenstack skills module: stores skills, reusable instruction packs in the Agent Skills format, with
+        their owners, sharing and fixed versions, and decides which skills a chat request receives.

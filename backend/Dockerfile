@@ -18,6 +18,12 @@ COPY --from=runtime_manifests runtime-manifest*.json runtime-image/
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --inexact --no-dev
 
+# What the image is, as GHCR shows it (the same as .github/workflows/docker-publish.yml; cli/tests/test_image_labels.py).
+LABEL org.opencontainers.image.title="Fadenstack backend" \
+      org.opencontainers.image.description="The Fadenstack backend: the API behind the Fadenstack console. It keeps the installation's people, teams, agents, model providers, clusters, machines and settings in PostgreSQL, talks to the node agents on the machines, and runs the installation's background work, such as the daily update check." \
+      org.opencontainers.image.source="https://github.com/fadenstack/fadenstack" \
+      org.opencontainers.image.licenses="Apache-2.0"
+
 CMD ["/usr/local/bin/python", "-m", "faden_backend"]
 
 FROM prod AS dev
