@@ -227,3 +227,80 @@ async def test_missing_auth_or_claimed_risk_is_not_accepted(
         json=command(tool_class="read"),
     )
     assert forged.status_code == 400
+
+
+@pytest.mark.anyio
+async def test_model_host_origin_is_discoverable_and_audited_without_arguments(
+    client: AsyncClient, db_session: AsyncSession, backend: _Backend,
+) -> None:
+    await configure(db_session, backend)
+    profile = await client.get("/v1/agents/eplan-assistant/profile", headers=_headers())
+    assert profile.status_code == 200, profile.text
+    assert "host_tools.dispatch_check" in profile.json()["features"]
+    response = await client.post(
+        "/v1/agents/eplan-assistant/tools/check", headers=_headers(),
+        json=command(origin="model_tool", call_id="model-call-1"),
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["decision"] == "ask"
+    events = (await db_session.execute(select(AgentClientEvent).where(
+        AgentClientEvent.type == "host_tool.checked",
+    ))).scalars().all()
+    assert len(events) == 1
+    assert events[0].data["origin"] == "model_tool"
+    assert events[0].data["call_id"] == "model-call-1"
+    assert "fixture-action" not in json.dumps(events[0].data)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("change", [{"origin": "user_history"}, {"call_id": "model-call-2"}])
+async def test_prepared_model_call_cannot_change_attribution(
+    change: dict[str, Any], client: AsyncClient, db_session: AsyncSession, backend: _Backend,
+) -> None:
+    await configure(db_session, backend)
+    response = await client.post(
+        "/v1/agents/eplan-assistant/tools/check", headers=_headers(),
+        json=command(origin="model_tool", call_id="model-call-1"),
+    )
+    assert response.status_code == 200, response.text
+    before = response.json()
+    body = command(origin="model_tool", call_id="model-call-1", phase="dispatch",
+                   prepared_profile=before["profile_stamp"], prepared_arguments=before["arguments_stamp"],
+                   prepared_decision=before["decision_stamp"])
+    body.update(change)
+    after = await client.post("/v1/agents/eplan-assistant/tools/check", headers=_headers(), json=body)
+    assert after.status_code == 409, after.text
+    assert after.json()["error"]["code"] == "host_command_changed"
+
+
+@pytest.mark.anyio
+async def test_model_host_recheck_refuses_a_rule_added_during_approval(
+    client: AsyncClient, db_session: AsyncSession, backend: _Backend,
+) -> None:
+    await configure(db_session, backend)
+    response = await client.post(
+        "/v1/agents/eplan-assistant/tools/check", headers=_headers(),
+        json=command(origin="model_tool", call_id="model-call-1"),
+    )
+    assert response.status_code == 200, response.text
+    before = response.json()
+    await _rule(db_session, "nc_actions_*", "deny", "Changed while approval was open.")
+    gov.tool_rules.invalidate()
+    after = await client.post(
+        "/v1/agents/eplan-assistant/tools/check", headers=_headers(),
+        json=command(origin="model_tool", call_id="model-call-1", phase="dispatch",
+                     prepared_profile=before["profile_stamp"], prepared_arguments=before["arguments_stamp"],
+                     prepared_decision=before["decision_stamp"]),
+    )
+    assert after.status_code == 409, after.text
+
+
+@pytest.mark.anyio
+async def test_model_host_origin_requires_a_call_id(
+    client: AsyncClient, db_session: AsyncSession, backend: _Backend,
+) -> None:
+    await configure(db_session, backend)
+    response = await client.post(
+        "/v1/agents/eplan-assistant/tools/check", headers=_headers(), json=command(origin="model_tool"),
+    )
+    assert response.status_code == 400

@@ -76,7 +76,7 @@ CONVERSATION_HEADER = "x-faden-conversation-id"
 CLIENT_SUPPORTS_HEADER = "x-faden-client-supports"
 #: The client shows Bypass with its confirmation and marker, and makes its grant (sdk/40 A3).
 SUPPORTS_BYPASS = "tool_mode.bypass"
-#: The client can have the person sign in again in the browser before it switches Bypass on (sdk/41). Bypass is
+#: The client can have the person sign in again in the browser before switching Bypass on (sdk/41).
 #: offered only to clients that name both: one that cannot do the step-up could never make the grant.
 SUPPORTS_STEP_UP = "bypass.step_up"
 
@@ -466,7 +466,7 @@ async def agent_profile(
     top = tool_classes.limited(ceiling, highest)
     found = await approval_settings.current(dao.session.bind)
     # Bypass only to clients that announce it (sdk/40 §3 rule 5) and only where it may be chosen; any other
-    # client sees Auto as the highest level, as before. Since the second sign-in (sdk/41), only to clients that
+    # Other clients see Auto as the highest level. Since the second sign-in (sdk/41), only clients that
     # also announce the step-up: an older one sees the block, but never Bypass allowed.
     supported = client_supports(request)
     supports_bypass = SUPPORTS_BYPASS in supported
@@ -477,11 +477,14 @@ async def agent_profile(
     except grants.LimitsUnavailableError:
         limits = None
     offered = (
-        supports_bypass and supports_step_up and limits is not None and bypass_offered(profile, ceiling, found)
+        supports_bypass and supports_step_up and limits is not None
+        and bypass_offered(profile, ceiling, found)
     )
     bypass = tool_classes.ToolMode.BYPASS
     shown_max = highest if highest is not bypass or offered else tool_classes.ToolMode.AUTO
-    longest = grants.longest(profile, limits.longest(found.longest_grant_minutes)) if limits is not None else 0
+    longest = (
+        grants.longest(profile, limits.longest(found.longest_grant_minutes)) if limits is not None else 0
+    )
     approvals: dict[str, Any] = {
         "standing": list(profile.standing) if profile.standing is not None else None,
         "longest_grant_minutes": longest,
@@ -549,13 +552,13 @@ async def agent_profile(
         "extensions": profile.extensions,
         "required_client_modules": registry.client_modules(profile.extensions),
         "edition": registry.edition,
-        "features": sorted(registry.features),
+        "features": sorted({*registry.features, "host_tools.dispatch_check"}),
         "principal": principal(auth, agent),
     }
 
 
 class HostToolCheck(BaseModel):
-    """An explicit device command, never an arbitrary gateway tool execution."""
+    """A host dispatch check, never an arbitrary gateway tool execution."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -563,7 +566,8 @@ class HostToolCheck(BaseModel):
     arguments: dict[str, Any] = Field(default_factory=dict)
     #: The session's level; ``bypass`` is checked as Auto here: a command is not a call a grant covers.
     tool_mode: Literal["off", "read_only", "ask", "auto", "bypass"]
-    origin: Literal["user_command", "user_history"] = "user_command"
+    origin: Literal["user_command", "user_history", "model_tool"] = "user_command"
+    call_id: str | None = Field(default=None, min_length=1, max_length=128, pattern=r"^[\x20-\x7e]+$")
     phase: Literal["prepare", "dispatch"] = "prepare"
     schema_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     prepared_profile: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
@@ -578,7 +582,7 @@ async def agent_host_tool_check(
     service: Annotated[GatewayService, Depends(get_gateway_service)],
     dao: Annotated[GatewayDAO, Depends()],
 ) -> Response:
-    """Current central policy for one user command; no model/tool execution.
+    """Current central policy for one host call; no model/tool execution.
 
     This is not a signed grant or a substitute for native permissions. Clients
     recheck after approval, compare all three preparation stamps and stop on
@@ -594,7 +598,13 @@ async def agent_host_tool_check(
         )
     try:
         check = HostToolCheck.model_validate_json(raw)
-        arguments_stamp = stamp(check.arguments)
+        if check.origin == "model_tool" and not check.call_id:
+            raise ValueError("A model host call needs its call id.")
+        # Bind attribution as well as arguments across the human wait. Legacy
+        # callers treat stamps as opaque and retain their unchanged wire.
+        arguments_stamp = stamp(
+            {"arguments": check.arguments, "origin": check.origin, "call_id": check.call_id},
+        )
     except (ValidationError, ValueError, RecursionError) as exc:
         raise GatewayError(
             status_code=400,
@@ -673,6 +683,7 @@ async def agent_host_tool_check(
                 "tool": check.name,
                 "phase": check.phase,
                 "origin": check.origin,
+                **({"call_id": check.call_id} if check.call_id else {}),
                 "decision": result["decision"],
                 "tool_class": result["tool_class"],
             },
@@ -1043,4 +1054,7 @@ async def features(
 ) -> dict[str, Any]:
     """The edition and what it offers, for any signed-in caller (agent tokens too)."""
     del verified
-    return {"edition": registry.edition, "features": sorted(registry.features)}
+    return {
+        "edition": registry.edition,
+        "features": sorted({*registry.features, "host_tools.dispatch_check"}),
+    }
