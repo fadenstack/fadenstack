@@ -122,6 +122,10 @@ filterwarnings = [
     # is only used by tests (runtime never imports TestClient). Adopt httpx2 in a
     # dedicated change; allow it here rather than widening the runtime dev surface.
     "ignore:Using `httpx` with `starlette.testclient`:starlette.exceptions.StarletteDeprecationWarning",
+    # LiteLLM 1.108 imports its GitHub Copilot authenticator on a completion's first call; its module-level
+    # TypeAdapters of TypedDicts with ReadOnly items make pydantic warn that it will not protect them. A warning
+    # outside the tests; turned into an error here, it failed the import and every completion through LiteLLM.
+    "ignore:Items? .* (is|are) using the `ReadOnly` qualifier:UserWarning",
 ]
 env = [
     "FADEN_GATEWAY_ENVIRONMENT=pytest",
