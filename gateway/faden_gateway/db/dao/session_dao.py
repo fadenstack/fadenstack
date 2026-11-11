@@ -391,12 +391,21 @@ class SessionDAO:
         )
         return result.scalar_one_or_none()
 
-    async def interrupt_stale_turns(self, *, stale_before: datetime, error: str) -> int:
-        """End the replies left running by a gateway that went away: heartbeat before *stale_before*."""
+    async def interrupt_stale_turns(
+        self, *, stale_before: datetime, error: str, turn_id: uuid.UUID | None = None,
+    ) -> int:
+        """End the replies left running by a gateway that went away: heartbeat before *stale_before*.
+
+        With *turn_id*, only that reply (a page reading it found its heartbeat stopped).
+        """
+        stale = update(ChatMessage).where(ChatMessage.status == "running", ChatMessage.updated_at < stale_before)
+        if turn_id is not None:
+            stale = stale.where(ChatMessage.id == turn_id)
+        # The database decides which rows: nothing loaded in this session is matched in Python (the reader that
+        # calls this has just loaded the reply).
         result = await self.session.execute(
-            update(ChatMessage)
-            .where(ChatMessage.status == "running", ChatMessage.updated_at < stale_before)
-            .values(status="interrupted", error=error, updated_at=func.now()),
+            stale.values(status="interrupted", error=error, updated_at=func.now()),
+            execution_options={"synchronize_session": False},
         )
         return result.rowcount or 0
 

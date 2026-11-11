@@ -16,7 +16,7 @@ from starlette import status
 
 from faden_gateway.db.dao.gateway_dao import GatewayDAO
 from faden_gateway.db.dao.session_dao import SessionDAO
-from faden_gateway.db.models.gateway import TURNS_RETRYABLE, ChatMessage, TurnStatus
+from faden_gateway.db.models.gateway import TURN_INTERRUPTED_ERROR, TURNS_RETRYABLE, ChatMessage, TurnStatus
 from faden_gateway.services.gateway import faden_events, picture_marking, text_marking, tool_classes
 from faden_gateway.services.gateway.agents import AgentRequest
 from faden_gateway.services.gateway.audit import AuditService
@@ -1119,8 +1119,17 @@ async def stream_resume(
         async def still_written() -> bool:
             async with AsyncSession(bind, expire_on_commit=False) as own:
                 row = await own.get(ChatMessage, turn_id)
+                alive = row is not None and _alive(row)
+                if row is not None and not alive and row.status == TurnStatus.RUNNING.value:
+                    # Its writer went away (the heartbeat stopped). End it now, as the sweeper would within the
+                    # minute: the page reads the chat again as this stream ends and must find the reply
+                    # interrupted, to try again, not still running (it showed an empty reply until reloaded).
+                    stale_before = datetime.now(timezone.utc) - timedelta(seconds=settings.chat_turn_stale_sec)
+                    await SessionDAO(own).interrupt_stale_turns(
+                        stale_before=stale_before, error=TURN_INTERRUPTED_ERROR, turn_id=turn_id,
+                    )
                 await own.commit()
-            return row is not None and _alive(row)
+            return alive
 
         if turn.trace_id:
             headers["x-langfuse-trace-id"] = turn.trace_id

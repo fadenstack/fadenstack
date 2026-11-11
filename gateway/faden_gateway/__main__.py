@@ -122,6 +122,10 @@ def _build_uvicorn_ssl_kwargs() -> dict[str, Any]:
     return kwargs
 
 
+#: Seconds a worker may not answer uvicorn's supervisor before it is killed as hung (see main()).
+WORKER_HEALTHCHECK_SEC = 30
+
+
 def main() -> None:
     """Entrypoint of the application."""
     # LiteLLM fetches its model price list from GitHub when it is imported,
@@ -151,6 +155,10 @@ def main() -> None:
         # both at 5 s, the backend sometimes reused a connection just as the gateway closed it: "Server
         # disconnected without sending a response", a 502 on the chat list (0.5.0, release server).
         timeout_keep_alive=30,
+        # How long a worker may not answer the supervisor's ping before it is killed as hung (uvicorn's
+        # default: 5 s). A worker serving its first chat sometimes stalled that long; it was killed and the
+        # reply it was writing was lost (test server, 0.7.0rc3). A really hung worker is still replaced.
+        timeout_worker_healthcheck=WORKER_HEALTHCHECK_SEC,
         **ssl_kwargs,
     )
 

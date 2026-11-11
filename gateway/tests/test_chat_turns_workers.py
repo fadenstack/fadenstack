@@ -26,6 +26,7 @@ from faden_gateway.db.models.gateway import TURN_INTERRUPTED_ERROR, ChatMessage
 from faden_gateway.services.gateway import turn_log as turn_log_module
 from faden_gateway.services.gateway.stream_buffer import StreamBuffer
 from faden_gateway.services.gateway.turn_log import TurnLog
+from faden_gateway.settings import settings
 from tests.test_chat_turns_background import (  # noqa: F401 - fixtures
     ANSWER,
     PIECES,
@@ -84,6 +85,35 @@ async def test_a_stop_asked_of_another_worker_stops_the_reply(
     reply = (await _replies(db_session, chat, _ended))[-1]
     assert reply.status == "stopped" and reply.content != ANSWER
     assert seen["closed"]
+
+
+@pytest.mark.anyio
+async def test_a_page_reading_a_reply_whose_writer_went_away_finds_it_interrupted(
+    fastapi_app: FastAPI, chat: uuid.UUID, client: AsyncClient, db_session: AsyncSession,  # noqa: F811
+    fake_redis_pool: ConnectionPool, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A worker killed while writing leaves its reply running, its heartbeat stopped.
+
+    A page reading it from another worker gets what was written, then the stream ends, and the reply is then
+    interrupted, to be tried again. Before, it stayed running until the sweep (once a minute), and the page, reading
+    the chat as the stream ended, showed an empty reply until it was reloaded (test server, 0.7.0rc4).
+    """
+    monkeypatch.setattr(turn_log_module, "_BLOCK_MS", 20)
+    stale = datetime.now(timezone.utc) - timedelta(seconds=settings.chat_turn_stale_sec + 5)
+    turn = ChatMessage(session_id=chat, role="assistant", content="", status="running", updated_at=stale)
+    db_session.add(turn)
+    await db_session.commit()
+    log = TurnLog(fake_redis_pool)
+    await log.append(str(turn.id), b'data: {"choices": [{"index": 0, "delta": {"content": "Half"}}]}\n\n')
+    _another_worker(fastapi_app, fake_redis_pool)
+
+    back = await asyncio.wait_for(client.get(f"/v1/sessions/{chat}/stream", headers=_auth()), 10)
+    assert back.status_code == 200
+    assert '"Half"' in back.text
+
+    await db_session.refresh(turn)
+    assert turn.status == "interrupted"
+    assert turn.error == TURN_INTERRUPTED_ERROR
 
 
 # ── The log ───────────────────────────────────────────────────────
