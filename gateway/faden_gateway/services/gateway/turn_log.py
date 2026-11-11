@@ -24,6 +24,7 @@ from typing import Any
 
 from cryptography.fernet import InvalidToken
 from redis.asyncio import ConnectionPool, Redis
+from redis.exceptions import TimeoutError as RedisTimeoutError
 
 from faden_gateway.db.crypto import seal, unseal
 
@@ -42,8 +43,11 @@ _PURPOSE = "chat-content"
 STOP_SEC = 600
 #: At most this many batches are kept per reply (about 30 minutes of them).
 MAX_BATCHES = 20_000
-#: How long a reader waits for the next batch before it asks whether the reply is still written.
-_BLOCK_MS = 5_000
+#: How long a reader waits for the next batch before it asks whether the reply is still written. Below the
+#: Redis client's read timeout (redis-py's ``socket_timeout``, 5 s by default; the pool sets none): a wait as
+#: long as that timeout answered "nothing yet" just after the client had given up, and the page following the
+#: reply was left with an empty one.
+_BLOCK_MS = 3_000
 
 
 def _events(turn_id: str) -> str:
@@ -119,7 +123,12 @@ class TurnLog:
         last = "0-0"
         async with Redis(connection_pool=self._pool) as redis:
             while True:
-                found = await redis.xread({_events(turn_id): last}, block=_BLOCK_MS, count=500)
+                try:
+                    found = await redis.xread({_events(turn_id): last}, block=_BLOCK_MS, count=500)
+                except RedisTimeoutError:
+                    # The client gave up first (a slow network, a shorter timeout): nothing yet, as an empty
+                    # answer. redis-py has dropped that connection; the next read connects afresh.
+                    found = []
                 if not found:
                     if not await still_written():
                         return

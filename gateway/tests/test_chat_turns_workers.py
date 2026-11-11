@@ -18,6 +18,7 @@ import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
 from redis.asyncio import ConnectionPool, Redis
+from redis.exceptions import TimeoutError as RedisTimeoutError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_gateway.db.dao.session_dao import SessionDAO
@@ -25,6 +26,7 @@ from faden_gateway.db.models.gateway import TURN_INTERRUPTED_ERROR, ChatMessage
 from faden_gateway.services.gateway import turn_log as turn_log_module
 from faden_gateway.services.gateway.stream_buffer import StreamBuffer
 from faden_gateway.services.gateway.turn_log import TurnLog
+from faden_gateway.settings import settings
 from tests.test_chat_turns_background import (  # noqa: F401 - fixtures
     ANSWER,
     PIECES,
@@ -119,6 +121,50 @@ async def test_a_reader_lets_go_of_a_reply_whose_writer_went_away(
 
     read = [data async for data in log.read("t2", still_written=gone)]
     assert read == [b"one"]
+
+
+@pytest.mark.anyio
+async def test_a_read_the_redis_client_gives_up_on_is_nothing_yet(
+    fake_redis_pool: ConnectionPool, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The client's read timeout came before Redis's "nothing yet": the reader goes on to the reply's end.
+
+    Before, the TimeoutError ended the stream of a page following the reply on another worker, and the page
+    showed an empty reply (.172, 11 November 2026).
+    """
+    log = TurnLog(fake_redis_pool)
+    await log.append("t9", b"one")
+    real_xread = Redis.xread
+    calls = 0
+
+    async def xread(self: Redis, *args: object, **kwargs: object) -> object:
+        nonlocal calls
+        calls += 1
+        if calls == 2:  # the first wait for the next batch, after the replay
+            raise RedisTimeoutError("Timeout reading from redis:6379")
+        return await real_xread(self, *args, **kwargs)
+
+    monkeypatch.setattr(Redis, "xread", xread)
+    read: list[bytes] = []
+
+    async def reader() -> None:
+        async for data in log.read("t9", still_written=_true):
+            read.append(data)
+
+    reading = asyncio.create_task(reader())
+    await asyncio.sleep(0.05)
+    await log.append("t9", b"two")
+    await log.end("t9")
+    await asyncio.wait_for(reading, 5)
+    assert read == [b"one", b"two"]
+    assert calls >= 3
+
+
+def test_a_reader_waits_less_than_the_redis_clients_read_timeout() -> None:
+    """The pool as the gateway makes it (web/lifespan.py): its connections' read timeout is longer than a wait."""
+    pool = ConnectionPool.from_url(str(settings.redis_url))
+    timeout = pool.make_connection().socket_timeout
+    assert timeout is None or turn_log_module._BLOCK_MS / 1000 < timeout
 
 
 @pytest.mark.anyio
