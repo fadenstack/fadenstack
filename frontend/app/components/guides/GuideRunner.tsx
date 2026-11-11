@@ -231,6 +231,7 @@ export function GuideRunner({ guideId, isSuperuser, onEnd }: GuideRunnerProps) {
   // While a step shows: move on when the person has acted, stop when its target goes away.
   useEffect(() => {
     if (!step || !shown) return;
+    let at: { top: number; left: number } | null = null;
     const timer = window.setInterval(() => {
       if (step.action && nextStep && findVisible(nextStep.target)) {
         window.clearInterval(timer);
@@ -238,8 +239,17 @@ export function GuideRunner({ guideId, isSuperuser, onEnd }: GuideRunnerProps) {
         return;
       }
       setCanGoBack(backPossible());
-      if (findVisible(step.target)) {
+      const target = findVisible(step.target);
+      if (target) {
         goneFor.current = 0;
+        // Joyride redraws its overlay's cut-out on a scroll, a resize of the window and a change of the target's
+        // size, not when the page moves the target (a card that loads above it): the cut-out stayed where the
+        // target had been and the overlay took the person's click on it. A move is told to Joyride as a resize.
+        const rect = target.getBoundingClientRect();
+        if (at && (Math.abs(rect.top - at.top) > 1 || Math.abs(rect.left - at.left) > 1)) {
+          window.dispatchEvent(new Event("resize"));
+        }
+        at = { top: rect.top, left: rect.left };
         return;
       }
       goneFor.current += TICK_MS;
