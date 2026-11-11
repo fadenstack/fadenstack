@@ -26,7 +26,6 @@ from faden_gateway.db.models.gateway import TURN_INTERRUPTED_ERROR, ChatMessage
 from faden_gateway.services.gateway import turn_log as turn_log_module
 from faden_gateway.services.gateway.stream_buffer import StreamBuffer
 from faden_gateway.services.gateway.turn_log import TurnLog
-from faden_gateway.settings import settings
 from tests.test_chat_turns_background import (  # noqa: F401 - fixtures
     ANSWER,
     PIECES,
@@ -161,10 +160,15 @@ async def test_a_read_the_redis_client_gives_up_on_is_nothing_yet(
 
 
 def test_a_reader_waits_less_than_the_redis_clients_read_timeout() -> None:
-    """The pool as the gateway makes it (web/lifespan.py): its connections' read timeout is longer than a wait."""
-    pool = ConnectionPool.from_url(str(settings.redis_url))
+    """A pool as the gateway makes it: its connections' read timeout is longer than a reader's wait.
+
+    web/lifespan.py makes it from a redis:// URL with no options, so redis-py's defaults hold. The URL is fixed
+    here, as a test run may have no Redis configured.
+    """
+    pool = ConnectionPool.from_url("redis://redis:6379/0")
     timeout = pool.make_connection().socket_timeout
-    assert timeout is None or turn_log_module._BLOCK_MS / 1000 < timeout
+    wait = turn_log_module._BLOCK_MS / 1000  # noqa: SLF001 - the module's own wait
+    assert timeout is None or timeout > wait
 
 
 @pytest.mark.anyio
