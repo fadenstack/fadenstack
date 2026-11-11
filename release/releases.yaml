@@ -25,6 +25,26 @@
 series: []
 
 releases:
+  - version: 0.7.0
+    channel: stable
+    date: ""
+    severity: normal
+    summary: >-
+      Approval levels for agents: deny wins, approvals for a time or a stretch of work held by the server, and Bypass
+      behind a second sign-in, off unless an administrator allows it. The Fadenstack apps for administrators and
+      people, and steadier chats. A Preview release.
+    highlights:
+      - "Tool rules: a deny always wins, then Ask first. Allow rules have no effect any more: check yours before upgrading (Agents → Governance → Tool rules)."
+      - "Each agent has a default and a highest level; a person may allow an agent for a time or a stretch of work, and administrators see and revoke running approvals."
+      - "Bypass, off by default: switching it on needs a fresh sign-in in the browser, and every call under it is recorded."
+      - "Fadenstack apps: Updates → Apps lists the desktop agent, the Office add-ins, the Nextcloud app and the Chrome extension from a signed app list, beside the versions your people use; a security release of a version in use is shown and mailed once. With Offer to people, everyone signed in finds them under Apps."
+      - "Steadier chats: a gateway worker that is briefly busy is no longer stopped in the middle of a reply, and a reply whose server stopped shows as interrupted, to try again, instead of staying empty."
+      - "`faden up` waits until the services are running and healthy, as `faden upgrade` does; `faden restore` makes each database exactly the backup."
+      - "Every image says what it is on GHCR: its own title, description and licence. Updated dependencies in the gateway (LiteLLM 1.108), the backend, the PII module and the console."
+      - "The gateway's default is up to eight workers when nothing sets FADEN_GATEWAY_WORKERS_COUNT; on servers faden manages, faden tune sizes it from the server's budget."
+    upgrade_from: 0.4.0
+    components:
+      agent: 0.2.12
   - version: 0.7.0rc3
     channel: preview
     date: ""
