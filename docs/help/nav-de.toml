@@ -11,6 +11,7 @@ nav = [
     { "Der Browser-Agent" = "use/browser-agent.md" },
     { "Office-Add-ins" = "use/office-add-ins.md" },
     { "Apps" = "use/apps.md" },
+    { "Eine Desktop-App anmelden" = "use/sign-in-an-app.md" },
     { "Inhalte prüfen" = "use/checking-content.md" },
     { "Ihr Konto" = "use/account.md" },
     { "Ihre Daten und Datenschutz" = "use/privacy.md" },

@@ -50,6 +50,7 @@ from faden_gateway.services.gateway.agents import (
 from faden_gateway.services.gateway.llm_adapter import CompletionResult, LLMAdapter
 from faden_gateway.services.gateway.service import GatewayService, _agent_tools, _Prepared
 from faden_gateway.services.gateway.usage_group import UsageGroupResolver
+from faden_gateway.web.api.v1.agents import REASONING_LEVELS, apply_agent
 from faden_gateway.services.registry import service_registry
 from faden_gateway.settings import settings
 from tests.test_gateway_pipeline_combined import (
@@ -861,6 +862,8 @@ async def test_the_profile_carries_what_the_sdk_caches_not_the_instructions(
     assert profile["local_mcp"] == {"mode": "disable", "developer_mode": True}
     assert profile["required_client_modules"] == []
     assert profile["edition"] == "community" and "agents" in profile["features"]
+    assert "client_events.trigger" in profile["features"]
+    assert "approval_scopes.time" not in profile["features"], "no approval for a time held by the app"
     assert profile["user"] == {"language": None}
     assert profile["skills"] is False, "no Skills module here: the SDK shows no skill picker"
     assert profile["approvals"] == {"standing": None, "longest_grant_minutes": 120, "grant_classes": ["read", "write"]}
@@ -1006,6 +1009,209 @@ async def test_only_those_who_may_use_the_agent_list_its_skills(
     assert skills_service.asked == []
 
 
+# -- the reasoning cap --------------------------------------------------------------------------
+
+LEVELS = ("none", "minimal", "low", "medium", "high", "xhigh", "max")
+
+
+def _effort(ui: Any, **payload: Any) -> Any:
+    shaped, _ = apply_agent(_profile(ui=ui), {"messages": [], **payload})
+    return shaped.get("reasoning_effort", "<absent>")
+
+
+def test_the_reasoning_scale_is_the_adapters() -> None:
+    from faden_gateway.services.gateway.llm_adapter import _EFFORTS  # noqa: PLC0415
+
+    assert LEVELS == _EFFORTS == REASONING_LEVELS
+
+
+@pytest.mark.parametrize("top", LEVELS)
+def test_a_request_above_the_agents_maximum_is_lowered_and_one_at_or_below_stays(top: str) -> None:
+    ui = {"reasoning": {"max": top}}
+    for level in LEVELS:
+        expected = level if LEVELS.index(level) <= LEVELS.index(top) else top
+        assert _effort(ui, reasoning_effort=level) == expected, (top, level)
+    assert _effort(ui) == top, "no level asked: the maximum"
+
+
+def test_the_request_is_not_changed_in_place() -> None:
+    payload = {"messages": [], "reasoning_effort": "max"}
+    apply_agent(_profile(ui={"reasoning": {"max": "low"}}), payload)
+    assert payload["reasoning_effort"] == "max"
+
+
+@pytest.mark.parametrize("ui", [
+    {}, None, {"greeting": "Hi"}, {"reasoning": {}}, {"reasoning": {"max": None}}, {"reasoning": {"max": 3}},
+    {"reasoning": {"max": "extreme"}}, {"reasoning": {"max": ["low"]}}, {"reasoning": "low"}, {"reasoning": ["max"]},
+])
+def test_without_a_usable_maximum_the_request_is_unchanged(ui: Any) -> None:
+    assert _effort(ui) == "<absent>"
+    assert _effort(ui, reasoning_effort="max") == "max"
+    assert _effort(ui, reasoning_effort="whatever") == "whatever"
+
+
+def test_a_value_off_the_scale_is_held_to_the_maximum() -> None:
+    ui = {"reasoning": {"max": "medium"}}
+    for odd in ("turbo", "", 5, None, ["high"]):
+        assert _effort(ui, reasoning_effort=odd) == "medium", odd
+
+
+# -- the MCP tools of the tenant ----------------------------------------------------------------
+
+TOOLS_URL = "/v1/agents/eplan-assistant/tools"
+
+
+def _listed(name: str, server: str, description: str = "Does a thing.", *, enabled: bool = True) -> dict[str, Any]:
+    """A row of the MCP service's tool listing, all of it: the route carries four fields of it."""
+    return {"qualified_name": name, "server_name": server, "description": description, "enabled": enabled}
+
+
+class _McpService:
+    """The MCP service as the gateway reaches it over HTTP: its listing, and what it was asked."""
+
+    def __init__(self) -> None:
+        self.catalog: list[dict[str, Any]] = []
+        self.asked: list[httpx.Request] = []
+        self.status = 200
+        self.down = False
+
+    def answer(self, request: httpx.Request) -> httpx.Response:
+        self.asked.append(request)
+        if self.down:
+            raise httpx.ConnectError("Connection refused", request=request)
+        return httpx.Response(self.status, json={"tools": self.catalog})
+
+
+@pytest.fixture
+async def mcp_service(fastapi_app: FastAPI, monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[_McpService]:
+    """The MCP module on, its service faked behind the app's HTTP client; off again afterwards."""
+    fake = _McpService()
+    service_registry.configure("mcp", enabled=True, url="http://mcp.local")
+    monkeypatch.setattr(settings, "mcp_service_token", "mcp-token")
+    async with httpx.AsyncClient(transport=httpx.MockTransport(fake.answer)) as http:
+        monkeypatch.setattr(fastapi_app.state, "http_client", http)
+        yield fake
+    service_registry.configure("mcp", enabled=False, url=None)
+
+
+@pytest.mark.anyio
+async def test_the_tools_list_names_each_mcp_tool_with_its_server_sorted(
+    client: AsyncClient, backend: _Backend, mcp_service: _McpService,
+) -> None:
+    mcp_service.catalog = [
+        _listed("mcp.github.search_issues", "GitHub", "Finds issues."),
+        _listed("mcp.docs.read_page", "Docs", "  Reads a page.  "),
+        _listed("mcp.github.create_issue", "GitHub", "x" * 600),
+    ]
+    r = await client.get(TOOLS_URL, headers=_headers())
+    assert r.status_code == 200, r.text
+    assert r.json() == {"tools": [
+        {"name": "mcp.docs.read_page", "server": "Docs", "description": "Reads a page.", "allowed": True,
+         "enabled": True},
+        {"name": "mcp.github.create_issue", "server": "GitHub", "description": "x" * 500, "allowed": True,
+         "enabled": True},
+        {"name": "mcp.github.search_issues", "server": "GitHub", "description": "Finds issues.", "allowed": True,
+         "enabled": True},
+    ]}
+    # Asked as the caller's tenant, with the service token; nothing of it reaches the answer.
+    [asked] = mcp_service.asked
+    assert (asked.url.host, asked.url.path) == ("mcp.local", "/api/internal/tools/listing")
+    assert dict(asked.url.params) == {"tenant_id": "tenant-a"}
+    assert asked.headers["authorization"] == "Bearer mcp-token"
+    for tool in r.json()["tools"]:
+        assert set(tool) == {"name", "server", "description", "allowed", "enabled"}, "names and descriptions only"
+    for hidden in ("server_name", "qualified_name", "mcp-token", "mcp.local"):
+        assert hidden not in r.text
+
+
+@pytest.mark.anyio
+async def test_a_tool_or_server_switched_off_is_listed_as_not_enabled(
+    client: AsyncClient, backend: _Backend, mcp_service: _McpService,
+) -> None:
+    mcp_service.catalog = [
+        _listed("mcp.github.one", "GitHub"),
+        _listed("mcp.github.two", "GitHub", enabled=False),
+        _listed("mcp.old.three", "Old server", enabled=False),
+    ]
+    r = await client.get(TOOLS_URL, headers=_headers())
+    assert r.status_code == 200, r.text
+    assert {t["name"]: t["enabled"] for t in r.json()["tools"]} == {
+        "mcp.github.one": True, "mcp.github.two": False, "mcp.old.three": False,
+    }
+
+
+@pytest.mark.anyio
+async def test_the_tools_list_says_which_tools_the_agents_version_allows(
+    client: AsyncClient, backend: _Backend, mcp_service: _McpService,
+) -> None:
+    mcp_service.catalog = [_listed("mcp.github.search_issues", "GitHub"), _listed("mcp.docs.read_page", "Docs")]
+
+    async def allowed() -> dict[str, bool]:
+        r = await client.get(TOOLS_URL, headers=_headers())
+        assert r.status_code == 200, r.text
+        return {tool["name"]: tool["allowed"] for tool in r.json()["tools"]}
+
+    assert await allowed() == {"mcp.docs.read_page": True, "mcp.github.search_issues": True}, "None: all allowed"
+    for server_tools, expected in (
+        (("mcp.github.*",), {"mcp.docs.read_page": False, "mcp.github.search_issues": True}),
+        (("mcp.docs.read_page", "current_time"), {"mcp.docs.read_page": True, "mcp.github.search_issues": False}),
+        ((), {"mcp.docs.read_page": False, "mcp.github.search_issues": False}),
+    ):
+        backend.put(_profile(server_tools=server_tools))
+        client_app = client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+        client_app.state.agent_directory.invalidate()
+        assert await allowed() == expected, server_tools
+
+
+@pytest.mark.anyio
+async def test_an_agent_without_mcp_tools_gets_an_empty_list(
+    client: AsyncClient, backend: _Backend, mcp_service: _McpService,
+) -> None:
+    r = await client.get(TOOLS_URL, headers=_headers())
+    assert r.status_code == 200 and r.json() == {"tools": []}, r.text
+    # Gateway tools are no MCP tools: they stay out of the list, whatever the catalog holds.
+    mcp_service.catalog = [_listed("current_time", "Gateway")]
+    r = await client.get(TOOLS_URL, headers=_headers())
+    assert r.json() == {"tools": []}
+
+
+@pytest.mark.anyio
+async def test_without_the_mcp_module_the_tools_list_is_empty(client: AsyncClient, backend: _Backend) -> None:
+    r = await client.get(TOOLS_URL, headers=_headers())
+    assert r.status_code == 200 and r.json() == {"tools": []}, r.text
+
+
+@pytest.mark.anyio
+async def test_a_failing_mcp_service_is_a_gateway_error_not_a_500(
+    client: AsyncClient, backend: _Backend, mcp_service: _McpService,
+) -> None:
+    mcp_service.status = 500
+    r = await client.get(TOOLS_URL, headers=_headers())
+    assert r.status_code == 502, r.text
+    assert r.json()["error"]["code"] == "mcp_unavailable" and r.json()["error"]["type"] == "server_error"
+
+    mcp_service.down = True
+    r = await client.get(TOOLS_URL, headers=_headers())
+    assert r.status_code == 503, r.text
+    assert r.json()["error"]["code"] == "mcp_unavailable"
+
+
+@pytest.mark.anyio
+async def test_only_those_who_may_use_the_agent_list_its_tools(
+    client: AsyncClient, backend: _Backend, mcp_service: _McpService,
+) -> None:
+    mcp_service.catalog = [_listed("mcp.github.search_issues", "GitHub")]
+    outsider = _agent_token(sub="44444444-4444-4444-4444-444444444444")
+    refused = await client.get(TOOLS_URL, headers=_headers(outsider))
+    profile = await client.get("/v1/agents/eplan-assistant/profile", headers=_headers(outsider))
+    assert refused.status_code == profile.status_code == 403
+    assert refused.json() == profile.json(), "the same answer as the profile route gives"
+    assert (await client.get(TOOLS_URL)).status_code == 401
+    assert (await client.get(TOOLS_URL, headers=_headers(_agent_token(OTHER_AGENT_ID)))).status_code == 403
+    assert "search_issues" not in refused.text
+    assert mcp_service.asked == [], "a refused caller asks the MCP service nothing"
+
+
 # -- the user's settings ------------------------------------------------------------------------
 
 
@@ -1096,7 +1302,9 @@ async def test_events_are_stored_without_content(
         ("session.stats", AGENT_ID, USER, "device-7"),
         ("tool.executed", AGENT_ID, USER, "device-7"),
     ]
-    assert rows[2].data == {"tool": "read_page", "source": "host", "server": None, "duration_ms": 42, "outcome": "ok"}
+    assert rows[2].data == {"tool": "read_page", "source": "host", "server": None, "duration_ms": 42, "outcome": "ok",
+        "trigger": None,
+    }
     assert rows[1].conversation_id == "conv-9"
 
     for bad in (
@@ -1114,7 +1322,8 @@ async def test_features_answer_any_signed_in_caller(client: AsyncClient, backend
         r = await client.get("/v1/features", headers=_headers(token))
         assert r.status_code == 200
         assert r.json()["edition"] == "community"
-        assert {"agents", "streaming"} <= set(r.json()["features"])
+        assert {"agents", "streaming", "client_events.trigger"} <= set(r.json()["features"])
+        assert "approval_scopes.time" not in r.json()["features"]
     assert (await client.get("/v1/features")).status_code == 401
 
 

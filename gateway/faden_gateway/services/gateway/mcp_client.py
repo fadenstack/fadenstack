@@ -16,6 +16,14 @@ import httpx
 logger = logging.getLogger(__name__)
 
 
+class MCPUnavailableError(Exception):
+    """The MCP service could not answer; *reached*: it answered with an error status."""
+
+    def __init__(self, *, reached: bool) -> None:
+        super().__init__("MCP service unavailable")
+        self.reached = reached
+
+
 @dataclass(slots=True)
 class ToolCatalog:
     """Snapshot of the MCP tool catalog for a tenant."""
@@ -121,6 +129,27 @@ class MCPClient:
         except Exception:
             logger.exception("MCP catalog fetch failed")
             return ToolCatalog(version=0, tools=[])
+
+    async def list_tools(self, tenant_id: str) -> list[dict[str, Any]]:
+        """Every tool of the tenant, switched off or not, for a list a person reads.
+
+        Calls ``GET /api/internal/tools/listing?tenant_id=<tid>``. Unlike the catalog it
+        raises ``MCPUnavailableError`` when the service cannot answer, so the caller can say so.
+        """
+        try:
+            resp = await self._http.get(
+                f"{self._base}/api/internal/tools/listing",
+                params={"tenant_id": tenant_id},
+                headers=self._headers,
+                timeout=10.0,
+            )
+            resp.raise_for_status()
+            tools = resp.json().get("tools", [])
+        except httpx.HTTPStatusError as exc:
+            raise MCPUnavailableError(reached=True) from exc
+        except (httpx.HTTPError, ValueError, AttributeError) as exc:
+            raise MCPUnavailableError(reached=False) from exc
+        return tools if isinstance(tools, list) else []
 
     async def get_catalog_version(self, tenant_id: str) -> int:
         """Fetch just the catalog version for cache validation.

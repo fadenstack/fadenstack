@@ -134,6 +134,54 @@ async def get_tool_catalog(
     return ToolCatalogResponse(catalog_version=version, tools=entries)
 
 
+class ToolListingEntry(BaseModel):
+    """A tool for a list a person reads: names and a description, never how its server is reached."""
+
+    qualified_name: str
+    server_name: str
+    description: str = ""
+    #: The tool is switched on and so is its server.
+    enabled: bool
+
+
+class ToolListingResponse(BaseModel):
+    tools: list[ToolListingEntry] = Field(default_factory=list)
+
+
+@router.get("/tools/listing", response_model=ToolListingResponse)
+async def get_tool_listing(
+    tenant_id: str = "default",
+    session: AsyncSession = Depends(get_db_session),
+) -> ToolListingResponse:
+    """Every tool of a tenant, switched off or not, for a list the gateway shows.
+
+    The catalog above is what a chat is offered: enabled tools only. This one is
+    for reading: a tool or server the administrator switched off is listed with
+    ``enabled`` false. No schemas, PII modes or connection settings.
+    """
+    dao = MCPDao(session)
+    tools = await dao.list_tools_by_tenant(tenant_id, enabled_only=False)
+    servers = await dao.server_labels(tenant_id)
+
+    entries = []
+    for tool in tools:
+        label = servers.get(tool.server_id)
+        if label is None:
+            continue
+        name, server_enabled = label
+        function = (tool.openai_schema_json or {}).get("function") or {}
+        description = function.get("description")
+        entries.append(
+            ToolListingEntry(
+                qualified_name=tool.qualified_name,
+                server_name=name,
+                description=description if isinstance(description, str) else "",
+                enabled=bool(tool.enabled) and server_enabled,
+            ),
+        )
+    return ToolListingResponse(tools=entries)
+
+
 @router.get("/tools/catalog/version")
 async def get_catalog_version(
     request: Request,

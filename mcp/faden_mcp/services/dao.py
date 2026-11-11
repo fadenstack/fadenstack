@@ -67,6 +67,15 @@ class MCPDao:
         )
         return {row.id: row.pii_mode for row in result}
 
+    async def server_labels(self, tenant_id: str) -> dict[uuid.UUID, tuple[str, bool]]:
+        """Each server's name and whether it is enabled, by id -- one query, enabled or not."""
+        result = await self.session.execute(
+            select(MCPServerModel.id, MCPServerModel.name, MCPServerModel.enabled).where(
+                MCPServerModel.tenant_id == tenant_id,
+            ),
+        )
+        return {row.id: (row.name, bool(row.enabled)) for row in result}
+
     async def list_enabled_servers(self) -> list[MCPServerModel]:
         """List all enabled servers (for startup connection)."""
         return await self.list_servers(enabled=True)

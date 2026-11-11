@@ -54,6 +54,8 @@ from faden_gateway.services.gateway.auth import (
 )
 from faden_gateway.services.gateway.errors import GatewayError, error_from, error_response, validation_message
 from faden_gateway.services.gateway.host_policy import principal, stamp
+from faden_gateway.services.gateway.mcp_client import MCPUnavailableError
+from faden_gateway.services.gateway.mcp_tool_cache import MCP_TOOL_PREFIX
 from faden_gateway.services.gateway.pii_policy import VALID_EGRESS_MODES, mode_switch_allowed
 from faden_gateway.services.gateway.service import GatewayService
 from faden_gateway.services.gateway.skills_client import SkillsUnavailableError
@@ -295,6 +297,36 @@ def hold_back(
     return shaped, held
 
 
+#: The reasoning levels, lowest first (the scale the model adapter knows).
+REASONING_LEVELS = ("none", "minimal", "low", "medium", "high", "xhigh", "max")
+
+
+def reasoning_max(profile: AgentProfile) -> str | None:
+    """The highest reasoning level the agent's version allows (``ui.reasoning.max``); ``None``: no cap.
+
+    Anything that is not a level of the scale means no cap.
+    """
+    reasoning = profile.ui.get("reasoning") if isinstance(profile.ui, dict) else None
+    top = reasoning.get("max") if isinstance(reasoning, dict) else None
+    return top if isinstance(top, str) and top in REASONING_LEVELS else None
+
+
+def cap_reasoning(payload: dict[str, Any], top: str | None) -> dict[str, Any]:
+    """The request with its ``reasoning_effort`` held to *top*: lowered when above, set when missing.
+
+    A level at or below the cap stays; so does everything when there is no cap. A value that is not on
+    the scale counts as above it: the server decides, the client is the second line.
+    """
+    if top is None:
+        return payload
+    effort = payload.get("reasoning_effort")
+    if isinstance(effort, str) and effort in REASONING_LEVELS and (
+        REASONING_LEVELS.index(effort) <= REASONING_LEVELS.index(top)
+    ):
+        return payload
+    return {**payload, "reasoning_effort": top}
+
+
 def apply_agent(
     profile: AgentProfile, payload: dict[str, Any], *, local_mcp: bool = False,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -305,6 +337,8 @@ def apply_agent(
     the device may attach local MCP servers (*local_mcp*): their tools are in no contract, and the tool mode
     treats them as unclassified. With no contract at all nothing is held back, and every tool is
     unclassified: the gateway marks its calls for the client to ask (``faden.approval_required``).
+
+    The version's ``ui.reasoning.max`` caps ``reasoning_effort``: see ``cap_reasoning``.
     """
     if "session_id" in payload:
         raise GatewayError(
@@ -316,7 +350,7 @@ def apply_agent(
     held: list[dict[str, Any]] = []
     if profile.host_tool_contract and not local_mcp:
         payload, held = hold_back(payload, profile.host_tools)
-    shaped = dict(payload)
+    shaped = cap_reasoning(dict(payload), reasoning_max(profile))
     if profile.model_alias:
         shaped["model"] = profile.model_alias
     elif shaped.get("model") in (None, "", SDK_MODEL_PLACEHOLDER):
@@ -680,6 +714,55 @@ async def agent_models(
         return _error(exc)
 
 
+# -- tools ----------------------------------------------------------------------------
+
+#: The longest tool description the list carries; a server writes it, so it is bounded.
+TOOL_DESCRIPTION_MAX = 500
+
+
+@router.get("/v1/agents/{agent}/tools")
+async def agent_tools(
+    caller: Annotated[tuple[AuthContext, AgentRequest], Depends(agent_request)],
+    service: Annotated[GatewayService, Depends(get_gateway_service)],
+) -> dict[str, Any]:
+    """The MCP tools of the caller's tenant on this server, for a "from your server" list.
+
+    Names and descriptions only, never how a server is reached. ``server``: the server's name as the
+    console shows it. ``allowed``: the agent's version lets the model be offered the tool
+    (``server_tools``). ``enabled``: the administrator has the tool and its server switched on in the
+    MCP Hub; a tool switched off is listed too. Gateway tools (current time, knowledge, attachments)
+    are not MCP tools and are left out. Sorted by server, then name. With no MCP module the list is
+    empty; with the MCP service failing it is a gateway error, as the skills list gives.
+    """
+    auth, agent = caller
+    client = service.mcp_client
+    try:
+        listing = await client.list_tools(auth.tenant_id) if client is not None else []
+    except MCPUnavailableError as exc:
+        logger.warning("Could not list the MCP tools for agent %s (reached: %s)", agent.id, exc.reached)
+        raise GatewayError(
+            status_code=502 if exc.reached else 503,
+            message="The tools could not be listed right now; try again.",
+            error_type="server_error",
+            code="mcp_unavailable",
+        ) from exc
+    tools: list[dict[str, Any]] = []
+    for entry in listing:
+        name = str(entry.get("qualified_name") or "")
+        if not name.startswith(MCP_TOOL_PREFIX):
+            continue
+        description = entry.get("description")
+        tools.append({
+            "name": name,
+            "server": str(entry.get("server_name") or ""),
+            "description": description.strip()[:TOOL_DESCRIPTION_MAX] if isinstance(description, str) else "",
+            "allowed": agent.allows_server_tool(name),
+            "enabled": entry.get("enabled") is True,
+        })
+    tools.sort(key=lambda tool: (tool["server"], tool["name"]))
+    return {"tools": tools}
+
+
 # -- skills ---------------------------------------------------------------------------
 
 #: How many skills one list holds at most, and by default.
@@ -751,6 +834,10 @@ async def agent_skills(
 # -- events -------------------------------------------------------------------------
 
 
+#: Who started a tool call: the model, the user, or a UI module by its plugin name.
+_TRIGGER_PATTERN = r"^(model|user|module:[a-z0-9][a-z0-9-]{0,62})$"
+
+
 class _Event(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -767,6 +854,8 @@ class ToolExecuted(_Event):
     server: str | None = Field(default=None, max_length=128)
     duration_ms: int = Field(ge=0)
     outcome: Literal["ok", "error", "denied", "cancelled"]
+    #: What started the call: the model, the user, or a UI module (``module:<plugin>``).
+    trigger: str | None = Field(default=None, pattern=_TRIGGER_PATTERN)
 
 
 class ApprovalDecided(_Event):
@@ -781,6 +870,8 @@ class ApprovalDecided(_Event):
     #: app's bypass mode (development and trusted automation), or a grant (``grant_id``, sdk/38 §6).
     scope: Literal["once", "chat", "always", "bypass", "grant"] | None = None
     grant_id: uuid.UUID | None = None
+    #: What started the call: the model, the user, or a UI module (``module:<plugin>``).
+    trigger: str | None = Field(default=None, pattern=_TRIGGER_PATTERN)
 
 
 class LocalMcpAttached(_Event):

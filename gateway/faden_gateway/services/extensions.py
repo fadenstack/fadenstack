@@ -60,9 +60,11 @@ from typing import Any
 log = logging.getLogger(__name__)
 
 #: ``approval_scopes.grant``: grants held by the server (``/v1/agents/{agent}/grants``, sdk/38 §6) -- a client
-#: offers its grant card only where the profile lists it.
+#: offers its grant card only where the profile lists it. ``client_events.trigger``: client events may say
+#: what started a tool call (the model, the user, or a UI module).
 CORE_FEATURES = (
     "agents", "agent_tokens", "agent_events", "skills", "sessions", "streaming", "approval_scopes.grant",
+    "client_events.trigger",
 )
 
 #: ``(user_id, agent_id) -> reason`` to deny, or ``None`` to allow.

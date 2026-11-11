@@ -57,6 +57,14 @@
 "How do I connect an app to the server?" = "get-an-app-and-connect-it"
 "Where do the downloads on the Apps page go?" = "where-the-downloads-go"
 
+["use/sign-in-an-app.md"]
+"How do I sign in a desktop app?" = "approve-the-sign-in"
+"The app shows a code: where do I enter it?" = "approve-the-sign-in"
+"What should I check before I approve an app's sign-in?" = "what-to-check-before-you-approve"
+"How long does a sign-in code work?" = "limits"
+"How do I end an app's sign-in?" = "see-and-end-the-sign-in"
+
+
 ["use/checking-content.md"]
 "How do I check whether a text or a picture was made by AI?" = "check-a-text-a-picture-or-a-file"
 "What does the result of a content check mean?" = "read-the-result"

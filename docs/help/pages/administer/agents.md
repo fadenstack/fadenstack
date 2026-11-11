@@ -75,6 +75,11 @@ The agent's page opens. Its list status is **Draft**, **Published** or **Retired
     ask first. People in **Developer mode** (see [Users, groups and roles](users.md#developer-mode)) may attach
     them either way.
 
+??? info "More about chat sessions running at once"
+    **Chat sessions running at once** (under **Appearance**) sets how many chat sessions of this agent can work
+    at the same time on one device: choose 1 to 5, or **Default (5)**. More sessions cost more and need more
+    attention. The desktop agent follows this limit; the setting needs no other change.
+
 ![The Versions tab of the Word assistant: v2 live with View and Changes, v1 with View and Roll back, below the agent's tabs and the Edit and Retire buttons](../images/administer/agent-versions.png)
 
 Saving the definition makes a new version (**Save as new version**, or **Save and publish**); versions never

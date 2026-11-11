@@ -16,6 +16,7 @@ Die Seite **Mein Profil** öffnet sich mit:
 | **Kontoinformationen** | Ihre **E-Mail**, Ihre **Benutzer-ID** und Ihr **Status** |
 | **Passwort ändern** | Siehe [Ihr Passwort ändern](#change-your-password) |
 | **Darstellung** | Die **Akzentfarbe** (**Frost**, **Graphite** oder **Aurora**) und das **Design** (**Hell** oder **Dunkel**). Beides wird in diesem Browser gespeichert. |
+| **Angemeldete Apps** | Die Apps und Geräte, auf denen Sie angemeldet sind (siehe [Angemeldete Apps](#signed-in-apps)) |
 | **API-Token** | Ihre persönlichen API-Tokens (siehe [API-Tokens](#api-tokens)) |
 
 Ihre E-Mail-Adresse und was Sie tun dürfen, legt Ihr Administrator fest. Siehe [Benutzer, Gruppen und Rollen](../administer/users.md).
@@ -73,6 +74,16 @@ hat.
   Passwort anmelden möchten.
 
 Eine Anmeldung, die hier schon zu einem anderen Konto gehört, wird nicht mit Ihrem verknüpft.
+
+## Angemeldete Apps {#signed-in-apps}
+
+**Mein Profil** zeigt unter **Angemeldete Apps** jede App und jedes Gerät, auf dem Sie angemeldet sind: Die
+Desktop-App, die Office-Add-ins und die Browser-Erweiterung melden sich jeweils einmal pro Gerät an. Zu jeder sehen
+Sie die **App**, das **Gerät**, wann Sie **Angemeldet** wurden und wann sie **Zuletzt verwendet** wurde.
+
+Um eine zu beenden, wählen Sie daneben **Abmelden** und bestätigen Sie. Die App auf diesem Gerät muss dann erneut
+angemeldet werden (siehe [Eine Desktop-App anmelden](sign-in-an-app.md)). Beenden Sie die Anmeldung eines Computers,
+den Sie verloren haben oder nicht mehr nutzen, und jede, die Sie nicht kennen.
 
 ## API-Tokens {#api-tokens}
 

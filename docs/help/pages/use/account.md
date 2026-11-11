@@ -16,6 +16,7 @@ Your account is how Fadenstack knows you: your sign-in, your chats, your skills,
 | **Account Information** | Your **Email**, your **User ID** and your **Status** |
 | **Change Password** | See [Change your password](#change-your-password) |
 | **Appearance** | The **Accent** colour (**Frost**, **Graphite** or **Aurora**) and the **Theme** (**Light** or **Dark**). They are saved in this browser. |
+| **Signed-in apps** | The apps and devices you are signed in on (see [Signed-in apps](#signed-in-apps)) |
 | **API Token** | Your personal API tokens (see [API tokens](#api-tokens)) |
 
 Your e-mail address and what you may do are set by your administrator. See [Users, groups and roles](../administer/users.md).
@@ -70,6 +71,16 @@ password also signs you in. It appears when your organisation connected its own 
   first, if you want to sign in with a password instead.
 
 A sign-in that already belongs to another account here is not linked to yours.
+
+## Signed-in apps
+
+**My Profile** shows, under **Signed-in apps**, every app and device you are signed in on: the desktop app, the Office
+add-ins and the browser extension each sign in once per device. For each you see the **App**, the **Device**, when
+you were **Signed in** and when it was **Last used**.
+
+To end one, select **Sign out** beside it and confirm. That device must be signed in again in the app (see
+[Sign in a desktop app](sign-in-an-app.md)). End the sign-in of a computer you lost or no longer use, and any you
+do not recognise.
 
 ## API tokens
 
