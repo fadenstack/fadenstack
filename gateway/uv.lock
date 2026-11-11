@@ -899,7 +899,7 @@ wheels = [
 
 [[package]]
 name = "faden-gateway"
-version = "0.7.0rc1"
+version = "0.7.0rc2"
 source = { editable = "." }
 dependencies = [
     { name = "aio-pika" },
