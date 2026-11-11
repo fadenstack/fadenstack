@@ -408,7 +408,9 @@ async def test_what_turns_up_again_of_an_erased_person_is_removed_by_every_run_f
         await conn.commit()
     assert {r["user_id"] for r in await _all(engine, UsageDailyPerson)} == {"stayer"}
 
-    later = NOW + usage_rollup.ERASED_KEPT + timedelta(days=1)
+    # erase_user records the erasure at the clock's time, not the test's NOW: count the 30 days from whichever is
+    # later (from NOW alone the test failed once the clock passed NOW + 1 day).
+    later = max(NOW, datetime.now(UTC)) + usage_rollup.ERASED_KEPT + timedelta(days=1)
     await usage_rollup.run_once(engine, UTC_SETTINGS, now=later)
     assert await _all(engine, UsageErased) == [], "forgotten after 30 days"
 
