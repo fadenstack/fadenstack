@@ -5271,6 +5271,7 @@
     "requested_from": "Von {{address}} um {{time}}",
     "requested_from_unknown": "Von einer unbekannten Adresse um {{time}}",
     "other_network": "Diese Anfrage kam aus einem anderen Netzwerk als Ihrem.",
+    "type_code_other_network": "Diese Anfrage kommt aus einem anderen Netzwerk als Ihrem. Geben Sie den Code ein, den Ihre App auf Ihrem eigenen Gerät zeigt, und wählen Sie dann Weiter.",
     "fact_lasts": "Bleibt angemeldet",
     "lasts_value": "Höchstens {{max}}; die Anmeldung endet früher, wenn die App {{idle}} lang nicht genutzt wird",
     "days_one": "{{n}} Tag",

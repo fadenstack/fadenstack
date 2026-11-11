@@ -5271,6 +5271,7 @@
     "requested_from": "Depuis {{address}} à {{time}}",
     "requested_from_unknown": "Depuis une adresse inconnue à {{time}}",
     "other_network": "Cette demande provient d'un autre réseau que le vôtre.",
+    "type_code_other_network": "Cette demande provient d'un autre réseau que le vôtre. Saisissez le code affiché par votre application sur votre propre appareil, puis sélectionnez Continuer.",
     "fact_lasts": "Durée de la connexion",
     "lasts_value": "Jusqu'à {{max}} ; elle prend fin plus tôt si l'application n'est pas utilisée pendant {{idle}}",
     "days_one": "{{n}} jour",

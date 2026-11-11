@@ -5269,6 +5269,7 @@
     "requested_from": "From {{address}} at {{time}}",
     "requested_from_unknown": "From an unknown address at {{time}}",
     "other_network": "This request came from another network than yours.",
+    "type_code_other_network": "This request comes from another network than yours. Type the code your app shows on your own device, then select Continue.",
     "fact_lasts": "Stays signed in",
     "lasts_value": "Up to {{max}}; it ends sooner when the app goes unused for {{idle}}",
     "days_one": "{{n}} day",

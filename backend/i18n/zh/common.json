@@ -5271,6 +5271,7 @@
     "requested_from": "来自 {{address}}，时间 {{time}}",
     "requested_from_unknown": "来自未知地址，时间 {{time}}",
     "other_network": "此请求来自与您不同的网络。",
+    "type_code_other_network": "此请求来自与您不同的网络。请输入您自己设备上的应用显示的代码，然后选择“继续”。",
     "fact_lasts": "登录保持时间",
     "lasts_value": "最长 {{max}}；若应用连续 {{idle}}未使用，登录会提前结束",
     "days_one": "{{n}} 天",

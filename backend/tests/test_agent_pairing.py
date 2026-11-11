@@ -444,6 +444,33 @@ async def test_wrong_codes_are_limited_per_person_without_locking_the_account(
     assert (await _console(client, "lookup", "BBBB-BBBB")).status_code == status.HTTP_404_NOT_FOUND
 
 
+async def test_wrong_codes_and_limits_reached_are_in_the_audit_trail_without_a_code(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession, secret: str,
+) -> None:
+    """ASVS 5.0 16.3.3: each wrong code, and each time a limit holds a person or an address back, is a security
+    event the trail keeps: who and from where, never the code."""
+    anna = await _user(dbsession)
+    signed_in.user = anna
+    for _ in range(5):
+        assert (await _console(client, "lookup", "BBBB-BBBB")).status_code == status.HTTP_404_NOT_FOUND
+    assert (await _console(client, "approve", "BBBB-BBBB")).status_code == status.HTTP_429_TOO_MANY_REQUESTS
+    for _ in range(10):
+        await _start(client)
+    assert (await client.post(f"{BASE}/pairings", json={"agent": "desk", "device_label": "PC"})).status_code == 429
+
+    events = (await dbsession.execute(select(AuditEvent))).scalars().all()
+    wrong = [e for e in events if e.action == "agent_pairing.wrong_code"]
+    limited = [e for e in events if e.action == "agent_pairing.limited"]
+    start_limited = [e for e in events if e.action == "agent_pairing.start_limited"]
+    assert len(wrong) == 5 and all(e.actor_id == anna.id and e.result == "deny" for e in wrong)
+    assert len(limited) == 1 and limited[0].actor_id == anna.id
+    assert json.loads(limited[0].metadata_json)["retry_after"] > 0
+    assert len(start_limited) == 1 and json.loads(start_limited[0].metadata_json)["retry_after"] > 0
+    trail = json.dumps([[e.action, e.target_id, e.metadata_json] for e in events])
+    for value in ("BBBB-BBBB", "BBBBBBBB"):
+        assert value not in trail
+
+
 async def test_wrong_codes_are_limited_per_address(
     signed_in: _As, client: AsyncClient, far_client: AsyncClient, dbsession: AsyncSession, secret: str,
 ) -> None:

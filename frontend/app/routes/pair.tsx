@@ -10,6 +10,9 @@
  *   taken from the fragment, which is dropped from the address bar at once, and kept in this tab's
  *   sessionStorage only for the way through the sign-in page.
  * - Opening the link only fills the field (RFC 8628 §5.4): looking up needs **Continue**, approving **Approve**.
+ *   When the request comes from another network than this browser, a code that came with the link is not enough:
+ *   the person types the code their app shows (RFC 8628 §5.4, remote phishing: a link sent by someone else carries
+ *   their code; the person cannot type one no app of theirs shows).
  * - The requests are POSTs with the code in the body (`api/pairing.ts`); the backend counts wrong codes and
  *   answers 429 over its limits.
  */
@@ -53,7 +56,7 @@ type Step =
   | { kind: "denied" };
 
 type Problem =
-  | { kind: "incomplete" | "unknown_code" | "decided" | "not_available" | "failed" }
+  | { kind: "incomplete" | "unknown_code" | "decided" | "not_available" | "failed" | "type_code" }
   | { kind: "too_many"; seconds: number | null };
 
 /** Where the sign-in page brings the person back to: this page, never with the code in the address. */
@@ -84,6 +87,8 @@ function problemText(t: TFunction, problem: Problem, language: string): string {
       return t("pair.decided");
     case "not_available":
       return t("pair.not_available");
+    case "type_code":
+      return t("pair.type_code_other_network");
     default:
       return t("pair.failed");
   }
@@ -96,6 +101,8 @@ export default function PairPage() {
 
   const [user, setUser] = useState<AuthUser | null>(null);
   const [code, setCode] = useState("");
+  /** Whether the code in the field was typed here, not brought by the link. */
+  const [typed, setTyped] = useState(false);
   const [step, setStep] = useState<Step>({ kind: "enter" });
   const [problem, setProblem] = useState<Problem | null>(null);
   const [busy, setBusy] = useState(false);
@@ -130,7 +137,10 @@ export default function PairPage() {
         // Signed in: the kept code goes into the field and out of the storage.
         const kept = keptCode();
         dropKeptCode();
-        if (kept) setCode(kept);
+        if (kept) {
+          setCode(kept);
+          setTyped(false);
+        }
       })
       .catch(() => {
         if (!cancelled) navigate(SIGN_IN, { replace: true });
@@ -195,6 +205,12 @@ export default function PairPage() {
     setProblem(null);
     try {
       const found = await pairingApi.lookup(entered);
+      if (!found.same_network && !typed) {
+        // From another network, a code that came with a link is not enough: the person types the one their app shows.
+        setCode("");
+        setProblem({ kind: "type_code" });
+        return;
+      }
       setStep({ kind: "review", found, code: entered });
       if (!found.available) setProblem({ kind: "not_available" });
     } catch (err: unknown) {
@@ -284,6 +300,7 @@ export default function PairPage() {
                   value={code}
                   onChange={(e) => {
                     setCode(formatCode(e.target.value));
+                    setTyped(true);
                     if (codeProblem) setProblem(null);
                   }}
                   inputRef={fieldRef}

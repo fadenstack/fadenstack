@@ -290,6 +290,37 @@ describe("looking up, approving and denying", () => {
     expect(review).toHaveTextContent(/From an unknown address at \d{1,2}:\d{2}/);
     expect(review).toHaveTextContent("Up to 1 day; it ends sooner when the app goes unused for 12 hours");
   });
+
+  it("from another network, a code that came with the link is not enough: the person types the one the app shows", async () => {
+    // RFC 8628 §5.4: a link someone else sent carries their code; nobody can type a code no app of theirs shows.
+    answer("lookup", { status: 200, body: { ...FOUND, same_network: false } }, { status: 200, body: { ...FOUND, same_network: false } });
+    answer("approve", { status: 204 });
+    open("/pair#code=BDWP-HTQX");
+    await waitFor(() => expect(field()).toHaveValue(CODE));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(await screen.findByTestId("pair-problem")).toHaveTextContent(
+      "This request comes from another network than yours. Type the code your app shows on your own device, then select Continue.",
+    );
+    expect(screen.queryByTestId("pair-review")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+    expect(field()).toHaveValue("");
+
+    await lookUp(CODE);
+    const review = await screen.findByTestId("pair-review");
+    fireEvent.click(within(review).getByRole("button", { name: "Approve" }));
+    expect(await screen.findByTestId("pair-result")).toHaveTextContent("Signed in. You can go back to the app.");
+    expectNoCodeInAnyAddress();
+  });
+
+  it("from the same network, the code that came with the link goes on as it is", async () => {
+    answer("lookup", { status: 200, body: FOUND });
+    open("/pair#code=BDWP-HTQX");
+    await waitFor(() => expect(field()).toHaveValue(CODE));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(await screen.findByTestId("pair-review")).toBeInTheDocument();
+    expect(screen.queryByTestId("pair-problem")).not.toBeInTheDocument();
+  });
 });
 
 describe("refusals", () => {

@@ -27,6 +27,10 @@ To refuse, select **Deny**. You see **Denied. The app was not signed in.**, and 
 
 Opening the page, or the link the app opens, approves nothing: only **Approve** does.
 
+When the app asked from another network than your browser's (your browser on your phone, say), the code that came
+with the link is not enough: the page asks you to type the code your app shows, then **Continue**. A link someone
+else sent you carries their code, and you cannot type a code that no app of yours shows.
+
 ## What to check before you approve
 
 The page asks **Sign in** *the agent* **on** *the device*, and shows:

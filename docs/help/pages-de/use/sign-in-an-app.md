@@ -30,6 +30,11 @@ dass die Anmeldung abgelehnt wurde.
 
 Die Seite oder den Link zu öffnen, den die App öffnet, genehmigt nichts: Das tut nur **Genehmigen**.
 
+Hat die App aus einem anderen Netzwerk gefragt als Ihr Browser (etwa wenn Ihr Browser auf Ihrem Telefon läuft),
+genügt der Code aus dem Link nicht: Die Seite bittet Sie, den Code einzugeben, den Ihre App zeigt, und dann
+**Weiter** zu wählen. Ein Link, den Ihnen jemand anderes geschickt hat, enthält dessen Code, und einen Code, den keine
+Ihrer Apps zeigt, können Sie nicht eingeben.
+
 ## Was Sie vor dem Genehmigen prüfen {#what-to-check-before-you-approve}
 
 Die Seite fragt, ob *der Agent* auf *dem Gerät* angemeldet werden soll, und zeigt:

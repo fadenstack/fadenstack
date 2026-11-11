@@ -1148,6 +1148,15 @@ async def start_agent_pairing(
     ip = _caller(request)
     wait = await pairing.start_wait(dao.session, ip, now)
     if wait:
+        # A limit reached is a security event (ASVS 5.0 16.3.3): the address and the wait, never a code.
+        await audit.log(
+            action="agent_pairing.start_limited",
+            target_type="agent_pairing",
+            target_id="-",
+            result=AuditResult.DENY,
+            severity="warning",
+            metadata_json=json.dumps({"ip": ip, "retry_after": wait}),
+        )
         raise _too_many(wait, "Too many sign-in requests from this address; try again later.")
     started = await pairing.start(
         dao.session,
@@ -1225,7 +1234,9 @@ async def agent_pairing_token(
     return _tokens_dto(issued)
 
 
-async def _pending_pairing(code: str, request: Request, user: User, dao: AgentsDAO) -> AgentPairing:
+async def _pending_pairing(
+    code: str, request: Request, user: User, dao: AgentsDAO, audit: AuditDAO,
+) -> AgentPairing:
     """The pending pairing *code* names, for the console, after the brute-force limits (RFC 8628 §5.1).
 
     429 while the person or their address is over a limit; 404 for a wrong or expired code, which counts
@@ -1236,12 +1247,30 @@ async def _pending_pairing(code: str, request: Request, user: User, dao: AgentsD
     ip = _caller(request)
     wait = await pairing.failure_wait(dao.session, user.id, ip, now)
     if wait:
+        # A wrong code and a limit reached are security events (ASVS 5.0 16.3.3): who, from where, never the code.
+        await audit.log(
+            action="agent_pairing.limited",
+            target_type="agent_pairing",
+            target_id="-",
+            result=AuditResult.DENY,
+            actor_id=user.id,
+            severity="warning",
+            metadata_json=json.dumps({"ip": ip, "retry_after": wait}),
+        )
         raise _too_many(wait, "Too many wrong codes; try again later.")
     row = await pairing.find(dao.session, secret=await _secret(dao.session), entered=code, now=now)
     if row is None:
         await pairing.record_failure(dao.session, user.id, ip, now)
         # The count, and an expiry noted, must stick although the answer is an error.
         await dao.session.commit()
+        await audit.log(
+            action="agent_pairing.wrong_code",
+            target_type="agent_pairing",
+            target_id="-",
+            result=AuditResult.DENY,
+            actor_id=user.id,
+            metadata_json=json.dumps({"ip": ip}),
+        )
         raise _refuse(
             status.HTTP_404_NOT_FOUND,
             "unknown_code",
@@ -1273,13 +1302,14 @@ async def lookup_agent_pairing(
     response: Response,
     user: Annotated[User, Depends(current_active_user)],
     dao: AgentsDAO = Depends(),
+    audit: AuditDAO = Depends(),
 ) -> PairingLookupDTO:
     """What asks to be signed in with this code, for the person to check before approving (ASVS 5.0 10.7.1).
 
     A POST, so the code stays out of addresses and logs. ``available`` is false, and the agent's name null,
     when the person may not use the agent -- unknown, retired and not granted alike.
     """
-    row = await _pending_pairing(payload.code, request, user, dao)
+    row = await _pending_pairing(payload.code, request, user, dao, audit)
     agent, decision = await pairing.resolve(dao, row, user)
     available = agent is not None and decision.allowed
     life = (
@@ -1322,7 +1352,7 @@ async def approve_agent_pairing(
     ``access.decide`` first. An agent that is unknown, retired or not granted to them answers the same 403;
     the pairing stays open (they may deny it, or it expires).
     """
-    row = await _pending_pairing(payload.code, request, user, dao)
+    row = await _pending_pairing(payload.code, request, user, dao, audit)
     agent, decision = await pairing.resolve(dao, row, user)
     if agent is None or not decision.allowed:
         await audit.log(
@@ -1355,7 +1385,7 @@ async def deny_agent_pairing(
     audit: AuditDAO = Depends(),
 ) -> Response:
     """The person denies the pairing: the app's next poll answers ``access_denied``."""
-    row = await _pending_pairing(payload.code, request, user, dao)
+    row = await _pending_pairing(payload.code, request, user, dao, audit)
     await pairing.deny(dao.session, row, user, datetime.now(UTC))
     await audit.log(
         action="agent_pairing.deny",

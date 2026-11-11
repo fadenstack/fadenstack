@@ -5271,6 +5271,7 @@
     "requested_from": "Desde {{address}} a las {{time}}",
     "requested_from_unknown": "Desde una dirección desconocida a las {{time}}",
     "other_network": "Esta solicitud procede de una red distinta de la suya.",
+    "type_code_other_network": "Esta solicitud procede de una red distinta de la suya. Escriba el código que muestra su aplicación en su propio dispositivo y seleccione Continuar.",
     "fact_lasts": "Duración de la sesión",
     "lasts_value": "Hasta {{max}}; termina antes si la aplicación no se usa durante {{idle}}",
     "days_one": "{{n}} día",
