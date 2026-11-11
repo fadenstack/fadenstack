@@ -25,6 +25,24 @@
 series: []
 
 releases:
+  - version: 0.7.0rc2
+    channel: preview
+    date: ""
+    severity: normal
+    summary: >-
+      The second release candidate of 0.7.0, a Preview release: approval levels for agents as in rc1, and the
+      Fadenstack apps: administrators hear about new releases of the desktop agent, the Office add-ins, the Nextcloud
+      app and the Chrome extension, and can offer them to everyone signed in.
+    highlights:
+      - "Fadenstack apps: Updates → Apps lists the Fadenstack apps from a signed app list, read with the release list, beside the versions your people use; a security release of a version in use is shown and mailed once."
+      - "Offer to people: with the switch on, everyone signed in finds the apps under Apps, with their downloads and how to connect each one to this server."
+      - "`faden up` waits until the services are running and healthy, as `faden upgrade` does, so a chat sent right after switching a module such as PII on is no longer refused; `--no-wait` returns at once."
+      - "Every image says what it is on GHCR: its own title, description and licence."
+      - "Updated dependencies in the gateway (LiteLLM 1.108), the backend, the PII module and the console."
+      - "As in rc1: a deny always wins, then Ask first. Allow rules have no effect any more: check yours before upgrading (Agents → Governance → Tool rules)."
+    upgrade_from: 0.4.0
+    components:
+      agent: 0.2.12
   - version: 0.7.0rc1
     channel: preview
     date: ""
