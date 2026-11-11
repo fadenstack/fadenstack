@@ -75,7 +75,10 @@ test.describe("guides", () => {
       // Hiding it is remembered.
       await card.locator("[data-checklist-hide]").click();
       await expect(card).toBeHidden();
-      expect(((await readPrefs(page)).getting_started as { dismissed?: boolean })?.dismissed).toBe(true);
+      // The card hides before its save completes: wait for the saved preference, as the tour's test does.
+      await expect
+        .poll(async () => ((await readPrefs(page)).getting_started as { dismissed?: boolean })?.dismissed)
+        .toBe(true);
 
       // The Help menu still has it.
       await openHelp(page, "getting_started");
