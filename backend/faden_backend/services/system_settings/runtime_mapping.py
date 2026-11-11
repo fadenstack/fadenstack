@@ -42,6 +42,8 @@ _RUNTIME_VALUE_KEY_MAP: dict[str, str] = {
     "updates.channel": "updates_channel",
     "updates.feed_url": "updates_feed_url",
     "updates.proxy_url": "updates_proxy_url",
+    "updates.app_news": "updates_app_news",
+    "updates.apps_offered": "updates_apps_offered",
 }
 
 _RUNTIME_SECRET_KEY_MAP: dict[str, str] = {

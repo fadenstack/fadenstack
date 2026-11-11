@@ -48,6 +48,16 @@ class SettingDefinition:
         return self.protected and value not in self.narrowing_values
 
 
+def check_app_ids(value: object) -> None:
+    """Refuse anything but app ids of the app list, comma-separated (``desktop,nextcloud``)."""
+    import re  # noqa: PLC0415
+
+    parts = [p.strip() for p in str(value).split(",") if p.strip()]
+    if len(parts) > 20 or any(not re.fullmatch(r"[a-z][a-z0-9-]{0,39}", p) for p in parts):
+        msg = f"Not a list of app ids: {value!r}."
+        raise ValueError(msg)
+
+
 def check_time_zone(value: object) -> None:
     """Refuse anything but an IANA zone name the tz database knows (``Europe/Berlin``, ``UTC``).
 
@@ -914,6 +924,39 @@ SETTINGS_REGISTRY: list[SettingDefinition] = [
         default="",
         apply_scope=SystemApplyScope.LIVE_RELOAD,
         service_targets=(),
+    ),
+    SettingDefinition(
+        key="updates.app_news",
+        type="bool",
+        category="updates",
+        group="apps",
+        label="News about Fadenstack apps",
+        description=(
+            "Tell administrators when a Fadenstack app (the desktop agent, the Office add-ins, the Nextcloud app, "
+            "the Chrome extension) is new or has a new release. Read with the release list, from the same public "
+            "file; nothing is sent. Security releases of apps in use are shown either way."
+        ),
+        is_secret=False,
+        default=True,
+        apply_scope=SystemApplyScope.LIVE_RELOAD,
+        service_targets=(),
+    ),
+    SettingDefinition(
+        key="updates.apps_offered",
+        type="string",
+        category="updates",
+        group="apps",
+        label="Apps offered to people",
+        description=(
+            "The apps everyone signed in sees on their Apps page, with the download and how to connect it to "
+            "this server: app ids, comma-separated (desktop, office, nextcloud, chrome). Switched under "
+            "Updates, Apps."
+        ),
+        is_secret=False,
+        default="",
+        apply_scope=SystemApplyScope.LIVE_RELOAD,
+        service_targets=(),
+        check=check_app_ids,
     ),
     *USAGE_SETTINGS,
     *APPROVAL_SETTINGS,

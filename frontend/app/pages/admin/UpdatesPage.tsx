@@ -53,6 +53,7 @@ import {
 import { PageHeader, WidgetCard } from "~/components/dashboard/kit";
 import { fmtAgo } from "~/components/dashboard/format";
 import { fmtDay, useUpdateNotice } from "~/lib/updateNotice";
+import AppsSection from "./AppsSection";
 
 /** Where the release list is published; a server without internet gets a copy of it. */
 export const FEED_DIRECTORY = "https://fadenstack.com/updates/v1/";
@@ -95,6 +96,8 @@ export default function UpdatesPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
+  // Counts up after a check: the Apps section reads its list again.
+  const [checkTick, setCheckTick] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -131,6 +134,7 @@ export default function UpdatesPage() {
     } catch (err: unknown) {
       setCheckError(errorText(err));
     } finally {
+      setCheckTick((tick) => tick + 1);
       setChecking(false);
     }
   }
@@ -171,6 +175,8 @@ export default function UpdatesPage() {
       {!failedWithoutData && <PartsCard overview={overview} loading={loading && !overview} />}
 
       <OfflineUpload onUploaded={took} />
+
+      <AppsSection checkTick={checkTick} checking={checking} onCheck={() => void checkNow()} />
     </Stack>
   );
 }

@@ -805,7 +805,10 @@ async def _update_check_loop(app: FastAPI) -> None:
         try:
             if broker.is_worker_process:
                 return
-            await check.run_pass(app.state.db_session_factory)
+            await check.run_pass(
+                app.state.db_session_factory,
+                gateway_factory=getattr(app.state, "llm_graph_trace_session_factory", None),
+            )
         except asyncio.CancelledError:
             raise
         except Exception:

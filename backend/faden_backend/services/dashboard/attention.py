@@ -621,6 +621,58 @@ async def releases(facts: Facts) -> list[Item]:
                 "release_mismatch", "release_mismatch", "warning", "platform",
                 {"count": len(other), "names": ", ".join(other), "release": current}, None, link,
             ))
+    return items + await app_releases(facts)
+
+
+async def app_releases(facts: Facts) -> list[Item]:
+    """The Fadenstack apps (services/updates/apps.py): security releases and support of the versions in use here.
+
+    With ``updates.app_news``, also a new release of an app in use, and an app new in the list that nobody here
+    uses or is offered yet. Each release is its own item: muting one does not mute the next.
+    """
+    from faden_backend.services.updates import apps, release_feed  # noqa: PLC0415
+
+    catalogue = apps.stored(await facts.on_backend(apps.load_state))
+    if catalogue is None:
+        return []
+    seen: dict[str, Any] = {}
+    if facts.has_gateway:
+        seen = await facts.on_gateway(lambda s: apps.in_use(s, facts.now))
+    offered = apps.offered_ids()
+    today = facts.now.date()
+    link = "/admin/updates#apps"
+    items: list[Item] = []
+    if release_feed.apps_expired(catalogue, facts.now):
+        # Not renewed in time: a security release may be held back from this server (always shown, like security).
+        items.append(Item(
+            f"app_list_expired:{catalogue.expires.date().isoformat()}", "app_list_expired", "warning", "platform",
+            {"since": catalogue.expires.date().isoformat()}, catalogue.expires, link,
+        ))
+    for found in apps.assessments(catalogue, seen, today=today):
+        app, latest = found.app, found.latest
+        params = {"app": release_feed.localized(app.name, "en")}
+        if latest is not None and found.outdated and found.severity in ("security", "critical"):
+            items.append(Item(
+                f"app_update_{found.severity}:{app.id}:{latest.version}", f"app_update_{found.severity}",
+                "critical" if found.severity == "critical" else "warning", "platform",
+                {**params, "version": latest.version, "current": ", ".join(found.outdated)}, None, link,
+            ))
+        items.extend(
+            Item(f"app_unsupported:{app.id}:{v}", "app_unsupported", "warning", "platform",
+                 {**params, "version": v}, None, link)
+            for v in found.unsupported
+        )
+        if not settings.updates_app_news or latest is None:
+            continue
+        if found.outdated and found.severity == "normal":
+            items.append(Item(
+                f"app_update_available:{app.id}:{latest.version}", "app_update_available", "info", "platform",
+                {**params, "version": latest.version, "current": ", ".join(found.outdated)}, None, link,
+            ))
+        elif not found.in_use and app.id not in offered and apps.is_new(app, today):
+            items.append(Item(
+                f"app_new:{app.id}", "app_new", "info", "platform", {**params, "version": latest.version}, None, link,
+            ))
     return items
 
 

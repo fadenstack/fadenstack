@@ -117,6 +117,8 @@ solcher Link teilt der Website mit, wo er angeklickt wurde (z. B. `ref=console-a
 Organisation oder diesen Server, öffnet sich in einem neuen Tab und gibt die Adresse der Seite, von der Sie kommen,
 nicht weiter. Gesendet wird nur etwas, wenn Sie einen anklicken.
 
+Die Download-Links auf **Apps** führen zu der Seite, auf der eine App veröffentlicht ist (GitHub, der Chrome Web Store oder der Nextcloud-App-Store). Diese Seite sieht Ihre Adresse (IP), wie bei jedem Link; die Links senden keinen Referrer, sodass sie die Adresse des Servers Ihrer Organisation nicht erfährt. Der Server selbst liest die öffentliche Liste der Fadenstack-Apps einmal am Tag, wie die Liste der Releases, und sendet nichts über sich (siehe [Apps](apps.md)).
+
 <span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span> Mit Enterprise können Administratoren die Links der Konsole entfernen (die Anmeldeseite, **Über Fadenstack**,
 die Versionshinweise unter **Updates**): **Einstellungen → Erscheinungsbild → Show links to fadenstack.com**.
 

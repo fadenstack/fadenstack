@@ -231,13 +231,50 @@ async def notify(session: AsyncSession, state: ReleaseFeedState) -> bool:
     )
 
 
-async def run_pass(session_factory: Any, *, now: datetime | None = None) -> bool:
-    """One pass of the background check: read the feed when it is due. True when it was read.
+async def check_feed(session: AsyncSession, *, now: datetime) -> None:
+    """Read the release feed and mail its security notice, in the caller's transaction."""
+    state = await check_now(session, now=now)
+    if state.error is None:
+        await notify(session, state)
+
+
+async def check_apps(session: AsyncSession, *, now: datetime, gateway_factory: Any) -> None:
+    """Read the app list and mail its security notices, apart from the release check beside it.
+
+    It runs in a savepoint of the caller's transaction, after the release feed's part was flushed: whatever goes
+    wrong in it (a list signed with the app list's own key but shaped wrongly, a database error on its row), only
+    this part is undone and kept as the app list's error, and the release check's record and notice are
+    committed all the same, and never sent again. The app list's key can so never hold back the release check
+    (OWASP ASVS 5.0 16.5.2, 16.5.3).
+    """
+    from faden_backend.services.updates import apps  # noqa: PLC0415
+
+    try:
+        async with session.begin_nested():
+            state = await apps.check_now(session, now=now)
+            if state.error is None:
+                await apps.notify(session, state, await apps_in_use(gateway_factory, now))
+    except Exception as exc:
+        log.exception("App list: reading it failed; the release check beside it is kept")
+        try:
+            async with session.begin_nested():
+                await apps.record_failure(session, exc, now=now)
+        except Exception:
+            log.exception("App list: its failure could not be recorded")
+
+
+async def run_pass(session_factory: Any, *, now: datetime | None = None, gateway_factory: Any = None) -> bool:
+    """One pass of the background check: read the feed and the app list when due. True when either was read.
 
     Every uvicorn worker runs the loop; a transaction-scoped advisory lock lets
     one act, and the kept ``checked_at`` stops the others from reading it again.
+    The app list is read with the feed, at once when it never was (an install
+    that just upgraded to a release that reads it), and on its own when only it
+    is due (after a failed read, as the feed is retried). *gateway_factory*
+    opens the gateway's database, where the apps in use are read.
     """
     from faden_backend.services.system_settings.runtime_mapping import refresh_runtime_values  # noqa: PLC0415
+    from faden_backend.services.updates import apps  # noqa: PLC0415
 
     now = now or datetime.now(UTC)
     async with session_factory() as session:
@@ -248,10 +285,21 @@ async def run_pass(session_factory: Any, *, now: datetime | None = None) -> bool
             locked = (await session.execute(text(f"SELECT pg_try_advisory_xact_lock({_LOCK})"))).scalar()
             if not locked:
                 return False
-        if not due(await load_state(session), now):
+        feed_due = due(await load_state(session), now)
+        if not feed_due and not due(await apps.load_state(session), now):
             return False
-        state = await check_now(session, now=now)
-        if state.error is None:
-            await notify(session, state)
+        if feed_due:
+            await check_feed(session, now=now)
+        await check_apps(session, now=now, gateway_factory=gateway_factory)
         await session.commit()
         return True
+
+
+async def apps_in_use(gateway_factory: Any, now: datetime) -> dict[str, Any]:
+    """The app versions people ran lately (services/updates/apps.py), read in the gateway's database."""
+    from faden_backend.services.updates import apps  # noqa: PLC0415
+
+    if gateway_factory is None:
+        return {}
+    async with gateway_factory() as gateway:
+        return await apps.in_use(gateway, now)

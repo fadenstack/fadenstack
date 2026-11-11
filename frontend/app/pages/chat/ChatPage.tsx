@@ -316,6 +316,7 @@ export default function ChatPage() {
       onLogout: handleLogout,
       onSkills: chatSkills.value.enabled ? () => navigate("/skills") : undefined,
       onAgents: agentsAllowed ? () => navigate("/agents") : undefined,
+      onApps: () => navigate("/apps"),
       onCheckContent: checkAllowed ? () => navigate("/check-content") : undefined,
       onUsage: () => navigate("/usage"),
       onTeamUsage: teamUsageAllowed ? () => navigate("/admin/usage") : undefined,

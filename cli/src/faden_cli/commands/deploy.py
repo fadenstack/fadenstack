@@ -174,8 +174,9 @@ def update_check_step(env_path: Path, cfg: FadenConfig, *, choice: bool | None, 
             console.print("\n[bold cyan]Step 3e: New releases…[/bold cyan]")
             console.print(
                 f"  Once a day the server and this CLI read {FEED_URL},\n"
-                "  the public list of releases. They send nothing about this server: the list is\n"
-                "  compared here, and administrators see in the console when an update is out."
+                "  the public list of releases, and the server reads the public list of Fadenstack apps\n"
+                "  too. They send nothing about this server: the lists are compared here, and\n"
+                "  administrators see in the console when an update is out."
             )
             choice = click.confirm("  Check for new releases?", default=True)
     if env_vars.get("FADEN_UPDATE_CHECK") != ("true" if choice else "false"):

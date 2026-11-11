@@ -52,6 +52,11 @@
 "Where does my data from Office go?" = "where-your-data-goes"
 "How do I change the language of the Office pane?" = "language-and-settings"
 
+["use/apps.md"]
+"Where do I download the Fadenstack apps?" = "open-the-page"
+"How do I connect an app to the server?" = "get-an-app-and-connect-it"
+"Where do the downloads on the Apps page go?" = "where-the-downloads-go"
+
 ["use/checking-content.md"]
 "How do I check whether a text or a picture was made by AI?" = "check-a-text-a-picture-or-a-file"
 "What does the result of a content check mean?" = "read-the-result"
@@ -273,6 +278,12 @@
 "How do I check for updates without internet access?" = "a-server-without-internet-access"
 "How do I update the agents on the GPU machines?" = "update-the-machines-agents"
 "How do I go back to the previous version?" = "going-back"
+
+["operate/apps.md"]
+"How do I hear about new versions of the Fadenstack apps?" = "notices"
+"How do I offer the Fadenstack apps to people?" = "offer-an-app-to-people"
+"How do I set up the Office add-ins, Nextcloud app or Chrome extension for everyone?" = "connection-files"
+"How do I read the app list without internet access?" = "a-server-without-internet-access"
 
 ["operate/backups.md"]
 "How do I back up the server?" = "back-up-now"

@@ -19,6 +19,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import FactCheckIcon from "@mui/icons-material/FactCheck";
 import DataUsageIcon from "@mui/icons-material/DataUsage";
+import AppsIcon from "@mui/icons-material/Apps";
 import InsightsIcon from "@mui/icons-material/Insights";
 import PsychologyIcon from "@mui/icons-material/Psychology";
 import AgentAvatar from "~/components/AgentAvatar";
@@ -167,6 +168,12 @@ export default function ChatTopbar({
                 label: t("agents.title", { ns: "common" }),
                 icon: <AgentAvatar size={20} variant="mono" />,
                 onClick: shell.onAgents,
+              },
+              shell.onApps && {
+                key: "apps",
+                label: t("apps.menu", { ns: "common" }),
+                icon: <AppsIcon fontSize="small" />,
+                onClick: shell.onApps,
               },
               shell.onCheckContent && {
                 key: "check-content",

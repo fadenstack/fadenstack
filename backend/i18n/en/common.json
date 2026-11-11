@@ -759,6 +759,30 @@
       "release_mismatch": {
         "title": "Parts on another release: {{count}}",
         "detail": "Not on {{release}}: {{names}}. The Updates page lists what each part runs."
+      },
+      "app_update_security": {
+        "title": "{{app}} {{version}} fixes security problems: people here run {{current}}",
+        "detail": "Have people install the new version. The Updates page lists the files."
+      },
+      "app_update_critical": {
+        "title": "{{app}} {{version}} is a critical update: people here run {{current}}",
+        "detail": "Have people install the new version soon. The Updates page lists the files."
+      },
+      "app_update_available": {
+        "title": "{{app}} {{version}} is out: people here run {{current}}",
+        "detail": "The Updates page lists the files."
+      },
+      "app_unsupported": {
+        "title": "{{app}} {{version}} is past its support: people here should update",
+        "detail": "It gets no more fixes. The Updates page lists the newest version."
+      },
+      "app_new": {
+        "title": "New: {{app}} {{version}}",
+        "detail": "Offer it to people on the Updates page."
+      },
+      "app_list_expired": {
+        "title": "The app list has not been renewed since {{since}}: app security releases may be missing",
+        "detail": "Check this server's connection to fadenstack.com, or your mirror. The Updates page shows the app list."
       }
     },
     "integrations": {
@@ -1025,7 +1049,8 @@
       "bypass": "Bypass",
       "grants": "Grants",
       "evidence": "Evidence",
-      "vendor_links": "Links to fadenstack.com"
+      "vendor_links": "Links to fadenstack.com",
+      "apps": "Apps"
     },
     "current_value": "(current: {{value}})",
     "appearance": {
@@ -5048,6 +5073,60 @@
       "unsupported_plain": "Fadenstack {{current}} is no longer supported. Install a newer release.",
       "open": "See updates",
       "dismiss": "Hide until the next release"
+    },
+    "apps": {
+      "title": "Apps",
+      "subtitle": "The Fadenstack apps, which versions run here, and which apps you offer to people.",
+      "check_now_label": "Check now: app list",
+      "checked": "App list checked {{ago}}",
+      "never_checked": "App list not read yet",
+      "list_date": "App list of {{date}}",
+      "list_uploaded": "App list of {{date}}, uploaded by hand",
+      "check_error": "The app list could not be read: {{error}}",
+      "news_off": "News about apps is off: new apps and new versions are not announced. Security notices for apps in use still come.",
+      "in_use_unknown": "Which versions of the apps run here is not known right now.",
+      "empty": "The app list has no apps yet. Check now, or upload it.",
+      "offer": "Offer to people",
+      "no_release": "No release in the list yet.",
+      "security_alert": "Versions in use here have security problems fixed in {{version}}. Have people install it.",
+      "in_use": "In use here",
+      "in_use_none": "Not seen in the last {{days}} days",
+      "last_seen": "last seen {{ago}}",
+      "outdated": "outdated",
+      "unsupported": "Past support: {{versions}}",
+      "server_too_old": "Needs Fadenstack {{version}} or later on this server.",
+      "connect": {
+        "no_secrets": "The files carry no password or token: each person signs in with their own account.",
+        "download": "Download",
+        "close": "Close",
+        "office-policy": {
+          "button": "Office policy file",
+          "title": "Office policy for {{app}}",
+          "steps": "Put policy.json in %PROGRAMDATA%\\Fadenstack\\Office\\ on each computer, for example with Group Policy or Intune.",
+          "ca": "This server has its own certificate authority: also put this server's certificate at %PROGRAMDATA%\\Fadenstack\\Office\\fadenstack-ca.crt.",
+          "ca_link": "Download the certificate"
+        },
+        "nextcloud-occ": {
+          "button": "Nextcloud commands",
+          "title": "Nextcloud commands for {{app}}",
+          "steps": "Run these commands on the Nextcloud server, as the web server's user, in Nextcloud's folder."
+        },
+        "chrome-policy": {
+          "button": "Chrome policy file",
+          "title": "Chrome policy for {{app}}",
+          "steps": "On Linux, put the file in /etc/opt/chrome/policies/managed/. On Windows and macOS, set the same values with Group Policy, Intune or a configuration profile."
+        }
+      },
+      "upload": {
+        "title": "No internet on this server? Upload the app list",
+        "body": "On a computer with internet, download apps.json and apps.json.sig from the release list's address. Copy both files unchanged and upload them here. The signature is checked before the list is used.",
+        "choose_index": "Choose apps.json",
+        "choose_signature": "Choose apps.json.sig",
+        "upload": "Upload",
+        "uploaded": "App list uploaded."
+      },
+      "expired": "The app list has not been renewed since {{date}}. Newer app releases, security fixes included, may be missing: check this server's connection to fadenstack.com, or your mirror.",
+      "valid_until": "valid until {{date}}"
     }
   },
   "pii_policy.form.unavailable": "PII service is unavailable. These options do not confirm active protection.",
@@ -5625,6 +5704,43 @@
         "other": "This would go over a budget for this period. Ask an administrator or the budget's owner for more."
       },
       "until": "It starts again on {{when}}."
+    }
+  },
+  "apps": {
+    "menu": "Apps",
+    "title": "Apps",
+    "back_to_chat": "Back to chat",
+    "loading": "Loading apps",
+    "new": "New",
+    "preview": "Preview",
+    "new_tab": "(opens in a new tab)",
+    "copy": "Copy",
+    "copied": "Copied",
+    "latest": "Latest: {{version}}, {{date}}",
+    "supported_until": "Supported until {{date}}",
+    "release_notes": "Release notes",
+    "app_page": "Website",
+    "store": "Store",
+    "files": {
+      "title": "Downloads",
+      "none": "No download files.",
+      "sha256": "SHA-256",
+      "copy_hash": "Copy SHA-256",
+      "download": "Download"
+    },
+    "my": {
+      "intro": "Apps from your administrator for working with Fadenstack.",
+      "intro_server": "Apps for working with {{server}}.",
+      "server": "Server address:",
+      "copy_address": "Copy address",
+      "empty": "No apps are offered here yet. An administrator can offer them on the Updates page."
+    },
+    "connect": {
+      "title": "How to connect",
+      "desktop": "Install the app and start it. Enter this server's address when it asks, then sign in with the code the app shows.",
+      "office": "Usually your IT team installs and connects the add-ins. Otherwise, enter this server's address when the add-in pane asks for it, then sign in.",
+      "nextcloud": "The Nextcloud administrator turns the app on. Then open Fadenstack in Nextcloud and sign in.",
+      "chrome": "Install the extension. Enter this server's address on its first screen, then sign in."
     }
   }
 }
