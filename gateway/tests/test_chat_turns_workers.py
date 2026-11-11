@@ -18,6 +18,7 @@ import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
 from redis.asyncio import ConnectionPool, Redis
+from redis.exceptions import TimeoutError as RedisTimeoutError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_gateway.db.dao.session_dao import SessionDAO
@@ -119,6 +120,55 @@ async def test_a_reader_lets_go_of_a_reply_whose_writer_went_away(
 
     read = [data async for data in log.read("t2", still_written=gone)]
     assert read == [b"one"]
+
+
+@pytest.mark.anyio
+async def test_a_read_the_redis_client_gives_up_on_is_nothing_yet(
+    fake_redis_pool: ConnectionPool, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The client's read timeout came before Redis's "nothing yet": the reader goes on to the reply's end.
+
+    Before, the TimeoutError ended the stream of a page following the reply on another worker, and the page
+    showed an empty reply (.172, 11 November 2026).
+    """
+    log = TurnLog(fake_redis_pool)
+    await log.append("t9", b"one")
+    real_xread = Redis.xread
+    calls = 0
+
+    async def xread(self: Redis, *args: object, **kwargs: object) -> object:
+        nonlocal calls
+        calls += 1
+        if calls == 2:  # the first wait for the next batch, after the replay
+            raise RedisTimeoutError("Timeout reading from redis:6379")
+        return await real_xread(self, *args, **kwargs)
+
+    monkeypatch.setattr(Redis, "xread", xread)
+    read: list[bytes] = []
+
+    async def reader() -> None:
+        async for data in log.read("t9", still_written=_true):
+            read.append(data)
+
+    reading = asyncio.create_task(reader())
+    await asyncio.sleep(0.05)
+    await log.append("t9", b"two")
+    await log.end("t9")
+    await asyncio.wait_for(reading, 5)
+    assert read == [b"one", b"two"]
+    assert calls >= 3
+
+
+def test_a_reader_waits_less_than_the_redis_clients_read_timeout() -> None:
+    """A pool as the gateway makes it: its connections' read timeout is longer than a reader's wait.
+
+    web/lifespan.py makes it from a redis:// URL with no options, so redis-py's defaults hold. The URL is fixed
+    here, as a test run may have no Redis configured.
+    """
+    pool = ConnectionPool.from_url("redis://redis:6379/0")
+    timeout = pool.make_connection().socket_timeout
+    wait = turn_log_module._BLOCK_MS / 1000  # noqa: SLF001 - the module's own wait
+    assert timeout is None or timeout > wait
 
 
 @pytest.mark.anyio
