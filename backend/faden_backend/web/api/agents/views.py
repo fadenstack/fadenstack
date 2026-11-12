@@ -66,6 +66,7 @@ from faden_backend.web.api.agents.schema import (
     IssueTokenRequest,
     MemberDTO,
     PairingAgentDTO,
+    PairingAgentsEntryDTO,
     PairingClient,
     PairingCodeRequest,
     PairingLookupDTO,
@@ -1162,7 +1163,7 @@ async def start_agent_pairing(
         dao.session,
         secret=await _secret(dao.session),
         tenant_id=TENANT,
-        agent_ref=payload.agent,
+        agent_refs=payload.agent_refs(),
         device_label=payload.device_label,
         client_name=payload.client.name,
         client_version=payload.client.version,
@@ -1175,7 +1176,7 @@ async def start_agent_pairing(
         target_type="agent_pairing",
         target_id=str(started.pairing.id),
         result=AuditResult.ALLOW,
-        metadata_json=json.dumps({"agent": payload.agent, "ip": ip}),
+        metadata_json=json.dumps({"agent": payload.agent, "agents": payload.agent_refs(), "ip": ip}),
     )
     response.headers["Cache-Control"] = "no-store"
     page = f"{public_origin(request)}{PAIRING_PAGE}"
@@ -1187,6 +1188,7 @@ async def start_agent_pairing(
         verification_uri_complete=f"{page}#code={user_code}",
         expires_in=pairing.LIFETIME_S,
         interval=pairing.INTERVAL_S,
+        agents=payload.agent_refs(),
     )
 
 
@@ -1212,11 +1214,18 @@ async def agent_pairing_token(
     """The app polls with its pairing code: 400 with an RFC 8628 error until approved, then once its tokens.
 
     The tokens are a new sign-in of the approving person on this device (the pairing's device label), with
-    ``user`` saying who that is. After that the pairing is consumed: polling again answers ``invalid_grant``.
+    ``user`` saying who that is. A pairing for several agents gives each approved agent's tokens once, to the
+    request that names it (``agent``; the first when omitted); an agent not listed, refused or collected already
+    answers ``invalid_grant``. The pairing is consumed when every approved agent is collected, or ten minutes
+    after the approval.
     """
     try:
         paired = await pairing.poll(
-            dao, secret=await _secret(dao.session), pairing_code=payload.pairing_code, now=datetime.now(UTC),
+            dao,
+            secret=await _secret(dao.session),
+            pairing_code=payload.pairing_code,
+            agent=payload.agent,
+            now=datetime.now(UTC),
         )
     except pairing.PairingError as exc:
         # The poll's time, a raised interval or a noted expiry must stick, although the answer is an error.
@@ -1310,21 +1319,28 @@ async def lookup_agent_pairing(
     when the person may not use the agent -- unknown, retired and not granted alike.
     """
     row = await _pending_pairing(payload.code, request, user, dao, audit)
-    agent, decision = await pairing.resolve(dao, row, user)
-    available = agent is not None and decision.allowed
+    named = await pairing.members(dao.session, row)
+    listed = await pairing.resolve_all(dao, row, user, named)
+    entries = [
+        PairingAgentsEntryDTO(
+            slug=one.agent.slug if one.agent is not None and one.available else one.ref,
+            name=one.agent.name if one.agent is not None and one.available else None,
+            available=one.available,
+        )
+        for one in listed
+    ]
+    first_usable = next((one.agent for one in listed if one.available and one.agent is not None), None)
     life = (
-        await tokens.lifetimes(dao, agent)
-        if agent is not None and available
+        await tokens.lifetimes(dao, first_usable)
+        if first_usable is not None
         else registry.token_lifetimes.lifetimes({})
     )
     response.headers["Cache-Control"] = "no-store"
     day = 86400
     return PairingLookupDTO(
-        agent=PairingAgentDTO(
-            slug=agent.slug if agent is not None and available else row.agent_ref,
-            name=agent.name if agent is not None and available else None,
-        ),
-        available=available,
+        agent=PairingAgentDTO(slug=entries[0].slug, name=entries[0].name),
+        available=entries[0].available,
+        agents=entries,
         device_label=row.device_label,
         client=PairingClient(name=row.client_name, version=row.client_version, os=row.client_os),
         requester_ip=str(row.requester_ip) if row.requester_ip is not None else None,
@@ -1349,29 +1365,46 @@ async def approve_agent_pairing(
 ) -> Response:
     """The person approves the pairing: the app's next poll gets their tokens for the agent.
 
-    ``access.decide`` first. An agent that is unknown, retired or not granted to them answers the same 403;
-    the pairing stays open (they may deny it, or it expires).
+    ``access.decide`` for each agent the pairing names. One approval covers every one the person may use (ASVS
+    5.0 10.7.1, 10.7.2); the others are refused for this pairing and never issued. When there is none, the same
+    403 whether unknown, retired or not granted; the pairing stays open (they may deny it, or it expires). The
+    audit entry names all agents and the approved ones, never a code.
     """
     row = await _pending_pairing(payload.code, request, user, dao, audit)
-    agent, decision = await pairing.resolve(dao, row, user)
-    if agent is None or not decision.allowed:
+    named = await pairing.members(dao.session, row)
+    listed = await pairing.resolve_all(dao, row, user, named)
+    if not any(one.available for one in listed):
         await audit.log(
             action="agent_pairing.approve",
             target_type="agent_pairing",
             target_id=str(row.id),
             result=AuditResult.DENY,
             actor_id=user.id,
-            metadata_json=_pairing_record(row, agent=row.agent_ref, reason=decision.code),
+            metadata_json=_pairing_record(
+                row,
+                agent=row.agent_ref,
+                agents=[one.ref for one in listed],
+                approved=[],
+                reason=listed[0].decision.code,
+            ),
         )
         raise _refuse(status.HTTP_403_FORBIDDEN, "agent_not_available", _NOT_AVAILABLE)
-    await pairing.approve(dao.session, row, agent, user, datetime.now(UTC))
+    approved = await pairing.approve(dao.session, row, user, datetime.now(UTC), listed, named)
+    first = approved[0].agent
+    assert first is not None
     await audit.log(
         action="agent_pairing.approve",
         target_type="agent_pairing",
         target_id=str(row.id),
         result=AuditResult.ALLOW,
         actor_id=user.id,
-        metadata_json=_pairing_record(row, agent=agent.slug, agent_id=str(agent.id)),
+        metadata_json=_pairing_record(
+            row,
+            agent=first.slug,
+            agent_id=str(first.id),
+            agents=[one.ref for one in listed],
+            approved=[one.agent.slug for one in approved if one.agent is not None],
+        ),
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT, headers=_NO_STORE)
 

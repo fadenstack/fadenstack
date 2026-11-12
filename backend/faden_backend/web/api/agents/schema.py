@@ -5,7 +5,7 @@ from __future__ import annotations
 import unicodedata
 import uuid
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator, model_validator
 
@@ -312,6 +312,9 @@ class StartPairingRequest(BaseModel):
 
     #: The agent's slug or id. Whether it exists is told nobody here; the approval resolves it.
     agent: str = Field(pattern=AGENT_REF_PATTERN)
+    #: Further agents for the same approval: up to 8 in all, the first being ``agent``, none twice. Omitted, the
+    #: pairing is for ``agent`` alone, as before.
+    agents: list[Annotated[str, Field(pattern=AGENT_REF_PATTERN)]] | None = Field(default=None, max_length=8)
     device_label: str = Field(min_length=1, max_length=200)
     client: PairingClient = Field(default_factory=PairingClient)
 
@@ -319,6 +322,16 @@ class StartPairingRequest(BaseModel):
     @classmethod
     def _plain(cls, value: str) -> str:
         return _shown_as_is(value) or value
+
+    @model_validator(mode="after")
+    def _agents_start_with_agent(self) -> "StartPairingRequest":
+        if self.agents is not None and (self.agents[:1] != [self.agent] or len(set(self.agents)) != len(self.agents)):
+            raise ValueError("agents must start with agent and name none twice")
+        return self
+
+    def agent_refs(self) -> list[str]:
+        """The agents the pairing is for, in order: ``agent`` alone when no list came."""
+        return list(self.agents) if self.agents else [self.agent]
 
 
 class PairingStartDTO(BaseModel):
@@ -334,12 +347,16 @@ class PairingStartDTO(BaseModel):
     verification_uri_complete: str
     expires_in: int
     interval: int
+    #: The agents as stored: the request's list, or the one agent.
+    agents: list[str]
 
 
 class PairingTokenRequest(BaseModel):
     """The app polls for its tokens."""
 
     pairing_code: str = Field(min_length=16, max_length=256)
+    #: The agent to collect, one of the pairing's list; without it, the first.
+    agent: str | None = Field(default=None, pattern=AGENT_REF_PATTERN)
 
 
 class PairingCodeRequest(BaseModel):
@@ -356,6 +373,12 @@ class PairingAgentDTO(BaseModel):
     name: str | None
 
 
+class PairingAgentsEntryDTO(PairingAgentDTO):
+    """One agent of the pairing, and whether the person may use it."""
+
+    available: bool
+
+
 class SignInLastsDTO(BaseModel):
     """How long the sign-in stays: idle, and at most."""
 
@@ -366,9 +389,13 @@ class SignInLastsDTO(BaseModel):
 class PairingLookupDTO(BaseModel):
     """What the console shows before the person approves (ASVS 5.0 10.7.1, 10.7.2)."""
 
+    #: The first agent, for consoles that know nothing of several.
     agent: PairingAgentDTO
-    #: Whether the person may use the agent; approving answers 403 otherwise.
+    #: Whether the person may use the first agent. Approving covers every listed agent the person may use and
+    #: answers 403 when there is none.
     available: bool
+    #: Every agent the pairing asks for, in the app's order.
+    agents: list[PairingAgentsEntryDTO]
     device_label: str
     client: PairingClient
     requester_ip: str | None

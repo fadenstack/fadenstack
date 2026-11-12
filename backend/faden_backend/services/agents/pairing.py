@@ -17,6 +17,12 @@ Codes (OWASP ASVS 5.0 V6.5):
   codes; without the secret it does not. The key is derived (HMAC of a fixed label), not the secret itself,
   so a value made for one purpose is never valid for the other (the secret also signs JWTs).
 - Both work for 10 minutes (6.5.5, 10.4.3) and once (6.5.1): approved, then tokens once, then consumed.
+
+One pairing may name up to 8 agents (``agent_pairing_agent``, first = ``agent_pairings.agent_ref``). One approval
+covers every listed agent the person may use (10.7.1, 10.7.2); an agent they may not use is refused for this
+pairing and never issued. The app collects each approved agent's tokens once, by naming it; the pairing is
+consumed when all are collected, or ``REDEEM_WINDOW_S`` after the approval. A pairing made before the table
+existed has no rows and works as one agent, as before.
 - They are bound to their pairing (6.6.2): the user code approves only the pairing it was made for, and only
   that pairing's code collects the tokens -- a sign-in of its own, made at that poll and never kept.
 - Neither code is ever logged or written to the audit trail; the pairing's id is (V16).
@@ -53,7 +59,13 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import cast, delete, select, update
 from sqlalchemy.dialects.postgresql import INET
 
-from faden_backend.db.models.agents import Agent, AgentPairing, AgentPairingFailure, AgentPairingStatus
+from faden_backend.db.models.agents import (
+    Agent,
+    AgentPairing,
+    AgentPairingAgent,
+    AgentPairingFailure,
+    AgentPairingStatus,
+)
 from faden_backend.db.models.users import User
 from faden_backend.services.agents import tokens
 from faden_backend.services.agents.access import AccessDecision, decide
@@ -72,6 +84,10 @@ INTERVAL_S = 5
 SLOW_DOWN_S = 5
 #: A poll this much early still counts as on time: timers and networks are not exact.
 POLL_GRACE_S = 1.0
+#: How long after the approval the app may collect the tokens of the agents approved.
+REDEEM_WINDOW_S = 600
+#: The most agents one pairing names.
+MAX_AGENTS = 8
 #: Pairings are deleted a day after they were made.
 KEEP_S = 24 * 3600
 #: The window of every limit, and the limits in it.
@@ -229,7 +245,7 @@ async def start(
     *,
     secret: str,
     tenant_id: str,
-    agent_ref: str,
+    agent_refs: list[str],
     device_label: str,
     client_name: str | None,
     client_version: str | None,
@@ -237,7 +253,12 @@ async def start(
     ip: str | None,
     now: datetime,
 ) -> Started:
-    """A new pairing for the agent the app named; whether that agent exists is not looked at here."""
+    """A new pairing for the agents the app named; whether they exist is not looked at here.
+
+    *agent_refs* is the app's list, at most :data:`MAX_AGENTS`, without repeats; the first is the pairing's agent.
+    """
+    if not 1 <= len(agent_refs) <= MAX_AGENTS or len(set(agent_refs)) != len(agent_refs):
+        raise ValueError("a pairing names 1 to 8 different agents")
     kept_since = now - timedelta(seconds=KEEP_S)
     await session.execute(delete(AgentPairing).where(AgentPairing.created_at < kept_since))
     await session.execute(
@@ -262,7 +283,7 @@ async def start(
     row = AgentPairing(
         id=uuid.uuid4(),
         tenant_id=tenant_id,
-        agent_ref=agent_ref,
+        agent_ref=agent_refs[0],
         pairing_code_hash=pairing_code_hash(pairing_code),
         user_code_hmac=digest,
         device_label=device_label,
@@ -277,6 +298,10 @@ async def start(
         failed_polls=0,
     )
     session.add(row)
+    await session.flush()
+    session.add_all(
+        AgentPairingAgent(pairing_id=row.id, position=place, agent_ref=ref) for place, ref in enumerate(agent_refs)
+    )
     await session.flush()
     return Started(pairing=row, pairing_code=pairing_code, user_code=user_code)
 
@@ -296,28 +321,77 @@ async def find(session: AsyncSession, *, secret: str, entered: str, now: datetim
     if row is None:
         return None
     if now >= row.expires_at:
-        if row.status in (AgentPairingStatus.PENDING, AgentPairingStatus.APPROVED):
+        if row.status == AgentPairingStatus.PENDING:
             row.status = AgentPairingStatus.EXPIRED
             await session.flush()
-        return None
+            return None
+        # An approved pairing lives on by its own window (the poll decides); anything else is over.
+        if row.status != AgentPairingStatus.APPROVED:
+            return None
     return row
 
 
-async def resolve(dao: AgentsDAO, row: AgentPairing, user: User) -> tuple[Agent | None, AccessDecision]:
-    """The agent the pairing names, and whether *user* may use it (``access.decide``)."""
-    agent = await dao.get(row.tenant_id, row.agent_ref)
+async def members(session: AsyncSession, row: AgentPairing) -> list[AgentPairingAgent]:
+    """The agents the pairing names, in the app's order; none for a pairing made before the table existed."""
+    found = await session.scalars(
+        select(AgentPairingAgent).where(AgentPairingAgent.pairing_id == row.id).order_by(AgentPairingAgent.position),
+    )
+    return list(found)
+
+
+@dataclass(frozen=True)
+class Resolved:
+    """One named agent, and whether the person may use it."""
+
+    ref: str
+    agent: Agent | None
+    decision: AccessDecision
+
+    @property
+    def available(self) -> bool:
+        return self.agent is not None and self.decision.allowed
+
+
+async def resolve_ref(dao: AgentsDAO, tenant_id: str, ref: str, user: User) -> Resolved:
+    """The agent *ref* names, and whether *user* may use it (``access.decide``)."""
+    agent = await dao.get(tenant_id, ref)
     if agent is None:
-        return None, AccessDecision(False, "unknown_agent", "There is no such agent.")
-    return agent, await decide(dao, agent, user)
+        return Resolved(ref, None, AccessDecision(False, "unknown_agent", "There is no such agent."))
+    return Resolved(ref, agent, await decide(dao, agent, user))
 
 
-async def approve(session: AsyncSession, row: AgentPairing, agent: Agent, user: User, now: datetime) -> None:
-    """*user* approves the pairing for *agent*: the app gets their tokens at its next poll."""
+async def resolve_all(
+    dao: AgentsDAO, row: AgentPairing, user: User, named: list[AgentPairingAgent],
+) -> list[Resolved]:
+    """Every agent the pairing names (just its own when it has no rows), in order."""
+    refs = [m.agent_ref for m in named] or [row.agent_ref]
+    return [await resolve_ref(dao, row.tenant_id, ref, user) for ref in refs]
+
+
+async def approve(
+    session: AsyncSession,
+    row: AgentPairing,
+    user: User,
+    now: datetime,
+    resolved: list[Resolved],
+    named: list[AgentPairingAgent],
+) -> list[Resolved]:
+    """*user* approves the pairing for every agent they may use: the app gets their tokens for those, once each.
+
+    Returns the agents approved, which the caller has seen to be at least one. The others are refused for this
+    pairing (``approved`` false): never issued, whatever the app asks.
+    """
+    approved = [r for r in resolved if r.available]
+    for member, one in zip(named, resolved, strict=False):  # no rows: a pairing from before the table
+        member.approved = one.available
+        member.agent_id = one.agent.id if one.available and one.agent is not None else None
+    first = approved[0].agent
     row.status = AgentPairingStatus.APPROVED
-    row.agent_id = agent.id
+    row.agent_id = first.id if first is not None else None
     row.approved_by = user.id
     row.decided_at = now
     await session.flush()
+    return approved
 
 
 async def deny(session: AsyncSession, row: AgentPairing, user: User, now: datetime) -> None:
@@ -336,8 +410,13 @@ class Paired:
     pairing: AgentPairing
 
 
-async def poll(dao: AgentsDAO, *, secret: str, pairing_code: str, now: datetime) -> Paired:
-    """The app asks whether its pairing was approved; :class:`PairingError` until it gets the tokens."""
+async def poll(
+    dao: AgentsDAO, *, secret: str, pairing_code: str, now: datetime, agent: str | None = None,
+) -> Paired:
+    """The app asks whether its pairing was approved; :class:`PairingError` until it gets the tokens.
+
+    *agent* names the agent to collect (the first when omitted); each approved agent is collected once.
+    """
     session = dao.session
     digest = pairing_code_hash(pairing_code)
     row = await session.scalar(
@@ -349,11 +428,22 @@ async def poll(dao: AgentsDAO, *, secret: str, pairing_code: str, now: datetime)
         raise PairingError("invalid_grant", "The pairing was used already; start a new one.")
     if row.status == AgentPairingStatus.DENIED:
         raise PairingError("access_denied", "The sign-in was denied.")
-    if row.status == AgentPairingStatus.EXPIRED or now >= row.expires_at:
+    if row.status == AgentPairingStatus.EXPIRED:
+        raise PairingError("expired_token", "The code expired; start a new pairing.")
+    named = await members(session, row)
+    if named and row.status == AgentPairingStatus.APPROVED and row.decided_at is not None:
+        # After the approval the code's own expiry no longer counts: the approved agents may be collected for
+        # REDEEM_WINDOW_S, then the pairing is over.
+        if now >= row.decided_at + timedelta(seconds=REDEEM_WINDOW_S):
+            row.status = AgentPairingStatus.CONSUMED
+            raise PairingError("expired_token", "The approval is too old; start a new pairing.")
+    elif now >= row.expires_at:
         row.status = AgentPairingStatus.EXPIRED
         raise PairingError("expired_token", "The code expired; start a new pairing.")
+    # Collecting a further agent after the first is no polling: the interval counts while the app waits.
+    collecting = row.status == AgentPairingStatus.APPROVED and any(m.redeemed_at is not None for m in named)
     since_last = (now - row.last_polled_at).total_seconds() if row.last_polled_at is not None else None
-    if since_last is not None and since_last < row.interval_s - POLL_GRACE_S:
+    if not collecting and since_last is not None and since_last < row.interval_s - POLL_GRACE_S:
         row.interval_s = min(row.interval_s + SLOW_DOWN_S, LIFETIME_S)
         row.failed_polls += 1
         row.last_polled_at = now
@@ -365,16 +455,51 @@ async def poll(dao: AgentsDAO, *, secret: str, pairing_code: str, now: datetime)
         raise PairingError("authorization_pending", "Waiting for the approval in the console.")
 
     user = await session.get(User, row.approved_by) if row.approved_by else None
-    agent = await session.get(Agent, row.agent_id) if row.agent_id else None
-    if user is None or agent is None:
-        row.status = AgentPairingStatus.DENIED
+    if not named:
+        # Made before several agents were possible: one agent, as ever.
+        chosen = await session.get(Agent, row.agent_id) if row.agent_id else None
+        if user is None or chosen is None:
+            row.status = AgentPairingStatus.DENIED
+            raise PairingError("access_denied", "The sign-in was denied.")
+        try:
+            # decide() again: access lost since the approval gives no tokens.
+            issued = await tokens.issue(dao, secret=secret, user=user, agent=chosen, device_label=row.device_label)
+        except tokens.AgentTokenError as exc:
+            row.status = AgentPairingStatus.DENIED
+            raise PairingError("access_denied", "The agent is not available to the person who approved.") from exc
+        row.status = AgentPairingStatus.CONSUMED
+        await session.flush()
+        return Paired(issued=issued, pairing=row)
+
+    wanted = agent if agent is not None else named[0].agent_ref
+    member = next((m for m in named if m.agent_ref == wanted), None)
+    if member is None:
+        raise PairingError("invalid_grant", "The pairing does not name this agent.")
+    if member.approved is not True:
+        raise PairingError("invalid_grant", "The sign-in was not approved for this agent.")
+    if member.redeemed_at is not None:
+        raise PairingError("invalid_grant", "The tokens of this agent were collected already.")
+    chosen = await session.get(Agent, member.agent_id) if member.agent_id else None
+    if user is None or chosen is None:
+        member.approved = False
+        _settle(row, named)
         raise PairingError("access_denied", "The sign-in was denied.")
     try:
-        # decide() again: access lost since the approval gives no tokens.
-        issued = await tokens.issue(dao, secret=secret, user=user, agent=agent, device_label=row.device_label)
+        issued = await tokens.issue(dao, secret=secret, user=user, agent=chosen, device_label=row.device_label)
     except tokens.AgentTokenError as exc:
-        row.status = AgentPairingStatus.DENIED
+        member.approved = False
+        _settle(row, named)
         raise PairingError("access_denied", "The agent is not available to the person who approved.") from exc
-    row.status = AgentPairingStatus.CONSUMED
+    member.redeemed_at = now
+    _settle(row, named)
     await session.flush()
     return Paired(issued=issued, pairing=row)
+
+
+def _settle(row: AgentPairing, named: list[AgentPairingAgent]) -> None:
+    """Consumed once no approved agent is left to collect; denied if none was ever collected."""
+    if any(m.approved is True and m.redeemed_at is None for m in named):
+        return
+    row.status = (
+        AgentPairingStatus.CONSUMED if any(m.redeemed_at is not None for m in named) else AgentPairingStatus.DENIED
+    )

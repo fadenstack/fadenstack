@@ -20,6 +20,7 @@ from typing import Any
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     DateTime,
     Enum,
     ForeignKey,
@@ -331,6 +332,37 @@ class AgentPairing(Base):
     interval_s: Mapped[int] = mapped_column(Integer, nullable=False, default=5, server_default="5")
     #: Polls that came too early (each answered ``slow_down``).
     failed_polls: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+
+
+class AgentPairingAgent(Base):
+    """One agent a pairing asks for: the person approves them together, the app redeems each once.
+
+    ``agent_pairings.agent_ref`` stays the first agent's. A pairing made before this table existed has no rows
+    here and works as one agent (``services/agents/pairing.py``).
+    """
+
+    __tablename__ = "agent_pairing_agent"
+    __table_args__ = (UniqueConstraint("pairing_id", "agent_ref", name="uq_agent_pairing_agent_ref"),)
+
+    pairing_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("agent_pairings.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    #: Order of the app's request; the first is the pairing's own agent.
+    position: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    #: The agent as the app named it (slug or id).
+    agent_ref: Mapped[str] = mapped_column(String(64), nullable=False)
+    #: Set at the approval, for an agent the person may use.
+    agent_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("agents.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    #: Null until decided; true when the approval covers the agent, false when it was refused for this pairing.
+    approved: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    #: When the app collected this agent's tokens; once.
+    redeemed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class AgentPairingFailure(Base):
