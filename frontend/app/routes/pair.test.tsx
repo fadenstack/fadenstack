@@ -323,6 +323,80 @@ describe("looking up, approving and denying", () => {
   });
 });
 
+describe("one code for several agents", () => {
+  beforeEach(() => me.mockResolvedValue(ANNA));
+
+  const MANY: PairingLookup = {
+    ...FOUND,
+    agents: [
+      { slug: "word", name: "Word", available: true },
+      { slug: "excel", name: null, available: false },
+      { slug: "outlook", name: "Outlook", available: true },
+    ],
+    agent: { slug: "word", name: "Word" },
+  };
+
+  it("lists every agent with the unavailable ones marked, and the button says how many it signs in to", async () => {
+    answer("lookup", { status: 200, body: MANY });
+    answer("approve", { status: 204 });
+    open();
+    await lookUp();
+
+    const review = await screen.findByTestId("pair-review");
+    expect(within(review).getByRole("heading", { level: 2 })).toHaveTextContent(
+      "Sign in these assistants on “Desktop agent on SACHI-PC”?",
+    );
+    const items = within(screen.getByTestId("pair-agents")).getAllByRole("listitem");
+    expect(items.map((li) => li.getAttribute("data-available"))).toEqual(["true", "false", "true"]);
+    expect(items[0]).toHaveTextContent("Word");
+    expect(items[1]).toHaveTextContent("excel");
+    expect(items[1]).toHaveTextContent("not available to you, will not be signed in");
+    expect(items[2]).toHaveTextContent("Outlook");
+    // One approval, one request, with the code in the body.
+    fireEvent.click(within(review).getByRole("button", { name: "Sign in to 2 assistants" }));
+    expect(await screen.findByTestId("pair-result")).toHaveTextContent("Signed in.");
+    expect(calls.filter((c) => c.url.endsWith("/approve"))).toEqual([
+      { url: "/api/agent-tokens/pairings/approve", method: "POST", body: { code: CODE } },
+    ]);
+  });
+
+  it("says the number in the singular when one agent of several is usable", async () => {
+    answer("lookup", {
+      status: 200,
+      body: { ...MANY, agents: [MANY.agents![0], { slug: "excel", name: null, available: false }] },
+    });
+    open();
+    await lookUp();
+    expect(await screen.findByRole("button", { name: "Sign in to 1 assistant" })).toBeEnabled();
+  });
+
+  it("keeps Approve off when none of the agents is usable", async () => {
+    answer("lookup", {
+      status: 200,
+      body: {
+        ...MANY,
+        available: false,
+        agent: { slug: "word", name: null },
+        agents: MANY.agents!.map((one) => ({ ...one, name: null, available: false })),
+      },
+    });
+    open();
+    await lookUp();
+    expect(await screen.findByTestId("pair-problem")).toHaveTextContent("This agent is not available to you.");
+    expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled();
+  });
+
+  it("shows one agent as before when the server names one only", async () => {
+    answer("lookup", { status: 200, body: FOUND });
+    open();
+    await lookUp();
+    const review = await screen.findByTestId("pair-review");
+    expect(within(review).getByRole("heading", { level: 2 })).toHaveTextContent("Sign in Desk on");
+    expect(screen.queryByTestId("pair-agents")).not.toBeInTheDocument();
+    expect(within(review).getByRole("button", { name: "Approve" })).toBeEnabled();
+  });
+});
+
 describe("refusals", () => {
   beforeEach(() => me.mockResolvedValue(ANNA));
 

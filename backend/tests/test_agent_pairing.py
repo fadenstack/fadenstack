@@ -30,6 +30,7 @@ from starlette import status
 
 from faden_backend.db.models.agents import (
     AgentPairing,
+    AgentPairingAgent,
     AgentPairingFailure,
     AgentPairingStatus,
     AgentRefreshToken,
@@ -44,6 +45,7 @@ MIGRATION = (
     Path(__file__).resolve().parents[1]
     / "faden_backend" / "db" / "migrations" / "versions" / "2026-11-12-09-00_p41r1ng.py"
 )
+MIGRATION_AGENTS = MIGRATION.with_name("2026-11-12-15-00_p41r4gs.py")
 
 
 class _As:
@@ -615,7 +617,15 @@ async def test_the_app_revokes_its_own_sign_in(
 # -- the migration ----------------------------------------------------------------------------
 
 
-async def test_the_migration_upgrades_and_downgrades(dbsession: AsyncSession) -> None:
+def _load(path: Path, name: str) -> Any:
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+async def test_the_migrations_upgrade_and_downgrade(dbsession: AsyncSession) -> None:
     """Down and up again on the test database (made from the models), inside the test's transaction."""
     from alembic.autogenerate import compare_metadata
     from alembic.migration import MigrationContext
@@ -623,42 +633,365 @@ async def test_the_migration_upgrades_and_downgrades(dbsession: AsyncSession) ->
 
     from faden_backend.db.meta import meta
 
-    spec = importlib.util.spec_from_file_location("p41r1ng", MIGRATION)
-    assert spec is not None and spec.loader is not None
-    migration = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(migration)
+    migration, several = _load(MIGRATION, "p41r1ng"), _load(MIGRATION_AGENTS, "p41r4gs")
     assert (migration.revision, migration.down_revision) == ("p41r1ng", "st3pup0")
-    ours = {"agent_pairings", "agent_pairing_failures"}
+    assert (several.revision, several.down_revision) == ("p41r4gs", "p41r1ng")
+    ours = {"agent_pairings", "agent_pairing_failures", "agent_pairing_agent"}
 
     def run(sync_conn: Any) -> None:
         context = MigrationContext.configure(sync_conn)
         with Operations.context(context):
+            several.downgrade()
+            assert "agent_pairing_agent" not in sa.inspect(sync_conn).get_table_names()
             migration.downgrade()
             assert not ours & set(sa.inspect(sync_conn).get_table_names())
             enum = sync_conn.execute(sa.text("SELECT 1 FROM pg_type WHERE typname = 'agent_pairing_status'"))
             assert enum.first() is None
 
             migration.upgrade()
+            several.upgrade()
             inspector = sa.inspect(sync_conn)
             assert ours <= set(inspector.get_table_names())
             indexes = {i["name"]: i for i in inspector.get_indexes("agent_pairings")}
             pending = indexes["uq_agent_pairings_pending_user_code"]
             assert pending["unique"] and "pending" in str(pending.get("dialect_options", {}))
-            # What the migration made is what the models describe.
+            # What the migrations made is what the models describe.
             diffs = [d for d in compare_metadata(context, meta) if any(t in repr(d) for t in ours)]
             assert diffs == []
 
+            several.downgrade()
             migration.downgrade()
             migration.upgrade()
+            several.upgrade()
 
     connection = await dbsession.connection()
     await connection.run_sync(run)
 
 
-def test_the_pairing_migration_follows_the_second_sign_in_in_one_head() -> None:
-    """``p41r1ng`` comes right after 0.7.0's head ``st3pup0`` (the second sign-in): one line, one head."""
+def test_the_pairing_migrations_follow_the_second_sign_in_in_one_head() -> None:
+    """``p41r1ng`` comes right after 0.7.0's head ``st3pup0``, ``p41r4gs`` (several agents) after it: one head."""
     from alembic.script import ScriptDirectory
 
     scripts = ScriptDirectory(str(MIGRATION.parent.parent))
-    assert scripts.get_heads() == ["p41r1ng"]
+    assert scripts.get_heads() == ["p41r4gs"]
+    assert scripts.get_revision("p41r4gs").down_revision == "p41r1ng"
     assert scripts.get_revision("p41r1ng").down_revision == "st3pup0"
+
+
+# -- one pairing for several agents -------------------------------------------------------------
+
+
+async def _start_many(client: AsyncClient, agents: list[str], **more: Any) -> Any:
+    r = await client.post(
+        f"{BASE}/pairings", json={"agent": agents[0], "agents": agents, "device_label": "Word on SACHI-PC", **more},
+    )
+    assert r.status_code == status.HTTP_201_CREATED, r.text
+    return r.json()
+
+
+async def _token(client: AsyncClient, started: dict[str, Any], agent: str | None = None) -> Response:
+    body: dict[str, Any] = {"pairing_code": started["pairing_code"]}
+    if agent is not None:
+        body["agent"] = agent
+    return await client.post(f"{BASE}/pairings/token", json=body)
+
+
+async def _three_agents(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession,
+) -> tuple[User, User]:
+    """Agents word, excel and outlook; Anna may use word and outlook, not excel. Returns (admin, anna)."""
+    signed_in.user = admin = await _user(dbsession, admin=True)
+    anna = await _user(dbsession)
+    await _agent(client, "word", anna)
+    await _agent(client, "excel")
+    await _agent(client, "outlook", anna)
+    return admin, anna
+
+
+async def test_starting_for_several_agents_stores_them_in_order(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession, secret: str,
+) -> None:
+    started = await _start_many(client, ["word", "excel", "outlook"])
+    assert started["agents"] == ["word", "excel", "outlook"]
+    row = await _pairing_row(dbsession, started)
+    assert row.agent_ref == "word"
+    named = (await dbsession.execute(
+        select(AgentPairingAgent).where(AgentPairingAgent.pairing_id == row.id).order_by(AgentPairingAgent.position),
+    )).scalars().all()
+    assert [(m.position, m.agent_ref, m.approved, m.redeemed_at) for m in named] == [
+        (0, "word", None, None), (1, "excel", None, None), (2, "outlook", None, None),
+    ]
+    [start] = await _events(dbsession, "agent_pairing.start")
+    assert json.loads(start.metadata_json or "{}")["agents"] == ["word", "excel", "outlook"]
+
+
+async def test_an_old_client_naming_one_agent_gets_the_same_answer_plus_the_list(
+    client: AsyncClient, secret: str,
+) -> None:
+    started = await _start(client, "desk")
+    assert started["agents"] == ["desk"]
+    # One agent named twice over (agents = [agent]) is the same pairing.
+    again = await _start_many(client, ["desk"])
+    assert again["agents"] == ["desk"]
+
+
+async def test_at_most_eight_different_agents_the_first_being_agent(client: AsyncClient, secret: str) -> None:
+    eight = [f"app{n}" for n in range(8)]
+    assert (await _start_many(client, eight))["agents"] == eight
+    for agents, first in (
+        ([*eight, "app8"], "app0"),  # nine
+        (["app0", "app1", "app0"], "app0"),  # a repeat
+        (["app0", "app0"], "app0"),
+        (["app1", "app0"], "app0"),  # the first is not agent
+        ([], "app0"),
+        (["app0", "../x"], "app0"),
+    ):
+        r = await client.post(
+            f"{BASE}/pairings", json={"agent": first, "agents": agents, "device_label": "PC"},
+        )
+        assert r.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT, agents
+
+
+async def test_the_lookup_lists_every_agent_and_keeps_the_first_ones_fields(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession, secret: str,
+) -> None:
+    admin, anna = await _three_agents(signed_in, client, dbsession)
+    started = await _start_many(client, ["word", "excel", "outlook", "ghost"])
+    signed_in.user = anna
+    seen = (await _console(client, "lookup", started["user_code"])).json()
+    assert seen["agents"] == [
+        {"slug": "word", "name": "Word", "available": True},
+        {"slug": "excel", "name": None, "available": False},
+        {"slug": "outlook", "name": "Outlook", "available": True},
+        {"slug": "ghost", "name": None, "available": False},
+    ]
+    assert seen["agent"] == {"slug": "word", "name": "Word"} and seen["available"] is True
+    # When the first is the one not usable, agent/available say so, as an old console reads them.
+    started = await _start_many(client, ["excel", "word"])
+    seen = (await _console(client, "lookup", started["user_code"])).json()
+    assert seen["agent"] == {"slug": "excel", "name": None} and seen["available"] is False
+    assert [a["available"] for a in seen["agents"]] == [False, True]
+
+
+async def test_one_approval_covers_the_agents_the_person_may_use_and_refuses_the_rest(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession, secret: str,
+) -> None:
+    admin, anna = await _three_agents(signed_in, client, dbsession)
+    started = await _start_many(client, ["word", "excel", "outlook"])
+    signed_in.user = anna
+    r = await _console(client, "approve", started["user_code"])
+    assert r.status_code == status.HTTP_204_NO_CONTENT, r.text
+
+    row = await _pairing_row(dbsession, started)
+    named = (await dbsession.execute(
+        select(AgentPairingAgent).where(AgentPairingAgent.pairing_id == row.id).order_by(AgentPairingAgent.position),
+    )).scalars().all()
+    assert [(m.agent_ref, m.approved, m.agent_id is not None) for m in named] == [
+        ("word", True, True), ("excel", False, False), ("outlook", True, True),
+    ]
+    [approve] = await _events(dbsession, "agent_pairing.approve")
+    detail = json.loads(approve.metadata_json or "{}")
+    assert detail["agents"] == ["word", "excel", "outlook"] and detail["approved"] == ["word", "outlook"]
+    assert approve.actor_id == anna.id and approve.result == "allow"
+    assert started["user_code"] not in (approve.metadata_json or "")
+
+    await _waited(dbsession)
+    refused = await _token(client, started, "excel")
+    assert refused.status_code == status.HTTP_400_BAD_REQUEST and refused.json()["error"] == "invalid_grant"
+    assert (await dbsession.execute(select(AgentRefreshToken))).first() is None
+
+
+async def test_approving_with_none_of_the_agents_available_is_the_same_403(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession, secret: str,
+) -> None:
+    admin, anna = await _three_agents(signed_in, client, dbsession)
+    started = await _start_many(client, ["excel", "ghost"])
+    signed_in.user = anna
+    r = await _console(client, "approve", started["user_code"])
+    assert r.status_code == status.HTTP_403_FORBIDDEN
+    assert r.json() == {"detail": {"code": "agent_not_available", "message": "This agent is not available to you."}}
+    row = await _pairing_row(dbsession, started)
+    assert row.status == AgentPairingStatus.PENDING
+    [approve] = await _events(dbsession, "agent_pairing.approve")
+    detail = json.loads(approve.metadata_json or "{}")
+    assert approve.result == "deny" and detail["approved"] == [] and detail["agents"] == ["excel", "ghost"]
+
+
+async def test_each_approved_agent_gives_its_tokens_once_to_the_request_naming_it(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession, secret: str,
+) -> None:
+    admin, anna = await _three_agents(signed_in, client, dbsession)
+    started = await _start_many(client, ["word", "excel", "outlook"])
+    # Before the approval: pending, whichever agent.
+    assert (await _token(client, started, "outlook")).json()["error"] == "authorization_pending"
+    signed_in.user = anna
+    assert (await _console(client, "approve", started["user_code"])).status_code == status.HTTP_204_NO_CONTENT
+    await _waited(dbsession)
+
+    # Without `agent`: the first. Each is a sign-in of Anna on this device, for that agent.
+    first = await _token(client, started)
+    assert first.status_code == status.HTTP_201_CREATED, first.text
+    assert first.headers["cache-control"] == "no-store"
+    word = first.json()
+    assert word["agent"] == "word" and word["user"]["id"] == str(anna.id)
+    # Collecting the next agent is no polling: no waiting of the interval in between.
+    second = await _token(client, started, "outlook")
+    assert second.status_code == status.HTTP_201_CREATED, second.text
+    outlook = second.json()
+    assert outlook["agent"] == "outlook" and outlook["agent_id"] != word["agent_id"]
+    assert outlook["device_id"] != word["device_id"] and outlook["refresh_token"] != word["refresh_token"]
+    claims = jwt.decode(outlook["access_token"], secret, algorithms=["HS256"], audience=f"agent:{outlook['agent_id']}")
+    assert claims["sub"] == str(anna.id)
+    mine = (await client.get(f"{BASE}/mine")).json()
+    assert sorted(s["device_label"] for s in mine) == ["Word on SACHI-PC", "Word on SACHI-PC"]
+
+    # All approved agents collected: consumed.
+    assert (await _pairing_row(dbsession, started)).status == AgentPairingStatus.CONSUMED
+    again = await _token(client, started, "word")
+    assert again.status_code == status.HTTP_400_BAD_REQUEST and again.json()["error"] == "invalid_grant"
+    issues = await _events(dbsession, "agent_token.issue")
+    pairing_id = str((await _pairing_row(dbsession, started)).id)
+    assert len(issues) == 2 and all(json.loads(e.metadata_json or "{}")["pairing"] == pairing_id for e in issues)
+
+
+async def test_an_agent_is_redeemed_once_and_the_pairing_stays_open_for_the_others(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession, secret: str,
+) -> None:
+    admin, anna = await _three_agents(signed_in, client, dbsession)
+    started = await _start_many(client, ["word", "excel", "outlook"])
+    signed_in.user = anna
+    await _console(client, "approve", started["user_code"])
+    await _waited(dbsession)
+    assert (await _token(client, started, "word")).status_code == status.HTTP_201_CREATED
+    again = await _token(client, started, "word")
+    assert again.status_code == status.HTTP_400_BAD_REQUEST and again.json()["error"] == "invalid_grant"
+    row = await _pairing_row(dbsession, started)
+    assert row.status == AgentPairingStatus.APPROVED  # outlook is still to collect
+    assert (await _token(client, started, "outlook")).status_code == status.HTTP_201_CREATED
+    assert (await dbsession.execute(select(sa.func.count()).select_from(AgentRefreshToken))).scalar_one() == 2
+
+
+async def test_an_agent_not_in_the_list_gets_nothing_even_if_the_person_may_use_it(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession, secret: str,
+) -> None:
+    admin, anna = await _three_agents(signed_in, client, dbsession)
+    started = await _start_many(client, ["word", "excel"])
+    signed_in.user = anna
+    await _console(client, "approve", started["user_code"])
+    await _waited(dbsession)
+    r = await _token(client, started, "outlook")  # Anna may use it, but the pairing never named it
+    assert r.status_code == status.HTTP_400_BAD_REQUEST and r.json()["error"] == "invalid_grant"
+    assert (await dbsession.execute(select(AgentRefreshToken))).first() is None
+    await _waited(dbsession)
+    assert (await _token(client, started, "word")).status_code == status.HTTP_201_CREATED
+
+
+async def test_the_tokens_can_be_collected_for_ten_minutes_after_the_approval(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession, secret: str,
+) -> None:
+    admin, anna = await _three_agents(signed_in, client, dbsession)
+    started = await _start_many(client, ["word", "outlook"])
+    signed_in.user = anna
+    await _console(client, "approve", started["user_code"])
+    row = await _pairing_row(dbsession, started)
+    # The code's own ten minutes ran out meanwhile; the approval's window counts instead.
+    row.created_at -= timedelta(seconds=590)
+    row.expires_at -= timedelta(seconds=590)
+    row.decided_at = datetime.now(UTC) - timedelta(seconds=540)
+    await dbsession.flush()
+    await _waited(dbsession)
+    assert (await _token(client, started, "word")).status_code == status.HTTP_201_CREATED
+
+    # Ten minutes after the approval: over, the second agent too.
+    row.decided_at = datetime.now(UTC) - timedelta(seconds=601)
+    await dbsession.flush()
+    r = await _token(client, started, "outlook")
+    assert r.status_code == status.HTTP_400_BAD_REQUEST and r.json()["error"] == "expired_token"
+    assert row.status == AgentPairingStatus.CONSUMED
+    assert (await _token(client, started, "outlook")).json()["error"] == "invalid_grant"
+    assert (await dbsession.execute(select(sa.func.count()).select_from(AgentRefreshToken))).scalar_one() == 1
+
+
+async def test_the_codes_own_expiry_still_applies_before_the_approval(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession, secret: str,
+) -> None:
+    await _three_agents(signed_in, client, dbsession)
+    started = await _start_many(client, ["word", "outlook"])
+    row = await _pairing_row(dbsession, started)
+    row.expires_at = datetime.now(UTC) - timedelta(seconds=1)
+    await dbsession.flush()
+    r = await _token(client, started, "outlook")
+    assert r.status_code == status.HTTP_400_BAD_REQUEST and r.json()["error"] == "expired_token"
+
+
+async def test_denying_a_pairing_for_several_agents_gives_none(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession, secret: str,
+) -> None:
+    admin, anna = await _three_agents(signed_in, client, dbsession)
+    started = await _start_many(client, ["word", "outlook"])
+    signed_in.user = anna
+    assert (await _console(client, "deny", started["user_code"])).status_code == status.HTTP_204_NO_CONTENT
+    await _waited(dbsession)
+    for agent in ("word", "outlook"):
+        r = await _token(client, started, agent)
+        assert r.status_code == status.HTTP_400_BAD_REQUEST and r.json()["error"] == "access_denied"
+
+
+async def test_access_lost_to_one_agent_after_the_approval_costs_only_that_agent(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession, secret: str,
+) -> None:
+    admin, anna = await _three_agents(signed_in, client, dbsession)
+    started = await _start_many(client, ["word", "outlook"])
+    signed_in.user = anna
+    await _console(client, "approve", started["user_code"])
+    signed_in.user = admin
+    await _grant(client, "word")
+    await _waited(dbsession)
+    r = await _token(client, started, "word")
+    assert r.status_code == status.HTTP_400_BAD_REQUEST and r.json()["error"] == "access_denied"
+    await _waited(dbsession)
+    assert (await _token(client, started, "outlook")).status_code == status.HTTP_201_CREATED
+    assert (await _pairing_row(dbsession, started)).status == AgentPairingStatus.CONSUMED
+
+
+async def test_a_pairing_made_before_the_table_existed_works_as_one_agent(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession, secret: str,
+) -> None:
+    """No rows in ``agent_pairing_agent`` (a pairing from before the migration): approve and collect as ever."""
+    signed_in.user = await _user(dbsession, admin=True)
+    anna = await _user(dbsession)
+    await _agent(client, "desk", anna)
+    started = await _start(client)
+    row = await _pairing_row(dbsession, started)
+    await dbsession.execute(sa.delete(AgentPairingAgent).where(AgentPairingAgent.pairing_id == row.id))
+    await dbsession.flush()
+
+    signed_in.user = anna
+    seen = (await _console(client, "lookup", started["user_code"])).json()
+    assert seen["agent"] == {"slug": "desk", "name": "Desk"} and seen["available"] is True
+    assert seen["agents"] == [{"slug": "desk", "name": "Desk", "available": True}]
+    assert (await _console(client, "approve", started["user_code"])).status_code == status.HTTP_204_NO_CONTENT
+    await _waited(dbsession)
+    # An `agent` naming the one agent is fine; the pairing is consumed after it, as before.
+    r = await _token(client, started, "desk")
+    assert r.status_code == status.HTTP_201_CREATED and r.json()["agent"] == "desk"
+    await _waited(dbsession)
+    r = await _poll(client, started)
+    assert r.status_code == status.HTTP_400_BAD_REQUEST and r.json()["error"] == "invalid_grant"
+    assert (await _pairing_row(dbsession, started)).status == AgentPairingStatus.CONSUMED
+
+
+async def test_an_old_client_polls_without_agent_and_gets_the_first_agents_tokens_once(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession, secret: str,
+) -> None:
+    signed_in.user = await _user(dbsession, admin=True)
+    anna = await _user(dbsession)
+    await _agent(client, "desk", anna)
+    started = await _start(client)
+    signed_in.user = anna
+    await _console(client, "approve", started["user_code"])
+    await _waited(dbsession)
+    r = await _poll(client, started)
+    assert r.status_code == status.HTTP_201_CREATED and r.json()["agent"] == "desk"
+    r = await _poll(client, started)
+    assert r.status_code == status.HTTP_400_BAD_REQUEST and r.json()["error"] == "invalid_grant"

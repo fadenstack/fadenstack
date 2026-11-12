@@ -27,6 +27,11 @@ To refuse, select **Deny**. You see **Denied. The app was not signed in.**, and 
 
 Opening the page, or the link the app opens, approves nothing: only **Approve** does.
 
+Some apps come as a suite, for example the Office add-ins for Word, Excel, PowerPoint and Outlook. One code can then
+ask to sign in several assistants at once: the page lists each of them, and one approval signs in all that you may
+use. An assistant marked as not available to you is left out; if none is available to you, the page does not let you
+approve. The button says how many assistants it signs in, for example **Sign in to 3 assistants**.
+
 When the app asked from another network than your browser's (your browser on your phone, say), the code that came
 with the link is not enough: the page asks you to type the code your app shows, then **Continue**. A link someone
 else sent you carries their code, and you cannot type a code that no app of yours shows.

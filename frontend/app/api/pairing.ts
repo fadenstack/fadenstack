@@ -9,7 +9,7 @@
  * - 404 `unknown_code`: wrong or expired (counts as a wrong try);
  * - 409 `already_decided`: approved or denied already;
  * - 429 `too_many_attempts`: too many wrong codes, `Retry-After` says for how long (nginx's own 429 too);
- * - 403 `agent_not_available`: the agent is unknown, retired or not granted to this person (approve only);
+ * - 403 `agent_not_available`: none of the agents is available to this person (approve only);
  * - 401: the console sign-in ended.
  */
 import { readError } from "./http";
@@ -21,12 +21,29 @@ export interface PairingClient {
   os: string | null;
 }
 
+/** One agent a pairing asks for; `name` is null when the person may not use it. */
+export interface PairingAgent {
+  slug: string;
+  name: string | null;
+  available: boolean;
+}
+
+/** The agents a lookup names (a server that knows one agent only names the first), and those usable. */
+export function pairingAgents(found: PairingLookup): PairingAgent[] {
+  return found.agents?.length ? found.agents : [{ ...found.agent, available: found.available }];
+}
+
 /** What asks to be signed in, for the person to check before approving. */
 export interface PairingLookup {
   /** `name` is null when the agent is not available to the person (unknown, retired or not granted alike). */
   agent: { slug: string; name: string | null };
-  /** Whether the person may use the agent; approving answers 403 otherwise. */
+  /** Whether the person may use the first agent. */
   available: boolean;
+  /**
+   * Every agent the pairing asks for, in the app's order; one approval covers those the person may use, and
+   * answers 403 when there is none. Absent from a server that knows one agent only.
+   */
+  agents?: PairingAgent[];
   device_label: string;
   client: PairingClient;
   requester_ip: string | null;

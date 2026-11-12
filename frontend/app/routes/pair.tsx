@@ -34,7 +34,7 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 
 import { auth, type AuthUser } from "~/api/auth";
-import { pairingApi, PairingRefused, type PairingLookup } from "~/api/pairing";
+import { pairingAgents, pairingApi, PairingRefused, type PairingLookup } from "~/api/pairing";
 import AppBrand from "~/components/AppBrand";
 import BrandMark from "~/components/BrandMark";
 import {
@@ -172,7 +172,16 @@ export default function PairPage() {
     if (err.status === 403 && err.code === "agent_not_available") {
       setProblem({ kind: "not_available" });
       setStep((current) =>
-        current.kind === "review" ? { ...current, found: { ...current.found, available: false } } : current,
+        current.kind === "review"
+          ? {
+              ...current,
+              found: {
+                ...current.found,
+                available: false,
+                agents: pairingAgents(current.found).map((one) => ({ ...one, available: false })),
+              },
+            }
+          : current,
       );
       return;
     }
@@ -212,7 +221,7 @@ export default function PairPage() {
         return;
       }
       setStep({ kind: "review", found, code: entered });
-      if (!found.available) setProblem({ kind: "not_available" });
+      if (!pairingAgents(found).some((one) => one.available)) setProblem({ kind: "not_available" });
     } catch (err: unknown) {
       refused(err, entered);
     } finally {
@@ -368,6 +377,9 @@ function Review({
 }) {
   const { t } = useTranslation();
   const { found, code } = step;
+  const agents = pairingAgents(found);
+  const several = agents.length > 1;
+  const usable = agents.filter((one) => one.available).length;
   const agent = found.agent.name ?? found.agent.slug;
   const app = [found.client.name, found.client.version].filter(Boolean).join(" ");
   const device = found.client.os ? `${found.device_label} (${found.client.os})` : found.device_label;
@@ -401,8 +413,40 @@ function Review({
         tabIndex={-1}
         sx={{ outline: "none", overflowWrap: "anywhere" }}
       >
-        {t("pair.question", { agent, device: found.device_label })}
+        {several
+          ? t("pair.question_many", { device: found.device_label })
+          : t("pair.question", { agent, device: found.device_label })}
       </Typography>
+
+      {several && (
+        <Box data-testid="pair-agents">
+          <Typography variant="body2" color="text.secondary">
+            {t("pair.agents_intro")}
+          </Typography>
+          <Box component="ul" sx={{ m: 0, mt: 0.5, pl: 3 }}>
+            {agents.map((one) => (
+              <Typography
+                component="li"
+                variant="body1"
+                key={one.slug}
+                data-available={one.available ? "true" : "false"}
+                sx={{ overflowWrap: "anywhere" }}
+              >
+                {one.available ? (
+                  (one.name ?? one.slug)
+                ) : (
+                  <>
+                    {one.slug}{" "}
+                    <Typography component="span" variant="body2" color="warning.main">
+                      ({t("pair.agent_off")})
+                    </Typography>
+                  </>
+                )}
+              </Typography>
+            ))}
+          </Box>
+        </Box>
+      )}
 
       <Typography variant="body1" data-testid="pair-compare">
         <Trans
@@ -453,8 +497,8 @@ function Review({
         <Button variant="outlined" size="large" disabled={busy} onClick={() => onDecide(false)}>
           {t("pair.deny")}
         </Button>
-        <Button variant="contained" size="large" disabled={busy || !found.available} onClick={() => onDecide(true)}>
-          {t("pair.approve")}
+        <Button variant="contained" size="large" disabled={busy || usable === 0} onClick={() => onDecide(true)}>
+          {several && usable > 0 ? t("pair.approve_many", { count: usable }) : t("pair.approve")}
         </Button>
       </Stack>
     </Stack>
