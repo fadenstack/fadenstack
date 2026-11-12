@@ -622,7 +622,11 @@ async def agent_host_tool_check(
     row = next(
         (t for t in agent.agent.host_tool_contract if t.get("name") == check.name), {},
     )
-    if row and not row.get("schema_sha256"):
+    # A command a person starts runs a host tool by itself, so its schema must be pinned in the published contract. A
+    # model's call (``model_tool``) is the model's tool call already offered under the contract: its check adds the
+    # current policy right before it runs and binds the call's id; an agent whose contract pins no schema keeps its
+    # tools. A pinned schema is still compared for every origin.
+    if row and not row.get("schema_sha256") and check.origin != "model_tool":
         raise GatewayError(
             status_code=409,
             message="Publish a pinned schema before enabling direct host commands.",

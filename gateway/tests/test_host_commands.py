@@ -178,6 +178,35 @@ async def test_no_contract_and_unpinned_schema_fail_closed(
 
 
 @pytest.mark.anyio
+async def test_a_model_call_is_checked_without_a_pinned_schema_but_a_pinned_one_must_match(
+    client: AsyncClient, db_session: AsyncSession, backend: _Backend,
+) -> None:
+    """The model-call recheck adds the current policy to a call the model already made under the contract: an agent
+    whose contract pins no schema keeps its tools (a person's command still needs the pin); a pinned schema that
+    differs is refused for every origin."""
+    await configure(db_session, backend)
+    changed = await client.post(
+        "/v1/agents/eplan-assistant/tools/check",
+        headers=_headers(),
+        json=command(origin="model_tool", call_id="model-call-2", schema_sha256="b" * 64),
+    )
+    assert changed.status_code == 409 and changed.json()["error"]["code"] == "host_schema_changed"
+    backend.agents.clear()
+    backend.put(
+        _profile(slug="unpinned", host_tool_contract=({"name": "nc_actions_undo", "risk": "destructive"},)),
+    )
+    model = await client.post(
+        "/v1/agents/unpinned/tools/check",
+        headers=_headers(),
+        json=command(origin="model_tool", call_id="model-call-1"),
+    )
+    assert model.status_code == 200, model.text
+    assert model.json()["decision"] in ("ask", "allow", "deny")
+    person = await client.post("/v1/agents/unpinned/tools/check", headers=_headers(), json=command())
+    assert person.status_code == 409 and person.json()["error"]["code"] == "host_schema_required"
+
+
+@pytest.mark.anyio
 @pytest.mark.parametrize(
     "change",
     [
