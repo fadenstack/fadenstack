@@ -14,22 +14,22 @@ Die Office-Add-ins bringen einen Fadenstack-Agenten in einen Aufgabenbereich neb
 ## Agent öffnen und anmelden {#open-the-agent-and-sign-in}
 
 1. Wählen Sie auf der Registerkarte **Start** (in einer Nachricht, die in einem eigenen Fenster geöffnet ist: auf der Registerkarte **Nachricht**) in der Gruppe **Fadenstack** die Schaltfläche **Agent**. Der Aufgabenbereich öffnet sich neben dem Dokument. Ist kein Dokument geöffnet, öffnet sich mit ihm ein leeres (in PowerPoint eine Präsentation mit einer Folie).
-2. Geben Sie beim ersten Mal in **Sign in to your agent** den **Server** ein, falls die IT ihn nicht eingestellt hat, und wählen Sie dann **Sign in with a code**.
-3. Der Aufgabenbereich zeigt **Your sign-in code**. Wählen Sie **Open the sign-in page**; Ihr Browser öffnet die Fadenstack-Seite dafür. Öffnet sich kein Browser, wählen Sie **Copy the link** und öffnen den Link selbst. **Copy the code** kopiert den Code.
+2. Geben Sie beim ersten Mal in **Bei Ihrem Agenten anmelden** den **Server** ein, falls die IT ihn nicht eingestellt hat, und wählen Sie dann **Mit einem Code anmelden**.
+3. Der Aufgabenbereich zeigt **Ihr Anmeldecode**. Wählen Sie **Anmeldeseite öffnen**; Ihr Browser öffnet die Fadenstack-Seite dafür. Öffnet sich kein Browser, wählen Sie **Link kopieren** und öffnen den Link selbst. **Code kopieren** kopiert den Code.
 4. Melden Sie sich auf dieser Seite wie gewohnt bei Fadenstack an, falls der Browser danach fragt, prüfen Sie, ob der Code der im Aufgabenbereich ist, und genehmigen Sie. Der Aufgabenbereich zeigt währenddessen **Waiting for your approval...** und meldet sich danach selbst an. Ihr Passwort bleibt im Browser. Mehr dazu: [Eine Desktop-App anmelden](sign-in-an-app.md).
 
 Eine Genehmigung meldet alle Office-Agenten an: Word, Excel, PowerPoint und Outlook auf diesem Computer.
 
 ??? info "Stattdessen mit Passwort anmelden"
-    Wählen Sie **Sign in with a password**, geben Sie Ihre **E-mail** und Ihr **Password** (Ihr Fadenstack-Konto) ein und wählen Sie **Sign in**. Eine Anmeldung gilt für Word, Excel, PowerPoint und Outlook auf diesem Computer. Das ist auch der Weg, wenn Ihr Server älter ist und sich nicht mit einem Code anmelden kann: Der Aufgabenbereich sagt dann **This server does not support signing in with a code yet.** und zeigt das Passwortformular. **Sign in with a code** bringt den Code zurück.
+    Wählen Sie **Mit einem Passwort anmelden**, geben Sie Ihre **E-Mail** und Ihr **Passwort** (Ihr Fadenstack-Konto) ein und wählen Sie **Anmelden**. Eine Anmeldung gilt für Word, Excel, PowerPoint und Outlook auf diesem Computer. Das ist auch der Weg, wenn Ihr Server älter ist und sich nicht mit einem Code anmelden kann: Der Aufgabenbereich sagt dann **This server does not support signing in with a code yet.** und zeigt das Passwortformular. **Mit einem Code anmelden** bringt den Code zurück.
 
 ??? info "Ein Agent, den Sie nicht nutzen dürfen"
-    Hat Ihr Administrator Ihnen einen der Office-Agenten nicht freigegeben, werden die anderen trotzdem angemeldet, und der Aufgabenbereich sagt **Not available to you:** mit dem Namen des Agenten. Ist es der Agent der Anwendung, die Sie geöffnet haben, sehen Sie **You have no access to this agent.** Wenden Sie sich an Ihren Administrator (siehe [Agenten und Add-ins](../administer/agents.md)). Agenten, die der Server nicht gleich mit anmelden konnte, werden angemeldet, wenn Sie ihre Anwendung öffnen: **Not signed in yet:** nennt sie.
+    Hat Ihr Administrator Ihnen einen der Office-Agenten nicht freigegeben, werden die anderen trotzdem angemeldet, und der Aufgabenbereich sagt **Für Sie nicht verfügbar:** mit dem Namen des Agenten. Ist es der Agent der Anwendung, die Sie geöffnet haben, sehen Sie **Sie haben keinen Zugriff auf diesen Agenten.** Wenden Sie sich an Ihren Administrator (siehe [Agenten und Add-ins](../administer/agents.md)). Agenten, die der Server nicht gleich mit anmelden konnte, werden angemeldet, wenn Sie ihre Anwendung öffnen: **Noch nicht angemeldet:** nennt sie.
 
 ??? info "Wenn der Code nicht funktioniert"
-    - **The code expired.** oder **The sign-in was denied in the browser.**: Wählen Sie **Get a new code**.
-    - **Too many sign-in attempts. Wait a moment and try again.**: Warten Sie kurz und versuchen Sie es erneut.
-    - **Cancel** beendet das Warten auf die Genehmigung.
+    - **Der Code ist abgelaufen.** oder **Die Anmeldung wurde im Browser abgelehnt.**: Wählen Sie **Neuen Code anfordern**.
+    - **Zu viele Anmeldeversuche. Warten Sie einen Moment und versuchen Sie es erneut.**: Warten Sie kurz und versuchen Sie es erneut.
+    - **Abbrechen** beendet das Warten auf die Genehmigung.
 
 ??? info "Mehr zum Aufgabenbereich"
     Jedes Dokumentfenster hat seinen eigenen Aufgabenbereich und seinen eigenen Chat; wenn Sie den Aufgabenbereich ausblenden, bleibt sein Chat erhalten.
@@ -44,9 +44,9 @@ Der Bereich zeigt sich in der Sprache von Office. Um eine andere zu wählen, wä
 
 ![Der Aufgabenbereich des Agenten in Excel: vorgeschlagene Anfragen, die markierten Zellen als Chip im Nachrichtenfeld und darunter die Schaltfläche Context](../images/use/office-excel-pane.png)
 
-- **Ihre Markierung.** Was Sie markieren, wird als Chip (**Current selection**) im Nachrichtenfeld angeboten. Der Chip folgt Ihrer Markierung, und Sie können ihn ausschalten. Sein Inhalt wird beim Senden gelesen.
-- **Kontext.** Die Schaltfläche **Context** listet die Teile des Dokuments auf (Blätter, Tabellen, Abschnitte, Folien, Nachrichten), die Sie Ihrer Nachricht hinzufügen können.
-- **Ask about selection** im Menüband oder **Ask the agent about this** und **Add to agent chat** im Kontextmenü (Rechtsklick) fügen die Markierung dem Chat hinzu. In Outlook bietet eine Nachricht, die in einem eigenen Fenster geöffnet ist, **Ask about this message**.
+- **Ihre Markierung.** Was Sie markieren, wird als Chip (**Aktuelle Auswahl**) im Nachrichtenfeld angeboten. Der Chip folgt Ihrer Markierung, und Sie können ihn ausschalten. Sein Inhalt wird beim Senden gelesen.
+- **Kontext.** Die Schaltfläche **Kontext** listet die Teile des Dokuments auf (Blätter, Tabellen, Abschnitte, Folien, Nachrichten), die Sie Ihrer Nachricht hinzufügen können.
+- **Zur Auswahl fragen** im Menüband oder **Den Agenten dazu fragen** und **Zum Agenten-Chat hinzufügen** im Kontextmenü (Rechtsklick) fügen die Markierung dem Chat hinzu. In Outlook bietet eine Nachricht, die in einem eigenen Fenster geöffnet ist, **Zu dieser Nachricht fragen**.
 - Der Agent kann das Dokument auch selbst lesen, wenn Ihre Frage es erfordert. Ein langes Dokument liest er in Teilen.
 
 ## Was er in jeder Anwendung kann {#what-it-can-do-in-each-application}
@@ -62,9 +62,9 @@ Der Bereich zeigt sich in der Sprache von Office. Um eine andere zu wählen, wä
     | Anwendung | Eine Änderung zurücknehmen |
     |---|---|
     | **Word** | Rückgängig in Word selbst. Standardmäßig ist jede Änderung außerdem eine nachverfolgte Änderung, die Sie annehmen oder ablehnen. Kommentare stammen von „Fadenstack agent“ |
-    | **Excel** | **Undo agent change** im Menüband, eine Änderung nach der anderen. Formatierungsänderungen und ein gelöschtes Blatt sind nicht abgedeckt |
+    | **Excel** | **Agentenänderung rückgängig** im Menüband, eine Änderung nach der anderen. Formatierungsänderungen und ein gelöschtes Blatt sind nicht abgedeckt |
     | **PowerPoint** | Rückgängig in PowerPoint selbst, eine Änderung nach der anderen |
-    | **Outlook** | **Undo agent change** im Menüband: Ein Entwurf oder Termin wird gelöscht, ein Verschieben oder Löschen wird rückgängig gemacht, Kategorien und Kennzeichnungen werden wiederhergestellt |
+    | **Outlook** | **Agentenänderung rückgängig** im Menüband: Ein Entwurf oder Termin wird gelöscht, ein Verschieben oder Löschen wird rückgängig gemacht, Kategorien und Kennzeichnungen werden wiederhergestellt |
 
 ![Der Aufgabenbereich des Agenten in Outlook, nachdem er eine Antwort entworfen hat: was im Entwurf steht und dass er nichts gesendet hat](../images/use/office-outlook-draft-reply.png)
 
@@ -115,8 +115,8 @@ Mehr dazu: [Ihre Daten und Datenschutz](privacy.md).
 
 ## Abmelden {#sign-out}
 
-1. Wählen Sie im Menüband **More**.
-2. Wählen Sie **Sign out**.
+1. Wählen Sie im Menüband **Mehr**.
+2. Wählen Sie **Abmelden**.
 
 Damit melden Sie sich auf diesem Computer in allen vier Anwendungen ab.
 
@@ -126,7 +126,7 @@ Damit melden Sie sich auf diesem Computer in allen vier Anwendungen ab.
 |---|---|
 | Die Schaltfläche **Agent** ist ausgegraut | Das Dokument ist in der geschützten Ansicht geöffnet. Wählen Sie **Bearbeitung aktivieren**, dann **Agent**. |
 | In Outlook gibt es keine Gruppe **Fadenstack** | Sie verwenden das neue Outlook für Windows. Wechseln Sie zum klassischen Outlook zurück. |
-| **The e-mail or password is not right.** | Nur bei der Anmeldung mit Passwort: Prüfen Sie beides und melden Sie sich erneut an. Passwort vergessen? Siehe [Ihr Konto](account.md#forgot-your-password). |
-| **You have no access to this agent.** | Ihr Administrator hat ihn Ihnen noch nicht freigegeben, oder die für diese Anwendung eingestellte Adresse des Agenten ist falsch. |
+| **E-Mail oder Passwort stimmen nicht.** | Nur bei der Anmeldung mit Passwort: Prüfen Sie beides und melden Sie sich erneut an. Passwort vergessen? Siehe [Ihr Konto](account.md#forgot-your-password). |
+| **Sie haben keinen Zugriff auf diesen Agenten.** | Ihr Administrator hat ihn Ihnen noch nicht freigegeben, oder die für diese Anwendung eingestellte Adresse des Agenten ist falsch. |
 | **Office is busy (a cell may be in edit mode, or a dialog is open). Finish that and try again.** | Verlassen Sie die Zelle oder schließen Sie das Dialogfeld, und fragen Sie erneut. |
-| **The agent could not start**, mit einer Begründung | Wählen Sie **Try again**. Wenn es weiterhin fehlschlägt, teilen Sie Ihrer IT-Abteilung mit, was in der Begründung steht. |
+| **Der Agent konnte nicht starten**, mit einer Begründung | Wählen Sie **Erneut versuchen**. Wenn es weiterhin fehlschlägt, teilen Sie Ihrer IT-Abteilung mit, was in der Begründung steht. |
