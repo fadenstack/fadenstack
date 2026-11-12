@@ -158,13 +158,15 @@ async def test_the_apps_own_agents_are_ready_to_create(
     found = {t["id"]: t for t in (await client.get("/api/agents/templates")).json()}
     assert set(found) == {"browser-assistant", "word-assistant", "excel-assistant", "powerpoint-assistant", "outlook-assistant"}
     chrome = found["browser-assistant"]
-    assert (chrome["app"], chrome["slug"], chrome["tools"]) == ("Chrome", "browser-assistant", 11)
+    assert (chrome["app"], chrome["slug"], chrome["tools"]) == ("Chrome", "browser-assistant", 17)
     for template in found.values():  # each one is a body POST /api/agents takes
         r = await client.post("/api/agents", json=template["definition"])
         assert r.status_code == status.HTTP_201_CREATED, (template["id"], r.text)
     version = (await client.get("/api/agents/browser-assistant/versions/1")).json()
     assert "page:document" in version["instructions"]
-    assert {t["name"] for t in version["host_tool_contract"]} >= {"read_context", "fill_field", "replace_selection", "click_element"}
+    assert {t["name"] for t in version["host_tool_contract"]} >= {
+        "read_context", "fill_field", "replace_selection", "click_element", "navigate_page", "press_key", "use_page_tool",
+    }
     # The knowledge search and the time; the tenant's other server tools only when IT adds them.
     assert version["server_tools"] == ["knowledge_search", "knowledge_open", "current_time"]
 
