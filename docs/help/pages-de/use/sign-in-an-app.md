@@ -30,6 +30,12 @@ dass die Anmeldung abgelehnt wurde.
 
 Die Seite oder den Link zu öffnen, den die App öffnet, genehmigt nichts: Das tut nur **Genehmigen**.
 
+Manche Apps kommen als Paket, etwa die Office-Add-ins für Word, Excel, PowerPoint und Outlook. Ein Code kann dann
+mehrere Assistenten auf einmal anmelden wollen: Die Seite listet jeden einzelnen auf, und eine Genehmigung meldet
+alle an, die Sie nutzen dürfen. Ein Assistent, der als für Sie nicht verfügbar markiert ist, bleibt außen vor; ist
+keiner für Sie verfügbar, lässt die Seite das Genehmigen nicht zu. Die Schaltfläche nennt die Zahl der Assistenten,
+etwa **Bei 3 Assistenten anmelden**.
+
 Hat die App aus einem anderen Netzwerk gefragt als Ihr Browser (etwa wenn Ihr Browser auf Ihrem Telefon läuft),
 genügt der Code aus dem Link nicht: Die Seite bittet Sie, den Code einzugeben, den Ihre App zeigt, und dann
 **Weiter** zu wählen. Ein Link, den Ihnen jemand anderes geschickt hat, enthält dessen Code, und einen Code, den keine
