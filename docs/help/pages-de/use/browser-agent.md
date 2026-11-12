@@ -174,7 +174,7 @@ Bei der Installation erlaubt Chrome der Erweiterung, ihre Seitenleiste zu öffne
 - Mit eingeschalteter Websuche geht eine Suche, die Sie erlauben, an die in Chrome eingestellte Suchmaschine.
 - Die Untertitel eines Videos werden von der Website des Videos geholt, so wie sein Player es tut. Mit eingeschalteten Tools von Websites geht, was ein solches Tool bekommt, an diese Website.
 - PDFs werden in Ihrem Browser gelesen. Bilder werden in Ihrem Browser verkleinert, bevor sie gesendet werden. CSV- und Markdown-Dateien, die Sie speichern, bleiben auf Ihrem Computer.
-- Ihre Unterhaltungen und gespeicherten Prompts bleiben in diesem Browser. Der Server protokolliert, welche Tools liefen und wie lange sie dauerten, nicht, was sie gelesen haben.
+- Ihre Unterhaltungen bleiben in diesem Browser, verschlüsselt mit einem Schlüssel, der ihn nie verlässt; Ihre gespeicherten Prompts bleiben ebenfalls in diesem Browser. Der Server protokolliert, welche Tools liefen und wie lange sie dauerten, nicht, was sie gelesen haben.
 - Ihre Anmeldung wird in diesem Browser gespeichert und ist dort nicht verschlüsselt. Melden Sie sich auf einem Computer, den auch andere nutzen, ab, wenn Sie fertig sind: Wählen Sie oben in der Seitenleiste das Zahnrad (**Einstellungen**), dann **Auf diesem Gerät abmelden**.
 
 Mehr dazu, was gespeichert wird und wer es sieht: [Ihre Daten und Datenschutz](privacy.md).
