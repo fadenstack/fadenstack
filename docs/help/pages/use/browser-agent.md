@@ -1,6 +1,6 @@
 # The browser agent
 
-The browser agent is Fadenstack in Chrome's side panel. It works with the page you have open: it answers questions about it, summarises and translates it, shows you where something is, copies tables out, compares tabs, reads PDFs, looks at screenshots, and writes into the mail or ticket you are working on. It answers with your organisation's model, through your Fadenstack server, and in the **Ask** tool mode, where every chat starts, it asks before it changes anything.
+The browser agent is Fadenstack in Chrome's side panel. It works with the page you have open: it answers questions about it, summarises and translates it, shows you where something is, copies tables out, compares tabs, reads PDFs and video transcripts, looks at screenshots, writes into the mail or ticket you are working on, and goes through a form over several pages. It answers with your organisation's model, through your Fadenstack server, and in the **Ask** tool mode, where every chat starts, it asks before it changes anything.
 
 ![The browser agent's panel: suggested questions, the bar naming the open page, and the message box with its buttons below](../images/use/browser-agent-panel.png)
 
@@ -15,8 +15,10 @@ The browser agent is Fadenstack in Chrome's side panel. It works with the page y
 1. Select the Fadenstack button in Chrome's toolbar, or press Alt+Shift+F.
 2. The first time, enter the **Server** and the **Agent** in **Connect to Fadenstack**.
 3. Select **Connect**, and allow the access when Chrome asks.
-4. Enter your **E-mail** and **Password** (your Fadenstack account).
-5. Select **Sign in**.
+4. The panel shows a sign-in code. Select **Open the sign-in page**: your server's page opens in a new tab with the code filled in.
+5. Sign in there as you do in the console, check that the code matches, and approve. The panel goes on to the chat by itself.
+
+Your password stays on your server's page; the extension never sees it. **Sign in with a password**, under the code, signs in with your **E-mail** and **Password** in the panel instead (for a server that cannot sign in with a code yet).
 
 If your IT department set the server and agent, the form shows them and you only select **Connect** and sign in.
 
@@ -28,7 +30,7 @@ If your IT department set the server and agent, the form shows them and you only
 
 The panel shows itself in your browser's language. To pick another, select the gear (**Settings**) at the top of the panel, then a language under **Language**: the whole panel changes at once, the conversation, the agent's greeting and the right-click items too. **Automatic** goes back to the browser's language. The language is kept for your account, so the console and the Office add-ins follow it, on this and your other computers. If your organisation set a language, the settings show it with **Set by your organisation**, and you cannot change it.
 
-Below the languages, **Settings** shows which agent you use on which server, with **Sign out on this device** and **Change server or agent**.
+**Settings** also holds the switches **Search the web with Chrome** and **Use tools that sites offer (experimental)**; **Tools**, which lists what the agent can use (see [Tools](#tools)); **Export chat**, which saves the open chat as a Markdown file; and your account: which agent you use on which server, **Export my data**, **Delete my data on this device**, **Sign out on this device** and **Change server or agent**.
 
 **About**, the last entry under the gear, names the agent and its version, the model, the extension, the Fadenstack SDK it is built with and the server; **Copy details** copies them for a question to your IT department. It links to your organisation's Help and to fadenstack.com. A small **Fadenstack** link also sits under the message box (what such a link sends: [Your data and privacy](privacy.md#links-to-fadenstackcom)).
 
@@ -71,9 +73,41 @@ Quick actions ask the agent at once, in your language. They are in the panel's *
 
 **Translate into …** offers the panel's language and English. To ask about a selection from the keyboard, select the text and press Alt+Shift+S: the panel opens with the selection added.
 
-## Skills
+## Skills and your own prompts
 
 Skills are ways of working your organisation set up, such as "Reply in our style" or "Check a contract against our checklist". To use one for a message, type `$` in the message box (or `/` at its start), and pick the skill from the list: type a few letters to narrow it, then press Enter. The skill shows above the message box and goes with that message only. See [Skills](skills.md).
+
+The same list starts with **My prompts**: questions you saved yourself. To save one, select **Save as prompt** (the bookmark) under a message you sent. Picking a prompt puts its text into the message box, where you can change it before you send it. The trash icon beside a prompt deletes it. Your prompts are kept in this browser only, up to 100; **Export my data** includes them, and **Delete my data on this device** deletes them.
+
+## Videos
+
+On a page with a video, the agent can read its transcript: ask "Summarise this video" or "What does it say about the warranty?". It reads the captions the video has, on YouTube also the transcript YouTube shows, each line with the time it is said at, and quotes the times. Ask "Where does it say that?" and it moves the video to that point; you can also give a time, such as "Go to 3:42".
+
+??? info "When a video has no transcript"
+    A video without captions or a transcript cannot be read; the agent says so. Captions made by speech recognition may mishear names and numbers: check what matters in the video itself.
+
+## Tasks across pages
+
+The agent can go through a task that spans several pages of a site, such as a form in steps or a search on the site: it goes to another page of the same site, goes back, scrolls, waits for the next page, and presses Enter, Tab, Esc or the arrow keys in a field. While it acts on a page, the page shows a coloured edge and, at its foot, **Fadenstack is working on this page** with a **Stop** button: **Stop** there stops the answer as the panel's Stop does.
+
+It stays on the site the tab is on. Another site it opens in a new tab with **Open page**, which needs your permission for that site, or reaches by clicking a link, which asks you. One request takes at most 25 actions on pages; then the agent tells you what is done and asks whether to go on. It never buys, pays, creates accounts or accepts terms for you: it stops before such a step and hands it to you.
+
+## Tables and chats as files
+
+Every table in an answer has **Download CSV** beside its copy button: the table as a file for Excel or another spreadsheet, saved where Chrome saves downloads. **Export chat**, under the gear, saves the open chat as a Markdown file, with your messages, the names of what you added (not their content) and the agent's answers.
+
+??? info "Cells that start with = + - @"
+    In the CSV file such a cell starts with an apostrophe, so a spreadsheet shows it as text instead of running it as a formula.
+
+## Tools
+
+**Tools**, under the gear, lists what the agent can use. **In this app**: the extension's own tools, each with what it may do (**Read**, **Changes data**, **Cannot be undone**). **From your organisation's server**: the tools of your organisation's connected services, grouped by service, each marked available to this agent, switched off by your administrator, or not allowed for this agent.
+
+## Tools that sites offer (experimental)
+
+Some sites offer assistants actions of their own (WebMCP), such as "find an order" on a shop's page. Chrome tests this standard and offers it only in some versions or on some sites. The agent uses such tools only when you switch them on: select the gear, then **Use tools that sites offer (experimental)**. If your organisation decided for you, the item shows **Set by your organisation**.
+
+Every use of a site's tool asks you first, with **Allow** and **Deny** only, whatever the site says about the tool: the site runs it, and it may change something there. What a site says about its tools, and what they answer, the agent treats as the site's text, never as instructions.
 
 ## Web search
 
@@ -88,7 +122,7 @@ In the **Ask** tool mode, every search asks first, and the card shows the query.
 
 | Ask it to | What it does |
 |---|---|
-| **Show you where** something is on the page | It marks the passage and scrolls to it. In a PDF it opens the PDF at the right page. |
+| **Show you where** something is on the page | It marks the passage and scrolls to it. In a PDF it opens the PDF at the right page; in a video it moves the video there. |
 | **Copy a table** or text | It puts it on your clipboard as text and as a table, so it pastes into Excel as cells and into Word or Outlook as a table. Every table in an answer also has a copy button. |
 | **Write into a mail, a ticket or a form** | It fills form fields, and writes formatted text into the editor on the page, such as a mail in Outlook on the web or Gmail, a ticket, or a note. Say where: at your cursor, below the greeting, at the end, or replacing everything. |
 | **Improve or translate text you selected in a field** | It puts its version in place of your selection. |
@@ -102,13 +136,13 @@ The **Tool mode** at the top of the panel decides what runs without asking:
 
 | What | Off | Read only | Ask (default) | Auto |
 |---|---|---|---|---|
-| Read the page, tabs, PDFs, the selection; search; show where | no | runs | runs | runs |
-| Fill a field, write into an editor, replace your selection, copy to the clipboard, open a page, search the web | no | no | asks | runs |
-| Press a button or follow a link | no | no | asks, every time | asks, every time |
+| Read the page, tabs, PDFs, a video's transcript, the selection; search; show where; scroll; wait for a page | no | runs | runs | runs |
+| Fill a field, write into an editor, replace your selection, copy to the clipboard, open a page, search the web, go to another page of the site, go back | no | no | asks | runs |
+| Press a button or follow a link, press a key (Enter may send something), use a tool a site offers | no | no | asks, every time | asks, every time |
 
 ![A card asking Run copy_to_clipboard?, showing the table it will copy, with the Allow, Allow for this chat and Deny buttons](../images/use/browser-agent-approval.png)
 
-When it asks, a card shows **Run …?** with the action and what it is given. Select **Allow** (this once), **Allow for this chat** (until you close or reopen the chat), **Allow always** (for this agent in this browser), or **Deny**. Pressing a button, and anything your administrator wants asked first, offers only **Allow** and **Deny**: it asks every time. **Reset approvals**, at the bottom of the tool-mode menu, takes back what you allowed for the chat and always.
+When it asks, a card shows **Run …?** with the action and what it is given, and says what it acts on, such as *Button "Send" on mail.example.com*, *Press Enter in Text box "Search" on shop.example* or *Go to https://shop.example/order/2*. Select **Allow** (this once), **Allow for this chat** (until you close or reopen the chat), **Allow always** (for this agent in this browser), or **Deny**. Pressing a button or a key, using a site's tool, and anything your administrator wants asked first, offers only **Allow** and **Deny**: it asks every time. **Reset approvals**, at the bottom of the tool-mode menu, takes back what you allowed for the chat and always.
 
 ??? info "What the card shows for a field or a button"
     For a field or a button, what the action is given is the page's internal reference, not its label.
@@ -129,8 +163,9 @@ marks in place when you go on editing.
 
 - It never reads the content of a site you have not allowed; only the titles and addresses of this window's tabs reach the model. On such a site the bar says **The agent cannot read …**; select **Allow on this site** (or **All sites**) to let it. A quick action on text you selected sends that text, even from a site you have not allowed.
 - It never reads out or fills in password fields, nor card fields the site marks as such. A payment field the site does not mark is read and filled like any other field.
-- It never presses a button, such as **Send**, without asking you, every time: no earlier answer covers it.
-- It is told never to take instructions from the page or a picture: what they say is something to read, not an order to follow. A page can still mislead a model, so read what a card asks before you allow it.
+- It never presses a button, such as **Send**, or Enter in a field without asking you, every time: no earlier answer covers it.
+- It never goes to another site in your tab by itself, and never buys, pays, creates accounts or accepts terms for you.
+- It is told never to take instructions from the page or a picture: what they say is something to read, not an order to follow. What a page, a PDF, a transcript or a site's tool contains reaches the model marked as the page's text, in a way the page cannot fake, and text that tries to instruct assistants is pointed out to the model; the agent then tells you that the page tries to instruct it. A page can still mislead a model, so read what a card asks before you allow it.
 - It never reaches files on your computer that you did not add.
 
 ## Permissions it asks for
@@ -141,8 +176,9 @@ At installation, Chrome lets the extension open its side panel, keep its setting
 
 - What you ask, and what the agent reads to answer (the page, tabs, PDF pages, pictures you add), goes to your organisation's server and to the model your administrator chose for the agent.
 - With web search switched on, a search you allow goes to the search engine set in Chrome.
-- PDFs are read inside your browser. Pictures are made smaller in your browser before they go.
-- Your conversations stay in this browser. The server records which tools ran and how long they took, not what they read.
+- A video's captions are fetched from the video's own site, as its player does. With tools that sites offer switched on, what a site's tool is given goes to that site.
+- PDFs are read inside your browser. Pictures are made smaller in your browser before they go. CSV and Markdown files you save stay on your computer.
+- Your conversations and saved prompts stay in this browser. The server records which tools ran and how long they took, not what they read.
 - Your sign-in is kept in this browser and is not encrypted there. On a computer others use, sign out when you are done: select the gear (**Settings**) at the top of the panel, then **Sign out on this device**.
 
 More on what is kept and who sees it: [Your data and privacy](privacy.md).
@@ -156,6 +192,7 @@ More on what is kept and who sees it: [Your data and privacy](privacy.md).
 | A PDF over 50 MB | It says so |
 | A PDF on your computer opened in Chrome | Add it with **Add a PDF from this computer** instead |
 | A selection inside Chrome's PDF viewer | Copy the passage into your message |
+| A video without captions or a transcript | It says so |
 | A part of the page from a site you have not allowed (a frame) | It says so. Allow that site in Chrome's settings for the extension (**Site access**) |
 | Chrome's own pages and the Chrome Web Store | Chrome does not let extensions read them |
 
