@@ -15,12 +15,13 @@ The browser agent is Fadenstack in Chrome's side panel. It works with the page y
 1. Select the Fadenstack button in Chrome's toolbar, or press Alt+Shift+F.
 2. The first time, enter the **Server** and the **Agent** in **Connect to Fadenstack**.
 3. Select **Connect**, and allow the access when Chrome asks.
-4. The panel shows a sign-in code. Select **Open the sign-in page**: your server's page opens in a new tab with the code filled in.
-5. Sign in there as you do in the console, check that the code matches, and approve. The panel goes on to the chat by itself.
-
-Your password stays on your server's page; the extension never sees it. **Sign in with a password**, under the code, signs in with your **E-mail** and **Password** in the panel instead (for a server that cannot sign in with a code yet).
+4. The panel shows **Your sign-in code**. Select **Open the sign-in page**; your browser opens Fadenstack's page for it. If you cannot open it from the panel, **Copy the code** copies the code.
+5. On that page, sign in to Fadenstack as usual if the browser asks, check that the code is the one in the panel, and approve. The panel says **Waiting for your approval...** meanwhile and signs in by itself afterwards. Your password stays on that page; the extension never sees it. More: [Sign in a desktop app](sign-in-an-app.md).
 
 If your IT department set the server and agent, the form shows them and you only select **Connect** and sign in.
+
+??? info "Sign in with a password instead"
+    Select **Sign in with a password**, enter your **E-mail** and **Password** (your Fadenstack account), and select **Sign in**. This is also the way in when your server is older and cannot sign in with a code: the panel says **This server cannot sign in with a code yet. Sign in with a password.** **Sign in with a code** brings the code back. If the code expired or was denied, select **Get a new code**.
 
 ??? info "Server and Agent"
     - **Server**: your Fadenstack server, for example `https://ai.example.internal`.
@@ -30,7 +31,18 @@ If your IT department set the server and agent, the form shows them and you only
 
 The panel shows itself in your browser's language. To pick another, select the gear (**Settings**) at the top of the panel, then a language under **Language**: the whole panel changes at once, the conversation, the agent's greeting and the right-click items too. **Automatic** goes back to the browser's language. The language is kept for your account, so the console and the Office add-ins follow it, on this and your other computers. If your organisation set a language, the settings show it with **Set by your organisation**, and you cannot change it.
 
-**Settings** also holds the switches **Search the web with Chrome** and **Use tools that sites offer (experimental)**; **Tools**, which lists what the agent can use (see [Tools](#tools)); **Export chat**, which saves the open chat as a Markdown file; and your account: which agent you use on which server, **Export my data**, **Delete my data on this device**, **Sign out on this device** and **Change server or agent**.
+Below the languages, **Settings** holds the switches **Search the web with Chrome** and **Use tools that sites offer (experimental)**, and shows which agent you use on which server, with these items:
+
+| Select | What happens |
+|---|---|
+| **Export my data** | Saves a JSON file with your chats, your saved prompts and the **Allow always** choices kept for you in this browser. Your sign-in is not in it, and neither is what the server keeps; ask your IT department for that. |
+| **Delete my data on this device** | After you confirm, deletes the chats, saved prompts and **Allow always** choices kept for you in this browser, and the key that protects them, and signs you out. This cannot be undone. Your chats cannot be read again, not even from a copy. What the server keeps stays; ask your IT department. |
+| **Sign out on this device** | Signs you out here. Your chats stay in this browser for your next sign-in. |
+| **Change server or agent** | Back to the first form. |
+
+The chats and choices are kept for each signed-in person on their own: someone else who signs in to the same browser does not see yours.
+
+**Settings** also holds **Tools**, which lists what the agent can use (see [Tools](#tools)), and **Export chat**, which saves the open chat as a Markdown file.
 
 **About**, the last entry under the gear, names the agent and its version, the model, the extension, the Fadenstack SDK it is built with and the server; **Copy details** copies them for a question to your IT department. It links to your organisation's Help and to fadenstack.com. A small **Fadenstack** link also sits under the message box (what such a link sends: [Your data and privacy](privacy.md#links-to-fadenstackcom)).
 
@@ -73,7 +85,7 @@ Quick actions ask the agent at once, in your language. They are in the panel's *
 
 **Translate into …** offers the panel's language and English. To ask about a selection from the keyboard, select the text and press Alt+Shift+S: the panel opens with the selection added.
 
-## Skills and your own prompts
+## Skills and your own prompts {#skills}
 
 Skills are ways of working your organisation set up, such as "Reply in our style" or "Check a contract against our checklist". To use one for a message, type `$` in the message box (or `/` at its start), and pick the skill from the list: type a few letters to narrow it, then press Enter. The skill shows above the message box and goes with that message only. See [Skills](skills.md).
 
@@ -178,8 +190,8 @@ At installation, Chrome lets the extension open its side panel, keep its setting
 - With web search switched on, a search you allow goes to the search engine set in Chrome.
 - A video's captions are fetched from the video's own site, as its player does. With tools that sites offer switched on, what a site's tool is given goes to that site.
 - PDFs are read inside your browser. Pictures are made smaller in your browser before they go. CSV and Markdown files you save stay on your computer.
-- Your conversations stay in this browser, encrypted with a key that never leaves it; your saved prompts stay in this browser too. The server records which tools ran and how long they took, not what they read.
-- Your sign-in is kept in this browser and is not encrypted there. On a computer others use, sign out when you are done: select the gear (**Settings**) at the top of the panel, then **Sign out on this device**.
+- Your conversations stay in this browser, encrypted, each signed-in person's on their own. The key stays in the browser and cannot be read out of it. Your saved prompts stay in this browser too. The server records which tools ran and how long they took, not what they read.
+- Your sign-in is kept in this browser and, unlike the conversations, is not encrypted there. On a computer others use, sign out when you are done: select the gear (**Settings**) at the top of the panel, then **Sign out on this device**. To remove your conversations and saved prompts as well, select **Delete my data on this device**.
 
 More on what is kept and who sees it: [Your data and privacy](privacy.md).
 

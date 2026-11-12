@@ -19,7 +19,7 @@ Auf Ihrem eigenen Computer:
 
 | | Seine Unterhaltungen | Ihre Anmeldung |
 |---|---|---|
-| **Der Browser-Agent** | In Ihrem Browser, nicht auf dem Server | Ebenfalls in Ihrem Browser, unverschlüsselt |
+| **Der Browser-Agent** | Verschlüsselt in Ihrem Browser, nicht auf dem Server | Ebenfalls in Ihrem Browser, unverschlüsselt |
 | **Die Office-Add-ins** | Verschlüsselt auf Ihrem Computer | Geschützt durch Windows |
 
 Fadenstack bewahrt Ihre Chats auf, bis sie gelöscht werden. Siehe [Löschen](#deleting).
@@ -105,6 +105,7 @@ Hält ein Limit eine Anfrage an, nennt die Meldung das Limit, etwa das Tageslimi
 | **Ein Projekt** | Es wird sofort endgültig gelöscht, mit allen seinen Chats und deren Dateien. |
 | **Ihr Konto** (ein Administrator löscht es) | Ihre Chats, Projekte, Dateien und das, was sich der Assistent gemerkt hat, werden mit ihm gelöscht. |
 | Einen Chat in **Chat history**, im Browser-Agenten | Er wird aus Ihrem Browser entfernt. |
+| **Meine Daten auf diesem Gerät löschen**, in den Einstellungen des Browser-Agenten | Alle Chats und Entscheidungen **Immer zulassen**, die für Sie in diesem Browser gespeichert sind, werden samt Schlüssel gelöscht, und Sie werden abgemeldet. **Meine Daten exportieren** speichert sie vorher als Datei. |
 
 Muss etwas früher endgültig gelöscht werden, z. B. personenbezogene Daten, die Sie versehentlich eingefügt haben, wenden Sie sich an Ihren Administrator: Ein Chat, den er in der Konsole löscht, wird sofort gelöscht. Vorher erstellte Sicherungen enthalten ihn, bis sie ersetzt werden (die nächtlichen nach einer Woche).
 

@@ -61,6 +61,10 @@ receipt**, and says whether it **Points to AI generation**. A receipt or record 
 
 ![A text a person wrote, checked: No mark found, with the text watermark not found](../images/use/check-content-text-nothing.png)
 
+## An answer without a mark
+
+Your organisation may allow a model to answer without an AI mark. The chat panels of the browser agent and the Office add-ins do not tell you about it, unless you ask them to: select the gear (**Settings**) at the top of the panel and switch on **Tell me when an answer carries no AI mark**. From then on, such an answer shows the notice **Answer without an AI mark** under it. The setting is yours and is kept for your account.
+
 ## Show the result to someone else
 
 **Download signed result** saves the result as a JSON file signed by this installation. Whoever you give it to

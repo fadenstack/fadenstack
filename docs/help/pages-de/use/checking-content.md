@@ -63,6 +63,10 @@ Nachweis zeigt seine ID.
 
 ![Ein geprüfter Text, den ein Mensch geschrieben hat: Keine Kennzeichnung gefunden, das Text-Wasserzeichen nicht gefunden](../images/use/check-content-text-nothing.png)
 
+## Eine Antwort ohne Kennzeichen {#an-answer-without-a-mark}
+
+Ihre Organisation kann einem Modell erlauben, ohne KI-Kennzeichen zu antworten. Die Chat-Bereiche des Browser-Agenten und der Office-Add-ins weisen Sie nicht darauf hin, es sei denn, Sie wünschen es: Wählen Sie oben im Bereich das Zahnrad (**Einstellungen**) und schalten Sie **Hinweis, wenn eine Antwort kein KI-Kennzeichen trägt** ein. Danach zeigt eine solche Antwort darunter den Hinweis **Antwort ohne KI-Kennzeichen**. Die Einstellung gehört Ihnen und wird für Ihr Konto gespeichert.
+
 ## Das Ergebnis anderen zeigen {#show-the-result-to-someone-else}
 
 **Signiertes Ergebnis herunterladen** speichert das Ergebnis als JSON-Datei, signiert von dieser Installation.

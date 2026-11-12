@@ -132,7 +132,9 @@ Residency Map**, under **Content marking**:
   answer says whether it was marked.
 - **Allow answers without a mark**, with a reason. Its answers then go out with a notice: the chat shows one
   under the answer, and the API sends the header `x-faden-unmarked: allowed-by-administrator` (and the event
-  `faden.unmarked`). The choice is recorded with your name and the time, and in the audit log.
+  `faden.unmarked`). In the browser agent and the Office add-ins, people see the notice only if they switch on
+  **Tell me when an answer carries no AI mark** in the panel's settings (see
+  [Checking content](../use/checking-content.md#an-answer-without-a-mark)). The choice is recorded with your name and the time, and in the audit log.
 
 !!! warning "After the upgrade to 0.5.0"
     Chats with remote providers, and with models on runtimes without the watermark, are refused until one of
