@@ -14,10 +14,22 @@ Die Office-Add-ins bringen einen Fadenstack-Agenten in einen Aufgabenbereich neb
 ## Agent öffnen und anmelden {#open-the-agent-and-sign-in}
 
 1. Wählen Sie auf der Registerkarte **Start** (in einer Nachricht, die in einem eigenen Fenster geöffnet ist: auf der Registerkarte **Nachricht**) in der Gruppe **Fadenstack** die Schaltfläche **Agent**. Der Aufgabenbereich öffnet sich neben dem Dokument. Ist kein Dokument geöffnet, öffnet sich mit ihm ein leeres (in PowerPoint eine Präsentation mit einer Folie).
-2. Geben Sie beim ersten Mal in **Sign in to your agent** Ihre **E-mail** und Ihr **Password** (Ihr Fadenstack-Konto) ein, und den **Server**, falls die IT ihn nicht eingestellt hat.
-3. Wählen Sie **Sign in**.
+2. Geben Sie beim ersten Mal in **Sign in to your agent** den **Server** ein, falls die IT ihn nicht eingestellt hat, und wählen Sie dann **Sign in with a code**.
+3. Der Aufgabenbereich zeigt **Your sign-in code**. Wählen Sie **Open the sign-in page**; Ihr Browser öffnet die Fadenstack-Seite dafür. Öffnet sich kein Browser, wählen Sie **Copy the link** und öffnen den Link selbst. **Copy the code** kopiert den Code.
+4. Melden Sie sich auf dieser Seite wie gewohnt bei Fadenstack an, falls der Browser danach fragt, prüfen Sie, ob der Code der im Aufgabenbereich ist, und genehmigen Sie. Der Aufgabenbereich zeigt währenddessen **Waiting for your approval...** und meldet sich danach selbst an. Ihr Passwort bleibt im Browser. Mehr dazu: [Eine Desktop-App anmelden](sign-in-an-app.md).
 
-Eine Anmeldung gilt für Word, Excel, PowerPoint und Outlook auf diesem Computer.
+Eine Genehmigung meldet alle Office-Agenten an: Word, Excel, PowerPoint und Outlook auf diesem Computer.
+
+??? info "Stattdessen mit Passwort anmelden"
+    Wählen Sie **Sign in with a password**, geben Sie Ihre **E-mail** und Ihr **Password** (Ihr Fadenstack-Konto) ein und wählen Sie **Sign in**. Eine Anmeldung gilt für Word, Excel, PowerPoint und Outlook auf diesem Computer. Das ist auch der Weg, wenn Ihr Server älter ist und sich nicht mit einem Code anmelden kann: Der Aufgabenbereich sagt dann **This server does not support signing in with a code yet.** und zeigt das Passwortformular. **Sign in with a code** bringt den Code zurück.
+
+??? info "Ein Agent, den Sie nicht nutzen dürfen"
+    Hat Ihr Administrator Ihnen einen der Office-Agenten nicht freigegeben, werden die anderen trotzdem angemeldet, und der Aufgabenbereich sagt **Not available to you:** mit dem Namen des Agenten. Ist es der Agent der Anwendung, die Sie geöffnet haben, sehen Sie **You have no access to this agent.** Wenden Sie sich an Ihren Administrator (siehe [Agenten und Add-ins](../administer/agents.md)). Agenten, die der Server nicht gleich mit anmelden konnte, werden angemeldet, wenn Sie ihre Anwendung öffnen: **Not signed in yet:** nennt sie.
+
+??? info "Wenn der Code nicht funktioniert"
+    - **The code expired.** oder **The sign-in was denied in the browser.**: Wählen Sie **Get a new code**.
+    - **Too many sign-in attempts. Wait a moment and try again.**: Warten Sie kurz und versuchen Sie es erneut.
+    - **Cancel** beendet das Warten auf die Genehmigung.
 
 ??? info "Mehr zum Aufgabenbereich"
     Jedes Dokumentfenster hat seinen eigenen Aufgabenbereich und seinen eigenen Chat; wenn Sie den Aufgabenbereich ausblenden, bleibt sein Chat erhalten.
@@ -114,7 +126,7 @@ Damit melden Sie sich auf diesem Computer in allen vier Anwendungen ab.
 |---|---|
 | Die Schaltfläche **Agent** ist ausgegraut | Das Dokument ist in der geschützten Ansicht geöffnet. Wählen Sie **Bearbeitung aktivieren**, dann **Agent**. |
 | In Outlook gibt es keine Gruppe **Fadenstack** | Sie verwenden das neue Outlook für Windows. Wechseln Sie zum klassischen Outlook zurück. |
-| **The e-mail or password is not right.** | Prüfen Sie beides und melden Sie sich erneut an. Passwort vergessen? Siehe [Ihr Konto](account.md#forgot-your-password). |
+| **The e-mail or password is not right.** | Nur bei der Anmeldung mit Passwort: Prüfen Sie beides und melden Sie sich erneut an. Passwort vergessen? Siehe [Ihr Konto](account.md#forgot-your-password). |
 | **You have no access to this agent.** | Ihr Administrator hat ihn Ihnen noch nicht freigegeben, oder die für diese Anwendung eingestellte Adresse des Agenten ist falsch. |
 | **Office is busy (a cell may be in edit mode, or a dialog is open). Finish that and try again.** | Verlassen Sie die Zelle oder schließen Sie das Dialogfeld, und fragen Sie erneut. |
 | **The agent could not start**, mit einer Begründung | Wählen Sie **Try again**. Wenn es weiterhin fehlschlägt, teilen Sie Ihrer IT-Abteilung mit, was in der Begründung steht. |

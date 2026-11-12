@@ -14,10 +14,22 @@ The Office add-ins put a Fadenstack agent in a pane beside your document in Word
 ## Open the agent and sign in
 
 1. On the **Home** tab (in a message opened in its own window: the **Message** tab), select **Agent** in the **Fadenstack** group. The pane opens beside the document. With no document open, a blank one opens with it (in PowerPoint, a presentation with one slide).
-2. The first time, in **Sign in to your agent**, enter your **E-mail** and **Password** (your Fadenstack account), and the **Server** if IT has not set it.
-3. Select **Sign in**.
+2. The first time, in **Sign in to your agent**, enter the **Server** if IT has not set it, then select **Sign in with a code**.
+3. The pane shows **Your sign-in code**. Select **Open the sign-in page**; your browser opens Fadenstack's page for it. If no browser opens, select **Copy the link** and open it yourself. **Copy the code** copies the code.
+4. On that page, sign in to Fadenstack as usual if the browser asks, check that the code is the one in the pane, and approve. The pane says **Waiting for your approval...** meanwhile and signs in by itself afterwards. Your password stays in the browser. More: [Sign in a desktop app](sign-in-an-app.md).
 
-One sign-in covers Word, Excel, PowerPoint and Outlook on this computer.
+One approval signs in all the Office agents: Word, Excel, PowerPoint and Outlook on this computer.
+
+??? info "Sign in with a password instead"
+    Select **Sign in with a password**, enter your **E-mail** and **Password** (your Fadenstack account), and select **Sign in**. One sign-in covers Word, Excel, PowerPoint and Outlook on this computer. This is also the way in when your server is older and cannot sign in with a code: the pane says **This server does not support signing in with a code yet.** and shows the password form. **Sign in with a code** brings the code back.
+
+??? info "An agent you may not use"
+    If your administrator has not given you one of the Office agents, the others are signed in all the same, and the pane says **Not available to you:** with the name of the agent. If it is the agent of the application you opened, you see **You have no access to this agent.** Ask your administrator (see [Agents and add-ins](../administer/agents.md)). Agents the server could not sign in together are signed in when you open their application: **Not signed in yet:** names them.
+
+??? info "If the code does not work"
+    - **The code expired.** or **The sign-in was denied in the browser.**: select **Get a new code**.
+    - **Too many sign-in attempts. Wait a moment and try again.**: wait, then try again.
+    - **Cancel** stops waiting for the approval.
 
 ??? info "More about the pane"
     Each document window has its own pane and its own chat; hiding the pane keeps its chat.
@@ -119,7 +131,7 @@ This signs you out of all four applications on this computer.
 |---|---|
 | The **Agent** button is greyed out | The document is open in Protected View. Select **Enable Editing**, then **Agent**. |
 | There is no **Fadenstack** group in Outlook | You are in the new Outlook for Windows. Switch back to classic Outlook. |
-| **The e-mail or password is not right.** | Check them, and sign in again. Forgot your password? See [Your account](account.md#forgot-your-password). |
+| **The e-mail or password is not right.** | Only with a password: check them, and sign in again. Forgot your password? See [Your account](account.md#forgot-your-password). |
 | **You have no access to this agent.** | Your administrator has not given it to you yet, or the agent's address set for this application is wrong. |
 | **Office is busy (a cell may be in edit mode, or a dialog is open). Finish that and try again.** | Leave the cell, or close the dialog, and ask again. |
 | **The agent could not start**, with a reason | Select **Try again**. If it keeps failing, tell your IT department what the reason says. |

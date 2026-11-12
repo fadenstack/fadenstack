@@ -15,10 +15,13 @@ Der Browser-Agent ist Fadenstack in der Seitenleiste von Chrome. Er arbeitet mit
 1. Wählen Sie die Fadenstack-Schaltfläche in der Symbolleiste von Chrome, oder drücken Sie Alt+Umschalt+F.
 2. Geben Sie beim ersten Mal in **Mit Fadenstack verbinden** den **Server** und den **Agent** ein.
 3. Wählen Sie **Verbinden**, und erlauben Sie den Zugriff, wenn Chrome danach fragt.
-4. Geben Sie unter **E-Mail** und **Passwort** die Zugangsdaten Ihres Fadenstack-Kontos ein.
-5. Wählen Sie **Anmelden**.
+4. Die Seitenleiste zeigt **Ihr Anmeldecode**. Wählen Sie **Anmeldeseite öffnen**; Ihr Browser öffnet die Fadenstack-Seite dafür. Lässt sie sich nicht aus der Seitenleiste öffnen, kopiert **Code kopieren** den Code.
+5. Melden Sie sich auf dieser Seite wie gewohnt bei Fadenstack an, falls der Browser danach fragt, prüfen Sie, ob der Code der in der Seitenleiste ist, und genehmigen Sie. Die Seitenleiste zeigt währenddessen **Warte auf Ihre Genehmigung…** und meldet sich danach selbst an. Ihr Passwort bleibt auf dieser Seite. Mehr dazu: [Eine Desktop-App anmelden](sign-in-an-app.md).
 
 Wenn Ihre IT-Abteilung Server und Agent für Sie eingestellt hat, zeigt das Formular beide an; Sie wählen nur **Verbinden** und melden sich an.
+
+??? info "Stattdessen mit Passwort anmelden"
+    Wählen Sie **Mit einem Passwort anmelden**, geben Sie unter **E-Mail** und **Passwort** die Zugangsdaten Ihres Fadenstack-Kontos ein und wählen Sie **Anmelden**. Das ist auch der Weg, wenn Ihr Server älter ist und sich nicht mit einem Code anmelden kann: Die Seitenleiste sagt dann **Dieser Server unterstützt die Anmeldung mit einem Code noch nicht. Melden Sie sich mit einem Passwort an.** **Mit einem Code anmelden** bringt den Code zurück. Ist der Code abgelaufen oder wurde er abgelehnt, wählen Sie **Neuen Code anfordern**.
 
 ??? info "Server und Agent"
     - **Server**: Ihr Fadenstack-Server, z. B. `https://ai.example.internal`.
@@ -28,7 +31,16 @@ Wenn Ihre IT-Abteilung Server und Agent für Sie eingestellt hat, zeigt das Form
 
 Die Seitenleiste zeigt sich in der Sprache Ihres Browsers. Um eine andere zu wählen, wählen Sie oben in der Seitenleiste das Zahnrad (**Einstellungen**) und dann unter **Sprache** eine Sprache: Die ganze Seitenleiste wechselt sofort, auch die Unterhaltung, die Begrüßung des Agenten und die Einträge im Kontextmenü. **Automatisch** kehrt zur Sprache des Browsers zurück. Die Sprache wird für Ihr Konto gespeichert, sodass die Konsole und die Office-Add-ins ihr folgen, auf diesem und auf Ihren anderen Computern. Hat Ihre Organisation eine Sprache festgelegt, zeigen die Einstellungen sie mit **Von Ihrer Organisation festgelegt** an, und Sie können sie nicht ändern.
 
-Unter den Sprachen zeigen die **Einstellungen**, welchen Agenten Sie auf welchem Server nutzen, mit **Auf diesem Gerät abmelden** und **Server oder Agent ändern**.
+Unter den Sprachen zeigen die **Einstellungen**, welchen Agenten Sie auf welchem Server nutzen, mit diesen Einträgen:
+
+| Wählen Sie | Was geschieht |
+|---|---|
+| **Meine Daten exportieren** | Speichert eine JSON-Datei mit Ihren Chats und den Entscheidungen **Immer zulassen**, die für Sie in diesem Browser gespeichert sind. Ihre Anmeldung ist nicht darin, ebenso wenig das, was der Server speichert; fragen Sie dazu Ihre IT-Abteilung. |
+| **Meine Daten auf diesem Gerät löschen** | Löscht nach Ihrer Bestätigung die Chats und Entscheidungen **Immer zulassen**, die für Sie in diesem Browser gespeichert sind, samt dem Schlüssel, der sie schützt, und meldet Sie ab. Das lässt sich nicht rückgängig machen. Ihre Chats lassen sich nicht mehr lesen, auch nicht aus einer Kopie. Was der Server speichert, bleibt; fragen Sie dazu Ihre IT-Abteilung. |
+| **Auf diesem Gerät abmelden** | Meldet Sie hier ab. Ihre Chats bleiben für Ihre nächste Anmeldung in diesem Browser. |
+| **Server oder Agent ändern** | Zurück zum ersten Formular. |
+
+Die Chats und Entscheidungen werden für jede angemeldete Person getrennt gespeichert: Wer sich im selben Browser anmeldet, sieht Ihre nicht.
 
 **Info**, der letzte Eintrag unter dem Zahnrad, nennt den Agenten und seine Version, das Modell, die Erweiterung, das Fadenstack-SDK, mit dem er gebaut ist, und den Server; **Details kopieren** kopiert sie für eine Frage an Ihre IT-Abteilung. Er verlinkt auf die Hilfe Ihrer Organisation und auf fadenstack.com. Unter dem Nachrichtenfeld steht außerdem ein kleiner Link **Fadenstack** (was ein solcher Link sendet: [Ihre Daten und Datenschutz](privacy.md#links-to-fadenstackcom)).
 
@@ -138,8 +150,8 @@ Bei der Installation erlaubt Chrome der Erweiterung, ihre Seitenleiste zu öffne
 - Was Sie fragen und was der Agent liest, um zu antworten (die Seite, Tabs, PDF-Seiten, Bilder, die Sie hinzufügen), geht an den Server Ihrer Organisation und an das Modell, das Ihr Administrator für den Agenten ausgewählt hat.
 - Mit eingeschalteter Websuche geht eine Suche, die Sie erlauben, an die in Chrome eingestellte Suchmaschine.
 - PDFs werden in Ihrem Browser gelesen. Bilder werden in Ihrem Browser verkleinert, bevor sie gesendet werden.
-- Ihre Unterhaltungen bleiben in diesem Browser. Der Server protokolliert, welche Tools liefen und wie lange sie dauerten, nicht, was sie gelesen haben.
-- Ihre Anmeldung wird in diesem Browser gespeichert und ist dort nicht verschlüsselt. Melden Sie sich auf einem Computer, den auch andere nutzen, ab, wenn Sie fertig sind: Wählen Sie oben in der Seitenleiste das Zahnrad (**Einstellungen**), dann **Auf diesem Gerät abmelden**.
+- Ihre Unterhaltungen bleiben verschlüsselt in diesem Browser, für jede angemeldete Person getrennt. Der Schlüssel bleibt im Browser und lässt sich nicht aus ihm auslesen. Der Server protokolliert, welche Tools liefen und wie lange sie dauerten, nicht, was sie gelesen haben.
+- Ihre Anmeldung wird in diesem Browser gespeichert und ist dort, anders als die Unterhaltungen, nicht verschlüsselt. Melden Sie sich auf einem Computer, den auch andere nutzen, ab, wenn Sie fertig sind: Wählen Sie oben in der Seitenleiste das Zahnrad (**Einstellungen**), dann **Auf diesem Gerät abmelden**. Um auch Ihre Unterhaltungen zu entfernen, wählen Sie **Meine Daten auf diesem Gerät löschen**.
 
 Mehr dazu, was gespeichert wird und wer es sieht: [Ihre Daten und Datenschutz](privacy.md).
 

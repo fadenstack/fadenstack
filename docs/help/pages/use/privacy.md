@@ -19,7 +19,7 @@ On your own computer:
 
 | | Its conversations | Your sign-in |
 |---|---|---|
-| **The browser agent** | In your browser, not on the server | In your browser too, not encrypted |
+| **The browser agent** | In your browser, not on the server, encrypted | In your browser too, not encrypted |
 | **The Office add-ins** | On your computer, encrypted | Protected by Windows |
 
 Fadenstack keeps your chats until they are deleted. See [Deleting](#deleting).
@@ -105,6 +105,7 @@ When a limit stops a request, the message names the limit, for example the insta
 | **A project** | It is erased at once, with all its chats and their files. |
 | **Your account** (an administrator does it) | Your chats, projects, files and what the assistant remembered are erased with it. |
 | A chat in **Chat history**, in the browser agent | It is removed from your browser. |
+| **Delete my data on this device**, in the browser agent's settings | All chats and **Allow always** choices kept for you in that browser are erased, with their key, and you are signed out. **Export my data** saves them first, as a file. |
 
 If something must be erased sooner, for example personal data you pasted by mistake, ask your administrator: a chat they delete in the console is erased at once. Backups taken before keep it until they are replaced (the nightly ones after a week).
 

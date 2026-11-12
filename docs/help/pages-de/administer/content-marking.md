@@ -150,7 +150,10 @@ Für ein abgelehntes Modell wählt ein Administrator eines davon, auf der Karte 
   sagt, ob sie gekennzeichnet ist.
 - **Antworten ohne Kennzeichnung erlauben**, mit einer Begründung. Seine Antworten gehen dann mit einem Hinweis
   hinaus: Der Chat zeigt ihn unter der Antwort, die API sendet den Header
-  `x-faden-unmarked: allowed-by-administrator` (und das Ereignis `faden.unmarked`). Die Wahl wird mit Ihrem
+  `x-faden-unmarked: allowed-by-administrator` (und das Ereignis `faden.unmarked`). Im Browser-Agenten und in
+  den Office-Add-ins sehen Menschen den Hinweis nur, wenn sie in den Einstellungen des Bereichs **Hinweis, wenn
+  eine Antwort kein KI-Kennzeichen trägt** einschalten (siehe
+  [Inhalte prüfen](../use/checking-content.md#an-answer-without-a-mark)). Die Wahl wird mit Ihrem
   Namen und der Zeit gespeichert, auch im Audit-Log.
 
 !!! warning "Nach dem Upgrade auf 0.5.0"
