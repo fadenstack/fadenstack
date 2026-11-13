@@ -55,6 +55,7 @@
       }
     ],
     "local_mcp_mode": "disable",
+    "local_skills_mode": "disable",
     "ui": {
       "greeting": "I work with your mail. Select a message and ask, or tell me what to write. I draft; you send.",
       "suggestions": [

@@ -57,6 +57,17 @@ class LocalMcpMode(enum.StrEnum):
     ALLOW = "allow"
 
 
+class LocalSkillsMode(enum.StrEnum):
+    """Whether an SDK may run the person's own skills, kept on their device, for this agent (sdk/50 R3-7).
+
+    Off unless the agent's author allows them. The gateway only reports it in the agent's profile: local
+    skills run in the client.
+    """
+
+    DISABLE = "disable"
+    ALLOW = "allow"
+
+
 class PrincipalType(enum.StrEnum):
     """Who a grant is for."""
 
@@ -159,6 +170,13 @@ class AgentVersion(Base):
         Enum(LocalMcpMode, name="agent_local_mcp_mode", values_callable=lambda e: [m.value for m in e]),
         nullable=False,
         default=LocalMcpMode.DISABLE,
+    )
+    #: Whether the person's own skills may run beside the organisation's (``LocalSkillsMode``).
+    local_skills_mode: Mapped[LocalSkillsMode] = mapped_column(
+        Enum(LocalSkillsMode, name="agent_local_skills_mode", values_callable=lambda e: [m.value for m in e]),
+        nullable=False,
+        default=LocalSkillsMode.DISABLE,
+        server_default=LocalSkillsMode.DISABLE.value,
     )
     #: Greeting, starter prompts, icon.
     ui: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)

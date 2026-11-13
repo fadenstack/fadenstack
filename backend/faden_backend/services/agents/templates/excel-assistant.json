@@ -51,6 +51,7 @@
       }
     ],
     "local_mcp_mode": "disable",
+    "local_skills_mode": "disable",
     "ui": {
       "greeting": "I work in this workbook. Select cells and ask, or tell me what to build.",
       "suggestions": [

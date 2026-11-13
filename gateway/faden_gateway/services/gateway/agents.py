@@ -39,7 +39,8 @@ _AGENT_SQL = """
 SELECT a.id::text AS id, a.tenant_id, a.slug, a.name, a.status::text AS status,
        (a.published_version_id IS NOT NULL) AS published, a.restricted_by,
        v.version, v.instructions, v.model_alias, v.knowledge, v.server_tools,
-       v.host_tool_contract, v.local_mcp_mode::text AS local_mcp_mode, v.ui, v.pii, v.approvals, v.extensions,
+       v.host_tool_contract, v.local_mcp_mode::text AS local_mcp_mode,
+       v.local_skills_mode::text AS local_skills_mode, v.ui, v.pii, v.approvals, v.extensions,
        ARRAY(SELECT m.user_id::text FROM agent_members m
              WHERE m.agent_id = a.id AND m.role = 'maintainer') AS maintainers,
        ARRAY(SELECT g.principal_id::text FROM agent_grants g
@@ -176,6 +177,9 @@ class AgentProfile:
     max_grant_minutes: int | None = None
     #: The classes a grant may cover, within ``read`` and ``write``; ``None``: both.
     grant_classes: tuple[str, ...] | None = None
+    #: Whether the person's own skills may run in the client (``allow`` | ``disable``; sdk/50 R3-7). Only
+    #: ``allow`` allows: a missing or unknown value reads as ``disable``. The gateway only reports it.
+    local_skills_mode: str = "disable"
 
     def levels(self) -> tuple[tool_classes.ToolMode, tool_classes.ToolMode]:
         """The level conversations start in, and the highest.
@@ -235,6 +239,8 @@ class AgentProfile:
             standing=_strings(approvals.get("standing")),
             max_grant_minutes=_minutes(approvals.get("max_grant_minutes")),
             grant_classes=_strings(approvals.get("grant_classes")),
+            # Fail closed (ASVS 5.0 V8): only ``allow`` allows.
+            local_skills_mode="allow" if row.get("local_skills_mode") == "allow" else "disable",
         )
 
 
@@ -677,6 +683,15 @@ class AgentRequest:
         The agent allows local MCP, or the user has developer mode.
         """
         return self.agent.local_mcp_mode == "allow" or self.developer_mode
+
+    @property
+    def local_skills_allowed(self) -> bool:
+        """Whether the person's own skills may run on the device, by the rule of :attr:`local_mcp_allowed`.
+
+        The agent allows local skills, or the user has developer mode. The client runs them; the gateway
+        only reports this in the agent's profile.
+        """
+        return self.agent.local_skills_mode == "allow" or self.developer_mode
 
     def allows_server_tool(self, name: str) -> bool:
         """Whether the agent lets the model be offered the gateway tool *name*."""

@@ -860,6 +860,7 @@ async def test_the_profile_carries_what_the_sdk_caches_not_the_instructions(
     assert profile["instructions_sha256"] == "abc"
     assert profile["host_tool_contract"] == [{"name": "read_page", "risk": "read"}]
     assert profile["local_mcp"] == {"mode": "disable", "developer_mode": True}
+    assert profile["local_skills"] == {"mode": "disable", "developer_mode": True}
     assert profile["required_client_modules"] == []
     assert profile["edition"] == "community" and "agents" in profile["features"]
     assert "client_events.trigger" in profile["features"]
@@ -867,6 +868,52 @@ async def test_the_profile_carries_what_the_sdk_caches_not_the_instructions(
     assert profile["user"] == {"language": None}
     assert profile["skills"] is False, "no Skills module here: the SDK shows no skill picker"
     assert profile["approvals"] == {"standing": None, "longest_grant_minutes": 120, "grant_classes": ["read", "write"]}
+
+
+@pytest.mark.anyio
+async def test_the_profile_says_whether_the_persons_own_skills_may_run(
+    client: AsyncClient, fastapi_app: FastAPI, backend: _Backend,
+) -> None:
+    """sdk/50 R3-7, R3-11: beside ``local_mcp``, in its shape. The SDK runs local skills; the gateway only tells."""
+    backend.put(_profile(local_skills_mode="allow"))
+    fastapi_app.state.agent_directory.invalidate()
+    r = await client.get("/v1/agents/eplan-assistant/profile", headers=_headers())
+    assert r.status_code == 200, r.text
+    assert r.json()["local_skills"] == {"mode": "allow", "developer_mode": False}
+    assert r.json()["local_mcp"] == {"mode": "disable", "developer_mode": False}, "its own field"
+
+
+@pytest.mark.parametrize(("mode", "dev", "allowed"), [
+    ("disable", False, False), ("disable", True, True), ("allow", False, True), ("allow", True, True),
+])
+def test_local_skills_are_allowed_as_local_mcp_is(mode: str, dev: bool, allowed: bool) -> None:
+    """``allow``, or the user's developer mode (F01): the rule of ``local_mcp_allowed``."""
+    request = AgentRequest(agent=_profile(local_skills_mode=mode), developer_mode=dev)
+    assert request.local_skills_allowed is allowed
+
+
+def _row(**overrides: Any) -> dict[str, Any]:
+    """A directory row as ``_AGENT_SQL`` returns it."""
+    row: dict[str, Any] = {
+        "id": AGENT_ID, "tenant_id": "tenant-a", "slug": "eplan-assistant", "name": "EPLAN assistant",
+        "status": "published", "published": True, "restricted_by": [], "version": 3, "instructions": INSTRUCTIONS,
+        "model_alias": ALIAS, "knowledge": "[]", "server_tools": None, "host_tool_contract": "[]",
+        "local_mcp_mode": "disable", "local_skills_mode": "disable", "ui": "{}", "pii": "{}", "approvals": "{}",
+        "extensions": "{}", "maintainers": [], "grant_users": [], "grant_groups": [],
+    }
+    row.update(overrides)
+    return row
+
+
+@pytest.mark.parametrize(("stored", "read"), [
+    ("allow", "allow"), ("disable", "disable"), (None, "disable"), ("everything", "disable"), ("ALLOW", "disable"),
+])
+def test_a_local_skills_mode_the_gateway_does_not_know_reads_as_disable(stored: Any, read: str) -> None:
+    """Fail closed (ASVS 5.0 V8): only ``allow`` allows; a missing or unknown value narrows."""
+    assert AgentProfile.from_row(_row(local_skills_mode=stored)).local_skills_mode == read
+    row = _row()
+    del row["local_skills_mode"]
+    assert AgentProfile.from_row(row).local_skills_mode == "disable", "a row without the column"
 
 
 @pytest.mark.anyio

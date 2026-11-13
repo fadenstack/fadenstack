@@ -80,6 +80,7 @@
       "current_time"
     ],
     "local_mcp_mode": "disable",
+    "local_skills_mode": "disable",
     "ui": {
       "greeting": "I work with the page you have open, PDFs too. Ask about it, or select a passage and ask.",
       "suggestions": [

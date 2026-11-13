@@ -3,7 +3,16 @@
  * without the version's own metadata. Pure functions, so the editor, the
  * create dialog and the version comparison agree on what a definition is.
  */
-import type { Agent, AgentApprovals, AgentDefinition, AgentPii, AgentVersion, ApprovalLevel, HostTool } from "~/api/agents";
+import type {
+  Agent,
+  AgentApprovals,
+  AgentDefinition,
+  AgentPii,
+  AgentVersion,
+  ApprovalLevel,
+  HostTool,
+  LocalSkillsMode,
+} from "~/api/agents";
 
 /** The approval levels, least to most: an agent's default level is never above its highest. */
 export const TOOL_LEVELS: ApprovalLevel[] = ["off", "read_only", "ask", "auto", "bypass"];
@@ -21,6 +30,7 @@ export const EMPTY_DEFINITION: AgentDefinition = {
   server_tools: null,
   host_tool_contract: [],
   local_mcp_mode: "disable",
+  local_skills_mode: "disable",
   ui: {},
   pii: { allow_mode_override: null },
   approvals: DEFAULT_APPROVALS,
@@ -36,6 +46,7 @@ export const DEFINITION_FIELDS = [
   "host_tool_contract",
   "approvals",
   "local_mcp_mode",
+  "local_skills_mode",
   "ui",
   "pii",
   "extensions",
@@ -53,11 +64,17 @@ export function definitionOf(version: AgentVersion | null | undefined): AgentDef
     server_tools: version.server_tools ?? null,
     host_tool_contract: version.host_tool_contract ?? [],
     local_mcp_mode: version.local_mcp_mode ?? "disable",
+    local_skills_mode: localSkillsModeOf(version.local_skills_mode),
     ui: version.ui ?? {},
     pii: piiOf(version.pii),
     approvals: approvalsOf(version.approvals),
     extensions: version.extensions ?? {},
   };
+}
+
+/** Local skills as the console keeps them: only "allow" allows; anything else, or nothing, is off. */
+function localSkillsModeOf(value: unknown): LocalSkillsMode {
+  return value === "allow" ? "allow" : "disable";
 }
 
 /** The PII settings as the console keeps them: anything but true or false follows the tenant. */
@@ -318,6 +335,7 @@ export function parseAgentImport(text: string): ImportedAgent {
   definition.host_tool_contract = (definition.host_tool_contract ?? []).map(toolFrom);
   definition.pii = piiOf(definition.pii);
   definition.approvals = approvalsOf(definition.approvals);
+  definition.local_skills_mode = localSkillsModeOf(definition.local_skills_mode);
   return {
     slug: typeof record.slug === "string" ? record.slug : undefined,
     name: typeof record.name === "string" ? record.name : undefined,

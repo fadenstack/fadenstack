@@ -1,6 +1,7 @@
 /**
  * An agent's definition: its instructions and model, what it may use (knowledge,
- * the gateway's tools, the host's tools, local MCP servers), the tool modes its
+ * the gateway's tools, the host's tools, local MCP servers, the person's own
+ * skills on their device), the tool modes its
  * conversations start in and may reach, and what the SDKs show. Controlled: the
  * parent owns the value and decides when to save it.
  */
@@ -16,7 +17,13 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 
 import { hasFeature } from "~/api/about";
-import { AGENT_TOKEN_LIFETIMES, type AgentDefinition, type ApprovalLevel, type LocalMcpMode } from "~/api/agents";
+import {
+  AGENT_TOKEN_LIFETIMES,
+  type AgentDefinition,
+  type ApprovalLevel,
+  type LocalMcpMode,
+  type LocalSkillsMode,
+} from "~/api/agents";
 import { chatApi } from "~/api/chatClient";
 import { ragLite } from "~/api/rag";
 import { ChipListField } from "~/components/ChipListField";
@@ -48,6 +55,7 @@ import { HostToolContractEditor } from "./HostToolContractEditor";
 
 const SERVER_TOOLS_MODES: ServerToolsMode[] = ["default", "listed", "none"];
 const LOCAL_MCP_MODES: LocalMcpMode[] = ["disable", "allow"];
+const LOCAL_SKILLS_MODES: LocalSkillsMode[] = ["disable", "allow"];
 const PII_MODE_SWITCHES: PiiModeSwitch[] = ["tenant", "allow", "refuse"];
 const SESSION_COUNTS = Array.from({ length: MAX_RUNNING_SESSIONS }, (_, i) => i + 1);
 
@@ -161,6 +169,22 @@ export function AgentDefinitionEditor({ value, onChange, readOnly = false }: Age
           {LOCAL_MCP_MODES.map((mode) => (
             <MenuItem key={mode} value={mode}>
               {t(`agents.definition.local_mcp_${mode}`)}
+            </MenuItem>
+          ))}
+        </TextField>
+        <TextField
+          select
+          size="small"
+          label={t("agents.definition.local_skills")}
+          helperText={t(`agents.definition.local_skills_${value.local_skills_mode}_help`)}
+          value={value.local_skills_mode}
+          disabled={readOnly}
+          onChange={(e) => set("local_skills_mode", e.target.value as LocalSkillsMode)}
+          sx={{ maxWidth: 360 }}
+        >
+          {LOCAL_SKILLS_MODES.map((mode) => (
+            <MenuItem key={mode} value={mode}>
+              {t(`agents.definition.local_skills_${mode}`)}
             </MenuItem>
           ))}
         </TextField>

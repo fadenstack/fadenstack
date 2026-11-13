@@ -136,6 +136,29 @@ describe("agent definitions", () => {
   });
 });
 
+describe("local skills (sdk/50 R3-7)", () => {
+  it("are off unless the version allows them; only allow allows", () => {
+    expect(EMPTY_DEFINITION.local_skills_mode).toBe("disable");
+    const missing = { ...VERSION, local_skills_mode: undefined } as unknown as AgentVersion;
+    expect(definitionOf(missing).local_skills_mode).toBe("disable");
+    const odd = { ...VERSION, local_skills_mode: "everything" } as unknown as AgentVersion;
+    expect(definitionOf(odd).local_skills_mode).toBe("disable");
+    expect(definitionOf({ ...VERSION, local_skills_mode: "allow" }).local_skills_mode).toBe("allow");
+  });
+
+  it("are a field of the definition, compared and versioned on their own", () => {
+    const before = definitionOf(VERSION);
+    expect(changedFields(before, { ...before, local_skills_mode: "allow" })).toEqual(["local_skills_mode"]);
+    expect(cleanDefinition({ ...before, local_skills_mode: "allow" }).local_skills_mode).toBe("allow");
+  });
+
+  it("come through an import, and an unknown value is off", () => {
+    expect(parseAgentImport('{"instructions": "x"}').definition.local_skills_mode).toBe("disable");
+    expect(parseAgentImport('{"version": {"local_skills_mode": "allow"}}').definition.local_skills_mode).toBe("allow");
+    expect(parseAgentImport('{"local_skills_mode": "yes"}').definition.local_skills_mode).toBe("disable");
+  });
+});
+
 describe("the PII mode setting", () => {
   it("is null (the tenant decides), true or false", () => {
     expect(EMPTY_DEFINITION.pii).toEqual({ allow_mode_override: null });

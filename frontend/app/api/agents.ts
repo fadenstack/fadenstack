@@ -17,6 +17,8 @@ const request = requester("/api/agents");
 
 export type AgentStatus = "draft" | "published" | "retired";
 export type LocalMcpMode = "disable" | "allow";
+/** Whether an SDK may run the person's own skills, kept on their device (sdk/50 R3-7). Off unless allowed. */
+export type LocalSkillsMode = "disable" | "allow";
 /** A host tool's class; absent: unclassified (always asks). */
 export type ToolRisk = "read" | "write" | "destructive";
 export type ToolApproval = "never" | "ask" | "always";
@@ -67,6 +69,7 @@ export interface AgentDefinition {
   server_tools: string[] | null;
   host_tool_contract: HostTool[];
   local_mcp_mode: LocalMcpMode;
+  local_skills_mode: LocalSkillsMode;
   /** What the SDKs show: `greeting`, `suggestions`. */
   ui: Record<string, unknown>;
   pii: AgentPii;

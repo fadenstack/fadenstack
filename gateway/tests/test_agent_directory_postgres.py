@@ -78,6 +78,7 @@ async def test_a_draft_serves_its_newest_version_a_published_agent_its_published
         assert draft.host_tools == {"read_page"} and draft.ui == {"greeting": "Hi"}
         assert draft.pii_allow_mode_override is None, "a version without PII settings follows the tenant"
         assert (draft.default_level, draft.max_level) == ("ask", "auto"), "the migration's default: as before"
+        assert draft.local_skills_mode == "disable", "the migration's default: the person's own skills stay off"
 
         conn = await asyncpg.connect(rows["dsn"])
         await conn.execute(
@@ -86,7 +87,8 @@ async def test_a_draft_serves_its_newest_version_a_published_agent_its_published
         )
         await conn.execute(
             """UPDATE agent_versions SET pii = '{"allow_mode_override": false}',
-               approvals = '{"default_level": "read_only", "max_level": "ask"}' WHERE id = $1::uuid""", rows["v1"],
+               approvals = '{"default_level": "read_only", "max_level": "ask"}',
+               local_skills_mode = 'allow' WHERE id = $1::uuid""", rows["v1"],
         )
         await conn.close()
         published = await backend.agent(("default", rows["agent"]))  # by id this time
@@ -95,6 +97,7 @@ async def test_a_draft_serves_its_newest_version_a_published_agent_its_published
         assert published.status == "published"
         assert published.pii_allow_mode_override is False
         assert [m.value for m in published.levels()] == ["read_only", "ask"]
+        assert published.local_skills_mode == "allow"
 
         assert await backend.agent(("other-tenant", rows["slug"])) is None
         flags = await backend.user(rows["user"])

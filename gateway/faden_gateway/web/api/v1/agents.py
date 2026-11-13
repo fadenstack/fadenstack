@@ -523,6 +523,12 @@ async def agent_profile(
             # unless an Enterprise lock says otherwise (in ``extensions``).
             "developer_mode": agent.developer_mode,
         },
+        # Whether the person's own skills, kept on the device, may run (sdk/50 R3-7): ``allow``, or the user's
+        # developer mode, as for local MCP. The SDK runs them; the gateway does nothing else with this.
+        "local_skills": {
+            "mode": profile.local_skills_mode,
+            "developer_mode": agent.developer_mode,
+        },
         # Sessions start in the agent's default level (sdk/38 §5); the SDK sends its session's mode
         # (X-Faden-Tool-Mode), never wider than the ceiling: the narrowest of the agent's highest level
         # (``max``) and the EE ceilings. An agent that goes up to Auto adds no ceiling.

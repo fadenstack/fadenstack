@@ -78,6 +78,7 @@ export function versionFixture(version: number, overrides: Partial<AgentVersion>
     server_tools: null,
     host_tool_contract: [{ name: "read_range", risk: "read" }],
     local_mcp_mode: "disable",
+    local_skills_mode: "disable",
     ui: {},
     pii: { allow_mode_override: null },
     approvals: { default_level: "ask", max_level: "auto" },

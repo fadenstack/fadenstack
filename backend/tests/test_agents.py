@@ -8,15 +8,18 @@ rotate, and a reused refresh token ends the sign-in everywhere.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import jwt
 import pytest
+import sqlalchemy as sa
 from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy import select, text
@@ -24,7 +27,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette import status
 
 from faden_backend.db.dao.rbac_dao import RbacDAO
-from faden_backend.db.models.agents import Agent, AgentGrant, AgentMember, AgentRefreshToken, AgentVersion
+from faden_backend.db.models.agents import (
+    Agent,
+    AgentGrant,
+    AgentMember,
+    AgentRefreshToken,
+    AgentVersion,
+    LocalSkillsMode,
+)
 from faden_backend.db.models.containers import AuditEvent
 from faden_backend.db.models.groups import Group, UserGroup
 from faden_backend.db.models.system_settings import SystemSettingValue
@@ -306,6 +316,123 @@ async def test_the_pii_mode_setting_is_versioned_and_follows_the_tenant_unless_s
         select(AgentVersion).where(AgentVersion.agent_id == uuid.UUID(agent["id"]), AgentVersion.version == 3),
     )).scalar_one()
     assert row.pii == {"allow_mode_override": False}, "as the gateway reads it"
+
+
+async def test_local_skills_are_off_unless_the_version_allows_them(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession,
+) -> None:
+    """sdk/50 R3-7, R3-11: ``local_skills_mode`` is ``disable`` unless set, versioned like ``local_mcp_mode``."""
+    signed_in.user = await _user(dbsession, admin=True)
+    agent = await _agent(client, slug="skills-helper")
+    first = (await client.get("/api/agents/skills-helper/versions/1")).json()
+    assert first["local_skills_mode"] == "disable", "unset: the person's own skills stay off"
+
+    r = await client.post("/api/agents/skills-helper/versions", json={"local_skills_mode": "allow"})
+    assert r.status_code == status.HTTP_201_CREATED, r.text
+    assert r.json()["local_skills_mode"] == "allow"
+    assert r.json()["local_mcp_mode"] == "disable", "its own field: local MCP does not follow it"
+    assert (await client.get("/api/agents/skills-helper/versions/1")).json()["local_skills_mode"] == "disable"
+
+    row = (await dbsession.execute(
+        select(AgentVersion).where(AgentVersion.agent_id == uuid.UUID(agent["id"]), AgentVersion.version == 2),
+    )).scalar_one()
+    assert row.local_skills_mode == LocalSkillsMode.ALLOW, "as the gateway reads it"
+
+
+@pytest.mark.parametrize("mode", ["maybe", "ALLOW", "", None, True])
+async def test_local_skills_take_disable_or_allow_only(
+    mode: Any, signed_in: _As, client: AsyncClient, dbsession: AsyncSession,
+) -> None:
+    signed_in.user = await _user(dbsession, admin=True)
+    r = await client.post("/api/agents", json={"slug": "odd-skills", "name": "x", "version": {"local_skills_mode": mode}})
+    assert r.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT, r.text
+
+
+async def test_the_apps_own_agents_keep_local_skills_off(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession,
+) -> None:
+    """The templates say it, so an administrator sees the choice in the JSON they start from."""
+    signed_in.user = await _user(dbsession, admin=True)
+    for template in (await client.get("/api/agents/templates")).json():
+        assert template["definition"]["version"]["local_skills_mode"] == "disable", template["id"]
+
+
+MIGRATIONS = Path(__file__).resolve().parents[1] / "faden_backend" / "db" / "migrations" / "versions"
+LOCAL_SKILLS_MIGRATION = MIGRATIONS / "2026-11-13-15-00_l0c4lsk.py"
+
+
+def _migration(path: Path, name: str) -> Any:
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+async def test_the_local_skills_migration_upgrades_and_downgrades(dbsession: AsyncSession) -> None:
+    """Down and up again on the test database (made from the models), inside the test's transaction."""
+    from alembic.autogenerate import compare_metadata
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+
+    from faden_backend.db.meta import meta
+
+    migration = _migration(LOCAL_SKILLS_MIGRATION, "l0c4lsk")
+    assert (migration.revision, migration.down_revision) == ("l0c4lsk", "p41r4gs")
+
+    def columns(sync_conn: Any) -> set[str]:
+        return {c["name"] for c in sa.inspect(sync_conn).get_columns("agent_versions")}
+
+    def enum_exists(sync_conn: Any) -> bool:
+        found = sync_conn.execute(sa.text("SELECT 1 FROM pg_type WHERE typname = 'agent_local_skills_mode'"))
+        return found.first() is not None
+
+    def run(sync_conn: Any) -> None:
+        # Server defaults compared too: the model says ``disable`` as the migration does.
+        context = MigrationContext.configure(sync_conn, opts={"compare_server_default": True})
+        with Operations.context(context):
+            agent_id = uuid.uuid4()
+            sync_conn.execute(
+                sa.text("INSERT INTO agents (id, tenant_id, slug, name, status) "
+                        "VALUES (:id, 'default', :slug, 'x', 'draft')"),
+                {"id": agent_id, "slug": f"mig-{agent_id.hex[:8]}"},
+            )
+            migration.downgrade()
+            assert "local_skills_mode" not in columns(sync_conn) and not enum_exists(sync_conn)
+            # A version written before the column: the upgrade gives it ``disable``.
+            sync_conn.execute(
+                sa.text(
+                    "INSERT INTO agent_versions (id, agent_id, version, instructions, knowledge, host_tool_contract, "
+                    "local_mcp_mode, ui, extensions) VALUES (:id, :agent, 1, '', '[]', '[]', 'disable', '{}', '{}')",
+                ),
+                {"id": uuid.uuid4(), "agent": agent_id},
+            )
+
+            migration.upgrade()
+            assert "local_skills_mode" in columns(sync_conn) and enum_exists(sync_conn)
+            stored = sync_conn.execute(
+                sa.text("SELECT local_skills_mode::text FROM agent_versions WHERE agent_id = :agent"),
+                {"agent": agent_id},
+            ).scalar_one()
+            assert stored == "disable"
+            # What the migration made is what the models describe.
+            diffs = [d for d in compare_metadata(context, meta) if "local_skills" in repr(d)]
+            assert diffs == []
+
+            migration.downgrade()
+            migration.upgrade()
+
+    connection = await dbsession.connection()
+    await connection.run_sync(run)
+
+
+def test_the_local_skills_migration_is_the_one_head() -> None:
+    """It follows 0.7.1's pairing migrations (``p41r4gs``)."""
+    from alembic.script import ScriptDirectory
+
+    scripts = ScriptDirectory(str(MIGRATIONS.parent))
+    assert scripts.get_heads() == ["l0c4lsk"]
+    assert scripts.get_revision("l0c4lsk").down_revision == "p41r4gs"
 
 
 @pytest.mark.parametrize("pii", [

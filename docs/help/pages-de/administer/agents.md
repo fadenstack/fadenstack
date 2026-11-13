@@ -56,7 +56,7 @@ Die Seite des Agenten öffnet sich. Sein Status in der Liste ist **Entwurf**, **
 
 | Reiter | Was er enthält |
 |---|---|
-| **Definition** | Die Version, die Benutzer erhalten: **Anweisungen**, **Modell**, **Wissen** (Sammlungen, die er durchsuchen darf), **Server-Tools** (**Wie im Chat**, **Nur diese** oder **Keine**), **Lokale MCP-Server**, **Host-Tools** (die Tools der Anwendung und ihre Klassen), **Freigabestufen** (der Tool-Modus, in dem Unterhaltungen beginnen, und der höchste), **Darstellung** (Begrüßung und vorgeschlagene Prompts) und **Datenschutz**. |
+| **Definition** | Die Version, die Benutzer erhalten: **Anweisungen**, **Modell**, **Wissen** (Sammlungen, die er durchsuchen darf), **Server-Tools** (**Wie im Chat**, **Nur diese** oder **Keine**), **Lokale MCP-Server**, **Lokale Skills**, **Host-Tools** (die Tools der Anwendung und ihre Klassen), **Freigabestufen** (der Tool-Modus, in dem Unterhaltungen beginnen, und der höchste), **Darstellung** (Begrüßung und vorgeschlagene Prompts) und **Datenschutz**. |
 | **Versionen** | Jede Version. Mit **Veröffentlichen** eine Version veröffentlichen, mit **Zurücksetzen** zu einer früheren zurückkehren, unter **Änderungen** die Unterschiede sehen. |
 | **Zugriff** | **Wer ihn nutzen darf**, die Liste **Ausgeschlossene Personen** <span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span> und seine **Betreuer** (mit Enterprise: **Betreuer und Prüfer** <span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span>). **Zugriff prüfen** zeigt, ob eine Person den Agenten nutzen darf, und warum. |
 | **Aktivität** | Nutzung über einen Zeitraum (Anfragen, Fehler, Tokens, Benutzer, Unterhaltungen: nur Zahlen, nie Inhalte), nur, wenn mindestens fünf Personen den Agenten im Zeitraum genutzt haben; der Eigentümer eines persönlichen Agenten sieht dessen Zahlen trotzdem. Was die Anwendungen gemeldet haben (ausgeführte Tools, Zustimmungen) und **Angemeldete Geräte**. Der Reiter nennt niemanden außer Ihnen selbst. |
@@ -77,6 +77,15 @@ Die Seite des Agenten öffnet sich. Sein Status in der Liste ist **Entwurf**, **
     lässt ihn MCP-Server auf dem Computer der Person einbinden; deren Tools sind nicht
     eingestuft und fragen deshalb immer zuerst. Personen im **Entwicklermodus** (siehe
     [Benutzer, Gruppen und Rollen](users.md#developer-mode)) dürfen sie in jedem Fall einbinden.
+
+??? info "Mehr zu lokalen Skills"
+    **Lokale Skills**: **Nicht erlaubt** (die Voreinstellung) beschränkt den Agenten auf die Skills Ihrer
+    Organisation. Die Skills, die eine Person auf ihrem eigenen Gerät hat, bleiben aus.
+    **Erlaubt** lässt die Anwendung auch diese Skills nutzen, neben denen Ihrer Organisation. Sie sind als nicht
+    geprüft gekennzeichnet, weil niemand in Ihrer Organisation sie geprüft hat; Skripte darin laufen nie. Personen
+    im **Entwicklermodus** (siehe [Benutzer, Gruppen und Rollen](users.md#developer-mode)) dürfen sie in jedem
+    Fall nutzen. Die Einstellung sagt der Anwendung nur, was sie darf. Die Skills liegen auf dem Gerät der Person,
+    nicht auf dem Server; nutzt das Modell einen, wird sein Text Teil der Unterhaltung, wie jede andere Nachricht.
 
 ??? info "Mehr zu gleichzeitig laufenden Chat-Sitzungen"
     **Gleichzeitig laufende Chat-Sitzungen** (unter **Darstellung**) legt fest, wie viele Chat-Sitzungen dieses

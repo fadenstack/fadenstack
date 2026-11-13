@@ -1,6 +1,7 @@
 /**
- * The definition editor: its "Chat sessions running at once" setting (shown, chosen, back to the default), and the
- * approval levels (Bypass can be the highest level, never the one a conversation starts in).
+ * The definition editor: its "Chat sessions running at once" setting (shown, chosen, back to the default), the local
+ * skills switch (off unless allowed), and the approval levels (Bypass can be the highest level, never the one a
+ * conversation starts in).
  */
 import { useState } from "react";
 import { render, screen, within } from "@testing-library/react";
@@ -65,6 +66,28 @@ describe("AgentDefinitionEditor sessions setting", () => {
     await user.click(screen.getByRole("combobox", { name: "Chat sessions running at once" }));
     await user.click(within(screen.getByRole("listbox")).getByRole("option", { name: "Default (5)" }));
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ ui: { greeting: "Hi" } }));
+  });
+});
+
+describe("AgentDefinitionEditor local skills", () => {
+  it("shows them off by default, with what that means", async () => {
+    render(<AgentDefinitionEditor value={EMPTY_DEFINITION} onChange={vi.fn()} />);
+    expect(await screen.findByRole("combobox", { name: "Local skills" })).toHaveTextContent("Not allowed");
+    expect(screen.getByText(/A person's own skills, kept on their device, stay off/)).toBeInTheDocument();
+    expect(await optionNames("Local skills")).toEqual(["Not allowed", "Allowed"]);
+  });
+
+  it("saves Allowed as the version's local_skills_mode, and leaves local MCP as it was", async () => {
+    const onChange = vi.fn();
+    render(<Harness initial={EMPTY_DEFINITION} onChange={onChange} />);
+
+    await userEvent.click(await screen.findByRole("combobox", { name: "Local skills" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Allowed" }));
+
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ local_skills_mode: "allow", local_mcp_mode: "disable" }),
+    );
+    expect(screen.getByText(/Nobody in your organisation has reviewed them/)).toBeInTheDocument();
   });
 });
 
