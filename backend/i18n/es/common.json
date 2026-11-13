@@ -3811,6 +3811,8 @@
       "share_label": "Aceleradores por copia",
       "share_help": "1 es un acelerador entero. Menos permite que las copias compartan uno; más de 0,5 mantiene cada copia en un acelerador propio. El motor usa la misma fracción de su memoria (uno entero: 0,8).",
       "share_invalid": "Introduzca de 0,05 a 1.",
+      "share_invalid_split": "Introduzca de 0,05 a 1, o {{sizes}} para repartir cada copia entre tantos aceleradores.",
+      "share_help_split": "1 es un acelerador entero. Menos permite que las copias compartan uno; más de 0,5 mantiene cada copia en un acelerador propio. Con 2 o más, cada copia se reparte entre tantos (paralelismo de tensores), para un modelo demasiado grande para uno. El motor usa la misma fracción de la memoria de cada acelerador (uno entero: 0,8).",
       "share_memory": "El motor usa el {{percent}} % de la memoria de cada acelerador.",
       "share_restarts": "Cambiar la fracción reinicia todas las copias. El modelo no está disponible hasta que vuelvan.",
       "show_in_logs": "Mostrar los errores",

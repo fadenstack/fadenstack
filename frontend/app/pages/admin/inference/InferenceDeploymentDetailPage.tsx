@@ -83,8 +83,9 @@ import {
   endpointStatusColor,
   environmentStatusColor,
   formatTimestamp,
-  memoryForShare,
+  memoryForResize,
   reconcileSummary,
+  SPLIT_SIZES,
   shortId,
 } from "./common";
 
@@ -359,7 +360,7 @@ function EngineRow({ deploymentId }: { deploymentId: string }) {
 
 export default function InferenceDeploymentDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const roleLabel = (role: string) =>
     role === "head" || role === "worker" ? t(`clusters.role.${role}`) : role;
@@ -579,34 +580,46 @@ export default function InferenceDeploymentDetailPage() {
   }
 
   const perCopy = deployment ? acceleratorsPerCopy(deployment) : 1;
-  // A copy on one device may take a share of it; one spread over several
-  // (tensor or pipeline parallel) takes exactly those, as the compiler requires.
-  const topology = asRecord(deployment?.spec?.topology);
-  const devicesPerCopy =
-    (Number(topology.tensor_parallel_size) || 1) * (Number(topology.pipeline_parallel_size) || 1);
-  const shareEditable = devicesPerCopy === 1;
-  const shareTyped = Number(shareInput);
-  const shareValid =
-    !shareEditable || (shareInput.trim() !== "" && shareTyped >= 0.05 && shareTyped <= 1);
-  const shareChanged = shareEditable && shareValid && shareTyped !== perCopy;
-  const planShare = shareChanged ? shareTyped : perCopy;
-  // What the engine will take of each accelerator's memory. A new share sets
-  // it (memoryForShare), in the same save; otherwise it is the engine's
-  // gpu_memory_utilization, which a share below 1 caps (compiler.py), or 0.80.
-  const askedMemory = Number(asRecord(asRecord(deployment?.spec?.engine).config).gpu_memory_utilization);
-  const memoryShare = shareChanged
-    ? memoryForShare(shareTyped)
-    : planShare < 1
-      ? askedMemory > 0
-        ? Math.min(askedMemory, planShare)
-        : planShare
-      : askedMemory > 0
-        ? askedMemory
-        : COMPILER_DEFAULT_MEMORY;
   const clusterAccelerators = data.members.reduce((sum, member) => {
     const node = data.nodes.find((n) => n.id === member.node_id);
     return sum + (node ? gpuCount(node) : 0);
   }, 0);
+  // A copy takes a share of one accelerator (0.05 to 1), or is split across
+  // 2, 4, 8 or 16 (tensor parallel): a model too large for one accelerator
+  // needs that, and it could only be chosen when the model was deployed. Flash
+  // on the DGX pair, 95 GiB of weights for 121 GiB each, ran out of memory on
+  // one per copy and could not be split here (.22, 2026-11-13). A picture model
+  // runs on one; a copy that is also pipeline parallel (set through the API)
+  // keeps its shape.
+  const topology = asRecord(deployment?.spec?.topology);
+  const shareEditable = (Number(topology.pipeline_parallel_size) || 1) === 1;
+  const splitLimit = clusterAccelerators > 0 ? clusterAccelerators : SPLIT_SIZES[SPLIT_SIZES.length - 1];
+  const splitSizes: number[] =
+    deployment && !isPictureDeployment(deployment) ? SPLIT_SIZES.filter((n) => n <= splitLimit) : [];
+  const shareTyped = Number(shareInput);
+  const shareValid =
+    !shareEditable ||
+    (shareInput.trim() !== "" &&
+      ((shareTyped >= 0.05 && shareTyped <= 1) || splitSizes.includes(shareTyped)));
+  const shareChanged = shareEditable && shareValid && shareTyped !== perCopy;
+  const planShare = shareChanged ? shareTyped : perCopy;
+  // What the engine will take of each accelerator's memory. A resize sets it
+  // when it must (memoryForResize), in the same save; otherwise it is the
+  // engine's gpu_memory_utilization, which a share below 1 caps (compiler.py),
+  // or 0.80.
+  const askedMemory = Number(asRecord(asRecord(deployment?.spec?.engine).config).gpu_memory_utilization);
+  const resizeMemory = shareChanged ? memoryForResize(perCopy, shareTyped) : null;
+  const memoryShare =
+    resizeMemory !== null
+      ? resizeMemory
+      : planShare < 1
+        ? askedMemory > 0
+          ? Math.min(askedMemory, planShare)
+          : planShare
+        : askedMemory > 0
+          ? askedMemory
+          : COMPILER_DEFAULT_MEMORY;
+  const splitList = new Intl.ListFormat(i18n.language, { type: "disjunction" }).format(splitSizes.map(String));
   const copiesThatFit =
     clusterAccelerators > 0 && planShare > 0 ? Math.floor(clusterAccelerators / planShare) : null;
 
@@ -616,23 +629,26 @@ export default function InferenceDeploymentDetailPage() {
     try {
       // Replace the whole spec: v1alpha1 is not partially patchable, and the
       // scale block is mutually exclusive between fixed and autoscaled.
-      // A new share brings the engine's memory along: the memory left as it
-      // was for the old share went on capping the new one (.61, 2026-10-01).
-      const resources = asRecord(deployment.spec.resources);
-      const engine = asRecord(deployment.spec.engine);
-      const spec = {
-        ...deployment.spec,
-        scale: { replicas: replicaInput },
-        ...(shareChanged
-          ? {
-              resources: { ...resources, replica: { ...asRecord(resources.replica), gpus: shareTyped } },
-              engine: {
-                ...engine,
-                config: { ...asRecord(engine.config), gpu_memory_utilization: memoryForShare(shareTyped) },
-              },
-            }
-          : {}),
-      };
+      const spec: Record<string, unknown> = { ...deployment.spec, scale: { replicas: replicaInput } };
+      if (shareChanged) {
+        const resources = asRecord(deployment.spec.resources);
+        const replica: Record<string, unknown> = { ...asRecord(resources.replica), gpus: shareTyped };
+        // A copy split across several accelerators spans machines: a pin to one no longer holds.
+        if (shareTyped > 1) delete replica.machine;
+        spec.resources = { ...resources, replica };
+        // The compiler wants the accelerators of a copy to be its tensor parallel size.
+        const { tensor_parallel_size: _old, ...shape } = asRecord(deployment.spec.topology);
+        const nextTopology = shareTyped > 1 ? { ...shape, tensor_parallel_size: shareTyped } : shape;
+        if (Object.keys(nextTopology).length > 0) spec.topology = nextTopology;
+        else delete spec.topology;
+        // A new share brings the engine's memory along: the memory left as it
+        // was for the old share went on capping the new one (.61, 2026-10-01).
+        const memory = memoryForResize(perCopy, shareTyped);
+        if (memory !== null) {
+          const engine = asRecord(deployment.spec.engine);
+          spec.engine = { ...engine, config: { ...asRecord(engine.config), gpu_memory_utilization: memory } };
+        }
+      }
       await inferenceApi.updateDeployment(deployment.id, { spec });
       // Act now, not at the reconciler's next tick.
       await inferenceApi.reconcileDeployment(deployment.id).catch(() => undefined);
@@ -1381,10 +1397,25 @@ export default function InferenceDeploymentDetailPage() {
               type="number"
               value={shareInput}
               error={!shareValid}
-              slotProps={{ htmlInput: { min: 0.05, max: 1, step: 0.05 } }}
-              helperText={!shareValid ? t("inference.detail.share_invalid") : t("inference.detail.share_help")}
+              slotProps={{
+                htmlInput: { min: 0.05, max: splitSizes.length > 0 ? splitSizes[splitSizes.length - 1] : 1, step: 0.05 },
+              }}
+              helperText={
+                splitSizes.length > 0
+                  ? shareValid
+                    ? t("inference.detail.share_help_split")
+                    : t("inference.detail.share_invalid_split", { sizes: splitList })
+                  : shareValid
+                    ? t("inference.detail.share_help")
+                    : t("inference.detail.share_invalid")
+              }
               onChange={(e) => setShareInput(e.target.value)}
             />
+          )}
+          {shareValid && planShare > 1 && (
+            <Typography variant="body2" color="text.secondary" data-testid="scale-split">
+              {t("hosting.size_split_help", { count: planShare })}
+            </Typography>
           )}
           {shareValid && (
             <Typography variant="body2" color="text.secondary" data-testid="scale-memory">

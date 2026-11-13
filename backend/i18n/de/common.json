@@ -3811,6 +3811,8 @@
       "share_label": "Beschleuniger pro Kopie",
       "share_help": "1 ist ein ganzer Beschleuniger. Weniger lässt Kopien sich einen teilen; mehr als 0,5 hält jede Kopie auf einem eigenen. Die Engine belegt denselben Anteil seines Speichers (bei einem ganzen: 0,8).",
       "share_invalid": "0,05 bis 1 eingeben.",
+      "share_invalid_split": "0,05 bis 1 eingeben, oder {{sizes}}, um jede Kopie auf so viele Beschleuniger aufzuteilen.",
+      "share_help_split": "1 ist ein ganzer Beschleuniger. Weniger lässt Kopien sich einen teilen; mehr als 0,5 hält jede Kopie auf einem eigenen. Ab 2 wird jede Kopie auf so viele aufgeteilt (Tensor-Parallelität), für ein Modell, das für einen zu groß ist. Die Engine belegt denselben Anteil am Speicher jedes Beschleunigers (bei einem ganzen: 0,8).",
       "share_memory": "Die Engine belegt {{percent}} % des Speichers jedes Beschleunigers.",
       "share_restarts": "Eine Änderung des Anteils startet alle Kopien neu. Das Modell ist nicht erreichbar, bis sie wieder laufen.",
       "show_in_logs": "Fehler anzeigen",

@@ -99,7 +99,8 @@ The model keeps running while this changes.
 
 1. Select **Scale** on the deployment's page.
 2. Set **Copies**: how many copies run. More copies serve more requests at once.
-3. Set **Accelerators per copy**, for a model that runs on one accelerator.
+3. Set **Accelerators per copy**: a share of one accelerator, 1, or 2 or more to split each copy across that
+   many.
 4. Select **Apply**.
 
 ??? info "More about accelerators per copy"
@@ -107,10 +108,15 @@ The model keeps running while this changes.
     its own. The engine takes the same share of the accelerator's memory (a whole one: 80 %), and the dialog
     shows how much that is.
 
+    2, 4, 8 or 16 split each copy across that many accelerators (tensor parallel), up to the number the
+    cluster has. A model too large for one accelerator needs this. On machines with one accelerator each, a
+    copy then spans that many machines. Going from one whole number to another keeps the engine's memory
+    setting. A picture model always runs on one accelerator.
+
 | You change | What happens |
 |---|---|
 | The number of copies | The copies that run keep serving. New copies start beside them; surplus copies finish their requests and stop. The deployment stays **Serving**, and **Last message** says what is left, for example "Serving on 1 of 2 copies; 1 more starting." |
-| **Accelerators per copy** | Every copy restarts with its new share. The model is unavailable until they are back. |
+| **Accelerators per copy** | Every copy restarts with its new size. The model is unavailable until they are back. |
 
 ??? info "When you ask for more copies than fit"
     The dialog counts the cluster's accelerators: "Each copy uses 1 accelerator. This cluster has 2, so up to

@@ -108,7 +108,8 @@ Das Modell läuft weiter, während Sie das ändern.
 
 1. Wählen Sie auf der Seite der Bereitstellung **Skalieren**.
 2. Legen Sie unter **Kopien** fest, wie viele Kopien laufen. Mehr Kopien bedienen mehr Anfragen gleichzeitig.
-3. Legen Sie **Beschleuniger pro Kopie** fest, bei einem Modell, das auf einem Beschleuniger läuft.
+3. Legen Sie **Beschleuniger pro Kopie** fest: einen Anteil an einem Beschleuniger, 1, oder ab 2, um jede
+   Kopie auf so viele aufzuteilen.
 4. Wählen Sie **Anwenden**.
 
 ??? info "Mehr zu „Beschleuniger pro Kopie“"
@@ -116,10 +117,16 @@ Das Modell läuft weiter, während Sie das ändern.
     Kopie einen eigenen. Die Engine belegt denselben Anteil am Speicher des Beschleunigers (bei einem ganzen:
     80 %), und der Dialog zeigt, wie viel das ist.
 
+    2, 4, 8 oder 16 teilen jede Kopie auf so viele Beschleuniger auf (Tensor-Parallelität), höchstens auf so
+    viele, wie der Cluster hat. Ein Modell, das für einen Beschleuniger zu groß ist, braucht das. Bei Maschinen
+    mit je einem Beschleuniger erstreckt sich eine Kopie dann über so viele Maschinen. Von einer ganzen Zahl zu
+    einer anderen bleibt die Speichereinstellung der Engine, wie sie ist. Ein Bildmodell läuft immer auf einem
+    Beschleuniger.
+
 | Sie ändern | Was passiert |
 |---|---|
 | Die Zahl der Kopien | Die laufenden Kopien bedienen weiter Anfragen. Neue Kopien starten daneben; überzählige Kopien beenden ihre Anfragen und stoppen. Die Bereitstellung bleibt **Aktiv**, und **Letzte Meldung** sagt, was noch aussteht, z. B. „Serving on 1 of 2 copies; 1 more starting.“ |
-| **Beschleuniger pro Kopie** | Jede Kopie startet mit ihrem neuen Anteil neu. Das Modell ist nicht verfügbar, bis sie wieder laufen. |
+| **Beschleuniger pro Kopie** | Jede Kopie startet mit ihrer neuen Größe neu. Das Modell ist nicht verfügbar, bis sie wieder laufen. |
 
 ??? info "Wenn Sie mehr Kopien verlangen, als passen"
     Der Dialog zählt die Beschleuniger des Clusters: „Jede Kopie belegt 1 Beschleuniger. Dieser Cluster hat 2,

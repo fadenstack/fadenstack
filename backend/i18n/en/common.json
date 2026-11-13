@@ -3809,6 +3809,8 @@
       "share_label": "Accelerators per copy",
       "share_help": "1 is a whole accelerator. Less lets copies share one; more than 0.5 keeps each copy on an accelerator of its own. The engine takes the same share of the accelerator's memory (a whole one: 0.8).",
       "share_invalid": "Enter 0.05 to 1.",
+      "share_invalid_split": "Enter 0.05 to 1, or {{sizes}} to split each copy across that many accelerators.",
+      "share_help_split": "1 is a whole accelerator. Less lets copies share one; more than 0.5 keeps each copy on an accelerator of its own. 2 or more splits each copy across that many (tensor parallel), for a model too large for one. The engine takes the same share of each accelerator's memory (a whole one: 0.8).",
       "share_memory": "The engine takes {{percent}} % of each accelerator's memory.",
       "share_restarts": "Changing the share restarts every copy. The model is unavailable until they are back.",
       "show_in_logs": "Show the errors",

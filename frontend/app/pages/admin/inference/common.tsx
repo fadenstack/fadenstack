@@ -148,13 +148,23 @@ export function acceleratorsPerCopy(deployment: { spec?: Record<string, unknown>
 /** The engine memory share (gpu_memory_utilization) the compiler gives a whole accelerator when none is set. */
 export const COMPILER_DEFAULT_MEMORY = 0.8;
 
+/** The accelerators a copy can be split across (tensor parallel), as the hosting dialog offers them. */
+export const SPLIT_SIZES = [2, 4, 8, 16] as const;
+
 /**
- * The gpu_memory_utilization that goes with *share* of an accelerator: the
- * share itself, which the compiler never lets the engine exceed, or its
- * default for a whole accelerator.
+ * The gpu_memory_utilization a copy resized from *from* to *to* accelerators
+ * gets, or null to keep the engine's own.
+ *
+ * A share caps the memory at the share, which the compiler never lets the
+ * engine exceed. Leaving a share for whole accelerators brings the compiler's
+ * default back: the old cap would go on holding the copy. From whole to whole
+ * (1 to 2, say) each accelerator's memory is what it was, so the operator's
+ * own setting stays.
  */
-export function memoryForShare(share: number): number {
-  return share < 1 ? share : COMPILER_DEFAULT_MEMORY;
+export function memoryForResize(from: number, to: number): number | null {
+  if (to < 1) return to;
+  if (from < 1) return COMPILER_DEFAULT_MEMORY;
+  return null;
 }
 
 export interface PartialsNoticeProps {

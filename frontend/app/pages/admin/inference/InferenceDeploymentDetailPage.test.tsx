@@ -278,16 +278,142 @@ describe("InferenceDeploymentDetailPage", () => {
     expect(payload.spec?.resources).toEqual({ replica: { gpus: 1 } });
   });
 
-  it("offers no share for a copy spread over several accelerators", async () => {
-    vi.spyOn(inferenceApi, "getDeployment").mockResolvedValue({
-      ...deployment,
-      spec: { ...deployment.spec, topology: { tensor_parallel_size: 2 }, resources: { replica: { gpus: 2 } } },
-    });
-    await renderDetail();
+  describe("splitting a copy across accelerators", () => {
+    // Flash on the DGX pair, 95 GiB of weights for 121 GiB each, ran out of
+    // memory on one accelerator per copy, and the split it needed could only be
+    // chosen when the model was deployed (.22, 2026-11-13).
+    function twoAccelerators() {
+      vi.spyOn(nodesApi, "list").mockResolvedValue(
+        managedNodes.map((n) => ({ ...n, capabilities: { gpu_count: 1 } })) as never,
+      );
+    }
 
-    await userEvent.click(screen.getByRole("button", { name: /Scale/ }));
-    await screen.findByLabelText("Copies");
-    expect(screen.queryByLabelText("Accelerators per copy")).not.toBeInTheDocument();
+    async function openScale() {
+      await renderDetail();
+      await userEvent.click(screen.getByRole("button", { name: /Scale/ }));
+      return screen.findByLabelText("Accelerators per copy");
+    }
+
+    it("splits each copy across 2, keeping the engine's own memory", async () => {
+      twoAccelerators();
+      const update = vi.spyOn(inferenceApi, "updateDeployment").mockResolvedValue(deployment);
+      vi.spyOn(inferenceApi, "reconcileDeployment").mockResolvedValue(deployment);
+      vi.spyOn(inferenceApi, "getDeployment").mockResolvedValue({
+        ...deployment,
+        spec: { ...deployment.spec, engine: { name: "vllm", config: { gpu_memory_utilization: 0.75 } } },
+      });
+      const field = await openScale();
+      // Wait for the machines: the sizes offered follow the cluster's accelerators.
+      await screen.findByTestId("scale-capacity");
+
+      fireEvent.change(field, { target: { value: "2" } });
+      expect(screen.getByTestId("scale-split")).toHaveTextContent("Each copy is split across 2 accelerators (tensor parallel)");
+      expect(screen.getByTestId("scale-memory")).toHaveTextContent("75 %");
+      expect(screen.getByTestId("scale-restarts")).toBeInTheDocument();
+      expect(screen.getByTestId("scale-capacity")).toHaveTextContent("so up to 1 copy fits");
+      fireEvent.change(screen.getByLabelText("Copies"), { target: { value: "1" } });
+      await userEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+      await waitFor(() => expect(update).toHaveBeenCalled());
+      const [, payload] = update.mock.calls[0];
+      expect(payload.spec).toEqual({
+        ...deployment.spec,
+        engine: { name: "vllm", config: { gpu_memory_utilization: 0.75 } },
+        scale: { replicas: 1 },
+        resources: { replica: { gpus: 2 } },
+        // The compiler wants a copy's accelerators to be its tensor parallel size.
+        topology: { tensor_parallel_size: 2 },
+      });
+    });
+
+    it("refuses more than the cluster has, and says what it takes", async () => {
+      twoAccelerators();
+      const field = await openScale();
+      await screen.findByTestId("scale-capacity");
+
+      fireEvent.change(field, { target: { value: "4" } });
+      expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled();
+      expect(screen.getByText("Enter 0.05 to 1, or 2 to split each copy across that many accelerators.")).toBeInTheDocument();
+      fireEvent.change(field, { target: { value: "1.5" } });
+      expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled();
+    });
+
+    it("puts a split copy back on one accelerator", async () => {
+      const update = vi.spyOn(inferenceApi, "updateDeployment").mockResolvedValue(deployment);
+      vi.spyOn(inferenceApi, "reconcileDeployment").mockResolvedValue(deployment);
+      vi.spyOn(inferenceApi, "getDeployment").mockResolvedValue({
+        ...deployment,
+        spec: {
+          ...deployment.spec,
+          topology: { tensor_parallel_size: 2, nodes: 2 },
+          resources: { replica: { gpus: 2 } },
+        },
+      });
+      const field = await openScale();
+      expect(field).toHaveValue(2);
+
+      fireEvent.change(field, { target: { value: "1" } });
+      expect(screen.queryByTestId("scale-split")).toBeNull();
+      await userEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+      await waitFor(() => expect(update).toHaveBeenCalled());
+      const [, payload] = update.mock.calls[0];
+      expect(payload.spec?.resources).toEqual({ replica: { gpus: 1 } });
+      // Only the split goes; the rest of the layout stays.
+      expect(payload.spec?.topology).toEqual({ nodes: 2 });
+      expect(payload.spec?.engine).toEqual(deployment.spec.engine);
+    });
+
+    it("lets go of a machine pin when the copy spans machines", async () => {
+      twoAccelerators();
+      const update = vi.spyOn(inferenceApi, "updateDeployment").mockResolvedValue(deployment);
+      vi.spyOn(inferenceApi, "reconcileDeployment").mockResolvedValue(deployment);
+      vi.spyOn(inferenceApi, "getDeployment").mockResolvedValue({
+        ...deployment,
+        spec: { ...deployment.spec, resources: { replica: { gpus: 0.5, machine: "gpu-01" } } },
+      });
+      const field = await openScale();
+      await screen.findByTestId("scale-capacity");
+
+      fireEvent.change(field, { target: { value: "2" } });
+      await userEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+      await waitFor(() => expect(update).toHaveBeenCalled());
+      const [, payload] = update.mock.calls[0];
+      expect(payload.spec?.resources).toEqual({ replica: { gpus: 2 } });
+      // Leaving a share: its memory cap goes too.
+      expect(payload.spec?.engine).toEqual({ name: "vllm", config: { gpu_memory_utilization: 0.8 } });
+    });
+
+    it("never splits a picture model", async () => {
+      twoAccelerators();
+      vi.spyOn(inferenceApi, "getDeployment").mockResolvedValue({
+        ...deployment,
+        spec: { ...deployment.spec, engine: { name: "diffusers", config: {} } },
+      });
+      const field = await openScale();
+      await screen.findByTestId("scale-capacity");
+
+      fireEvent.change(field, { target: { value: "2" } });
+      expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled();
+      expect(screen.getByText("Enter 0.05 to 1.")).toBeInTheDocument();
+    });
+
+    it("leaves a pipeline parallel copy as it is", async () => {
+      vi.spyOn(inferenceApi, "getDeployment").mockResolvedValue({
+        ...deployment,
+        spec: {
+          ...deployment.spec,
+          topology: { tensor_parallel_size: 2, pipeline_parallel_size: 2 },
+          resources: { replica: { gpus: 4 } },
+        },
+      });
+      await renderDetail();
+
+      await userEvent.click(screen.getByRole("button", { name: /Scale/ }));
+      await screen.findByLabelText("Copies");
+      expect(screen.queryByLabelText("Accelerators per copy")).not.toBeInTheDocument();
+    });
   });
 
   it("offers the deployment in chat by setting the alias, and nothing else", async () => {
