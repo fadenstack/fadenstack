@@ -43,8 +43,12 @@ def server_has_files(hf_repo_id: str) -> bool:
 
 
 def _complete_blob(entry: Path) -> bool:
-    """A finished blob: a download under way keeps its part as ``<hash>.incomplete``."""
-    return entry.is_file() and not entry.name.endswith(".incomplete")
+    """A finished blob: a download under way keeps its part as ``<hash>.incomplete``.
+
+    A blob can be a link into the cache's shared store (huggingface_hub 2.x), and
+    while one is made it is a hidden ``.<hash>.<random>.shared`` link for a moment.
+    """
+    return entry.is_file() and not entry.name.endswith(".incomplete") and not entry.name.startswith(".")
 
 
 def resolve_blob_hash(fpath: Path, blobs_dir_resolved: Path) -> str | None:

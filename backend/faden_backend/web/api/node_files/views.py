@@ -501,6 +501,21 @@ async def model_manifest(
     return manifest
 
 
+def _blob_file(model_dir: str | os.PathLike[str], blob_hash: str) -> str | None:
+    """The file the model's blob *blob_hash* is, or None when it lies outside the cache's blob folders.
+
+    os.path: the form code scanning recognises as a containment check. Since
+    huggingface_hub 2.x a downloaded file lives in the cache's shared store,
+    ``<root>/blobs/<xx>/<hash>``, and the model's ``blobs/`` holds a link to it;
+    refusing those had every machine fail its copy of a new model with
+    "Invalid blob hash" (.22, 13 Nov 2026).
+    """
+    blobs_dir = os.path.realpath(os.path.join(model_dir, "blobs"))
+    shared_dir = os.path.realpath(os.path.join(os.path.dirname(model_dir), "blobs"))
+    target = os.path.realpath(os.path.join(blobs_dir, blob_hash))
+    return target if target.startswith((blobs_dir + os.sep, shared_dir + os.sep)) else None
+
+
 @router.get(
     "/models/{model_id}/blob/{blob_hash}",
     name="node_model_blob",
@@ -533,11 +548,8 @@ async def model_blob(
     if model_dir is None:
         raise HTTPException(status_code=404, detail="Model cache not found.")
 
-    # Resolve and enforce blobs/ containment (os.path: the form code
-    # scanning recognises as a containment check)
-    blobs_dir = os.path.realpath(os.path.join(model_dir, "blobs"))
-    target = os.path.realpath(os.path.join(blobs_dir, blob_hash))
-    if not target.startswith(blobs_dir + os.sep):
+    target = _blob_file(model_dir, blob_hash)
+    if target is None:
         raise HTTPException(status_code=400, detail="Invalid blob hash.")
     if not os.path.isfile(target):
         raise HTTPException(status_code=404, detail="Blob not found.")

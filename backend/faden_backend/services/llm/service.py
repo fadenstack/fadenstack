@@ -1448,18 +1448,40 @@ class LLMService:
 
 
 def _remove_tree(path: Path) -> int:
-    """Remove *path*; the bytes it held. Best effort: what cannot be removed is logged."""
-    import shutil  # noqa: PLC0415
+    """Remove *path*, a model's folder in the cache; the bytes freed. Best effort: what is left is logged.
 
+    Since huggingface_hub 2.x a downloaded file lives in the cache's shared store,
+    ``<root>/blobs/<xx>/<hash>``, and the model's folder holds a link to it, so
+    that two models with the same file keep it once. Removing the folder alone
+    left those files behind. The library's own deletion removes the folder, then
+    each shared file no other model links to any more.
+    """
+    from huggingface_hub import DeleteCacheStrategy  # noqa: PLC0415
+
+    shared_dir = (path.parent / "blobs").resolve()
     size = 0
+    shared: dict[Path, int] = {}
     for file in path.rglob("*"):
         try:
-            if file.is_file() and not file.is_symlink():
+            if file.is_symlink():
+                target = file.resolve()
+                if target.is_relative_to(shared_dir) and target.is_file():
+                    shared[target] = target.stat().st_size
+            elif file.is_file():
                 size += file.stat().st_size
         except OSError:
             pass
     try:
-        shutil.rmtree(path)
+        DeleteCacheStrategy(
+            expected_freed_size=0,
+            blobs=frozenset(),
+            refs=frozenset(),
+            repos=frozenset({path}),
+            snapshots=frozenset(),
+            cache_dir=path.parent,
+        ).execute()
     except OSError:
         log.warning("Could not remove every file under %s", path, exc_info=True)
-    return size
+    if path.exists():
+        log.warning("Could not remove every file under %s", path)
+    return size + sum(n for target, n in shared.items() if not target.exists())

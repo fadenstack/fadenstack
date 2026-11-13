@@ -75,3 +75,37 @@ async def test_a_link_out_of_the_blobs_folder_is_not_followed(client: AsyncClien
     resp = await client.get(_url("abcd"))
     assert resp.status_code == 400
     assert b"not a blob" not in resp.content
+
+
+def _link(link: Path, target: Path) -> None:
+    try:
+        link.symlink_to(target)
+    except OSError:
+        pytest.skip("this system makes no symbolic links for this user")
+
+
+async def test_a_blob_in_the_caches_shared_store_is_served(client: AsyncClient, cache: Path) -> None:
+    """huggingface_hub 2.x keeps a downloaded file once for the cache, and links the model's blob to it.
+
+    Refusing those had both machines fail to copy a new model (.22, 13 Nov 2026).
+    """
+    stored = "df" + "0" * 62
+    (cache.parent / "blobs" / "df").mkdir(parents=True)
+    (cache.parent / "blobs" / "df" / stored).write_bytes(b"shared weights")
+    _link(cache / "blobs" / ("071a" * 16), Path("..", "..", "blobs", "df", stored))
+
+    resp = await client.get(_url("071a" * 16))
+
+    assert resp.status_code == 200
+    assert resp.content == b"shared weights"
+
+
+async def test_a_link_to_a_folder_named_like_the_store_is_not_followed(client: AsyncClient, cache: Path) -> None:
+    (cache.parent / "blobs-other").mkdir()
+    (cache.parent / "blobs-other" / "f").write_bytes(b"not a blob")
+    _link(cache / "blobs" / "abcd", Path("..", "..", "blobs-other", "f"))
+
+    resp = await client.get(_url("abcd"))
+
+    assert resp.status_code == 400
+    assert b"not a blob" not in resp.content
