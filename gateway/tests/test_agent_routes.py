@@ -748,6 +748,26 @@ async def test_tools_outside_the_contract_are_held_back_and_kept_for_review(
 
 
 @pytest.mark.anyio
+async def test_the_sdks_tool_search_is_never_held_back_though_the_contract_does_not_list_it(
+    client: AsyncClient, db_session: AsyncSession, backend: _Backend, monkeypatch: pytest.MonkeyPatch,
+    manifests: None,
+) -> None:
+    """find_tool is the SDKs' own search, read (see tool_classes): the tools it finds are held back as any other."""
+    await _seed(db_session, provider=ProviderType.REMOTE_OPENAI, pii=None)
+    sent: list[dict[str, Any]] = []
+    _model(monkeypatch, sent)
+    tools = [_tool("read_page"), _tool("find_tool"), _tool("merge_pull_request")]
+
+    r = await client.post(URL, headers=_headers(), json=_chat(tools=tools))
+
+    assert r.status_code == 200, r.text
+    assert [t["function"]["name"] for t in sent[-1]["tools"] if t["function"]["name"] in {"read_page", "find_tool", "merge_pull_request"}] == [
+        "read_page", "find_tool",
+    ]
+    assert r.headers["x-faden-held-tools"] == "merge_pull_request"
+
+
+@pytest.mark.anyio
 async def test_an_agent_deleted_and_made_again_under_its_address_is_read_again_for_its_tokens(
     client: AsyncClient, db_session: AsyncSession, backend: _Backend, monkeypatch: pytest.MonkeyPatch,
 ) -> None:

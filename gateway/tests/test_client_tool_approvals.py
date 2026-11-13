@@ -167,6 +167,28 @@ async def test_an_agent_without_a_contract_has_its_tools_asked_about(
     assert [(m["toolClass"], m["rule"]) for m in _marks(_faden(r.text))] == expected
 
 
+@pytest.mark.anyio
+async def test_the_sdks_tool_search_runs_unasked_and_the_tool_it_found_is_asked_about(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+    backend: _Backend,  # noqa: F811 - the fixture
+) -> None:
+    """With no contract (the .NET SDK's local MCP tools are never in one), find_tool is read: no mark, it runs in Ask.
+    The tool it switched on is still unclassified, and asked about."""
+    await _seed(db_session, provider=ProviderType.REMOTE_OPENAI, pii=None)
+    backend.put(_profile(host_tool_contract=()))
+    fastapi_app.state.agent_directory.invalidate()
+    _Model(monkeypatch, _call("find_tool", {"query": "convert time"}), _call("convert_time", {"time": "14:30"}))
+    tools = [{"type": "function", "function": {"name": n, "parameters": {"type": "object"}}} for n in ("find_tool", "convert_time")]
+    asked = []
+    for _ in range(2):
+        r = await client.post("/v1/agents/eplan-assistant/chat/completions", json={
+            "model": "x", "stream": True, "tools": tools, "messages": [{"role": "user", "content": "14:30 in New York?"}],
+        }, headers={"Authorization": f"Bearer {_agent_token()}", **EVENTS})
+        assert r.status_code == 200, r.text
+        asked.append([(m["toolCallName"], m["toolClass"]) for m in _marks(_faden(r.text))])
+    assert asked == [[], [("convert_time", "unknown")]]
+
+
 class _AskingPolicy:
     """A policy, as EE would register one, that asks about every tool call."""
 

@@ -154,6 +154,19 @@ def test_where_a_class_comes_from() -> None:
     }
 
 
+def test_the_sdks_tool_search_is_read_unless_a_rule_or_the_contract_says_otherwise() -> None:
+    """find_tool only switches the client's own tools on; what it finds is classified on its own call."""
+    assert (tc.Classifier().classify("find_tool").tool_class, tc.Classifier().classify("find_tool").source) == (
+        C.READ, "sdk",
+    )
+    assert tc.Classifier(contract={"find_tool": ""}).classify("find_tool").tool_class is C.READ, "listed without a risk"
+    assert tc.Classifier(contract={"find_tool": "write"}).classify("find_tool").tool_class is C.WRITE, "the contract's word"
+    rule = tc.Classifier(rules=(tc.ClassRule("find_*", "destructive"),)).classify("find_tool")
+    assert (rule.tool_class, rule.source) == (C.DESTRUCTIVE, "rule"), "the admin's word first"
+    assert tc.Classifier().classify("find_tools").tool_class is C.UNKNOWN, "only that name"
+    assert tc.decide(M.ASK, tc.Classifier().classify("find_tool")) is D.RUN
+
+
 @pytest.mark.anyio
 async def test_ceilings_narrow_and_a_failing_one_counts_as_read_only() -> None:
     ctx = tc.CeilingContext(tenant_id="t", user_id="u")

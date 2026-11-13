@@ -182,6 +182,14 @@ def from_annotations(annotations: Mapping[str, Any] | None) -> tuple[ToolClass, 
     return ToolClass.DESTRUCTIVE, open_world  # the spec's default for a tool that writes
 
 
+#: The SDKs' tool search (the .NET SDK's local MCP module, the TypeScript SDK's tools on request): it only switches
+#: the client's own tools on for the conversation and runs nothing itself; each tool it finds is classified and asked
+#: about on its own call. So it is read unless an admin's rule or the agent's contract says otherwise. The SDKs keep
+#: the name for it: an app cannot give it to a tool of its own. (sdk/51, the owner, 13 Nov 2026; Claude's and
+#: Copilot's tool search does not ask either.)
+SDK_TOOL_SEARCH = "find_tool"
+
+
 @dataclass(frozen=True)
 class Classifier:
     """Classifies the tools of one request."""
@@ -214,6 +222,8 @@ class Classifier:
         risk = (self.contract or {}).get(name)
         if risk in ("read", "write", "destructive"):
             return Classified(name, ToolClass(risk), "agent")
+        if name == SDK_TOOL_SEARCH:
+            return Classified(name, ToolClass.READ, "sdk", False)
         open_world = ((self.annotations or {}).get(name) or {}).get("openWorldHint")
         return Classified(name, ToolClass.UNKNOWN, "none", open_world)
 

@@ -349,7 +349,8 @@ def apply_agent(
         )
     held: list[dict[str, Any]] = []
     if profile.host_tool_contract and not local_mcp:
-        payload, held = hold_back(payload, profile.host_tools)
+        # The SDKs' tool search is theirs, not a host tool the contract lists: never held back (see tool_classes).
+        payload, held = hold_back(payload, profile.host_tools | {tool_classes.SDK_TOOL_SEARCH})
     shaped = cap_reasoning(dict(payload), reasoning_max(profile))
     if profile.model_alias:
         shaped["model"] = profile.model_alias
