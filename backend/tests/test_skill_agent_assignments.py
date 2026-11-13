@@ -140,6 +140,16 @@ async def test_an_assignment_names_only_agents_of_this_tenant_the_caller_can_see
     assert r.json()["detail"]["ids"] == [missing, str(elsewhere.id), mine["slug"]], "a slug is not an id"
     assert skills.sent("PUT") == [], "nothing is forwarded"
 
+    # An address may look like an id: it does not name the agent with that id.
+    looks_like_an_id = str(uuid.uuid4())
+    r = await client.post(
+        "/api/agents", json={"slug": looks_like_an_id, "name": "Odd", "version": {"instructions": "x"}},
+    )
+    assert r.status_code == status.HTTP_201_CREATED, r.text
+    r = await _put_agents(client, skill, [looks_like_an_id])
+    assert r.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT, "an address is not an id"
+    assert skills.sent("PUT") == []
+
     r = await _put_agents(client, skill, [mine["id"]])
     assert r.status_code == status.HTTP_200_OK, r.text
     [sent] = skills.sent("PUT")

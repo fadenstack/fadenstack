@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import io
 import uuid
 import zipfile
@@ -967,6 +968,28 @@ async def test_the_agent_side_put_changes_only_the_callers_skills(
     cleared = await _put_skills(client, AGENT_1, [])
     assert [s["slug"] for s in cleared.json()] == ["elsewhere"]
     assert await _rows(client, two["id"]) == []
+
+
+async def test_a_change_to_assignments_waits_for_the_tenants_lock(
+    client: AsyncClient,
+) -> None:
+    """Two changes at once cannot both pass the duplicate check or the limit."""
+    from faden_skills.db.session import engine  # noqa: PLC0415
+    from faden_skills.services.dao import _lock_key  # noqa: PLC0415
+
+    skill = await _org_skill(client, "Locked")
+    async with engine.connect() as conn:
+        held = await conn.begin()
+        await conn.execute(
+            text("SELECT pg_advisory_xact_lock(:key)"),
+            {"key": _lock_key("skill-assignments:default")},
+        )
+        put = asyncio.ensure_future(_put_agents(client, skill["id"], [AGENT_1]))
+        await asyncio.sleep(0.5)
+        assert not put.done(), "it waits while another change holds the lock"
+        await held.rollback()
+    resp = await asyncio.wait_for(put, 10)
+    assert resp.status_code == 200, resp.text
 
 
 async def test_a_deleted_agent_loses_its_assignments(client: AsyncClient) -> None:
