@@ -106,19 +106,13 @@ export default function LoginPage() {
         // unknown: no reset offered
       });
 
-    // Check backend environment for dev mode features
-    fetch("/api/health")
-      .then((res) => res.json())
-      .then((data: { environment?: string }) => {
-        if (!cancelled && data.environment === "dev") {
-          setIsDevMode(true);
-          setUsername("admin@localhost");
-          setPassword("admin");
-        }
-      })
-      .catch(() => {
-        // health endpoint unavailable — stay in production mode
-      });
+    // The developer sign-in in a development build of the console only. The anonymous health check says nothing
+    // about the install, and the server refuses the developer sign-in outside development anyway.
+    if (import.meta.env.DEV) {
+      setIsDevMode(true);
+      setUsername("admin@localhost");
+      setPassword("admin");
+    }
 
     // Back from the identity provider's logout (SAML Single Logout).
     const signedOut = params.get("signed_out");
