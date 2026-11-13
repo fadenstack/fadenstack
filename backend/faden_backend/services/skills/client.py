@@ -133,6 +133,12 @@ class SkillsServiceClient:
         if response.status_code >= 400:
             raise HTTPException(status_code=response.status_code, detail=_detail(response))
 
+    async def remove_agent(self, agent_id: str) -> None:
+        """Drop every skill assignment to a deleted agent."""
+        response = await self.forward("DELETE", f"/api/internal/agents/{agent_id}/assignments", None)
+        if response.status_code >= 400:
+            raise HTTPException(status_code=response.status_code, detail=_detail(response))
+
     async def health(self) -> dict[str, Any]:
         """The service's health answer."""
         response = await self.forward("GET", "/api/health", None)
@@ -188,3 +194,19 @@ async def forget_principal(principal_type: str, principal_id: str) -> None:
             principal_id,
             exc,
         )
+
+
+async def forget_agent(agent_id: str) -> None:
+    """Best effort: a deleted agent keeps no skill assignments.
+
+    An assignment to a deleted agent matches no chat (ids are not reused), so a
+    failure here leaves an unused row, not access; it is logged, not raised, and
+    the console shows such a row as an agent that no longer exists.
+    """
+    client = skills_client_if_enabled()
+    if client is None or not client.service_token:
+        return
+    try:
+        await client.remove_agent(agent_id)
+    except Exception as exc:  # deleting the agent must not fail on this
+        logger.warning("Could not remove the skill assignments of agent %s: %s", agent_id, exc)

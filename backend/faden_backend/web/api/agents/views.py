@@ -46,6 +46,7 @@ from faden_backend.services import approval_config
 from faden_backend.services.agents import access, app_review, app_templates, pairing, tokens
 from faden_backend.services.extensions import registry
 from faden_backend.services.principals import PrincipalOption, find_principals
+from faden_backend.services.skills.client import forget_agent
 from faden_backend.services.usage import config as usage_config
 from faden_backend.services.usage.measures import Measures
 from faden_backend.services.usage.suppression import Cell, hide
@@ -136,11 +137,14 @@ async def _inspected_agent(dao: AgentsDAO, rbac: RbacDAO, ref: str, user: User) 
     return agent
 
 
+async def _may_see(dao: AgentsDAO, rbac: RbacDAO, agent: Agent, user: User) -> bool:
+    """Whether the user may see the agent at all: inspect it, or use it."""
+    return await _may_inspect(dao, rbac, agent, user) or (await access.decide(dao, agent, user)).allowed
+
+
 async def _visible_agent(dao: AgentsDAO, rbac: RbacDAO, ref: str, user: User) -> Agent:
     agent = await _agent_or_404(dao, ref)
-    if await _may_inspect(dao, rbac, agent, user):
-        return agent
-    if (await access.decide(dao, agent, user)).allowed:
+    if await _may_see(dao, rbac, agent, user):
         return agent
     # Not told apart from a missing agent: its existence is not the user's business.
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
@@ -399,6 +403,7 @@ async def delete_agent(
     A role's ``agents:delete``, not maintaining the agent, allows it. Retired first, so a live agent is never
     deleted by mistake -- and a client from before this route, when ``DELETE`` retired, cannot delete one.
     What the agent did stays: the gateway's request log and decisions, and the SDKs' events, keep its id.
+    The skills assigned to it are let go in the skills service, as far as it answers (``forget_agent``).
     """
     if not await _has(rbac, user, "delete"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied: agents:delete")
@@ -410,9 +415,11 @@ async def delete_agent(
             "only a retired agent can be deleted.",
         )
     # By name: once deleted, the id resolves to nothing.
+    agent_id = str(agent.id)
     record = {"slug": agent.slug, "name": agent.name, "versions": len(await dao.versions(agent.id))}
-    await _audit(audit, user, "agent.delete", str(agent.id), record)
+    await _audit(audit, user, "agent.delete", agent_id, record)
     await dao.remove(agent)
+    await forget_agent(agent_id)
 
 
 @router.post("/{agent_ref}/restore", response_model=AgentDTO, name="restore_agent")

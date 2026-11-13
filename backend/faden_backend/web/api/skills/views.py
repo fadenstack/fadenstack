@@ -23,15 +23,16 @@ import uuid
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
-from pydantic import BaseModel, Field
+from pydantic import AfterValidator, BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
+from faden_backend.db.dao.agents_dao import AgentsDAO
 from faden_backend.db.dao.rbac_dao import RbacDAO
 from faden_backend.db.dependencies import get_db_session
 from faden_backend.db.models.groups import UserGroup
-from faden_backend.db.models.users import User
+from faden_backend.db.models.users import User, current_active_user
 from faden_backend.services.chat.gateway_client import shared_client
 from faden_backend.services.principals import PrincipalOption, find_principals
 from faden_backend.services.skills import drafting
@@ -41,6 +42,8 @@ from faden_backend.services.skills.client import (
     get_skills_client,
     skills_client_if_enabled,
 )
+from faden_backend.web.api.agents.views import TENANT as AGENTS_TENANT
+from faden_backend.web.api.agents.views import _managed_agent, _may_see
 from faden_backend.web.api.rbac import require_permission
 
 logger = logging.getLogger(__name__)
@@ -193,6 +196,134 @@ async def draft_skill(
             detail="The model answered without instructions; try again or pick another model.",
         )
     return DraftResponse(**draft.to_json())
+
+
+# ── Assignments to agents: checked here, then forwarded ───────────────
+# Before the catch-all ``forward``: the skills service does not know agents, so
+# the backend checks each agent an assignment names (ASVS 5.0 V8, object-level
+# authorisation) and bounds the lists (V2) before anything reaches it.
+
+#: Ids one request may name; the skills service enforces the same.
+MAX_IDS_PER_REQUEST = 100
+
+
+def _unique[T: (str, uuid.UUID)](ids: list[T]) -> list[T]:
+    if len(set(ids)) != len(ids):
+        raise ValueError("Each id may be named once.")
+    return ids
+
+
+class AgentIdsRequest(BaseModel):
+    """The agents a skill is assigned to: the whole set."""
+
+    agent_ids: Annotated[
+        list[Annotated[str, Field(min_length=1, max_length=128)]],
+        Field(max_length=MAX_IDS_PER_REQUEST),
+        AfterValidator(_unique),
+    ]
+
+
+class SkillIdsRequest(BaseModel):
+    """The skills assigned to an agent, among those the caller administers: the whole set."""
+
+    skill_ids: Annotated[list[uuid.UUID], Field(max_length=MAX_IDS_PER_REQUEST), AfterValidator(_unique)]
+
+
+@router.put("/{skill_id}/assignments/agents", include_in_schema=False)
+async def assign_skill_to_agents(
+    skill_id: uuid.UUID,
+    body: AgentIdsRequest,
+    user: Annotated[User, Depends(current_active_user)],
+    principal: Annotated[SkillsPrincipal, Depends(skills_principal)],
+    client: Annotated[SkillsServiceClient, Depends(get_skills_client)],
+    dao: Annotated[AgentsDAO, Depends()],
+    rbac: Annotated[RbacDAO, Depends()],
+) -> Response:
+    """Assign the skill to exactly these agents (``PUT`` on the skills service).
+
+    Each agent the skill is not assigned to yet must be an agent of this tenant the caller can see; otherwise
+    422 ``unknown_agent`` names the ids and nothing is forwarded. An agent it is assigned to already may stay
+    in the set as it is: one the caller cannot see, or that is gone, or an id an older client stored.
+    """
+    current = await client.get_json(f"/api/skills/{skill_id}/assignments", principal)
+    assigned = {row.get("target_id") for row in current if row.get("target_type") == "assistant"}
+    unknown = [
+        agent_id
+        for agent_id in body.agent_ids
+        if agent_id not in assigned and not await _sees_agent(dao, rbac, user, agent_id)
+    ]
+    if unknown:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={
+                "code": "unknown_agent",
+                "message": "No such agent: " + ", ".join(unknown),
+                "ids": unknown,
+            },
+        )
+    return await _send(client, "PUT", f"/api/skills/{skill_id}/assignments/agents", principal, body)
+
+
+@router.get("/assignments/agents/{agent_id}", include_in_schema=False)
+async def list_agent_skills(
+    agent_id: uuid.UUID,
+    user: Annotated[User, Depends(current_active_user)],
+    principal: Annotated[SkillsPrincipal, Depends(skills_principal)],
+    client: Annotated[SkillsServiceClient, Depends(get_skills_client)],
+    dao: Annotated[AgentsDAO, Depends()],
+    rbac: Annotated[RbacDAO, Depends()],
+) -> Response:
+    """The skills assigned to an agent the caller manages, and those assigned to everyone."""
+    await _managed_agent(dao, rbac, str(agent_id), user)
+    return await _send(client, "GET", f"/api/skills/assignments/agents/{agent_id}", principal)
+
+
+@router.put("/assignments/agents/{agent_id}", include_in_schema=False)
+async def assign_skills_to_agent(
+    agent_id: uuid.UUID,
+    body: SkillIdsRequest,
+    user: Annotated[User, Depends(current_active_user)],
+    principal: Annotated[SkillsPrincipal, Depends(skills_principal)],
+    client: Annotated[SkillsServiceClient, Depends(get_skills_client)],
+    dao: Annotated[AgentsDAO, Depends()],
+    rbac: Annotated[RbacDAO, Depends()],
+) -> Response:
+    """Assign an agent the caller manages exactly these skills, among those the caller administers."""
+    await _managed_agent(dao, rbac, str(agent_id), user)
+    return await _send(client, "PUT", f"/api/skills/assignments/agents/{agent_id}", principal, body)
+
+
+async def _sees_agent(dao: AgentsDAO, rbac: RbacDAO, user: User, agent_id: str) -> bool:
+    """Whether *agent_id* is the id of an agent of this tenant that *user* can see."""
+    try:
+        wanted = uuid.UUID(agent_id)
+    except ValueError:
+        return False
+    agent = await dao.get(AGENTS_TENANT, str(wanted))
+    # ``get`` also matches a slug: only the agent with this id counts.
+    return agent is not None and agent.id == wanted and await _may_see(dao, rbac, agent, user)
+
+
+async def _send(
+    client: SkillsServiceClient,
+    method: str,
+    path: str,
+    principal: SkillsPrincipal,
+    body: BaseModel | None = None,
+) -> Response:
+    """*body* to the skills service as *principal*; its answer as it is."""
+    upstream = await client.forward(
+        method,
+        path,
+        principal,
+        content=body.model_dump_json().encode() if body is not None else None,
+        content_type="application/json" if body is not None else None,
+    )
+    return Response(
+        content=upstream.content,
+        status_code=upstream.status_code,
+        media_type=upstream.headers.get("content-type"),
+    )
 
 
 # ── Forwarded to the skills service ───────────────────────────────────
