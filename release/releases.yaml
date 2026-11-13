@@ -25,6 +25,29 @@
 series: []
 
 releases:
+  # DRAFT 0.7.1 (owner, 13 Nov 2026): not released. Kept as a comment because update_feed.py publishes every
+  # entry it reads and has no draft field: uncommented, installs would be told of 0.7.1 at the next feed build,
+  # and the release workflow would accept a 0.7.1 tag. At the release: finish it (the rest of 0.7.1, sign-in
+  # by pairing and the clients' server side, see fadenstack-dev release/0.7.1-release-plan.md; the agent's
+  # components version), then uncomment it.
+  #
+  # - version: 0.7.1
+  #   channel: stable
+  #   date: ""
+  #   severity: normal
+  #   summary: >-
+  #     Skills for agents: the organisation's skills assigned to the agents that should have them, from the
+  #     skill or the agent's page, and an agent may allow the person's own skills. The agent SDKs' tool
+  #     search runs without asking. The anonymous health check says only "ok".
+  #   highlights:
+  #     - "Local skills: an agent version can allow the skills kept on the person's own computer beside your organisation's (Agents → the agent → Local skills). Off unless allowed."
+  #     - "Skills assigned to an agent reach that agent only, in every chat with it; assigned to everyone, a skill reaches every agent."
+  #     - "Assigning skills to agents: a skill's Assignments tab and an agent's Skills tab pick from searchable lists and save the whole set at once. An agent the skill does not have yet must be one you can see; a deleted agent's assignments go."
+  #     - "The agent SDKs' tool search, find_tool, is a read tool: with local MCP servers allowed it finds a tool without asking, and the tool it finds still asks first, every time."
+  #     - "The anonymous GET /api/health answers only {\"status\": \"ok\"}: it no longer says `environment`. Anything that read that field (a monitor, a script) stops getting it; read the status code or `status`."
+  #   upgrade_from: 0.4.0
+  #   components:
+  #     agent: (fill in at the release)
   - version: 0.7.0
     channel: stable
     date: ""

@@ -18,7 +18,7 @@ What users see: [Skills](../docs/help/pages/use/skills.md); what administrators 
 | `skills` | Owner (`owner_id`, none = the organization), `visibility` (private/tenant/global), `activation` (always/auto/manual), `latest_version`, `published_version` |
 | `skill_versions` | Immutable: description, body, SKILL.md's other frontmatter, the `faden.yaml` manifest (tools, knowledge, triggers), files, `content_sha256` |
 | `skill_grants` | Sharing with a user or group, `read` or `write` |
-| `skill_assignments` | Admin bindings to a tenant, workspace, project or assistant |
+| `skill_assignments` | Admin bindings to the tenant, to every tenant (`global`) or to an agent (`assistant`); the API still accepts `workspace` and `project`, but they never match a chat |
 | `skill_usage_daily` | Uses per version per day |
 
 ## Who is asking
@@ -81,10 +81,22 @@ Limits: see `settings.py` and [Skills for the organisation](../docs/help/pages/a
 - `POST /{id}/archive`, `POST /{id}/restore`
 - `PUT /{id}/visibility`, `GET|PUT /{id}/grants`
 - `GET /{id}/export?format=zip|md&version=`
-- `GET|POST /{id}/assignments`, `DELETE /{id}/assignments/{aid}` — administrators
+- `GET|POST /{id}/assignments`, `DELETE /{id}/assignments/{aid}` — administrators; the same target twice is
+  409 `already_assigned`
+- `PUT /{id}/assignments/agents` — assign the skill to exactly these agents (`agent_ids`, with
+  `vetted_agent_ids` from the backend); its other assignments stay. An agent the skill does not have yet must
+  be vetted, checked under the tenant's assignment lock: else 422 `unknown_agent` with the `ids`
+- `GET /assignments/agents/{agent_id}` — the skills the caller can see that reach that agent: its own, and
+  everyone's
+- `PUT /assignments/agents/{agent_id}` — assign the agent exactly these skills (`skill_ids`), among those the
+  caller administers; the others' assignments stay
+
+A tenant has at most 1,000 assignments (`max_assignments_per_tenant`), and a request names at most 100 ids,
+each once.
 
 ### Internal (service token)
 
 - `POST /api/internal/skills/resolve` — the skills a chat request gets (`user_id`, `group_ids`, `requested`, `user_query`)
 - `POST /api/internal/skills/usage` — count a use
 - `DELETE /api/internal/principals/{user|group}/{id}` — drop a deleted principal's grants
+- `DELETE /api/internal/agents/{id}/assignments` — drop a deleted agent's assignments

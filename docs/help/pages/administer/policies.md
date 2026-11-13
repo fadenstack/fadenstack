@@ -222,6 +222,9 @@ People pick a tool mode per chat, and the class decides what runs:
 No mode up to **Auto** runs a destructive or unclassified tool without asking. To let a tool run in **Auto**, classify it
 as **read** or **write**. A fifth mode, [Bypass](#bypass), is off unless you allow it.
 Fadenstack's own tools (the knowledge base search, the time, the tool search) are read tools.
+So is `find_tool`, the search the agent SDKs bring when an agent allows **Local MCP servers** (see
+[Agents](agents.md)): it only finds the tools of the MCP servers on the person's computer and switches them on for the
+chat. Each tool it finds is unclassified and asks first, every time.
 
 ### Tool mode limits {#tool-mode-limits}
 

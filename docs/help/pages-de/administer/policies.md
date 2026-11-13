@@ -241,6 +241,9 @@ Benutzer wählen pro Chat einen Tool-Modus, und die Klasse entscheidet, was läu
 Kein Modus bis **Automatisch** führt ein zerstörendes oder nicht eingestuftes Tool aus, ohne nachzufragen. Damit ein Tool in
 **Automatisch** läuft, stufen Sie es als **lesen** oder **schreiben** ein. Ein fünfter Modus, [Bypass](#bypass), ist aus, solange Sie ihn nicht erlauben.
 Die eigenen Tools von Fadenstack (die Suche in der Wissensdatenbank, die Uhrzeit, die Tool-Suche) sind lesende Tools.
+Ebenso `find_tool`, die Suche, die die Agenten-SDKs mitbringen, wenn ein Agent **Lokale MCP-Server** erlaubt (siehe
+[Agenten](agents.md)): Sie findet nur die Tools der MCP-Server auf dem Computer der Person und schaltet sie für den Chat
+ein. Jedes Tool, das sie findet, ist nicht eingestuft und fragt jedes Mal zuerst.
 
 ### Grenzen für den Tool-Modus {#tool-mode-limits}
 
