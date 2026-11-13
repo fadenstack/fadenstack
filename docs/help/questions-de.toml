@@ -175,6 +175,7 @@
 "Wie lege ich einen Skill für alle an?" = "create-a-skill-for-everyone"
 "Wie funktionieren Versionen von Skills?" = "versions"
 "Wer sieht welchen Skill?" = "owners-and-who-sees-a-skill"
+"Wie gebe ich einem Agenten einen Skill, ohne dass jemand ihn auswählt?" = "manage-the-organisations-skills"
 
 ["administer/agents.md"]
 "Wie lege ich einen Agenten oder ein Add-in an?" = "create-the-agent"

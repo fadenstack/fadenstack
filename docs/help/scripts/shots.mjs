@@ -361,12 +361,22 @@ const SHOTS = [
   { name: "administer/skill-sharing", path: () => `/admin/skills/${IDS.skill}`, act: async (p) => p.getByRole("tab", { name: L("Sharing") }).click() },
   { name: "administer/skill-versions", path: () => `/admin/skills/${IDS.skill}`, act: async (p) => p.getByRole("tab", { name: L("Versions") }).click() },
   {
+    name: "administer/skill-assignments", path: () => `/admin/skills/${IDS.skill}`,
+    act: async (p) => {
+      await withoutNotices(p);
+      await p.getByRole("tab", { name: L("Assignments") }).click();
+    },
+  },
+  {
     name: "administer/agents-list", path: "/admin/agents",
     act: async (p) => p.getByText(L("Word assistant")).first().waitFor({ timeout: 45000 }),
   },
-  ...["Definition", "Versions", "Apps", "Access", "Activity"].map((tab) => ({
+  ...["Definition", "Versions", "Apps", "Access", "Skills", "Activity"].map((tab) => ({
     name: `administer/agent-${tab.toLowerCase()}`, path: () => `/admin/agents/${IDS.agent}`,
-    act: async (p) => p.getByRole("tab", { name: L(tab) }).click(),
+    act: async (p) => {
+      await withoutNotices(p);
+      await p.getByRole("tab", { name: L(tab) }).click();
+    },
   })),
   {
     name: "administer/provider-add", path: "/admin/llm/providers", clip: (p) => p.getByRole("dialog"),

@@ -52,13 +52,14 @@ Die Seite des Agenten öffnet sich. Sein Status in der Liste ist **Entwurf**, **
 
 ## Die Seite des Agenten {#the-agents-page}
 
-![Die Seite des Word-Assistenten auf dem Reiter „Definition“: die Reiter Definition, Versionen, Apps, Zugriff und Aktivität, oben Bearbeiten und Stilllegen, die Anweisungen und das Modell](../images/administer/agent-definition.png)
+![Die Seite des Word-Assistenten auf dem Reiter „Definition“: die Reiter Definition, Versionen, Apps, Zugriff, Skills und Aktivität, oben Bearbeiten und Stilllegen, die Anweisungen und das Modell](../images/administer/agent-definition.png)
 
 | Reiter | Was er enthält |
 |---|---|
 | **Definition** | Die Version, die Benutzer erhalten: **Anweisungen**, **Modell**, **Wissen** (Sammlungen, die er durchsuchen darf), **Server-Tools** (**Wie im Chat**, **Nur diese** oder **Keine**), **Lokale MCP-Server**, **Lokale Skills**, **Host-Tools** (die Tools der Anwendung und ihre Klassen), **Freigabestufen** (der Tool-Modus, in dem Unterhaltungen beginnen, und der höchste), **Darstellung** (Begrüßung und vorgeschlagene Prompts) und **Datenschutz**. |
 | **Versionen** | Jede Version. Mit **Veröffentlichen** eine Version veröffentlichen, mit **Zurücksetzen** zu einer früheren zurückkehren, unter **Änderungen** die Unterschiede sehen. |
 | **Zugriff** | **Wer ihn nutzen darf**, die Liste **Ausgeschlossene Personen** <span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span> und seine **Betreuer** (mit Enterprise: **Betreuer und Prüfer** <span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span>). **Zugriff prüfen** zeigt, ob eine Person den Agenten nutzen darf, und warum. |
+| **Skills** | Die Skills der Organisation, die in die Chats des Agenten kommen, ohne dass jemand sie auswählt: die allen zugewiesenen und die diesem Agenten zugewiesenen. Für alle, die den Agenten verwalten. |
 | **Aktivität** | Nutzung über einen Zeitraum (Anfragen, Fehler, Tokens, Benutzer, Unterhaltungen: nur Zahlen, nie Inhalte), nur, wenn mindestens fünf Personen den Agenten im Zeitraum genutzt haben; der Eigentümer eines persönlichen Agenten sieht dessen Zahlen trotzdem. Was die Anwendungen gemeldet haben (ausgeführte Tools, Zustimmungen) und **Angemeldete Geräte**. Der Reiter nennt niemanden außer Ihnen selbst. |
 | **Apps** | Was die Anwendungen mitbringen, verglichen mit der Version des Agenten (siehe [Wenn eine Anwendung neue Tools mitbringt](#when-an-application-brings-new-tools)). |
 
@@ -87,19 +88,31 @@ Die Seite des Agenten öffnet sich. Sein Status in der Liste ist **Entwurf**, **
     Fall nutzen. Die Einstellung sagt der Anwendung nur, was sie darf. Die Skills liegen auf dem Gerät der Person,
     nicht auf dem Server; nutzt das Modell einen, wird sein Text Teil der Unterhaltung, wie jede andere Nachricht.
 
+??? info "Mehr zu den Skills eines Agenten"
+    ![Der Reiter „Skills“: „Für alle in Ihrer Organisation“ mit einem Skill und „Für diesen Agenten“ mit zwei Skills und der Suche, um weitere hinzuzufügen](../images/administer/agent-skills.png)
+
+    **Für alle in Ihrer Organisation** listet die Skills, die allen zugewiesen sind; sie erreichen auch diesen
+    Agenten, und Sie ändern das auf der Seite des Skills. **Für diesen Agenten** enthält die Skills, die diesem
+    Agenten zugewiesen sind: Suchen Sie sie nach Name oder Beschreibung unter den veröffentlichten Skills, die Sie
+    verwalten, dann **Speichern**. Ein Skill, den Sie nicht verwalten, erscheint ohne Schaltfläche zum Entfernen:
+    Jemand, der diesen Skill verwaltet, hat ihn zugewiesen.
+    Der Reiter ist kein Teil einer Version: Eine Änderung gilt sofort, für jede Version. Er betrifft die Skills
+    Ihrer Organisation; **Lokale Skills** auf dem Reiter **Definition** betrifft die Skills, die Personen auf ihrem
+    eigenen Gerät haben. Andere Skills kommen weiter über ihre Auslöser hinzu oder wenn eine Person sie auswählt.
+
 ??? info "Mehr zu gleichzeitig laufenden Chat-Sitzungen"
     **Gleichzeitig laufende Chat-Sitzungen** (unter **Darstellung**) legt fest, wie viele Chat-Sitzungen dieses
     Agenten auf einem Gerät gleichzeitig arbeiten können: 1 bis 5 oder **Standard (5)**. Mehr Sitzungen kosten
     mehr und brauchen mehr Aufmerksamkeit. Der Desktop-Agent hält sich an diese Grenze; weitere Einstellungen sind
     nicht nötig.
 
-![Der Reiter „Versionen“ des Word-Assistenten: v2 aktiv mit Ansehen und Änderungen, v1 mit Ansehen und Zurücksetzen, unterhalb der Reiter des Agenten und der Schaltflächen Bearbeiten und Stilllegen](../images/administer/agent-versions.png)
+![Der Reiter „Versionen“ des Word-Assistenten: v1, aktiv, mit ihren Daten und Ansehen, unterhalb der Reiter des Agenten und der Schaltflächen Bearbeiten und Stilllegen](../images/administer/agent-versions.png)
 
 Das Speichern der Definition erzeugt eine neue Version (**Als neue Version speichern** oder **Speichern und
 veröffentlichen**); Versionen ändern sich nie. Eine veröffentlichte Version erreicht alle, die den Agenten
 nutzen, bei ihrer nächsten Anfrage.
 
-![Der Reiter „Zugriff“: „Wer ihn nutzen darf“ mit „Person oder Team hinzufügen“ und den Personen, denen der Agent gewährt ist](../images/administer/agent-access.png)
+![Der Reiter „Zugriff“: „Wer ihn nutzen darf“ mit „Person oder Team hinzufügen“ und der Person, der der Agent gewährt ist, darunter seine Betreuer und „Zugriff prüfen“](../images/administer/agent-access.png)
 
 **Betreuer** ändern den Agenten, veröffentlichen Versionen, entscheiden, wer ihn nutzen darf, und können ihn
 schon vor der Veröffentlichung nutzen. Das tun sie über **Agenten** im Benutzermenü des Chats; Zugriff auf die

@@ -111,7 +111,22 @@ In **Erweiterungen → Skills Hub**:
 | einen Skill aus der Nutzung zu nehmen und aufzubewahren | **Archivieren**; **Wiederherstellen** holt ihn zurück. |
 | einen Skill endgültig zu entfernen | **Löschen**. |
 | einen Skill aufzubewahren oder in anderen Tools zu nutzen | **Exportieren**: der **Skill-Ordner (.zip)** oder **Nur SKILL.md**. |
-| einen Skill in die Chats eines Mandanten, Arbeitsbereichs, Projekts oder Assistenten zu bringen – für die Personen, die ihn sehen können | Der Reiter **Zuweisungen**. |
+| einen Skill in jeden Chat Ihrer Organisation oder der Agenten Ihrer Wahl zu bringen | Der Reiter **Zuweisungen**. |
+
+??? info "Mehr zu Zuweisungen"
+    ![Der Reiter „Zuweisungen“ eines Skills: „Alle in Ihrer Organisation“ ausgeschaltet, unter „Agenten“ die zwei Agenten, denen der Skill zugewiesen ist, und die Suche, um weitere hinzuzufügen](../images/administer/skill-assignments.png)
+
+    **Alle in Ihrer Organisation** bringt den Skill in jeden Chat Ihrer Organisation, mit oder ohne Agent. Unter
+    **Agenten** suchen Sie Agenten nach Name oder Adresse und wählen sie aus; **Speichern** übernimmt die ganze
+    Auswahl, **Abbrechen** stellt sie wieder her. Der Reiter **Skills** eines Agenten tut dasselbe von der Seite
+    des Agenten aus (siehe [Agenten](agents.md#the-agents-page)).
+    Ein zugewiesener Skill kommt hinzu, ohne dass jemand ihn auswählt, und nur für Personen, die den Skill sehen
+    dürfen.
+    **Jede Organisation**, angeboten für alle, die jeden Skill verwalten, bringt ihn in die Chats aller, die ihn
+    sehen dürfen, in jeder Organisation auf dem Server.
+    Zuweisungen an einen **Arbeitsbereich** oder ein **Projekt**, die frühere Versionen anboten, haben nie
+    gegolten. Alte stehen unter **Nicht wirksam**, wo **Entfernen** sie wegnimmt. Ein stillgelegter Agent bleibt
+    grau in der Auswahl, bis Sie ihn entfernen; ein gelöschter Agent erscheint als **Agent gibt es nicht mehr**.
 
 Fadenstack führt die Skripte, die ein Skill-Ordner enthalten kann, nie aus. Sie werden aufbewahrt, damit der
 Skill in Tools exportiert werden kann, die sie ausführen.
@@ -141,6 +156,7 @@ Sofern der Betreiber des Servers sie nicht geändert hat:
 | Für eine Nachricht ausgewählte Skills | 5 |
 | Anweisungen einer Version | 100.000 Zeichen |
 | Dateien im Ordner eines Skills | 64, je höchstens 512 KiB und insgesamt 4 MiB |
+| Zuweisungen, über alle Skills der Organisation | 1.000 |
 
 Private Skills zählen nicht zu den 25.
 

@@ -106,7 +106,21 @@ In **Extensions → Skills Hub**:
 | Take a skill out of use and keep it | **Archive**; **Restore** brings it back. |
 | Remove a skill for good | **Delete**. |
 | Keep a skill, or use it in other tools | **Export**: the **Skill folder (.zip)** or the **SKILL.md only**. |
-| Bring a skill into the chats of a tenant, workspace, project or assistant, for the people who can see it | The **Assignments** tab. |
+| Bring a skill into every conversation of your organisation, or of the agents you choose | The **Assignments** tab. |
+
+??? info "More about assignments"
+    ![A skill's Assignments tab: Everyone in your organisation switched off, and under Agents the two agents the skill is assigned to, with the search to add more](../images/administer/skill-assignments.png)
+
+    **Everyone in your organisation** brings the skill into every conversation in your organisation, with or
+    without an agent. Under **Agents**, find agents by name or address and pick them; **Save** applies the whole
+    set, **Cancel** puts it back. An agent's own **Skills** tab does the same from the agent's side (see
+    [Agents](agents.md#the-agents-page)).
+    An assigned skill comes in without anyone picking it, and only for people who can see the skill.
+    **Every organisation**, offered to those who administer every skill, brings it into the conversations of
+    everyone who can see it, in every organisation on the server.
+    Assignments to a **Workspace** or a **Project**, which earlier versions offered, never applied. Old ones show
+    under **Not in effect**, where **Remove** takes them away. A retired agent stays greyed in the set until you
+    remove it; an agent that was deleted shows as **Agent no longer exists**.
 
 Fadenstack never runs the scripts a skill folder may contain. They are kept so the skill can be exported to
 tools that do.
@@ -135,6 +149,7 @@ Unless whoever runs the server changed them:
 | Skills picked for one message | 5 |
 | Instructions of one version | 100,000 characters |
 | Files in a skill's folder | 64, at most 512 KiB each and 4 MiB in all |
+| Assignments, across all of the organisation's skills | 1,000 |
 
 Private skills do not count against the 25.
 

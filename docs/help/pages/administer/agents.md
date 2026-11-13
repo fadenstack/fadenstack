@@ -49,13 +49,14 @@ The agent's page opens. Its list status is **Draft**, **Published** or **Retired
 
 ## The agent's page
 
-![The Word assistant's page on the Definition tab: the tabs Definition, Versions, Apps, Access and Activity, Edit and Retire at the top, the instructions and the model](../images/administer/agent-definition.png)
+![The Word assistant's page on the Definition tab: the tabs Definition, Versions, Apps, Access, Skills and Activity, Edit and Retire at the top, the instructions and the model](../images/administer/agent-definition.png)
 
 | Tab | What it holds |
 |---|---|
 | **Definition** | The version people get: **Instructions**, **Model**, **Knowledge** (collections it may search), **Server tools** (**What a chat gets**, **Only these**, or **None**), **Local MCP servers**, **Local skills**, **Host tools** (the application's tools and their classes), **Approval levels** (the tool mode conversations start in, and the highest), **Appearance** (greeting and suggested prompts) and **Privacy**. |
 | **Versions** | Every version. **Publish** one, **Roll back** to an earlier one, see the **Changes**. |
 | **Access** | **Who may use it**, the **Excluded people** <span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span> and its **Maintainers** (with Enterprise: **Maintainers and auditors** <span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span>). **Check someone's access** says whether a person may use the agent, and why. |
+| **Skills** | The organisation's skills that come into the agent's conversations without anyone picking them: those assigned to everyone, and those assigned to this agent. For those who manage the agent. |
 | **Activity** | Usage over a time range (requests, errors, tokens, users, conversations: counts only, never content), shown only when at least five people used the agent in the range; the owner of a personal agent sees its figures all the same. What the applications reported (tools that ran, approvals), and the **Signed-in devices**. It names nobody but you. |
 | **Apps** | What the applications bring, compared with the agent's version (see [When an application brings new tools](#when-an-application-brings-new-tools)). |
 
@@ -84,17 +85,28 @@ The agent's page opens. Its list status is **Draft**, **Published** or **Retired
     The setting only tells the application what it may do. The skills are kept on the person's device, not on
     the server; when the model uses one, its text becomes part of the conversation, like any other message.
 
+??? info "More about an agent's skills"
+    ![The Skills tab: For everyone in your organisation with one skill, and For this agent with two skills and the search to add more](../images/administer/agent-skills.png)
+
+    **For everyone in your organisation** lists the skills assigned to everyone; they reach this agent too, and
+    you change that on the skill's page. **For this agent** holds the skills assigned to this agent: find them by
+    name or description among the published skills you administer, then **Save**. A skill you do not administer
+    shows without a remove button: someone who manages that skill assigned it.
+    The tab is not part of a version: a change applies at once, to every version. It is about your
+    organisation's skills; **Local skills** on the **Definition** tab is about the skills people keep on their own
+    device. Other skills still come in by their triggers, or when a person picks them.
+
 ??? info "More about chat sessions running at once"
     **Chat sessions running at once** (under **Appearance**) sets how many chat sessions of this agent can work
     at the same time on one device: choose 1 to 5, or **Default (5)**. More sessions cost more and need more
     attention. The desktop agent follows this limit; the setting needs no other change.
 
-![The Versions tab of the Word assistant: v2 live with View and Changes, v1 with View and Roll back, below the agent's tabs and the Edit and Retire buttons](../images/administer/agent-versions.png)
+![The Versions tab of the Word assistant: v1, live, with its dates and View, below the agent's tabs and the Edit and Retire buttons](../images/administer/agent-versions.png)
 
 Saving the definition makes a new version (**Save as new version**, or **Save and publish**); versions never
 change. Publishing a version reaches everyone who uses the agent at their next request.
 
-![The Access tab: Who may use it, with Add a person or team and the people the agent is granted to](../images/administer/agent-access.png)
+![The Access tab: Who may use it, with Add a person or team and the person the agent is granted to, then its Maintainers and Check someone's access](../images/administer/agent-access.png)
 
 **Maintainers** change the agent, publish versions and decide who may use it, and can use it before it is
 published. They do this from **Agents** in the chat's user menu; they need no access to the console.
