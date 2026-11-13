@@ -633,3 +633,108 @@ async def test_a_model_the_runtime_knows_is_said_to_run(
     r = await client.get("/api/llm/marketplace/models/Qwen/Qwen3-8B")
     assert r.json()["compatibility"][env_id]["status"] == "runs"
     assert "runtime" not in r.json()["clusters"][0], "hundreds of names are not sent to the console"
+
+
+# ── the fit checks what a recipe sets; latent attention; split vision encoders (0.7.1) ──
+
+
+DEEPSEEK_V3_CONFIG = {
+    "architectures": ["DeepseekV3ForCausalLM"], "model_type": "deepseek_v3", "hidden_size": 7168,
+    "num_attention_heads": 128, "num_key_value_heads": 128, "num_hidden_layers": 61, "kv_lora_rank": 512,
+    "qk_rope_head_dim": 64, "max_position_embeddings": 163840,
+}
+
+
+def test_a_latent_attention_cache_is_sized_as_it_is_and_held_whole_by_each_accelerator() -> None:
+    arch = facts.architecture_from_config(DEEPSEEK_V3_CONFIG)
+    # One compressed vector per layer, not keys and values per head: 70 KB a token, not 1.75 MB.
+    assert arch.kv_bytes_per_token() == 61 * (512 + 64) * 2
+    needs = fit.ModelNeeds(weights_bytes=8 * 10**9, kv_bytes_per_token=arch.kv_bytes_per_token(),
+                           max_context=163840, attention_heads=128, kv_replicated=True)
+    one = fit.per_gpu_bytes(needs, tp=1, context=8192, kv_bytes_per_token=needs.kv_bytes_per_token)
+    two = fit.per_gpu_bytes(needs, tp=2, context=8192, kv_bytes_per_token=needs.kv_bytes_per_token)
+    kv = needs.kv_bytes_per_token * 8192
+    assert one - two == pytest.approx(needs.weights_bytes / 2, abs=2), "only the weights are divided"
+    assert two >= kv, "each accelerator holds the whole cache"
+    four = fit.ClusterHardware("e", "4", "ready", machines=[
+        fit.Machine("n", "n", [fit.Gpu("A", 80 * GIB, 80 * GIB) for _ in range(4)])])
+    split = fit.plan(needs, four, allow_sharing=False)
+    assert split.status == "fits" and split.max_context is not None
+    room = fit.MAX_UTILIZATION * 80 * GIB * split.tensor_parallel - needs.weights_bytes \
+        - fit.OVERHEAD_BYTES * split.tensor_parallel
+    assert split.max_context == min(163840, int(room // (needs.kv_bytes_per_token * split.tensor_parallel)))
+
+
+def _suggestion(config: dict[str, Any], reason: str = "recipe") -> dict[str, Any]:
+    return {"config": dict(config), "reasons": dict.fromkeys(config, reason)}
+
+
+def test_the_fit_checks_the_memory_values_a_recipe_sets() -> None:
+    whole = fit.plan(qwen3_8b_needs(), one_gpu(), allow_sharing=False)
+    assert whole.status == "fits" and whole.max_context is not None
+    # A context the copy cannot hold comes back to what it holds.
+    too_long = settings.reconcile(_suggestion({"max_model_len": 10**7}), whole)
+    assert too_long["config"]["max_model_len"] <= whole.max_context
+    assert too_long["reasons"]["max_model_len"] == "memory"
+    # More than the planned ceiling, or less than the weights need, comes back too.
+    greedy = settings.reconcile(_suggestion({"gpu_memory_utilization": 0.97}), whole)
+    assert greedy["config"]["gpu_memory_utilization"] == fit.MAX_UTILIZATION
+    meagre = settings.reconcile(_suggestion({"gpu_memory_utilization": 0.1}), whole)
+    assert meagre["config"]["gpu_memory_utilization"] > 0.1 and meagre["reasons"]["gpu_memory_utilization"] == "fit"
+    # A copy sharing its card does not take more than its share.
+    shared = fit.plan(qwen3_8b_needs(), dgx_pair())
+    assert shared.shareable
+    crowd = settings.reconcile(_suggestion({"gpu_memory_utilization": 0.9}), shared)
+    assert crowd["config"]["gpu_memory_utilization"] == shared.suggested_gpu_memory_utilization
+    assert crowd["reasons"]["gpu_memory_utilization"] == "shared_gpu"
+    # Values we tested ourselves, and values that already fit, are left as they are.
+    curated = settings.reconcile(_suggestion({"gpu_memory_utilization": 0.97}, reason="curated"), whole)
+    assert curated["config"]["gpu_memory_utilization"] == 0.97
+    fine = settings.reconcile(_suggestion({"max_model_len": 4096}), whole)
+    assert fine["config"]["max_model_len"] == 4096 and fine["reasons"]["max_model_len"] == "recipe"
+
+
+def test_a_recipes_parallel_sequences_are_checked_for_a_hybrid_model() -> None:
+    hybrid = fit.ModelNeeds(weights_bytes=20 * 10**9, kv_bytes_per_token=50_000, max_context=262144,
+                            recurrent=True, state_bytes_per_sequence=400 * 1024**2)
+    plan = fit.plan(hybrid, one_gpu(48 * 1024), allow_sharing=False)
+    assert plan.status == "fits" and plan.max_num_seqs == fit.RECURRENT_SEQUENCES
+    many = settings.reconcile(_suggestion({"max_num_seqs": 256}), plan, hybrid)
+    assert many["config"]["max_num_seqs"] == fit.RECURRENT_SEQUENCES
+    assert many["reasons"]["max_num_seqs"] == "recurrent_state"
+    few = settings.reconcile(_suggestion({"max_num_seqs": 40}), plan, hybrid)
+    assert few["config"]["max_num_seqs"] == 40, "forty states fit beside the weights"
+
+
+def test_automatic_tool_choice_without_a_parser_is_left_out() -> None:
+    lonely = settings.reconcile(_suggestion({"enable_auto_tool_choice": True}), None)
+    assert "enable_auto_tool_choice" not in lonely["config"]
+    paired = settings.reconcile(_suggestion({"enable_auto_tool_choice": True, "tool_call_parser": "hermes"}), None)
+    assert paired["config"]["enable_auto_tool_choice"] is True
+
+
+def test_a_recipe_parser_the_runtime_does_not_register_is_left_out() -> None:
+    config, dropped = recipes.args_to_config(["--enable-auto-tool-choice", "--tool-call-parser", "no_such_parser",
+                                              "--reasoning-parser", "qwen3"])
+    assert config == {"enable_auto_tool_choice": True, "reasoning_parser": "qwen3"}
+    assert dropped == ["--tool-call-parser no_such_parser"]
+    # Parsers vLLM 0.31 added are known.
+    assert recipes.args_to_config(["--tool-call-parser", "deepseek_v41"])[0] == {"tool_call_parser": "deepseek_v41"}
+
+
+def test_a_split_copy_keeps_a_vision_encoder_whole_on_each_accelerator() -> None:
+    from faden_backend.services.inference.drivers.ray.compiler import compile_deployment
+
+    split = build_spec(_request(gpus_per_copy=2, engine_config={}))
+    assert split["engine"]["config"]["mm_encoder_tp_mode"] == "data", "not known whether it sees: set"
+    seeing = build_spec(_request(gpus_per_copy=2, engine_config={}, vision=True))
+    assert seeing["engine"]["config"]["mm_encoder_tp_mode"] == "data"
+    blind = build_spec(_request(gpus_per_copy=2, engine_config={}, vision=False))
+    assert "mm_encoder_tp_mode" not in blind["engine"]["config"]
+    chosen = build_spec(_request(gpus_per_copy=2, engine_config={"mm_encoder_tp_mode": "weights"}, vision=True))
+    assert chosen["engine"]["config"]["mm_encoder_tp_mode"] == "weights", "the operator's choice stands"
+    whole = build_spec(_request(gpus_per_copy=1, engine_config={}, vision=True))
+    assert "mm_encoder_tp_mode" not in whole["engine"]["config"], "nothing to split on one accelerator"
+    compiled = compile_deployment(spec_data=seeing, model_display_name="Qwen3-VL", model_source="huggingface",
+                                  hf_repo_id="Qwen/Qwen3-VL-8B-Instruct")
+    assert compiled["llm_configs"][0]["engine_kwargs"]["mm_encoder_tp_mode"] == "data"

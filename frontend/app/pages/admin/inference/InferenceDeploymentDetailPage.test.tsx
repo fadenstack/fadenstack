@@ -318,12 +318,32 @@ describe("InferenceDeploymentDetailPage", () => {
       const [, payload] = update.mock.calls[0];
       expect(payload.spec).toEqual({
         ...deployment.spec,
-        engine: { name: "vllm", config: { gpu_memory_utilization: 0.75 } },
+        // A split copy keeps a vision encoder whole on each accelerator; whether this one sees pictures is not known.
+        engine: { name: "vllm", config: { gpu_memory_utilization: 0.75, mm_encoder_tp_mode: "data" } },
         scale: { replicas: 1 },
         resources: { replica: { gpus: 2 } },
         // The compiler wants a copy's accelerators to be its tensor parallel size.
         topology: { tensor_parallel_size: 2 },
       });
+    });
+
+    it("leaves the encoder setting out for a model known to see no pictures", async () => {
+      twoAccelerators();
+      const update = vi.spyOn(inferenceApi, "updateDeployment").mockResolvedValue(deployment);
+      vi.spyOn(inferenceApi, "reconcileDeployment").mockResolvedValue(deployment);
+      vi.spyOn(inferenceApi, "getDeployment").mockResolvedValue({
+        ...deployment,
+        spec: { ...deployment.spec, service: { path: "/v1", openai: true, vision: false } },
+      });
+      const field = await openScale();
+      await screen.findByTestId("scale-capacity");
+
+      fireEvent.change(field, { target: { value: "2" } });
+      await userEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+      await waitFor(() => expect(update).toHaveBeenCalled());
+      const [, payload] = update.mock.calls[0];
+      expect((payload.spec?.engine as { config?: unknown } | undefined)?.config).toEqual({});
     });
 
     it("refuses more than the cluster has, and says what it takes", async () => {
@@ -382,7 +402,9 @@ describe("InferenceDeploymentDetailPage", () => {
       const [, payload] = update.mock.calls[0];
       expect(payload.spec?.resources).toEqual({ replica: { gpus: 2 } });
       // Leaving a share: its memory cap goes too.
-      expect(payload.spec?.engine).toEqual({ name: "vllm", config: { gpu_memory_utilization: 0.8 } });
+      expect(payload.spec?.engine).toEqual({
+        name: "vllm", config: { gpu_memory_utilization: 0.8, mm_encoder_tp_mode: "data" },
+      });
     });
 
     it("never splits a picture model", async () => {

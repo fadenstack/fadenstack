@@ -326,6 +326,7 @@ async def model_detail(
         max_context=detail.get("max_context"),
         attention_heads=arch.get("num_attention_heads"),
         kv_heads=arch.get("num_kv_heads"),
+        kv_replicated=bool(arch.get("kv_lora_rank")),
         single_device=detail.get("task") == "images",
         recurrent=bool(arch.get("recurrent_layers")),
         state_bytes_per_sequence=arch.get("state_bytes_per_sequence"),
@@ -349,6 +350,9 @@ async def model_detail(
     if entry is not None and entry.settings:
         suggestion["config"].update(entry.settings)
         suggestion["reasons"].update({k: "curated" for k in entry.settings})
+    # A recipe is written for its own hardware: the fit checks what it set for this cluster.
+    checked_fit = chosen_fit if chosen_fit and chosen_fit.status == "fits" else None
+    settings_mod.reconcile(suggestion, checked_fit, needs)
     return {
         "hub": hub_state,
         "model": detail,

@@ -16,7 +16,10 @@ applies here:
 - hardware overrides are per generation, and are applied only when the
   cluster's accelerator is clearly that generation;
 - opt-in features are offered, not applied; one needing a JSON argument is
-  listed with its recipe rather than turned into a setting.
+  listed with its recipe rather than turned into a setting;
+- a tool-call or reasoning parser the runtime does not register is left out
+  (vLLM would not start with it), and the fit checks the memory values a
+  recipe sets (``settings.reconcile``).
 
 The server fetches recipes itself and caches them; an offline server simply
 has none, and the suggestions fall back to the family rules.
@@ -33,6 +36,7 @@ from typing import Any
 import httpx
 
 from faden_backend.services.inference.engine_guard import CODE_SETTINGS
+from faden_backend.services.marketplace.settings import REASONING_PARSERS, TOOL_PARSERS
 from faden_backend.services.tls import default_httpx_verify
 
 log = logging.getLogger(__name__)
@@ -48,6 +52,10 @@ SHAPE_FLAGS = frozenset({
     "tensor-parallel-size", "pipeline-parallel-size", "data-parallel-size",
     "served-model-name", "model", "host", "port",
 })
+
+#: Settings whose value must be a name the runtime registers: one it does not
+#: know stops vLLM at start-up, which is worse than no suggestion.
+_REGISTERED_NAMES = {"tool_call_parser": TOOL_PARSERS, "reasoning_parser": REASONING_PARSERS}
 
 _cache: dict[str, tuple[float, Any]] = {}
 
@@ -115,6 +123,11 @@ def _coerce(raw: str) -> Any:
     return raw
 
 
+def _unregistered(key: str, value: str | None) -> bool:
+    """A parser name the runtime's vLLM does not register."""
+    return value is not None and key in _REGISTERED_NAMES and value not in _REGISTERED_NAMES[key]
+
+
 def args_to_config(argv: list[str]) -> tuple[dict[str, Any], list[str]]:
     """``["--tool-call-parser", "hermes", "--enable-auto-tool-choice"]`` -> settings, and what was left out.
 
@@ -147,8 +160,12 @@ def args_to_config(argv: list[str]) -> tuple[dict[str, Any], list[str]]:
             # other arguments left out, so the person sees it was asked for.
             dropped.append(written)
             continue
-        if (not flag.startswith("--") or "." in name or name in SHAPE_FLAGS
-                or (value is not None and (value.startswith(("{", "[")) or "/" in value or value.endswith(".jinja")))):
+        key = name.replace("-", "_")
+        not_plain = value is not None and (
+            value.startswith(("{", "[")) or "/" in value or value.endswith(".jinja")
+        )
+        if (not flag.startswith("--") or "." in name or name in SHAPE_FLAGS or not_plain
+                or _unregistered(key, value)):
             if name not in SHAPE_FLAGS:
                 dropped.append(written)
             continue
@@ -156,9 +173,9 @@ def args_to_config(argv: list[str]) -> tuple[dict[str, Any], list[str]]:
             if name.startswith("no-"):
                 config[name[3:].replace("-", "_")] = False
             else:
-                config[name.replace("-", "_")] = True
+                config[key] = True
         else:
-            config[name.replace("-", "_")] = _coerce(value)
+            config[key] = _coerce(value)
     return config, dropped
 
 

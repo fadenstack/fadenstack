@@ -648,6 +648,16 @@ export default function InferenceDeploymentDetailPage() {
           const engine = asRecord(deployment.spec.engine);
           spec.engine = { ...engine, config: { ...asRecord(engine.config), gpu_memory_utilization: memory } };
         }
+        // A split copy splits a vision encoder too, and not every encoder can be
+        // (Flash's NVFP4 one: "not multiple of 16", .22, 2026-11-13): data mode
+        // keeps it whole on each accelerator. vLLM ignores it for a model without
+        // pictures, so it is left out only where the model is known to see none.
+        const engineNow = asRecord(spec.engine ?? deployment.spec.engine);
+        const configNow = asRecord(engineNow.config);
+        if (shareTyped > 1 && asRecord(deployment.spec.service).vision !== false
+            && configNow.mm_encoder_tp_mode === undefined) {
+          spec.engine = { ...engineNow, config: { ...configNow, mm_encoder_tp_mode: "data" } };
+        }
       }
       await inferenceApi.updateDeployment(deployment.id, { spec });
       // Act now, not at the reconciler's next tick.

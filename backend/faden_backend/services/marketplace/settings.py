@@ -1,7 +1,7 @@
 """Engine settings suggested for a model, from what it is and where it will run.
 
 Only names the cluster runtime's vLLM actually registers are suggested: the
-tool-call and reasoning parser lists below were read from vLLM 0.27.1 in the
+tool-call and reasoning parser lists below were read from vLLM 0.31.0 in the
 DGX runtime image (``ToolParserManager`` / ``ReasoningParserManager``). A
 suggestion the engine does not know would fail the deployment at start-up,
 which is worse than no suggestion.
@@ -12,26 +12,37 @@ was chosen, and the operator can change any of them.
 
 from __future__ import annotations
 
+import math
 import re
 from typing import Any
 
-from faden_backend.services.marketplace.fit import Fit
+from faden_backend.services.marketplace.fit import (
+    DEFAULT_CONTEXT,
+    MAX_UTILIZATION,
+    Fit,
+    ModelNeeds,
+    per_gpu_bytes,
+)
 
-#: Registered in the runtime's vLLM (0.27.1).
+#: Registered in the runtimes' vLLM 0.31.0 (``vllm.tool_parsers.ToolParserManager``, read from the
+#: gb10 runtime image on 13 Nov 2026). Runtimes with an older vLLM register a subset; until each
+#: runtime lists its own, these are the names a suggestion may use.
 TOOL_PARSERS = frozenset({
-    "apertus", "cohere_command3", "cohere_command4", "deepseek_v3", "deepseek_v31", "deepseek_v32", "deepseek_v4",
-    "ernie45", "functiongemma", "gemma4", "gigachat3", "glm45", "glm47", "granite", "granite-20b-fc",
-    "granite4", "hermes",
-    "hunyuan_a13b", "hy_v3", "inkling", "internlm", "jamba", "kimi_k2", "kimi_k3", "lfm2", "llama3_json",
-    "llama4_json", "llama4_pythonic", "longcat", "mimo", "minicpm5", "minimax_m2", "minimax_m3", "mistral", "olmo3",
-    "openai", "phi4_mini_json", "poolside_v1", "pythonic", "qwen3_coder", "qwen3_xml", "seed_oss", "step3",
-    "step3p5", "xlam",
+    "apertus", "cohere_command3", "cohere_command4", "deepseek_v3", "deepseek_v31", "deepseek_v32",
+    "deepseek_v4", "deepseek_v41", "dots", "ernie45", "functiongemma", "gemma4", "gigachat3", "glm45",
+    "glm47", "granite", "granite-20b-fc", "granite4", "hermes", "hunyuan_a13b", "hy_v3", "hy_v4",
+    "inkling", "internlm", "jamba", "k2_horizon", "kimi_k2", "kimi_k3", "lfm2", "ling3", "llama3_json",
+    "llama4_json", "llama4_pythonic", "longcat", "mimo", "minicpm5", "minimax_m2", "minimax_m3",
+    "mistral", "muse_glimmer", "olmo3", "openai", "phi4_mini_json", "poolside_v1", "pythonic",
+    "qwen3_coder", "qwen3_xml", "seed_oss", "step3", "step3p5", "xlam",
 })
 REASONING_PARSERS = frozenset({
-    "cohere_command3", "cohere_command4", "deepseek_r1", "deepseek_v3", "deepseek_v4", "ernie45", "gemma4", "glm45",
-    "glm47", "granite", "holo2", "hunyuan_a13b", "hy_v3", "inkling", "kimi_k2", "kimi_k3", "mimo", "minimax_m2",
-    "minimax_m2_append_think", "minimax_m3", "mistral", "nemotron_v3", "olmo3", "openai_gptoss", "poolside_v1",
-    "qwen3", "seed_oss", "step3", "step3p5",
+    "cohere_command3", "cohere_command4", "deepseek_r1", "deepseek_v3", "deepseek_v4", "deepseek_v41",
+    "ernie45", "gemma4", "glm45", "glm47", "granite", "granite_thinking_parser", "holo2", "hunyuan_a13b",
+    "hy_v3", "hy_v4",
+    "inkling", "k2_horizon", "kimi_k2", "kimi_k3", "ling3", "mimo", "minimax_m2", "minimax_m2_append_think",
+    "minimax_m3", "mistral", "muse_glimmer", "nemotron_v3", "olmo3", "openai_gptoss", "poolside_v1", "qwen3",
+    "seed_oss", "step3", "step3p5",
 })
 
 #: (pattern on the repo id, tool parser). First match wins, so specific before general.
@@ -165,3 +176,85 @@ def suggest(model: dict[str, Any], fit: Fit | None) -> dict[str, Any]:
         reasons["trust_remote_code"] = "needs_remote_code"
 
     return {"config": config, "reasons": reasons}
+
+
+def _share_up(value: float, step: float = 0.05) -> float:
+    return round(math.ceil(value / step - 1e-9) * step, 2)
+
+
+def _number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def reconcile(suggestion: dict[str, Any], fit: Fit | None, needs: ModelNeeds | None = None) -> dict[str, Any]:
+    """Check the values a recipe set against the fit, and drop what cannot stand alone.
+
+    A recipe's settings go in after the family rules, and they used to
+    replace the fit's memory values unchecked: a recipe's context or memory
+    share is written for its own hardware, not this cluster. Only values whose
+    reason is ``recipe`` are checked; the family rules come from the fit
+    already, and the curated ones were tested. A value the copy cannot hold is
+    brought back to the fit's, with the fit's reason, so the dialog says why.
+    """
+    config, reasons = suggestion["config"], suggestion["reasons"]
+    # vLLM refuses automatic tool choice without a parser to read the calls.
+    if config.get("enable_auto_tool_choice") and not config.get("tool_call_parser"):
+        config.pop("enable_auto_tool_choice")
+        reasons.pop("enable_auto_tool_choice", None)
+    if fit is None or fit.status != "fits":
+        return suggestion
+
+    def from_recipe(key: str) -> bool:
+        return reasons.get(key) == "recipe" and _number(config.get(key))
+
+    if from_recipe("max_model_len"):
+        _check_context(config, reasons, fit)
+    if from_recipe("gpu_memory_utilization"):
+        _check_share(config, reasons, fit)
+    if from_recipe("max_num_seqs") and needs is not None:
+        _check_sequences(config, reasons, fit, needs)
+    return suggestion
+
+
+def _check_context(config: dict[str, Any], reasons: dict[str, str], fit: Fit) -> None:
+    """A context the copy cannot hold comes back to what it holds."""
+    held = fit.max_context
+    if held and config["max_model_len"] > held:
+        config["max_model_len"] = max(1024, held // 1024 * 1024) if held >= 1024 else held
+        reasons["max_model_len"] = "memory"
+
+
+def _check_share(config: dict[str, Any], reasons: dict[str, str], fit: Fit) -> None:
+    """The memory share: no more than the copy's share or the ceiling, no less than the model needs."""
+    share = float(config["gpu_memory_utilization"])
+    planned = fit.suggested_gpu_memory_utilization
+    floor = None
+    if fit.needed_bytes_per_gpu and fit.gpu_bytes:
+        floor = _share_up(fit.needed_bytes_per_gpu / fit.gpu_bytes)
+    if fit.shareable and planned is not None and share > planned:
+        # The copy shares its accelerator: more would crowd the others on it.
+        config["gpu_memory_utilization"] = planned
+        reasons["gpu_memory_utilization"] = "shared_gpu"
+    elif share > MAX_UTILIZATION:
+        config["gpu_memory_utilization"] = MAX_UTILIZATION
+        reasons["gpu_memory_utilization"] = "fit"
+    elif floor is not None and share < floor:
+        # Less than the weights and the context need: vLLM would not start.
+        config["gpu_memory_utilization"] = min(floor, MAX_UTILIZATION)
+        reasons["gpu_memory_utilization"] = "fit"
+
+
+def _check_sequences(config: dict[str, Any], reasons: dict[str, str], fit: Fit, needs: ModelNeeds) -> None:
+    """A hybrid model keeps a recurrent state per sequence before it starts at all."""
+    sequences = int(config["max_num_seqs"])
+    if not (fit.max_num_seqs and needs.state_bytes_per_sequence and fit.gpu_bytes) or sequences <= fit.max_num_seqs:
+        return
+    share = config.get("gpu_memory_utilization")
+    budget = (float(share) if _number(share) else MAX_UTILIZATION) * fit.gpu_bytes
+    needed = per_gpu_bytes(
+        needs, tp=fit.tensor_parallel or 1, context=fit.context or DEFAULT_CONTEXT,
+        kv_bytes_per_token=fit.kv_bytes_per_token, sequences=sequences,
+    )
+    if needed > budget:
+        config["max_num_seqs"] = fit.max_num_seqs
+        reasons["max_num_seqs"] = "recurrent_state"

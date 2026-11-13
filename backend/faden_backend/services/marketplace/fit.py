@@ -12,8 +12,9 @@ accelerators means the model is too large for it.
 
 It is an estimate, and says so: the overhead is a flat allowance for the CUDA
 context, activations and graphs, and the KV cache is computed for full
-attention (sliding-window and latent-attention models need less). It errs on
-the side of "needs more", never on "fits".
+attention (sliding-window models need less); a latent-attention model's
+compressed cache is counted as it is, whole on every accelerator of a copy. It
+errs on the side of "needs more", never on "fits".
 
 Two numbers are kept apart on purpose:
 
@@ -119,6 +120,9 @@ class ModelNeeds:
     recurrent: bool = False
     #: That state, per sequence, in bytes (``None`` when the config does not say).
     state_bytes_per_sequence: int | None = None
+    #: Latent attention (DeepSeek, Kimi): every accelerator of a copy holds the
+    #: whole cache, so splitting the copy does not divide it.
+    kv_replicated: bool = False
 
 
 @dataclass
@@ -163,7 +167,8 @@ def per_gpu_bytes(needs: ModelNeeds, *, tp: int, context: int, kv_bytes_per_toke
     weights = needs.weights_bytes or 0
     kv = (kv_bytes_per_token or 0) * context
     state = (needs.state_bytes_per_sequence or 0) * sequences
-    return math.ceil(weights / tp + kv / tp + state / tp) + OVERHEAD_BYTES
+    kv_share = kv if needs.kv_replicated else kv / tp
+    return math.ceil(weights / tp + kv_share + state / tp) + OVERHEAD_BYTES
 
 
 def plan(needs: ModelNeeds, hardware: ClusterHardware, *, context: int | None = None,
@@ -253,7 +258,8 @@ def plan(needs: ModelNeeds, hardware: ClusterHardware, *, context: int | None = 
     max_context = None
     if kv_per_token:
         room = MAX_UTILIZATION * gpu_bytes * chosen - needs.weights_bytes - OVERHEAD_BYTES * chosen - state_bytes
-        max_context = max(0, int(room // kv_per_token))
+        # A latent cache is held whole on each of the copy's accelerators.
+        max_context = max(0, int(room // (kv_per_token * (chosen if needs.kv_replicated else 1))))
         if needs.max_context:
             max_context = min(max_context, needs.max_context)
 

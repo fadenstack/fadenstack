@@ -262,10 +262,21 @@ class Architecture:
     attention_layers: int | None = None
     #: The recurrent state one sequence holds across those layers, in bytes, when the config says enough.
     state_bytes_per_sequence: int | None = None
+    #: Multi-head latent attention (DeepSeek V2/V3, Kimi K2): the compressed key/value width per layer.
+    kv_lora_rank: int | None = None
+    #: Its rotary part, cached beside the latent.
+    qk_rope_head_dim: int | None = None
 
     def kv_bytes_per_token(self, dtype_bytes: int = 2) -> int | None:
-        """KV cache bytes one token of context occupies (keys and values, every attention layer)."""
+        """KV cache bytes one token of context occupies (keys and values, every attention layer).
+
+        A latent-attention model caches one compressed vector per layer instead
+        of keys and values per head: DeepSeek V3 holds 61 x (512 + 64) values a
+        token, about 70 KB, where counting its 128 heads would say 1.75 MB.
+        """
         layers = self.attention_layers or self.num_layers
+        if self.kv_lora_rank and layers:
+            return layers * (self.kv_lora_rank + (self.qk_rope_head_dim or 0)) * dtype_bytes
         if not (layers and self.num_kv_heads and self.head_dim):
             return None
         return 2 * layers * self.num_kv_heads * self.head_dim * dtype_bytes
@@ -314,6 +325,8 @@ def architecture_from_config(config: dict[str, Any] | None) -> Architecture:
         needs_remote_code=bool(config.get("auto_map")),
         moe=bool(pick("num_experts", "num_local_experts", "n_routed_experts")),
         transformers_version=str(config["transformers_version"]) if config.get("transformers_version") else None,
+        kv_lora_rank=_int(pick("kv_lora_rank")),
+        qk_rope_head_dim=_int(pick("qk_rope_head_dim")),
     )
 
 

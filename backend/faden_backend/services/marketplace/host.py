@@ -58,6 +58,13 @@ def build_spec(request: HostRequest) -> dict[str, Any]:
     if gpus >= 1 and not float(gpus).is_integer():
         raise HostError("More than one accelerator per copy must be a whole number.")
     tp = int(gpus) if gpus >= 1 else 1
+    if tp > 1 and request.vision is not False and "mm_encoder_tp_mode" not in engine:
+        # A split copy splits a vision encoder too, and not every encoder can be:
+        # Qwen3.8-Flash-Next's NVFP4 encoder stopped vLLM with "in features size
+        # is not multiple of 16" (.22, 13 Nov 2026). Data mode keeps the whole
+        # encoder on each accelerator. vLLM 0.31 falls back by itself for a model
+        # without it, and a model that sees no pictures ignores it.
+        engine["mm_encoder_tp_mode"] = "data"
     if gpus < 1 and float(engine.get("gpu_memory_utilization") or 1.0) > gpus + 1e-9:
         # A copy told it may use more of the card than it reserved -- vLLM's
         # own default is 0.9 -- would crowd the others it shares the card with.
