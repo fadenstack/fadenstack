@@ -2,7 +2,7 @@
  * A skill's Assignments tab (sdk/51 F01b): agents are picked from a searchable list and saved as a set; nobody
  * types an id. Workspace and project assignments are not offered; old ones show under "Not in effect".
  */
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -103,6 +103,17 @@ describe("SkillAssignmentsPanel", () => {
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(setSkillAgents).toHaveBeenCalledWith(SKILL, ["a-1", "a-2"]));
     expect(createAssignment).not.toHaveBeenCalled();
+  });
+
+  it("removes an agent's chip without following its link", async () => {
+    vi.mocked(listAssignments).mockResolvedValue([row("assistant", "a-1"), row("assistant", "a-2")]);
+    open();
+    const chip = await screen.findByRole("link", { name: /Excel assistant/ });
+    const followed = fireEvent.click(chip.querySelector(".MuiChip-deleteIcon") as Element);
+    expect(followed).toBe(false);
+    expect(screen.queryByRole("link", { name: /Excel assistant/ })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(setSkillAgents).toHaveBeenCalledWith(SKILL, ["a-2"]));
   });
 
   it("puts the set back on Cancel", async () => {

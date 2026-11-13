@@ -96,7 +96,14 @@ export function IdChipsPicker({
             variant: look.tone ? ("outlined" as const) : ("filled" as const),
             color: look.tone === "warning" ? ("warning" as const) : ("default" as const),
             sx: look.tone === "muted" ? { opacity: 0.6 } : undefined,
-            onDelete: look.fixed ? undefined : onDelete,
+            // The chip may be a link: removing it must not also follow the link (MUI stops the click, the
+            // browser would still go there).
+            onDelete: look.fixed
+              ? undefined
+              : (event: React.SyntheticEvent) => {
+                  event.preventDefault();
+                  onDelete(event);
+                },
           };
           return look.to ? (
             <Chip key={key} {...shared} component={RouterLink} to={look.to} clickable />
