@@ -48,6 +48,7 @@ from faden_gateway.services.gateway.agents import (
     UserFlags,
 )
 from faden_gateway.services.gateway.llm_adapter import CompletionResult, LLMAdapter
+from faden_gateway.services.gateway.skills_client import ResolvedSkill, SkillResolveResult, SkillsClient
 from faden_gateway.services.gateway.service import GatewayService, _agent_tools, _Prepared
 from faden_gateway.services.gateway.usage_group import UsageGroupResolver
 from faden_gateway.web.api.v1.agents import REASONING_LEVELS, apply_agent
@@ -326,6 +327,75 @@ async def test_a_stream_that_breaks_says_so_before_done(
         assert events[-1] == "[DONE]"
     await _until(lambda: len(logged) == 2)
     assert {row["status_code"] for row in logged} == {502}
+
+
+@pytest.mark.anyio
+async def test_a_skill_assigned_to_an_agent_reaches_that_agent_only(
+    client: AsyncClient, fastapi_app: FastAPI, db_session: AsyncSession, backend: _Backend,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """C-1 (sdk/51 F01): the agent and its version go to skill resolution, so an ``assistant`` assignment matches.
+
+    The fake service matches as ``faden_skills.services.resolve`` does: an assignment with the target ``assistant``
+    applies only when the request names that agent's id.
+    """
+    await _seed(db_session, provider=ProviderType.REMOTE_OPENAI, pii=None)
+    backend.put(_profile(id=OTHER_AGENT_ID, slug="tia-assistant", version=5))
+    service_registry.configure("skills", enabled=True, url="http://skills.local")
+    monkeypatch.setattr(settings, "skills_service_token", "skills-token")
+    asked: list[dict[str, Any]] = []
+
+    async def resolve(self: Any, **kwargs: Any) -> SkillResolveResult:
+        asked.append(kwargs)
+        if kwargs.get("assistant_id") != AGENT_ID:
+            return SkillResolveResult()
+        return SkillResolveResult(skills=[ResolvedSkill(
+            skill_id="s-eplan", name="EPLAN pages", slug="eplan-pages", version=1,
+            body_markdown="Name pages by their sheet number.", priority=50, score=150, matched_by="assignment",
+        )])
+
+    async def record(self: Any, **_: Any) -> None: ...
+
+    monkeypatch.setattr(SkillsClient, "resolve_skills", resolve)
+    monkeypatch.setattr(SkillsClient, "record_usage", record)
+    sent: list[dict[str, Any]] = []
+    _model(monkeypatch, sent)
+    try:
+        r = await client.post(URL, headers=_headers(), json=_chat())
+        assert r.status_code == 200, r.text
+        r = await client.post(
+            "/v1/agents/tia-assistant/chat/completions", headers=_headers(_agent_token(OTHER_AGENT_ID)), json=_chat(),
+        )
+        assert r.status_code == 200, r.text
+        r = await client.post("/v1/chat/completions", headers=_headers(_login_token(USER)), json=_chat(model=ALIAS))
+        assert r.status_code == 200, r.text
+    finally:
+        service_registry.configure("skills", enabled=False, url=None)
+
+    assert [(a.get("assistant_id"), a.get("assistant_version")) for a in asked] == [
+        (AGENT_ID, 3), (OTHER_AGENT_ID, 5), (None, None),
+    ], "each agent names itself and its version; a plain chat names none"
+    skill = "Name pages by their sheet number."
+    on_agent, on_other, plain = (json.dumps(payload["messages"]) for payload in sent)
+    assert skill in on_agent
+    assert skill not in on_other, "another agent does not get it"
+    assert skill not in plain, "a plain chat does not get it"
+
+
+@pytest.mark.anyio
+async def test_the_skills_client_sends_the_agent_and_its_version_to_resolution() -> None:
+    """What reaches ``POST /api/internal/skills/resolve`` (the skills service matches ``assistant_id``)."""
+    bodies: list[dict[str, Any]] = []
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        bodies.append(json.loads(request.content))
+        return httpx.Response(200, json={"skills": []})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(answer)) as http:
+        skills = SkillsClient(base_url="http://skills.local", http_client=http, service_token="t")
+        await skills.resolve_skills(tenant_id="tenant-a", user_id=USER, assistant_id=AGENT_ID, assistant_version=3)
+        await skills.resolve_skills(tenant_id="tenant-a", user_id=USER)
+    assert [(b["assistant_id"], b["assistant_version"]) for b in bodies] == [(AGENT_ID, 3), (None, None)]
 
 
 @pytest.mark.anyio

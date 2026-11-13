@@ -36,7 +36,10 @@ class SkillResolveRequest(BaseModel):
     group_ids: list[str] = Field(default_factory=list)
     #: Skills asked for by name (slug or id), e.g. from the chat's picker.
     requested: list[str] = Field(default_factory=list, max_length=20)
+    #: The agent a request runs under (its id): assignments with the target ``assistant`` match it.
     assistant_id: str | None = None
+    #: The version that agent serves, sent with it (sdk/51 F01, C-1); assignments match the agent, not a version.
+    assistant_version: int | None = Field(default=None, ge=1)
     workspace_id: str | None = None
     project_id: str | None = None
     session_id: str | None = None

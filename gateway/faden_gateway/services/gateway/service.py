@@ -3002,6 +3002,7 @@ class GatewayService:
                 file_types=file_types,
                 # A model that cannot call read_skill_file gets the files inline.
                 inline_files_chars=0 if searchable else skill_files.INLINE_CHARS,
+                agent=req.agent,
             )
             if chat
             else _value([]),
@@ -3567,6 +3568,7 @@ class GatewayService:
         *,
         file_types: list[str] | None = None,
         inline_files_chars: int = 0,
+        agent: AgentRequest | None = None,
     ) -> list[ResolvedSkill]:
         """The skills that apply to *question*, for ``_prepare`` to put in.
 
@@ -3574,6 +3576,9 @@ class GatewayService:
         request named; the skills service does not use it to resolve. It
         resolves among the skills the user can see, which takes their groups:
         a skill shared with a group reaches its members.
+
+        A request of an *agent* names it (its id) and its version: a skill assigned to the agent (target
+        ``assistant``) comes in on that agent only. Without it no such assignment ever matched (sdk/51 F01, C-1).
         """
         if not self.skills_client:
             return []
@@ -3585,6 +3590,8 @@ class GatewayService:
             user_id=auth.user_id,
             group_ids=groups,
             requested=requested,
+            assistant_id=agent.id if agent is not None else None,
+            assistant_version=agent.agent.version if agent is not None else None,
             session_id=session_id,
             user_query=question or None,
             file_types=file_types,

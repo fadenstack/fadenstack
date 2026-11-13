@@ -95,6 +95,7 @@ class SkillsClient:
         group_ids: list[str] | tuple[str, ...] | None = None,
         requested: list[str] | None = None,
         assistant_id: str | None = None,
+        assistant_version: int | None = None,
         workspace_id: str | None = None,
         project_id: str | None = None,
         session_id: str | None = None,
@@ -110,6 +111,8 @@ class SkillsClient:
         the skills *user_id* can see: their own, the tenant's, and the ones
         shared with them or one of *group_ids*. *requested* names skills the
         user asked for (slug or id), which come whatever their triggers say.
+        *assistant_id* is the agent a request runs under (its id), *assistant_version* the version it serves:
+        assignments with the target ``assistant`` match the agent's id.
         """
         body: dict[str, Any] = {
             "tenant_id": tenant_id,
@@ -117,6 +120,7 @@ class SkillsClient:
             "group_ids": list(group_ids or []),
             "requested": list(requested or []),
             "assistant_id": assistant_id,
+            "assistant_version": assistant_version,
             "workspace_id": workspace_id,
             "project_id": project_id,
             "session_id": session_id,

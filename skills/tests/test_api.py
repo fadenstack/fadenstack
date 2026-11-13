@@ -621,6 +621,36 @@ async def test_an_assignment_is_deleted_only_through_its_own_skill(
     assert right.status_code == 204
 
 
+async def test_a_skill_assigned_to_an_agent_comes_in_on_that_agent_only(
+    client: AsyncClient,
+) -> None:
+    """C-1 (sdk/51 F01): the gateway names the agent (``assistant_id``, its id) and its version."""
+    agent, other = "6f1c0d2e-0000-4000-8000-00000000a001", "6f1c0d2e-0000-4000-8000-00000000a002"
+    skill = await _create(
+        client,
+        ADMIN,
+        name="EPLAN pages",
+        owner="organization",
+        visibility="tenant",
+        publish=True,
+    )
+    created = await client.post(
+        f"/api/skills/{skill['id']}/assignments",
+        json={"target_type": "assistant", "target_id": agent},
+        headers=ADMIN,
+    )
+    assert created.status_code == 201, created.text
+    asked = {"user_query": "What is on page 12?"}
+    assert await _resolve(client, "alice", assistant_id=agent, assistant_version=3, **asked) == ["eplan-pages"]
+    assert await _resolve(client, "alice", assistant_id=other, assistant_version=1, **asked) == []
+    assert await _resolve(client, "alice", **asked) == [], "a plain chat names no agent"
+    bad = await client.post(
+        "/api/internal/skills/resolve",
+        json={"tenant_id": "default", "user_id": "alice", "assistant_id": agent, "assistant_version": 0},
+    )
+    assert bad.status_code == 422, "a version is a whole number from 1"
+
+
 async def test_uses_are_counted(client: AsyncClient) -> None:
     skill = await _create(client, ALICE, publish=True)
     for _ in range(3):
