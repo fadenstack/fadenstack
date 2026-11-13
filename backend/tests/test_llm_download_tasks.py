@@ -507,6 +507,16 @@ async def test_a_run_that_lost_the_job_mid_download_does_not_fail_the_model(monk
         (ConnectionError("reset"), True),
         (TimeoutError(), True),
         (RuntimeError("Data processing error: connection reset by peer"), False),  # not from hf_xet
+        # hf_xet's own, as a plain RuntimeError: the test server's network went away (12 Nov 2026) ...
+        (
+            RuntimeError(
+                "Task error: File reconstruction error: CAS Client Error: Request middleware error: "
+                "error sending request for url (https://us.aws.cdn.hf.co/xorbs/default/5512d7cd)"
+            ),
+            True,
+        ),
+        # ... and one trying again does not get past.
+        (RuntimeError("Task error: File reconstruction error: IO error: No space left on device (os error 28)"), False),
         (ValueError("401 Client Error"), False),
         (OSError(28, "No space left on device"), False),
     ],

@@ -27,6 +27,11 @@ _UNSEEN_POLL_SEC = 0.5
 #: Attempts at a download that the network broke off, before it is failed.
 _NETWORK_ATTEMPTS = 3
 _NETWORK_BACKOFF_SEC = 15.0
+#: How hf_xet's errors read. They reach Python as a plain RuntimeError, not as
+#: a type of its own module: "Task error: File reconstruction error: CAS Client
+#: Error: Request middleware error: error sending request for url (...)" broke
+#: off a download on the test server when its network went away (12 Nov 2026).
+_XET_WORDING = ("cas client error", "file reconstruction error")
 
 
 class DownloadCanceled(Exception):
@@ -362,7 +367,10 @@ def _network_error(exc: BaseException) -> bool:
 
     A wrong token or repository name is not: trying again only repeats it.
     """
-    markers = ("connection", "timed out", "timeout", "reset by peer", "broken pipe", "incomplete", "chunked")
+    markers = (
+        "connection", "timed out", "timeout", "reset by peer", "broken pipe", "incomplete", "chunked",
+        "error sending request",  # the HTTP client under hf_xet: no answer came at all
+    )
     seen: set[int] = set()
     current: BaseException | None = exc
     while current is not None and id(current) not in seen:
@@ -375,8 +383,9 @@ def _network_error(exc: BaseException) -> bool:
             m in name for m in ("connection", "timeout", "chunked", "protocol", "readerror", "incomplete", "remotedisconnected")
         ):
             return True
-        if module.startswith("hf_xet") or "xet" in name:
-            return any(m in str(current).lower() for m in markers)
+        text = str(current).lower()
+        if module.startswith("hf_xet") or "xet" in name or any(w in text for w in _XET_WORDING):
+            return any(m in text for m in markers)
         current = current.__cause__ or current.__context__
     return False
 

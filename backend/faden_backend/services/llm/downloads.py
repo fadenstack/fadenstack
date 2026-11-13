@@ -16,6 +16,7 @@ deployment waiting for it then sent the machines the half that had arrived.
 from __future__ import annotations
 
 import logging
+import uuid
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,6 +34,32 @@ STALE_AFTER_SEC = 30 * HEARTBEAT_SEC
 QUEUED_AFTER_SEC = 1800.0
 
 _ACTIVE = (DownloadJobStatus.QUEUED, DownloadJobStatus.RUNNING)
+
+
+async def cancel_download(session: AsyncSession, job_id: uuid.UUID) -> DownloadJob | None:
+    """Cancel a download; its model is failed now, unless another download of it is under way.
+
+    Canceling only marks the job. A running download hears of it before its
+    next file and fails the model itself -- but a queued one is never started,
+    and a running one whose worker died never hears of it: their models stayed
+    "downloading" until the backend's next start. Should the files all have
+    arrived before the download hears of it, it marks the model available
+    after all, which is what is on disk.
+    """
+    dao = DownloadJobDAO(session)
+    job = await dao.set_canceled(job_id)
+    if job is None:
+        return None
+    model = await session.get(LLMModel, job.model_id)
+    # The query flushes the cancel first, so this job is not counted as under way.
+    if (
+        model is not None
+        and model.status == ModelStatus.DOWNLOADING
+        and await dao.active_for_model(model.id) is None
+    ):
+        model.status = ModelStatus.FAILED
+    await session.flush()
+    return job
 
 
 async def interrupt_stale_downloads(session: AsyncSession, *, orphaned_models: bool = False) -> int:

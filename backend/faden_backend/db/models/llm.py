@@ -3,6 +3,7 @@
 import enum
 import uuid
 from datetime import datetime
+from typing import Any, ClassVar
 
 from sqlalchemy import (
     BigInteger,
@@ -382,6 +383,10 @@ class DownloadJob(Base):
     """Tracks background model download progress."""
 
     __tablename__ = "download_jobs"
+    #: A flush that changes a job gets the new ``updated_at`` back with the UPDATE
+    #: (RETURNING). Otherwise it is left unloaded, and reading it for an answer
+    #: -- as cancel and retry do -- would need a query outside the async context.
+    __mapper_args__: ClassVar[dict[str, Any]] = {"eager_defaults": True}
 
     id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),

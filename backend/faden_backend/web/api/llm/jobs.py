@@ -66,7 +66,9 @@ async def cancel_job(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Cannot cancel job in status '{job.status}'.",
         )
-    job = await job_dao.set_canceled(job_id)
+    from faden_backend.services.llm.downloads import cancel_download  # noqa: PLC0415
+
+    job = await cancel_download(job_dao.session, job_id)
     await audit_action(
         action="llm.job.cancel",
         target_type="download_job",
