@@ -78,7 +78,7 @@ async def _skill_error(_request: Request, exc: SkillError) -> JSONResponse:
     if exc.code:
         return JSONResponse(
             status_code=exc.status_code,
-            content={"detail": {"code": exc.code, "message": exc.detail}},
+            content={"detail": {"code": exc.code, "message": exc.detail, **exc.extra}},
         )
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 

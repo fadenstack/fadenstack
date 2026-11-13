@@ -609,11 +609,13 @@ async def replace_agent_assignments(
 ) -> list[SkillAssignmentResponse]:
     """Assign the skill to exactly these agents; its other assignments stay.
 
-    The backend has checked that each id is an agent the caller can see.
+    An agent the skill does not have yet must be one the backend vetted (``vetted_agent_ids``).
     """
     dao = SkillDao(session)
     skill, access = await dao.get_skill(skill_id, principal)
-    rows = await dao.replace_agent_assignments(skill, access, body.agent_ids)
+    rows = await dao.replace_agent_assignments(
+        skill, access, body.agent_ids, vetted=body.vetted_agent_ids,
+    )
     return [SkillAssignmentResponse.model_validate(a) for a in rows]
 
 

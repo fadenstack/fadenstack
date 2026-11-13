@@ -767,6 +767,45 @@ async def test_the_skill_side_put_replaces_only_its_agent_rows(
     assert [r["target_type"] for r in cleared.json()] == ["tenant"]
 
 
+async def test_an_agent_new_to_the_skill_must_be_vetted_under_the_lock(
+    client: AsyncClient,
+) -> None:
+    """The backend names the agents the caller can see; one the skill does not have yet must be among them.
+
+    Decided here, under the tenant's assignment lock: an agent another change removed a moment before is new
+    (the backend read the skill's agents before that change and could not tell).
+    """
+    skill = await _org_skill(client, "Vetted")
+    assert (await _put_agents(client, skill["id"], [AGENT_1])).status_code == 200
+
+    async def put(agent_ids: list[str], vetted: list[str]) -> Any:
+        return await client.put(
+            f"/api/skills/{skill['id']}/assignments/agents",
+            json={"agent_ids": agent_ids, "vetted_agent_ids": vetted},
+            headers=ADMIN,
+        )
+
+    resp = await put([AGENT_1, AGENT_2, AGENT_3], [AGENT_2])
+    assert resp.status_code == 422, resp.text
+    assert resp.json()["detail"] == {
+        "code": "unknown_agent",
+        "message": f"No such agent: {AGENT_3}",
+        "ids": [AGENT_3],
+    }, "AGENT_1 the skill has already may stay unvetted; AGENT_3 is new and not vetted"
+    assert [r["target_id"] for r in await _rows(client, skill["id"])] == [AGENT_1], (
+        "nothing changed"
+    )
+
+    resp = await put([AGENT_1, AGENT_2], [AGENT_2])
+    assert resp.status_code == 200, resp.text
+
+    # Removed by another change, then named again with the stale view: new now, so it must be vetted.
+    assert (await _put_agents(client, skill["id"], [AGENT_2])).status_code == 200
+    resp = await put([AGENT_1, AGENT_2], [AGENT_2])
+    assert resp.status_code == 422, resp.text
+    assert resp.json()["detail"]["ids"] == [AGENT_1]
+
+
 async def test_the_skill_side_put_drops_a_second_row_for_one_agent(
     client: AsyncClient,
 ) -> None:

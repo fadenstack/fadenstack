@@ -124,9 +124,13 @@ def _unique(ids: list[_Id]) -> list[_Id]:
 class AgentAssignmentsRequest(BaseModel):
     """The agents a skill is assigned to (replaces its ``assistant`` assignments).
 
-    Ids as the assignments hold them (``target_id``): the backend checks that
-    each one the skill does not have yet is an agent the caller can see. One
-    an older client stored that names no agent can stay until it is removed.
+    Ids as the assignments hold them (``target_id``). Each one the skill does
+    not have yet must be an agent the caller can see: the backend names those
+    in ``vetted_agent_ids``, and the service checks it under the tenant's
+    assignment lock (422 ``unknown_agent``), so an agent removed a moment
+    before counts as new. One the skill has already, also one an older client
+    stored that names no agent, can stay until it is removed. Without
+    ``vetted_agent_ids`` (an older backend) nothing is checked here.
     """
 
     agent_ids: Annotated[
@@ -134,6 +138,14 @@ class AgentAssignmentsRequest(BaseModel):
         Field(max_length=MAX_IDS_PER_REQUEST),
         AfterValidator(_unique),
     ]
+    vetted_agent_ids: (
+        Annotated[
+            list[Annotated[str, Field(min_length=1, max_length=128)]],
+            Field(max_length=MAX_IDS_PER_REQUEST),
+            AfterValidator(_unique),
+        ]
+        | None
+    ) = None
 
 
 class AgentSkillsRequest(BaseModel):

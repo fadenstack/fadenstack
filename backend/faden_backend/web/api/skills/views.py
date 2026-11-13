@@ -223,6 +223,12 @@ class AgentIdsRequest(BaseModel):
     ]
 
 
+class _VettedAgentIds(AgentIdsRequest):
+    """The set as the skills service gets it: with the agents of it the caller can see, which the backend vouches for."""
+
+    vetted_agent_ids: list[str]
+
+
 class SkillIdsRequest(BaseModel):
     """The skills assigned to an agent, among those the caller administers: the whole set."""
 
@@ -242,16 +248,17 @@ async def assign_skill_to_agents(
     """Assign the skill to exactly these agents (``PUT`` on the skills service).
 
     Each agent the skill is not assigned to yet must be an agent of this tenant the caller can see; otherwise
-    422 ``unknown_agent`` names the ids and nothing is forwarded. An agent it is assigned to already may stay
-    in the set as it is: one the caller cannot see, or that is gone, or an id an older client stored.
+    422 ``unknown_agent`` names the ids. An agent it is assigned to already may stay in the set as it is: one
+    the caller cannot see, or that is gone, or an id an older client stored. What the skill has is read here
+    to refuse early (nothing forwarded), and the skills service decides again under its tenant lock from the
+    agents the caller can see (``vetted_agent_ids``): an agent another change removed after this read is new
+    there, and must be one of them (ASVS 5.0 V8, no check-then-act gap).
     """
     current = await client.get_json(f"/api/skills/{skill_id}/assignments", principal)
     assigned = {row.get("target_id") for row in current if row.get("target_type") == "assistant"}
-    unknown = [
-        agent_id
-        for agent_id in body.agent_ids
-        if agent_id not in assigned and not await _sees_agent(dao, rbac, user, agent_id)
-    ]
+    visible = [agent_id for agent_id in body.agent_ids if await _sees_agent(dao, rbac, user, agent_id)]
+    seen = set(visible)
+    unknown = [agent_id for agent_id in body.agent_ids if agent_id not in assigned and agent_id not in seen]
     if unknown:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -261,7 +268,8 @@ async def assign_skill_to_agents(
                 "ids": unknown,
             },
         )
-    return await _send(client, "PUT", f"/api/skills/{skill_id}/assignments/agents", principal, body)
+    vetted = _VettedAgentIds(agent_ids=body.agent_ids, vetted_agent_ids=visible)
+    return await _send(client, "PUT", f"/api/skills/{skill_id}/assignments/agents", principal, vetted)
 
 
 @router.get("/assignments/agents/{agent_id}", include_in_schema=False)

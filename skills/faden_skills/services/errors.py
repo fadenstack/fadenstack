@@ -17,6 +17,8 @@ class SkillError(Exception):
         super().__init__(detail)
         self.detail = detail
         self.code = code
+        #: More of the refusal for the caller, next to ``code`` and ``message`` (only with a ``code``).
+        self.extra: dict[str, object] = {}
 
 
 class NotFoundError(SkillError):
@@ -41,3 +43,17 @@ class LimitError(SkillError):
     """A configured limit (skills per person, published skills) is reached."""
 
     status_code = 409
+
+
+class UnknownAgentError(SkillError):
+    """Agents a skill does not have yet that the backend did not vouch for (``unknown_agent``, with their ``ids``).
+
+    The same refusal the backend gives when it can tell before asking; here it is decided under the tenant's
+    assignment lock, so an agent removed a moment before counts as new.
+    """
+
+    status_code = 422
+
+    def __init__(self, ids: list[str]) -> None:
+        super().__init__("No such agent: " + ", ".join(ids), code="unknown_agent")
+        self.extra = {"ids": ids}

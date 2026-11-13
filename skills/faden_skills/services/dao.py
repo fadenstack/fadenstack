@@ -51,6 +51,7 @@ from faden_skills.services.errors import (
     ForbiddenError,
     LimitError,
     NotFoundError,
+    UnknownAgentError,
 )
 from faden_skills.services.resolve import Candidate, Match, RequestContext, choose
 from faden_skills.settings import settings
@@ -877,12 +878,17 @@ class SkillDao:
         skill: SkillModel,
         access: Access,
         agent_ids: list[str],
+        *,
+        vetted: list[str] | None = None,
     ) -> list[SkillAssignmentModel]:
         """Assign *skill* to exactly the agents *agent_ids* (target ``assistant``).
 
         Rows of the other targets stay. A row for an agent still listed stays
         as it is, with its id and ``priority_override``; a second row for the
-        same agent (the old dialog took one twice) goes.
+        same agent (the old dialog took one twice) goes. With *vetted* (the
+        agents the backend found the caller can see), an agent the skill does
+        not have yet must be among them: decided under the tenant's lock, so
+        a row another change removed a moment before is new here.
         """
         _require(access, Access.ADMIN, "assign")
         await self._lock_assignments(skill.tenant_id)
@@ -891,6 +897,11 @@ class SkillDao:
             [(row.id, row.target_id or "") for row in rows],
             list(dict.fromkeys(agent_ids)),
         )
+        if vetted is not None:
+            allowed = set(vetted)
+            unknown = [agent for agent in new if agent not in allowed]
+            if unknown:
+                raise UnknownAgentError(unknown)
         await self._check_assignment_limit(
             skill.tenant_id,
             adding=len(new),

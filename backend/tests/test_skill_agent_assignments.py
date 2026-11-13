@@ -38,11 +38,16 @@ class _As:
 
 
 class _Skills:
-    """The skills service: records each request; answers a skill's assignments from ``assigned``."""
+    """The skills service: records each request; answers a skill's assignments from ``assigned``.
+
+    A skill's set is refused as the service refuses it under its lock: an agent the skill does not have *then*
+    (``assigned_at_save``, else ``assigned``) must be one the backend vetted.
+    """
 
     def __init__(self) -> None:
         self.requests: list[httpx.Request] = []
         self.assigned: list[dict[str, Any]] = []
+        self.assigned_at_save: list[dict[str, Any]] | None = None
         self.fail = False
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
@@ -53,6 +58,16 @@ class _Skills:
             return httpx.Response(200, json=self.assigned)
         if request.method == "DELETE":
             return httpx.Response(200, json={"removed": 1})
+        if request.method == "PUT" and request.url.path.endswith("/assignments/agents"):
+            body = json.loads(request.content)
+            rows = self.assigned if self.assigned_at_save is None else self.assigned_at_save
+            has = {row["target_id"] for row in rows if row["target_type"] == "assistant"}
+            vetted = body.get("vetted_agent_ids")
+            unknown = [a for a in body["agent_ids"] if a not in has and vetted is not None and a not in vetted]
+            if unknown:
+                return httpx.Response(422, json={"detail": {
+                    "code": "unknown_agent", "message": "No such agent: " + ", ".join(unknown), "ids": unknown,
+                }})
         return httpx.Response(200, json=[])
 
     def sent(self, method: str) -> list[httpx.Request]:
@@ -154,7 +169,7 @@ async def test_an_assignment_names_only_agents_of_this_tenant_the_caller_can_see
     assert r.status_code == status.HTTP_200_OK, r.text
     [sent] = skills.sent("PUT")
     assert sent.url.path == f"/api/skills/{skill}/assignments/agents"
-    assert json.loads(sent.content) == {"agent_ids": [mine["id"]]}
+    assert json.loads(sent.content) == {"agent_ids": [mine["id"]], "vetted_agent_ids": [mine["id"]]}
     assert sent.headers["x-faden-user"] == str(signed_in.user.id), "forwarded as the caller"
 
 
@@ -189,7 +204,32 @@ async def test_an_agent_the_caller_cannot_see_is_unknown_unless_it_is_assigned_a
     ]
     r = await _put_agents(client, skill, [hidden["id"], "typed-in-the-old-dialog", shared["id"]])
     assert r.status_code == status.HTTP_200_OK, "what the skill has already may stay in the set"
+    assert json.loads(skills.sent("PUT")[-1].content)["vetted_agent_ids"] == [shared["id"]], (
+        "only the agent the caller can see is vouched for"
+    )
     assert admin is not None
+
+
+async def test_an_agent_removed_after_the_backend_read_counts_as_new(
+    signed_in: _As,
+    client: AsyncClient,
+    dbsession: AsyncSession,
+    skills: _Skills,
+) -> None:
+    """The backend reads the skill's agents, then the skills service saves: between the two another change may
+    remove an agent. The service decides under its lock from the agents the backend vouched for, so the stale
+    "assigned already" lets nobody add an agent they cannot see (ASVS 5.0 V8)."""
+    signed_in.user = await _user(dbsession, admin=True)
+    hidden = await _agent(client)
+    signed_in.user = await _user(dbsession)
+    skill = str(uuid.uuid4())
+    skills.assigned = [{"target_type": "assistant", "target_id": hidden["id"]}]  # what the backend reads
+    skills.assigned_at_save = []  # removed by another change before the save
+
+    r = await _put_agents(client, skill, [hidden["id"]])
+
+    assert r.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT, r.text
+    assert r.json()["detail"] == {"code": "unknown_agent", "message": f"No such agent: {hidden['id']}", "ids": [hidden["id"]]}
 
 
 @pytest.mark.parametrize(
