@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { hasFeature } from "~/api/about";
 import { AGENT_TOKEN_LIFETIMES, agentsApi } from "~/api/agents";
+import { agentSkills, skillsStatus } from "~/api/skills";
 import { agentFixture, appSeenFixture, appsReviewFixture, toolReviewFixture, versionFixture } from "~/test/agentFixtures";
 import { renderPage } from "~/test/renderPage";
 
@@ -32,6 +33,15 @@ vi.mock("~/api/agents", async (importOriginal) => {
 });
 vi.mock("~/api/chatClient", () => ({ chatApi: { listModels: vi.fn().mockResolvedValue([]) } }));
 vi.mock("~/api/about", () => ({ hasFeature: vi.fn() }));
+vi.mock("~/api/skills", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/api/skills")>();
+  return {
+    ...actual,
+    skillsStatus: vi.fn(),
+    agentSkills: vi.fn().mockResolvedValue([]),
+    listSkills: vi.fn().mockResolvedValue({ items: [], total: 0, offset: 0, limit: 500 }),
+  };
+});
 
 const api = vi.mocked(agentsApi);
 
@@ -48,6 +58,7 @@ beforeEach(() => {
   api.versions.mockResolvedValue([versionFixture(1)]);
   api.apps.mockResolvedValue(appsReviewFixture());
   vi.mocked(hasFeature).mockResolvedValue(false);
+  vi.mocked(skillsStatus).mockResolvedValue({ enabled: true });
 });
 
 describe("AgentDetail", () => {
@@ -224,5 +235,36 @@ describe("AgentDetail", () => {
     open(["agents:delete"]);
     expect(await screen.findByRole("button", { name: "Delete" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Restore" })).not.toBeInTheDocument();
+  });
+
+  it("has a Skills tab, after Access, for those who manage the agent while skills are on", async () => {
+    openAgent("skills");
+    await waitFor(() => expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toContain("Skills"));
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "Definition",
+      "Versions",
+      "Apps",
+      "Access",
+      "Skills",
+      "Activity",
+    ]);
+    expect(await screen.findByText("For everyone in your organisation")).toBeInTheDocument();
+    expect(agentSkills).toHaveBeenCalledWith("a-1");
+  });
+
+  it("has no Skills tab for those who only use the agent", async () => {
+    api.get.mockResolvedValue(agentFixture({ can_manage: false }));
+    openAgent();
+    await screen.findByRole("tab", { name: "Access" });
+    expect(screen.queryByRole("tab", { name: "Skills" })).not.toBeInTheDocument();
+    expect(skillsStatus).not.toHaveBeenCalled();
+  });
+
+  it("has no Skills tab while the Skills module is off, or when the caller may not ask", async () => {
+    vi.mocked(skillsStatus).mockResolvedValue({ enabled: false });
+    openAgent();
+    await waitFor(() => expect(skillsStatus).toHaveBeenCalled());
+    await screen.findByRole("tab", { name: "Access" });
+    expect(screen.queryByRole("tab", { name: "Skills" })).not.toBeInTheDocument();
   });
 });

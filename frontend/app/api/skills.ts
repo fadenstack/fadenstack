@@ -191,6 +191,18 @@ export interface SkillAssignment {
   created_at: string;
 }
 
+/** A skill that reaches an agent by assignment (`GET /api/skills/assignments/agents/{agent}`). */
+export interface AgentSkill {
+  id: string;
+  name: string;
+  slug: string;
+  status: SkillStatus;
+  /** What the caller may do with it: only `admin` changes its assignments. */
+  access: SkillAccess;
+  /** `agent`: assigned to this agent; `everyone`: to the whole organisation. */
+  via: "agent" | "everyone";
+}
+
 export interface CreateAssignmentPayload {
   target_type: AssignmentTargetType;
   target_id?: string | null;
@@ -387,6 +399,36 @@ export async function deleteAssignment(skillId: string, assignmentId: string): P
     method: "DELETE",
   });
 }
+
+/**
+ * Assign the skill to exactly these agents (their ids); its other assignments stay. The backend refuses an
+ * agent the skill does not have yet that the caller cannot see (422 `unknown_agent`).
+ */
+export async function setSkillAgents(skillId: string, agentIds: string[]): Promise<SkillAssignment[]> {
+  return request<SkillAssignment[]>(`/${id(skillId)}/assignments/agents`, {
+    method: "PUT",
+    body: JSON.stringify({ agent_ids: agentIds }),
+  });
+}
+
+/** The skills that reach an agent by assignment: assigned to it, or to everyone (for those who manage it). */
+export async function agentSkills(agentId: string): Promise<AgentSkill[]> {
+  return request<AgentSkill[]>(`/assignments/agents/${id(agentId)}`);
+}
+
+/**
+ * Assign an agent exactly these skills, of those the caller administers; the others' assignments stay. A
+ * skill the caller does not administer refuses the whole request (403 `not_your_skill`).
+ */
+export async function setAgentSkills(agentId: string, skillIds: string[]): Promise<AgentSkill[]> {
+  return request<AgentSkill[]>(`/assignments/agents/${id(agentId)}`, {
+    method: "PUT",
+    body: JSON.stringify({ skill_ids: skillIds }),
+  });
+}
+
+/** The refusals about assignments the console says in its own words (`skills.error_<code>`). */
+export const ASSIGNMENT_ERRORS = ["unknown_agent", "already_assigned", "not_your_skill"] as const;
 
 // ── Rights ─────────────────────────────────────────────────────────────────
 

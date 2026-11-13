@@ -1,10 +1,11 @@
 /**
  * One agent: what it is (definition), its versions, who may use and maintain
- * it (access), and what it did (activity). The tab is in the address
+ * it (access), the organisation's skills assigned to it (skills, for those who
+ * manage it), and what it did (activity). The tab is in the address
  * (`?tab=`), so a link opens the right one; a tab, once opened, stays mounted
  * so an unsaved definition survives a look at another tab.
  */
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 
@@ -25,6 +26,7 @@ import RestoreFromTrashIcon from "@mui/icons-material/RestoreFromTrash";
 import RemoveCircleOutlineIcon from "@mui/icons-material/RemoveCircleOutline";
 
 import { agentRights, agentsApi, type Agent, type AgentVersion, type AppsReview } from "~/api/agents";
+import { skillsStatus } from "~/api/skills";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { useAction } from "~/lib/useAction";
 import { useAsyncData } from "~/lib/useAsyncData";
@@ -36,11 +38,12 @@ import { AgentActivityPanel } from "./AgentActivityPanel";
 import { AgentAppsPanel } from "./AgentAppsPanel";
 import { AgentStatusChip, AgentVersionChips } from "./AgentChips";
 import { AgentDefinitionPanel } from "./AgentDefinitionPanel";
+import { AgentSkillsPanel } from "./AgentSkillsPanel";
 import { AgentVersionsPanel } from "./AgentVersionsPanel";
 import { EditAgentDialog } from "./EditAgentDialog";
 import type { AgentTab } from "./agentPaths";
 
-const TABS: AgentTab[] = ["definition", "versions", "apps", "access", "activity"];
+const TABS: AgentTab[] = ["definition", "versions", "apps", "access", "skills", "activity"];
 
 export interface AgentDetailProps {
   slug: string;
@@ -51,10 +54,16 @@ export interface AgentDetailProps {
 export function AgentDetail({ slug, basePath }: AgentDetailProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [tab, setTab] = useTabParam(TABS);
+  const agentQuery = useAsyncData(() => agentsApi.get(slug), [slug], { initialValue: null as Agent | null });
+  const manages = agentQuery.data?.can_manage ?? false;
+  // The Skills tab: for those who manage the agent, while the Skills module is on (asking needs skills:read).
+  const skillsTab = useAsyncData(() => (manages ? skillsStatus().then((s) => s.enabled) : Promise.resolve(false)), [manages], {
+    initialValue: false,
+  });
+  const tabs = useMemo(() => TABS.filter((name) => name !== "skills" || skillsTab.data), [skillsTab.data]);
+  const [tab, setTab] = useTabParam(tabs);
   const [opened, setOpened] = useState<Set<AgentTab>>(() => new Set([tab]));
 
-  const agentQuery = useAsyncData(() => agentsApi.get(slug), [slug], { initialValue: null as Agent | null });
   const versions = useAsyncData(() => agentsApi.versions(slug), [slug], { initialValue: [] as AgentVersion[] });
   // What the apps bring: the tab's badge counts what the gateway still holds back.
   const apps = useAsyncData(() => agentsApi.apps(slug), [slug], { initialValue: null as AppsReview | null });
@@ -119,6 +128,8 @@ export function AgentDetail({ slug, basePath }: AgentDetailProps) {
         );
       case "access":
         return <AgentAccessPanel agent={agent} onChanged={() => void reload()} />;
+      case "skills":
+        return <AgentSkillsPanel agent={agent} basePath={basePath} />;
       case "activity":
         return <AgentActivityPanel agent={agent} />;
     }
@@ -135,7 +146,7 @@ export function AgentDetail({ slug, basePath }: AgentDetailProps) {
         allowScrollButtonsMobile
         sx={{ borderBottom: 1, borderColor: "divider" }}
       >
-        {TABS.map((name) => (
+        {tabs.map((name) => (
           <Tab
             key={name}
             value={name}
@@ -157,7 +168,7 @@ export function AgentDetail({ slug, basePath }: AgentDetailProps) {
           />
         ))}
       </Tabs>
-      {TABS.filter((name) => opened.has(name) || name === tab).map((name) => (
+      {tabs.filter((name) => opened.has(name) || name === tab).map((name) => (
         <Box key={name} role="tabpanel" hidden={name !== tab}>
           {panel(name)}
         </Box>
