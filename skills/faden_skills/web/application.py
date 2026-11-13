@@ -75,6 +75,11 @@ async def _unreadable_request(
 
 async def _skill_error(_request: Request, exc: SkillError) -> JSONResponse:
     """A refusal from the skills layer, with the status it stands for."""
+    if exc.code:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": {"code": exc.code, "message": exc.detail}},
+        )
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 

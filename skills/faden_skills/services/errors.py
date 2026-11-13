@@ -4,13 +4,19 @@ from __future__ import annotations
 
 
 class SkillError(Exception):
-    """Base class; ``status_code`` is what the API answers with."""
+    """Base class; ``status_code`` is what the API answers with.
+
+    ``code`` names the refusal for a caller that tells refusals apart (the
+    console's texts); the API then answers ``{"detail": {"code", "message"}}``,
+    as the backend's own refusals do.
+    """
 
     status_code = 400
 
-    def __init__(self, detail: str) -> None:
+    def __init__(self, detail: str, *, code: str | None = None) -> None:
         super().__init__(detail)
         self.detail = detail
+        self.code = code
 
 
 class NotFoundError(SkillError):

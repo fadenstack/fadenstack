@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import io
+import uuid
 import zipfile
 from typing import Any
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import text
 
 from faden_skills.settings import settings
 from tests.conftest import ADMIN, SERVICE_TOKEN, as_user
@@ -649,6 +651,342 @@ async def test_a_skill_assigned_to_an_agent_comes_in_on_that_agent_only(
         json={"tenant_id": "default", "user_id": "alice", "assistant_id": agent, "assistant_version": 0},
     )
     assert bad.status_code == 422, "a version is a whole number from 1"
+
+
+# ── Assigning skills to agents as sets (sdk/51 F01b) ──────────────────
+
+AGENT_1 = "6f1c0d2e-0000-4000-8000-00000000b001"
+AGENT_2 = "6f1c0d2e-0000-4000-8000-00000000b002"
+AGENT_3 = "6f1c0d2e-0000-4000-8000-00000000b003"
+OTHER_ADMIN = as_user("admin-2", caps=("admin",), tenant="other")
+
+
+def _agent(n: int) -> str:
+    return f"6f1c0d2e-0000-4000-8000-{n:012d}"
+
+
+async def _org_skill(client: AsyncClient, name: str, **fields: Any) -> dict[str, Any]:
+    return await _create(
+        client,
+        ADMIN,
+        name=name,
+        owner="organization",
+        visibility="tenant",
+        **fields,
+    )
+
+
+async def _assign(
+    client: AsyncClient,
+    skill_id: str,
+    headers: dict[str, str] = ADMIN,
+    **body: Any,
+) -> Any:
+    return await client.post(
+        f"/api/skills/{skill_id}/assignments",
+        json=body,
+        headers=headers,
+    )
+
+
+async def _put_agents(
+    client: AsyncClient,
+    skill_id: str,
+    agent_ids: list[str],
+    headers: dict[str, str] = ADMIN,
+) -> Any:
+    return await client.put(
+        f"/api/skills/{skill_id}/assignments/agents",
+        json={"agent_ids": agent_ids},
+        headers=headers,
+    )
+
+
+async def _put_skills(
+    client: AsyncClient,
+    agent_id: str,
+    skill_ids: list[str],
+    headers: dict[str, str] = ADMIN,
+) -> Any:
+    return await client.put(
+        f"/api/skills/assignments/agents/{agent_id}",
+        json={"skill_ids": skill_ids},
+        headers=headers,
+    )
+
+
+async def _rows(client: AsyncClient, skill_id: str) -> list[dict[str, Any]]:
+    resp = await client.get(f"/api/skills/{skill_id}/assignments", headers=ADMIN)
+    assert resp.status_code == 200, resp.text
+    return resp.json()
+
+
+async def test_the_skill_side_put_replaces_only_its_agent_rows(
+    client: AsyncClient,
+) -> None:
+    skill = await _org_skill(client, "Pages")
+    everyone = (await _assign(client, skill["id"], target_type="tenant")).json()
+    first = (
+        await _assign(
+            client,
+            skill["id"],
+            target_type="assistant",
+            target_id=AGENT_1,
+            priority_override=70,
+        )
+    ).json()
+
+    resp = await _put_agents(client, skill["id"], [AGENT_1, AGENT_2])
+    assert resp.status_code == 200, resp.text
+    by_target = {(r["target_type"], r["target_id"]): r for r in resp.json()}
+    assert set(by_target) == {
+        ("tenant", None),
+        ("assistant", AGENT_1),
+        ("assistant", AGENT_2),
+    }
+    assert by_target[("tenant", None)]["id"] == everyone["id"], (
+        "another target's row stays"
+    )
+    kept = by_target[("assistant", AGENT_1)]
+    assert (kept["id"], kept["priority_override"]) == (first["id"], 70), (
+        "a kept row keeps its id and override"
+    )
+
+    again = await _put_agents(client, skill["id"], [AGENT_2, AGENT_1])
+    assert sorted(r["id"] for r in again.json()) == sorted(
+        r["id"] for r in resp.json()
+    ), "the same set again changes nothing"
+
+    fewer = await _put_agents(client, skill["id"], [AGENT_2])
+    assert {(r["target_type"], r["target_id"]) for r in fewer.json()} == {
+        ("tenant", None),
+        ("assistant", AGENT_2),
+    }
+    cleared = await _put_agents(client, skill["id"], [])
+    assert [r["target_type"] for r in cleared.json()] == ["tenant"]
+
+
+async def test_the_skill_side_put_drops_a_second_row_for_one_agent(
+    client: AsyncClient,
+) -> None:
+    """The old dialog took the same agent twice; the set keeps one row."""
+    from faden_skills.db.session import engine  # noqa: PLC0415
+
+    skill = await _org_skill(client, "Twice")
+    first = (
+        await _assign(client, skill["id"], target_type="assistant", target_id=AGENT_1)
+    ).json()
+    async with engine.begin() as conn:
+        await conn.execute(
+            text(
+                "INSERT INTO skill_assignments "
+                "(id, skill_id, target_type, target_id, enabled) "
+                "VALUES (gen_random_uuid(), :skill, 'assistant', :agent, true)",
+            ),
+            {"skill": skill["id"], "agent": AGENT_1},
+        )
+    assert len(await _rows(client, skill["id"])) == 2
+    resp = await _put_agents(client, skill["id"], [AGENT_1])
+    assert [r["id"] for r in resp.json()] == [first["id"]]
+
+
+async def test_assigning_to_agents_needs_admin_access(client: AsyncClient) -> None:
+    org = await _org_skill(client, "Org")
+    assert (
+        await _put_agents(client, org["id"], [AGENT_1], PUBLISHER)
+    ).status_code == 403
+    own = await _create(client, ALICE, name="Mine")
+    assert (
+        await _put_agents(client, own["id"], [AGENT_1], ALICE)
+    ).status_code == 403, "owning a skill is not administering its assignments"
+    assert (
+        await _put_skills(client, AGENT_1, [org["id"]], PUBLISHER)
+    ).status_code == 403
+    assert await _rows(client, org["id"]) == []
+
+
+async def test_a_request_names_at_most_100_ids_each_once(client: AsyncClient) -> None:
+    skill = await _org_skill(client, "Bounded")
+    assert (
+        await _put_agents(client, skill["id"], [_agent(n) for n in range(101)])
+    ).status_code == 422
+    assert (
+        await _put_agents(client, skill["id"], [AGENT_1, AGENT_1])
+    ).status_code == 422
+    assert (await _put_agents(client, skill["id"], [""])).status_code == 422
+    assert (await _put_agents(client, skill["id"], ["x" * 129])).status_code == 422
+    legacy = await _put_agents(client, skill["id"], ["typed-in-the-old-dialog"])
+    assert legacy.status_code == 200, "an old id stays; the backend checks new ones"
+    assert (
+        await _put_skills(client, AGENT_1, [skill["id"], skill["id"]])
+    ).status_code == 422
+    many = [str(uuid.UUID(int=n + 1)) for n in range(101)]
+    assert (await _put_skills(client, AGENT_1, many)).status_code == 422
+    resp = await _put_agents(client, skill["id"], [_agent(n) for n in range(100)])
+    assert resp.status_code == 200
+    assert len(resp.json()) == 100
+
+
+async def test_a_tenant_has_up_to_1000_assignments(client: AsyncClient) -> None:
+    assert settings.max_assignments_per_tenant == 1000
+    skills = [await _org_skill(client, f"Limit {n}") for n in range(11)]
+    for n, skill in enumerate(skills[:10]):
+        resp = await _put_agents(
+            client,
+            skill["id"],
+            [_agent(n * 100 + k) for k in range(100)],
+        )
+        assert resp.status_code == 200, resp.text
+
+    over = await _put_agents(client, skills[10]["id"], [AGENT_1])
+    assert over.status_code == 409
+    assert "1000" in over.json()["detail"]
+    assert await _rows(client, skills[10]["id"]) == []
+    assert (
+        await _assign(client, skills[10]["id"], target_type="tenant")
+    ).status_code == 409
+    assert (await _put_skills(client, AGENT_1, [skills[10]["id"]])).status_code == 409
+
+    swap = await _put_agents(
+        client,
+        skills[0]["id"],
+        [_agent(k) for k in range(99)] + [AGENT_1],
+    )
+    assert swap.status_code == 200, "removing as many as it adds stays within the limit"
+    fewer = await _put_agents(client, skills[0]["id"], [AGENT_1])
+    assert fewer.status_code == 200, "removing is always possible"
+    assert (await _put_agents(client, skills[10]["id"], [AGENT_2])).status_code == 200
+
+
+async def test_the_same_target_twice_is_refused(client: AsyncClient) -> None:
+    skill = await _org_skill(client, "Once")
+    assert (await _assign(client, skill["id"], target_type="tenant")).status_code == 201
+    again = await _assign(client, skill["id"], target_type="tenant")
+    assert again.status_code == 409
+    assert again.json()["detail"]["code"] == "already_assigned"
+    assert (
+        await _assign(client, skill["id"], target_type="assistant", target_id=AGENT_1)
+    ).status_code == 201
+    twice = await _assign(
+        client,
+        skill["id"],
+        target_type="assistant",
+        target_id=AGENT_1,
+    )
+    assert twice.status_code == 409
+    assert twice.json()["detail"]["code"] == "already_assigned"
+    assert (
+        await _assign(client, skill["id"], target_type="assistant", target_id=AGENT_2)
+    ).status_code == 201, "another agent is another target"
+    assert len(await _rows(client, skill["id"])) == 3
+
+
+async def test_an_agents_skills_list_its_own_and_everyones_as_the_caller_sees_them(
+    client: AsyncClient,
+) -> None:
+    own = await _org_skill(client, "Agent One Skill")
+    other = await _org_skill(client, "Agent Two Skill")
+    shared = await _org_skill(client, "For Everyone")
+    off = await _org_skill(client, "Switched Off")
+    hidden = await _create(client, BOB, name="Bobs Notes")
+    await _put_agents(client, own["id"], [AGENT_1])
+    await _put_agents(client, other["id"], [AGENT_2])
+    await _put_agents(client, hidden["id"], [AGENT_1])
+    await _assign(client, shared["id"], target_type="tenant")
+    await _assign(client, shared["id"], target_type="assistant", target_id=AGENT_1)
+    await _assign(client, off["id"], target_type="tenant", enabled=False)
+
+    def seen(resp: Any) -> set[tuple[str, str, str]]:
+        assert resp.status_code == 200, resp.text
+        return {(s["slug"], s["via"], s["access"]) for s in resp.json()}
+
+    as_admin = await client.get(
+        f"/api/skills/assignments/agents/{AGENT_1}",
+        headers=ADMIN,
+    )
+    assert seen(as_admin) == {
+        ("agent-one-skill", "agent", "admin"),
+        ("bobs-notes", "agent", "admin"),
+        ("for-everyone", "agent", "admin"),
+        ("for-everyone", "everyone", "admin"),
+    }
+    as_alice = await client.get(
+        f"/api/skills/assignments/agents/{AGENT_1}",
+        headers=ALICE,
+    )
+    assert seen(as_alice) == {
+        ("agent-one-skill", "agent", "read"),
+        ("for-everyone", "agent", "read"),
+        ("for-everyone", "everyone", "read"),
+    }, "Bob's private skill is not Alice's to see"
+    first = as_admin.json()[0]
+    assert set(first) == {"id", "name", "slug", "status", "access", "via"}
+
+
+async def test_the_agent_side_put_changes_only_the_callers_skills(
+    client: AsyncClient,
+) -> None:
+    one = await _org_skill(client, "One", publish=True)
+    two = await _org_skill(client, "Two", publish=True)
+    elsewhere = await _create(
+        client,
+        OTHER_ADMIN,
+        name="Elsewhere",
+        owner="organization",
+        visibility="global",
+        publish=True,
+    )
+    assert (
+        await _put_agents(client, elsewhere["id"], [AGENT_1], OTHER_ADMIN)
+    ).status_code == 200
+    await _put_agents(client, one["id"], [AGENT_1])
+
+    resp = await _put_skills(client, AGENT_1, [two["id"]])
+    assert resp.status_code == 200, resp.text
+    assert {(s["slug"], s["via"], s["access"]) for s in resp.json()} == {
+        ("two", "agent", "admin"),
+        ("elsewhere", "agent", "read"),
+    }, "another organisation's skill stays; this admin may only read it"
+    assert set(
+        await _resolve(client, "alice", assistant_id=AGENT_1, user_query="hi"),
+    ) == {
+        "two",
+        "elsewhere",
+    }, "what the tab shows is what the agent's chats get"
+
+    refused = await _put_skills(client, AGENT_1, [one["id"], elsewhere["id"]])
+    assert refused.status_code == 403
+    assert refused.json()["detail"]["code"] == "not_your_skill"
+    unknown = await _put_skills(client, AGENT_1, [one["id"], str(uuid.uuid4())])
+    assert unknown.status_code == 404
+    after = await client.get(f"/api/skills/assignments/agents/{AGENT_1}", headers=ADMIN)
+    assert {s["slug"] for s in after.json()} == {"two", "elsewhere"}, (
+        "a refused request changes nothing"
+    )
+
+    cleared = await _put_skills(client, AGENT_1, [])
+    assert [s["slug"] for s in cleared.json()] == ["elsewhere"]
+    assert await _rows(client, two["id"]) == []
+
+
+async def test_a_deleted_agent_loses_its_assignments(client: AsyncClient) -> None:
+    one = await _org_skill(client, "Kept Elsewhere")
+    await _put_agents(client, one["id"], [AGENT_1, AGENT_3])
+    await _assign(client, one["id"], target_type="tenant")
+    resp = await client.delete(f"/api/internal/agents/{AGENT_1}/assignments")
+    assert resp.status_code == 200
+    assert resp.json() == {"removed": 1}
+    assert {
+        (r["target_type"], r["target_id"]) for r in await _rows(client, one["id"])
+    } == {
+        ("assistant", AGENT_3),
+        ("tenant", None),
+    }
+    unauthenticated = await client.delete(
+        f"/api/internal/agents/{AGENT_3}/assignments",
+        headers={"Authorization": "Bearer wrong"},
+    )
+    assert unauthenticated.status_code in {401, 403}
 
 
 async def test_uses_are_counted(client: AsyncClient) -> None:

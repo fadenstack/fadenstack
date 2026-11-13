@@ -23,6 +23,7 @@ from faden_skills.services.access import Access, Principal
 from faden_skills.services.dao import (
     VIEW_ALL,
     VIEWS,
+    AgentSkill,
     GrantSpec,
     SkillDao,
     VersionContent,
@@ -31,6 +32,9 @@ from faden_skills.services.errors import ConflictError, ForbiddenError
 from faden_skills.settings import settings
 from faden_skills.web.api.auth import get_principal
 from faden_skills.web.api.skills.schemas import (
+    AgentAssignmentsRequest,
+    AgentSkillResponse,
+    AgentSkillsRequest,
     CompletionsResponse,
     CreateAssignmentRequest,
     CreateSkillRequest,
@@ -234,6 +238,45 @@ async def get_completions(
         ],
         file_types=["pdf", "xlsx", "docx", "csv", "json", "md", "txt", "html", "pptx"],
     )
+
+
+# ── An agent's skills ─────────────────────────────────────────────────
+# Declared before ``/{skill_id}``: these paths start with a word, not an id.
+# The service does not know agents; the backend checks the agent and that the
+# caller may manage it before it forwards these.
+
+
+@router.get(
+    "/assignments/agents/{agent_id}",
+    response_model=list[AgentSkillResponse],
+)
+async def list_agent_skills(
+    agent_id: uuid.UUID,
+    principal: Principal = Depends(get_principal),
+    session: AsyncSession = Depends(get_db_session),
+) -> list[AgentSkillResponse]:
+    """The skills the caller can see assigned to that agent, and to everyone."""
+    return _agent_skills(await SkillDao(session).agent_skills(principal, str(agent_id)))
+
+
+@router.put(
+    "/assignments/agents/{agent_id}",
+    response_model=list[AgentSkillResponse],
+)
+async def replace_agent_skills(
+    agent_id: uuid.UUID,
+    body: AgentSkillsRequest,
+    principal: Principal = Depends(get_principal),
+    session: AsyncSession = Depends(get_db_session),
+) -> list[AgentSkillResponse]:
+    """Assign the agent exactly these skills, among those the caller administers.
+
+    A listed skill the caller does not administer refuses the whole request
+    (403; one they cannot see, 404). The others' assignments stay.
+    """
+    dao = SkillDao(session)
+    await dao.replace_agent_skills(principal, str(agent_id), body.skill_ids)
+    return _agent_skills(await dao.agent_skills(principal, str(agent_id)))
 
 
 # ── One skill ─────────────────────────────────────────────────────────
@@ -554,6 +597,26 @@ async def create_assignment(
     return SkillAssignmentResponse.model_validate(assignment)
 
 
+@router.put(
+    "/{skill_id}/assignments/agents",
+    response_model=list[SkillAssignmentResponse],
+)
+async def replace_agent_assignments(
+    skill_id: uuid.UUID,
+    body: AgentAssignmentsRequest,
+    principal: Principal = Depends(get_principal),
+    session: AsyncSession = Depends(get_db_session),
+) -> list[SkillAssignmentResponse]:
+    """Assign the skill to exactly these agents; its other assignments stay.
+
+    The backend has checked that each id is an agent the caller can see.
+    """
+    dao = SkillDao(session)
+    skill, access = await dao.get_skill(skill_id, principal)
+    rows = await dao.replace_agent_assignments(skill, access, body.agent_ids)
+    return [SkillAssignmentResponse.model_validate(a) for a in rows]
+
+
 @router.delete("/{skill_id}/assignments/{assignment_id}", status_code=204)
 async def delete_assignment(
     skill_id: uuid.UUID,
@@ -596,6 +659,20 @@ def _need_owner() -> None:
 
 def _need_admin() -> None:
     raise ForbiddenError("Only administrators manage assignments.")
+
+
+def _agent_skills(found: list[AgentSkill]) -> list[AgentSkillResponse]:
+    return [
+        AgentSkillResponse(
+            id=item.skill.id,
+            name=item.skill.name,
+            slug=item.skill.slug,
+            status=item.skill.status,
+            access=item.access.label,  # type: ignore[arg-type]
+            via=item.via,  # type: ignore[arg-type]
+        )
+        for item in found
+    ]
 
 
 def _summary(skill: SkillModel, access: Access) -> SkillSummaryResponse:

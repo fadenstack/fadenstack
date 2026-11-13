@@ -113,7 +113,7 @@ class SkillFileResponse(BaseModel):
 
 
 class PrincipalRemovedResponse(BaseModel):
-    """How many grants a removed user or group had."""
+    """How many rows a removed user or group (grants), or agent (assignments), had."""
 
     removed: int
 
@@ -278,4 +278,17 @@ async def remove_principal(
     if principal_type not in {"user", "group"}:
         return PrincipalRemovedResponse(removed=0)
     removed = await SkillDao(session).remove_principal(principal_type, principal_id)
+    return PrincipalRemovedResponse(removed=removed)
+
+
+@router.delete(
+    "/agents/{agent_id}/assignments",
+    response_model=PrincipalRemovedResponse,
+)
+async def remove_agent_assignments(
+    agent_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db_session),
+) -> PrincipalRemovedResponse:
+    """Drop the assignments to an agent the backend has deleted."""
+    removed = await SkillDao(session).remove_agent(str(agent_id))
     return PrincipalRemovedResponse(removed=removed)

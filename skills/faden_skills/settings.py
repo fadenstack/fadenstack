@@ -72,7 +72,9 @@ class Settings(BaseSettings):
     # Skills one person may own. Versions are not limited: none is ever
     # deleted, since the audit log names the version a chat used.
     max_skills_per_user: int = 200
-    max_assignments_per_tenant: int = 10
+    # Assignments across all of a tenant's skills. A skill assigned to a few
+    # agents is a row per agent, so 10 was reached by one pick in the console.
+    max_assignments_per_tenant: int = 1000
     default_max_resolve_results: int = 3
     # Skills asked for by name ($slug, the chat's picker) come on top of the
     # ones that match on their own, up to this many.

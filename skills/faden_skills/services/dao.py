@@ -10,17 +10,19 @@ from __future__ import annotations
 import difflib
 import hashlib
 import uuid
+from collections.abc import Hashable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
-from typing import Any
+from typing import Any, TypeVar
 
-from sqlalchemy import and_, delete, func, or_, select, tuple_
+from sqlalchemy import ColumnElement, and_, delete, func, or_, select, tuple_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only
 
 from faden_skills.db.models.skill import (
+    AssignmentTargetType,
     GrantAccess,
     PrincipalType,
     SkillActivation,
@@ -92,9 +94,58 @@ class Resolved:
     match: Match
 
 
+#: How a skill reaches an agent by assignment (``agent_skills``).
+VIA_AGENT = "agent"
+VIA_EVERYONE = "everyone"
+
+#: Assignment targets that reach every agent.
+_EVERYONE = (AssignmentTargetType.TENANT.value, AssignmentTargetType.GLOBAL.value)
+
+
+@dataclass
+class AgentSkill:
+    """A skill assigned to an agent, or to everyone, as its caller sees it."""
+
+    skill: SkillModel
+    access: Access
+    via: str
+
+
 def _require(access: Access, needed: Access, what: str) -> None:
     if access < needed:
         raise ForbiddenError(f"You may not {what} this skill.")
+
+
+def _lock_key(name: str) -> int:
+    """A signed 64-bit key for ``pg_advisory_xact_lock``, the same in every process.
+
+    Not ``hash``: it changes from one process to the next.
+    """
+    digest = hashlib.sha256(name.encode()).digest()
+    return int.from_bytes(digest[:8], "big", signed=True)
+
+
+_K = TypeVar("_K", bound=Hashable)
+
+
+def _changes(
+    rows: list[tuple[uuid.UUID, _K]],
+    wanted: list[_K],
+) -> tuple[list[uuid.UUID], list[_K]]:
+    """What turns *rows* (``(id, target)``) into exactly *wanted*.
+
+    The rows that go, and the targets that are new. The first row for a
+    wanted target stays as it is; a second one for the same target goes.
+    """
+    want = set(wanted)
+    kept: set[_K] = set()
+    gone: list[uuid.UUID] = []
+    for row_id, target in rows:
+        if target in want and target not in kept:
+            kept.add(target)
+        else:
+            gone.append(row_id)
+    return gone, [target for target in wanted if target not in kept]
 
 
 class SkillDao:
@@ -769,21 +820,26 @@ class SkillDao:
         enabled: bool = True,
         priority_override: int | None = None,
     ) -> SkillAssignmentModel:
-        """Assign the skill to a target."""
+        """Assign the skill to a target; the same target twice is refused (409)."""
         _require(access, Access.ADMIN, "assign")
-        count = (
+        await self._lock_assignments(skill.tenant_id)
+        taken = (
             await self._session.execute(
-                select(func.count())
-                .select_from(SkillAssignmentModel)
-                .join(SkillModel, SkillAssignmentModel.skill_id == SkillModel.id)
-                .where(SkillModel.tenant_id == skill.tenant_id),
+                select(SkillAssignmentModel.id).where(
+                    SkillAssignmentModel.skill_id == skill.id,
+                    SkillAssignmentModel.target_type == target_type,
+                    SkillAssignmentModel.target_id.is_not_distinct_from(
+                        target_id or None,
+                    ),
+                ),
             )
-        ).scalar_one()
-        if count >= settings.max_assignments_per_tenant:
-            raise LimitError(
-                f"Tenant has reached the maximum of "
-                f"{settings.max_assignments_per_tenant} assignments.",
+        ).first()
+        if taken is not None:
+            raise ConflictError(
+                "The skill is already assigned to this target.",
+                code="already_assigned",
             )
+        await self._check_assignment_limit(skill.tenant_id, adding=1)
         assignment = SkillAssignmentModel(
             skill_id=skill.id,
             target_type=target_type,
@@ -815,6 +871,233 @@ class SkillDao:
         )
         if not result.rowcount:  # type: ignore[attr-defined]
             raise NotFoundError("Assignment not found.")
+
+    async def replace_agent_assignments(
+        self,
+        skill: SkillModel,
+        access: Access,
+        agent_ids: list[str],
+    ) -> list[SkillAssignmentModel]:
+        """Assign *skill* to exactly the agents *agent_ids* (target ``assistant``).
+
+        Rows of the other targets stay. A row for an agent still listed stays
+        as it is, with its id and ``priority_override``; a second row for the
+        same agent (the old dialog took one twice) goes.
+        """
+        _require(access, Access.ADMIN, "assign")
+        await self._lock_assignments(skill.tenant_id)
+        rows = await self._agent_rows(SkillAssignmentModel.skill_id == skill.id)
+        gone, new = _changes(
+            [(row.id, row.target_id or "") for row in rows],
+            list(dict.fromkeys(agent_ids)),
+        )
+        await self._check_assignment_limit(
+            skill.tenant_id,
+            adding=len(new),
+            removing=len(gone),
+        )
+        await self._delete_assignments(gone)
+        for agent in new:
+            self._add_agent_row(skill.id, agent)
+        await self._session.flush()
+        return await self.list_assignments(skill)
+
+    async def agent_skills(
+        self,
+        principal: Principal,
+        agent_id: str,
+    ) -> list[AgentSkill]:
+        """The skills *principal* can see that reach the agent *agent_id*.
+
+        ``via`` is ``agent`` for an assignment to that agent and ``everyone``
+        for one to the whole organisation (``tenant``) or every one
+        (``global``) that is on. A skill can come both ways: then it is
+        listed once each way.
+        """
+        to_agent = and_(
+            SkillAssignmentModel.target_type == AssignmentTargetType.ASSISTANT.value,
+            SkillAssignmentModel.target_id == agent_id,
+        )
+        to_everyone = and_(
+            SkillAssignmentModel.target_type.in_(_EVERYONE),
+            SkillAssignmentModel.enabled.is_(True),
+        )
+        rows = (
+            await self._session.execute(
+                select(SkillModel, SkillAssignmentModel.target_type)
+                .join(
+                    SkillAssignmentModel,
+                    SkillAssignmentModel.skill_id == SkillModel.id,
+                )
+                .where(visible_clause(principal), or_(to_agent, to_everyone))
+                .order_by(func.lower(SkillModel.name), SkillModel.id),
+            )
+        ).all()
+        grants = await self.grants_for(list({skill.id for skill, _ in rows}))
+        found: dict[tuple[uuid.UUID, str], AgentSkill] = {}
+        for skill, target_type in rows:
+            via = (
+                VIA_AGENT
+                if target_type == AssignmentTargetType.ASSISTANT.value
+                else VIA_EVERYONE
+            )
+            found.setdefault(
+                (skill.id, via),
+                AgentSkill(
+                    skill,
+                    access_to(principal, skill, grants.get(skill.id, [])),
+                    via,
+                ),
+            )
+        return list(found.values())
+
+    async def replace_agent_skills(
+        self,
+        principal: Principal,
+        agent_id: str,
+        skill_ids: list[uuid.UUID],
+    ) -> None:
+        """Assign *agent_id* exactly *skill_ids*, of the skills *principal* administers.
+
+        A listed skill they cannot see is "not found" and one they do not
+        administer "forbidden": the whole request is refused, nothing changes.
+        Assignments of skills they do not administer stay as they are.
+        """
+        await self._lock_assignments(principal.tenant_id)
+        wanted = list(dict.fromkeys(skill_ids))
+        rows = await self._agent_rows(SkillAssignmentModel.target_id == agent_id)
+        access = await self._access_to_skills(
+            principal,
+            set(wanted) | {row.skill_id for row in rows},
+        )
+        for skill_id in wanted:
+            level = access.get(skill_id, Access.NONE)
+            if level == Access.NONE:
+                raise NotFoundError("Skill not found.")
+            if level < Access.ADMIN:
+                raise ForbiddenError(
+                    f"You may not assign the skill {skill_id}.",
+                    code="not_your_skill",
+                )
+        theirs = [
+            (row.id, row.skill_id)
+            for row in rows
+            if access.get(row.skill_id, Access.NONE) >= Access.ADMIN
+        ]
+        gone, new = _changes(theirs, wanted)
+        await self._check_assignment_limit(
+            principal.tenant_id,
+            adding=len(new),
+            removing=len(gone),
+        )
+        await self._delete_assignments(gone)
+        for skill_id in new:
+            self._add_agent_row(skill_id, agent_id)
+        await self._session.flush()
+
+    async def remove_agent(self, agent_id: str) -> int:
+        """Drop every assignment to a deleted agent; how many there were."""
+        result = await self._session.execute(
+            delete(SkillAssignmentModel).where(
+                SkillAssignmentModel.target_type
+                == AssignmentTargetType.ASSISTANT.value,
+                SkillAssignmentModel.target_id == agent_id,
+            ),
+        )
+        return int(result.rowcount or 0)  # type: ignore[attr-defined]
+
+    async def _access_to_skills(
+        self,
+        principal: Principal,
+        skill_ids: set[uuid.UUID],
+    ) -> dict[uuid.UUID, Access]:
+        """What *principal* may do with each of *skill_ids* that exists."""
+        if not skill_ids:
+            return {}
+        skills = list(
+            (
+                await self._session.execute(
+                    select(SkillModel).where(SkillModel.id.in_(skill_ids)),
+                )
+            ).scalars(),
+        )
+        grants = await self.grants_for([skill.id for skill in skills])
+        return {
+            skill.id: access_to(principal, skill, grants.get(skill.id, []))
+            for skill in skills
+        }
+
+    async def _agent_rows(
+        self,
+        *where: ColumnElement[bool],
+    ) -> list[SkillAssignmentModel]:
+        """Assignments to agents (``assistant``) that match *where*, oldest first."""
+        return list(
+            (
+                await self._session.execute(
+                    select(SkillAssignmentModel)
+                    .where(
+                        SkillAssignmentModel.target_type
+                        == AssignmentTargetType.ASSISTANT.value,
+                        *where,
+                    )
+                    .order_by(
+                        SkillAssignmentModel.created_at,
+                        SkillAssignmentModel.id,
+                    ),
+                )
+            )
+            .scalars()
+            .all(),
+        )
+
+    def _add_agent_row(self, skill_id: uuid.UUID, agent_id: str) -> None:
+        self._session.add(
+            SkillAssignmentModel(
+                skill_id=skill_id,
+                target_type=AssignmentTargetType.ASSISTANT.value,
+                target_id=agent_id,
+            ),
+        )
+
+    async def _delete_assignments(self, ids: list[uuid.UUID]) -> None:
+        if ids:
+            await self._session.execute(
+                delete(SkillAssignmentModel).where(SkillAssignmentModel.id.in_(ids)),
+            )
+
+    async def _lock_assignments(self, tenant_id: str) -> None:
+        """Take the tenant's assignment lock until the transaction ends.
+
+        Without a unique index (and no migration in 0.7.1), two changes at once
+        could each find a target free, or each count below the limit.
+        """
+        key = _lock_key(f"skill-assignments:{tenant_id}")
+        await self._session.execute(select(func.pg_advisory_xact_lock(key)))
+
+    async def _check_assignment_limit(
+        self,
+        tenant_id: str,
+        *,
+        adding: int,
+        removing: int = 0,
+    ) -> None:
+        """Refuse a change that adds rows past the tenant's limit."""
+        if adding <= 0:
+            return
+        count = (
+            await self._session.execute(
+                select(func.count())
+                .select_from(SkillAssignmentModel)
+                .join(SkillModel, SkillAssignmentModel.skill_id == SkillModel.id)
+                .where(SkillModel.tenant_id == tenant_id),
+            )
+        ).scalar_one()
+        if count - removing + adding > settings.max_assignments_per_tenant:
+            raise LimitError(
+                f"Tenant has reached the maximum of "
+                f"{settings.max_assignments_per_tenant} assignments.",
+            )
 
     # ── Chats ─────────────────────────────────────────────────────────
 

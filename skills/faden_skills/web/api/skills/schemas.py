@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal, TypeVar
 
-from pydantic import BaseModel, Field
+from pydantic import AfterValidator, BaseModel, Field
 
 Visibility = Literal["private", "tenant", "global"]
 Activation = Literal["always", "auto", "manual"]
@@ -107,6 +107,45 @@ class CreateAssignmentRequest(BaseModel):
     priority_override: int | None = Field(default=None, ge=0, le=100)
 
 
+#: Ids one request may name (ASVS 5.0 V2: bounded input); the tenant's limit
+#: (``max_assignments_per_tenant``) counts the rows.
+MAX_IDS_PER_REQUEST = 100
+
+
+_Id = TypeVar("_Id", str, uuid.UUID)
+
+
+def _unique(ids: list[_Id]) -> list[_Id]:
+    if len(set(ids)) != len(ids):
+        raise ValueError("Each id may be named once.")
+    return ids
+
+
+class AgentAssignmentsRequest(BaseModel):
+    """The agents a skill is assigned to (replaces its ``assistant`` assignments).
+
+    Ids as the assignments hold them (``target_id``): the backend checks that
+    each one the skill does not have yet is an agent the caller can see. One
+    an older client stored that names no agent can stay until it is removed.
+    """
+
+    agent_ids: Annotated[
+        list[Annotated[str, Field(min_length=1, max_length=128)]],
+        Field(max_length=MAX_IDS_PER_REQUEST),
+        AfterValidator(_unique),
+    ]
+
+
+class AgentSkillsRequest(BaseModel):
+    """The skills assigned to an agent, among those the caller administers."""
+
+    skill_ids: Annotated[
+        list[uuid.UUID],
+        Field(max_length=MAX_IDS_PER_REQUEST),
+        AfterValidator(_unique),
+    ]
+
+
 # ── Responses ─────────────────────────────────────────────────────────
 
 
@@ -143,6 +182,19 @@ class SkillAssignmentResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class AgentSkillResponse(BaseModel):
+    """A skill that reaches an agent by assignment."""
+
+    id: uuid.UUID
+    name: str
+    slug: str
+    status: str
+    #: What the caller may do with it: only ``admin`` changes its assignments.
+    access: AccessLabel
+    #: ``agent``: assigned to this agent; ``everyone``: to the whole organisation.
+    via: Literal["agent", "everyone"]
 
 
 class SkillSummaryResponse(BaseModel):
