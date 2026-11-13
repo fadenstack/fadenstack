@@ -461,6 +461,89 @@ async def test_only_a_stray_model_of_fadenstacks_can_be_taken(
         await takeover.take_over_models(dbsession, None, environment_id=env.id, app_names=[APP])
 
 
+class _Gateway:
+    """The command channel to the machines: records what is issued."""
+
+    def __init__(self) -> None:
+        self.issued: list[dict[str, Any]] = []
+
+    async def issue(self, **kwargs: Any) -> Any:
+        self.issued.append(kwargs)
+        return None
+
+
+@pytest.mark.anyio
+async def test_a_stray_model_is_removed_on_the_head(
+    dbsession: AsyncSession, pair: tuple[InfraNode, InfraNode], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """What deleting its deployment would have done: its app is deleted on the cluster's head."""
+    head, _worker = pair
+    env = await _managed_pair(dbsession, head, monkeypatch)
+    _answering(monkeypatch, _Machine(_both()))
+    gateway = _Gateway()
+
+    result = await takeover.remove_stray_models(dbsession, gateway, environment_id=env.id, app_names=[STRAY])
+
+    assert result["removing"] == [STRAY]
+    [command] = gateway.issued
+    assert command["node_id"] == env.head_node_id
+    assert command["command_type"] == NodeCommandType.DELETE_SERVE_APP.value
+    assert command["payload"]["app_name"] == STRAY
+    assert command["idempotency_key"] == f"inference-deployment:delete:{STRAY}:{env.head_node_id}", (
+        "the key a deployment's own teardown uses: a remove while one is on its way joins it")
+
+
+@pytest.mark.anyio
+async def test_only_a_stray_model_of_fadenstacks_can_be_removed(
+    dbsession: AsyncSession, pair: tuple[InfraNode, InfraNode], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    head, _worker = pair
+    env = await _managed_pair(dbsession, head, monkeypatch)
+    _answering(monkeypatch, _Machine(_both()))
+    gateway = _Gateway()
+    with pytest.raises(takeover.TakeoverError, match=r"runs no model of Fadenstack's called someone-elses-app"):
+        await takeover.remove_stray_models(dbsession, gateway, environment_id=env.id, app_names=["someone-elses-app"])
+    with pytest.raises(takeover.TakeoverError, match="delete the deployment instead"):
+        await takeover.remove_stray_models(dbsession, gateway, environment_id=env.id, app_names=[STRAY, APP])
+    not_running = f"faden-{uuid.uuid4()}"
+    with pytest.raises(takeover.TakeoverError, match="runs no model of Fadenstack's called"):
+        await takeover.remove_stray_models(dbsession, gateway, environment_id=env.id, app_names=[not_running])
+    assert gateway.issued == [], "nothing is sent unless every one named checks out"
+
+
+def test_stray_apps_are_fadenstacks_own_that_no_deployment_owns() -> None:
+    owned = {APP.removeprefix("faden-")}
+    leaving = f"faden-{uuid.uuid4()}"
+    serve = {"available": True, "apps": {
+        APP: {"status": "RUNNING"},
+        STRAY: {"status": "RUNNING"},
+        "someone-elses-app": {"status": "RUNNING"},
+        # Its deployment was purged a moment ago; Serve is taking it down.
+        leaving: {"status": "DELETING"},
+    }}
+    assert takeover.stray_app_names(serve, owned) == [STRAY]
+    # The agent's host path wraps the same fields.
+    assert takeover.stray_app_names({"alive": True, "serve": serve}, owned) == [STRAY]
+    assert takeover.stray_app_names(None, owned) == []
+
+
+@pytest.mark.anyio
+async def test_the_note_carries_the_snapshot_it_was_made_from(
+    dbsession: AsyncSession, pair: tuple[InfraNode, InfraNode], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    head, _worker = pair
+    env = await _managed_pair(dbsession, head, monkeypatch)
+    at = "2026-11-13T12:00:00+00:00"
+    env.observed_status_json = {**(env.observed_status_json or {}), "cluster_observed_at": at}
+    serve = {"available": True, "apps": {APP: {"status": "RUNNING"}, STRAY: {"status": "RUNNING"}}}
+
+    await takeover.note_stray_apps(dbsession, env, serve)
+    assert env.observed_status_json["stray_apps"] == {"at": at, "apps": [STRAY]}
+
+    await takeover.note_stray_apps(dbsession, env, None)
+    assert env.observed_status_json["stray_apps"]["apps"] == [STRAY], "a look without Serve keeps the note"
+
+
 
 @pytest.mark.anyio
 async def test_a_model_deployed_with_the_external_scaler_keeps_scaling_in_place(

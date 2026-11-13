@@ -248,6 +248,13 @@ export default function ClusterDetailPage() {
   const step = clusterReadiness(cluster, data.members, data.deployments);
   const observed = asRecord(cluster.observed_status);
   const conditions = asRecordArray(observed.conditions);
+  // Models the last health check found running with no deployment here --
+  // shown only beside the snapshot that note was made from.
+  const strayNote = asRecord(observed.stray_apps);
+  const strayNoted =
+    strayNote.at && strayNote.at === observed.cluster_observed_at && Array.isArray(strayNote.apps)
+      ? strayNote.apps.map(String)
+      : [];
   const accelerators = data.members.reduce((sum, m) => {
     const node = data.nodes.find((n) => n.id === m.node_id);
     return sum + (node ? gpuCount(node) : 0);
@@ -691,6 +698,7 @@ export default function ClusterDetailPage() {
           it the new row read "unknown model" until the page was reloaded. */}
       <StrayModelsCard
         environmentId={id!}
+        noted={strayNoted}
         onTakenOver={() => {
           void deployments.refresh();
           void models.refresh();

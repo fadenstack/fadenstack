@@ -135,6 +135,25 @@ async def test_a_cluster_that_is_up_is_looked_at_not_started_again(
     assert env.observed_generation == env.generation
 
 
+async def test_the_look_notes_models_no_deployment_owns_without_asking_more(
+    probe_env, dbsession: AsyncSession, quick: None,
+) -> None:
+    """The cluster status already lists Serve's applications: the note costs no command."""
+    _cp, env, _nodes = probe_env
+    _up(env)
+    stray = f"faden-{uuid.uuid4()}"
+    answer = {**_probe(HEAD_IP, WORKER_IP), "serve": {"available": True, "apps": {
+        stray: {"status": "RUNNING"}, "someone-elses-app": {"status": "RUNNING"},
+    }}}
+    fake = _Scripted({STATUS: [answer]})
+
+    await _pass(dbsession, env, fake)
+
+    assert fake.types == [STATUS]
+    note = env.observed_status_json["stray_apps"]
+    assert note == {"at": env.observed_status_json["cluster_observed_at"], "apps": [stray]}
+
+
 async def test_the_start_sequence_marks_the_cluster_as_up(
     probe_env, dbsession: AsyncSession, quick: None,
 ) -> None:

@@ -504,15 +504,65 @@ async def test_deployment_reconcile_queues_for_reconciler(
     assert "no live actions" not in str(body.get("observed_status"))
 
 
-async def test_deployment_delete_204(
+async def test_deployment_delete_204_marks_it_for_the_reconciler(
     client: AsyncClient, authed_fapp: FastAPI, dbsession: AsyncSession
 ) -> None:
+    """Even one that never ran: the reconciler's pass may be sending its apply right now.
+
+    Removing such a row straight away left that application running on the
+    cluster with no deployment to own it.
+    """
     env, model_id = await _seed_env_and_model(client, dbsession, "cp-del", "env-del")
     dep = await _create_deploy(client, env, model_id, "del")
     r = await client.delete(f"{API}/deployments/{dep['id']}")
     assert r.status_code == 204
-    r2 = await client.get(f"{API}/deployments/{dep['id']}")
-    assert r2.status_code == 404
+    body = (await client.get(f"{API}/deployments/{dep['id']}")).json()
+    assert body["desired_state"] == "deleted"
+    assert body["observed_generation"] < body["generation"], "queued for the reconciler"
+    listed = (await client.get(f"{API}/deployments")).json()
+    assert dep["id"] not in {d["id"] for d in listed}
+
+    # Asked again: nothing new to do.
+    assert (await client.delete(f"{API}/deployments/{dep['id']}")).status_code == 204
+    again = (await client.get(f"{API}/deployments/{dep['id']}")).json()
+    assert again["generation"] == body["generation"]
+
+    # A cluster with a deployment still being removed is not deleted under it
+    # (the database would refuse, as an error nobody could read).
+    r = await client.delete(f"{API}/environments/{env['id']}")
+    assert r.status_code == 409
+    assert "still being removed" in r.text
+
+
+@pytest.mark.parametrize("names", [[], ["someone-elses-app"], ["faden-../../x"], [f"faden-{'0' * 36}"] * 33])
+async def test_removing_stray_models_takes_only_fadenstack_app_names(
+    client: AsyncClient, authed_fapp: FastAPI, names: list[str]
+) -> None:
+    """Checked before anything is asked of a machine (ASVS 5.1.3: input validated against an allow-list)."""
+    r = await client.post(f"{API}/environments/{uuid.uuid4()}/stray-models/remove", json={"app_names": names})
+    assert r.status_code == 422
+
+
+async def test_without_a_driver_a_deleted_deployment_is_purged(
+    client: AsyncClient, authed_fapp: FastAPI, dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Nothing could have started an application for it, so nothing is waited for."""
+    from faden_backend.db.models.inference import InferenceDeployment
+    from faden_backend.services.inference import reconciliation as reconciliation_mod
+    from faden_backend.services.inference.reconciliation import ReconciliationContext, reconcile_deployment
+
+    env, model_id = await _seed_env_and_model(client, dbsession, "cp-del-nodrv", "env-del-nodrv")
+    dep = await _create_deploy(client, env, model_id, "del-nodrv")
+    assert (await client.delete(f"{API}/deployments/{dep['id']}")).status_code == 204
+    row = await dbsession.get(InferenceDeployment, uuid.UUID(dep["id"]))
+    await dbsession.refresh(row)
+
+    monkeypatch.setattr(reconciliation_mod.registry, "get", lambda name: None)
+    result = await reconcile_deployment(ReconciliationContext.for_session(dbsession), row)
+    assert result["reason"] == "deleted"
+    await dbsession.flush()
+    assert (await client.get(f"{API}/deployments/{dep['id']}")).status_code == 404
+    await _create_deploy(client, env, model_id, "del-nodrv")
 
 
 async def test_deleting_a_serving_deployment_takes_its_model_off_the_machines_first(

@@ -3571,7 +3571,7 @@
     },
     "stray": {
       "title": "Modèles qui tournent ici sans déploiement",
-      "description": "Un déploiement supprimé alors que son cluster était injoignable laisse son modèle tourner : il occupe des GPU et répond toujours sur la passerelle. Recherchez ces modèles et reprenez-en un pour le gérer à nouveau : le garder, ou le supprimer proprement.",
+      "description": "Un déploiement supprimé alors que son cluster était injoignable laisse son modèle tourner : il occupe des GPU et répond toujours sur la passerelle. Recherchez ces modèles, puis reprenez-en un pour le gérer à nouveau, ou retirez-le du cluster.",
       "check": "Les rechercher",
       "checking": "Interrogation du cluster...",
       "none": "Chaque modèle de ce cluster a ici son déploiement.",
@@ -3579,7 +3579,13 @@
       "col_model": "Modèle",
       "col_running": "Copies en cours",
       "col_alias": "Nom sur la passerelle",
-      "take_over": "Reprendre"
+      "take_over": "Reprendre",
+      "noted_one": "La dernière vérification du cluster a trouvé un modèle qui tourne ici sans déploiement. Recherchez-le pour le reprendre ou le retirer.",
+      "noted_other": "La dernière vérification du cluster a trouvé {{count}} modèles qui tournent ici sans déploiement. Recherchez-les pour les reprendre ou les retirer.",
+      "remove": "Retirer",
+      "remove_title": "Retirer ce modèle du cluster ?",
+      "remove_confirm": "{{name}} ({{app}}) s'arrête sur le cluster et libère ses accélérateurs. Les requêtes qui lui sont adressées sur la passerelle échouent ensuite. Cette action est irréversible ; pour utiliser à nouveau le modèle, hébergez-le de nouveau.",
+      "removing": "{{name}} est en cours de retrait du cluster. Recherchez à nouveau dans une minute pour confirmer qu'il a disparu."
     },
     "model_tls": {
       "title": "Trafic des modèles",

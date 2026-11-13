@@ -240,9 +240,14 @@ cannot. The change applies to the next model placed on the cluster.
 
 ## Models running without a deployment
 
-A deployment deleted while its cluster could not be reached can leave its model running: it holds GPUs and still
-answers at the gateway. Under **Models running here without a deployment**, select **Look for them**, then
-**Take over** a model to manage it again: keep it, or delete it properly.
+A deployment deleted while its cluster's head machine was away can leave its model running: it holds GPUs and
+still answers at the gateway. The cluster's health check, every minute, notices such models, and the card
+**Models running here without a deployment** then says how many it found. Select **Look for them** to list them,
+then for each:
+
+- **Take over** manages it again as an ordinary deployment: keep it, or delete it properly.
+- **Remove** deletes it on the cluster and frees its accelerators. Requests to it at the gateway fail from then
+  on. A model's copies can take a minute to stop; select **Look for them** again to confirm it is gone.
 
 ## When it does not work
 

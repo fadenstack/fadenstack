@@ -22,15 +22,22 @@ names shown in the console. Those the admin gives when taking over.
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
 from typing import Any
 
 from faden_backend.services import machine_tls
-from faden_backend.services.inference.bundles import RUNTIME_KEY, default_bundle_registry
+from faden_backend.services.inference.bundles import (
+    RUNTIME_KEY,
+    default_bundle_registry,
+    runtime_bundle_payload_for,
+)
 from faden_backend.services.inference.drivers.ray.compiler import (
     DEFAULT_LOGGING_CONFIG,
 )
+
+log = logging.getLogger(__name__)
 
 #: Apps Fadenstack deploys are named ``faden-<deployment id>``.
 APP_PREFIX = "faden-"
@@ -953,3 +960,92 @@ async def take_over_models(
     wake_reconciler_after_commit(session)
     await session.commit()
     return {"environment_id": str(env.id), "deployments": taken, "by": str(user_id) if user_id else None}
+
+
+def stray_app_names(serve: Any, owned: set[str]) -> list[str]:
+    """Fadenstack's apps in a Serve status that no deployment in *owned* (ids) is named after.
+
+    Apps Serve is deleting are left out: one whose deployment was purged a
+    moment ago is on its way out, not stray.
+    """
+    from faden_backend.services.inference.drivers.ray.client import _parse_serve_status  # noqa: PLC0415
+
+    apps = _parse_serve_status(serve if isinstance(serve, dict) else None).apps
+    stray = []
+    for name, entry in apps.items():
+        deployment_id = deployment_id_of(str(name))
+        if deployment_id is None or deployment_id in owned:
+            continue
+        if str((entry or {}).get("status") or "").upper() == "DELETING":
+            continue
+        stray.append(str(name))
+    return sorted(stray)
+
+
+async def note_stray_apps(session: Any, environment: Any, serve: Any) -> None:
+    """Note on *environment* its stray apps, from the Serve status a health check just read.
+
+    Nothing extra is asked of the cluster: the status it took already lists
+    Serve's applications. The note carries the time of the snapshot it was
+    made from, so the cluster page shows it only beside that snapshot.
+    ``serve`` ``None`` (the probe did not carry Serve) keeps the last note.
+    """
+    if not isinstance(serve, dict):
+        return
+    observed = dict(environment.observed_status_json or {})
+    observed["stray_apps"] = {
+        "at": observed.get("cluster_observed_at"),
+        "apps": stray_app_names(serve, await _deployment_ids(session)),
+    }
+    environment.observed_status_json = observed
+
+
+async def remove_stray_models(
+    session: Any,
+    gateway: Any,
+    *,
+    environment_id: Any,
+    app_names: list[str],
+    user_id: Any = None,
+) -> dict[str, Any]:
+    """Delete models a managed cluster runs without a deployment here, on its head.
+
+    Each is checked against the cluster as it is now: only Fadenstack's own
+    apps that no deployment here owns -- a deployment's own model goes by
+    deleting the deployment. The deletes are queued on the head, not waited
+    for (a model's copies can take a minute to let go); the head runs them in
+    order, after anything it was already doing.
+    """
+    from faden_backend.db.models.node_control import NodeCommandType  # noqa: PLC0415
+
+    env = await _managed_cluster(session, environment_id)
+    if not app_names:
+        raise TakeoverError("Choose the models to remove.")
+    doc = await _client(gateway).describe_cluster(node_id=env.head_node_id)
+    if not doc or not doc.get("attached"):
+        raise TakeoverError((doc or {}).get("error") or "The head machine did not describe its cluster.")
+    running = {str(a.get("name")) for a in doc.get("apps") or []}
+    existing = await _deployment_ids(session)
+    for app_name in app_names:
+        deployment_id = deployment_id_of(app_name)
+        if deployment_id is None or app_name not in running:
+            raise TakeoverError(f"{env.name} runs no model of Fadenstack's called {app_name}.")
+        if deployment_id in existing:
+            raise TakeoverError(f"{app_name} has its deployment here: delete the deployment instead.")
+    runtime = await runtime_bundle_payload_for(session, env.head_node_id, environment=env)
+    for app_name in app_names:
+        payload: dict[str, Any] = {"app_name": app_name}
+        if runtime is not None:
+            payload["runtime_bundle"] = runtime
+        await gateway.issue(
+            node_id=env.head_node_id,
+            command_type=NodeCommandType.DELETE_SERVE_APP.value,
+            payload=payload,
+            # The key a deployment's own teardown uses for this app: a remove
+            # while one is on its way joins it instead of queueing another.
+            idempotency_key=f"inference-deployment:delete:{app_name}:{env.head_node_id}",
+            issued_by=user_id,
+            timeout_sec=300,
+        )
+    log.info("Removing stray models %s from cluster %s (by %s)", ", ".join(app_names), env.name, user_id)
+    return {"environment_id": str(env.id), "removing": list(app_names)}

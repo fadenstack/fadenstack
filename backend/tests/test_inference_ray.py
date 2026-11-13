@@ -1098,6 +1098,61 @@ async def test_deployment_delete_converges_and_retires(deployment_env, dbsession
     assert dep.observed_status_json["observation"]["action"] == "delete"
 
 
+async def test_a_delete_reaches_the_head_though_the_row_never_recorded_an_apply(
+    deployment_env, dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The orphan found on the DGX pair: hosted, then deleted within the second.
+
+    The row still read "pending" -- the reconciler's pass was sending the
+    apply at that moment -- so the delete removed the row and never asked the
+    head. The application came up with no deployment to own it. The delete is
+    now always the head's to carry out, after any apply already sent to it,
+    and it needs nothing a teardown does not use: not the model, not the spec.
+    """
+    dep, node = deployment_env
+    assert dep.phase == "pending" and not (dep.observed_status_json or {}).get("applied_config_hash")
+    dep.desired_state = "deleted"
+    dep.generation += 1
+    manager = _ray_driver().deployment_manager
+
+    async def _no_resolve(*_args: Any, **_kwargs: Any) -> Any:
+        raise AssertionError("a teardown must not resolve the model or the spec")
+
+    monkeypatch.setattr(manager, "_resolve", _no_resolve)
+    fake = _FakeNodeControl(
+        result_json=_healthy_probe_result(),
+        results={NodeCommandType.DELETE_SERVE_APP.value: {"deleted": True}},
+    )
+    await manager.reconcile_deployment(dbsession, dep, node_control=fake)
+
+    deletions = fake.by_type(NodeCommandType.DELETE_SERVE_APP.value)
+    assert [d["payload"]["app_name"] for d in deletions] == [f"faden-{dep.id}"]
+    assert deletions[0]["node_id"] == node.id
+    assert dep.phase == "deleted"
+    assert dep.observed_generation == dep.generation
+
+
+async def test_a_delete_does_not_wait_for_a_head_that_is_away(
+    deployment_env, dbsession: AsyncSession,
+) -> None:
+    """A command to an absent machine waits its whole budget, and every other cluster's pass with it.
+
+    The deployment converges at once; an application the machine still runs
+    when it is back has no owner, and the cluster page lists it.
+    """
+    dep, node = deployment_env
+    node.status = "offline"
+    dep.desired_state = "deleted"
+    dep.generation += 1
+    await dbsession.flush()
+    fake = _FakeNodeControl(result_json=_healthy_probe_result())
+    await _ray_driver().deployment_manager.reconcile_deployment(dbsession, dep, node_control=fake)
+
+    assert fake.issued == []
+    assert dep.phase == "deleted"
+    assert "away" in dep.phase_message
+
+
 async def test_a_slow_stop_is_stopping_not_failed(deployment_env, dbsession: AsyncSession) -> None:
     """Serve still removing the application is "stopping", asked again next pass -- then stopped.
 
@@ -1168,6 +1223,53 @@ async def test_a_stop_that_never_finishes_fails_after_the_deadline(
     assert dep.phase == "failed"
     assert "Cannot attach to Ray" in dep.phase_message
     assert "stopping_since" not in dep.observed_status_json
+
+
+async def test_a_delete_that_never_finishes_still_deletes_after_the_deadline(
+    deployment_env, dbsession: AsyncSession,
+) -> None:
+    """A failed delete was never purged: its row sat hidden, its name taken. It converges instead."""
+    from datetime import UTC, datetime, timedelta
+
+    from faden_backend.services.inference.drivers.ray.deployment import STOP_DEADLINE_SEC
+
+    dep, _node = deployment_env
+    dep.desired_state = "deleted"
+    dep.generation += 1
+    app = f"faden-{dep.id}"
+    dep.observed_status_json = {
+        "stopping_since": (datetime.now(tz=UTC) - timedelta(seconds=STOP_DEADLINE_SEC + 1)).isoformat(),
+        "stopping_generation": dep.generation,
+    }
+    stuck = _FakeNodeControl(
+        result_json=_healthy_probe_result(),
+        results={NodeCommandType.DELETE_SERVE_APP.value: {"deleted": False, "error": "Cannot attach to Ray"}},
+    )
+    await _ray_driver().deployment_manager.reconcile_deployment(dbsession, dep, node_control=stuck)
+
+    assert dep.phase == "deleted", "the reconciler purges it next"
+    assert dep.observed_generation == dep.generation
+    assert "cluster's page" in dep.phase_message
+    assert app in dep.phase_message
+
+
+@pytest.mark.parametrize("desired", ["deleted", "stopped"])
+async def test_on_a_stopped_cluster_nothing_is_asked_of_the_head(
+    deployment_env, dbsession: AsyncSession, desired: str,
+) -> None:
+    """Ray is down there, and every application with it; its helper would only time out."""
+    dep, _node = deployment_env
+    env = await dbsession.get(InferenceEnvironment, dep.environment_id)
+    env.desired_state = "stopped"
+    dep.desired_state = desired
+    dep.generation += 1
+    await dbsession.flush()
+    fake = _FakeNodeControl(result_json=_healthy_probe_result())
+    await _ray_driver().deployment_manager.reconcile_deployment(dbsession, dep, node_control=fake)
+
+    assert fake.issued == []
+    assert dep.phase == desired
+    assert "stopped" in dep.phase_message
 
 
 async def test_a_stop_request_reads_stopping_at_once(deployment_env, dbsession: AsyncSession) -> None:

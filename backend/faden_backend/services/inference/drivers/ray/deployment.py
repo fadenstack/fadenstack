@@ -82,6 +82,7 @@ from faden_backend.services.inference.bundles import (
     node_and_bundle_for,
     default_bundle_registry,
     running_mounts,
+    runtime_bundle_payload_for,
     translate_host_path_to_container,
 )
 from faden_backend.services.inference.drivers.ray.logs import (
@@ -597,6 +598,19 @@ class RayDeploymentManager:
             )
             return
 
+        # Desired stopped/deleted: converge by deleting the named app. Before
+        # the full resolve, which needs the model, the spec and the runtime's
+        # picture support -- none of which a teardown uses. A deleted model
+        # or a spec that no longer validates used to fail the deployment
+        # here, and the application it had started ran on with nothing left
+        # to stop it.
+        if deployment.desired_state in (
+            DeploymentDesiredState.STOPPED.value,
+            DeploymentDesiredState.DELETED.value,
+        ):
+            await self._reconcile_absent(session, deployment, node_control)
+            return
+
         facts = await self._resolve(session, deployment)
 
         # Unresolvable inputs are terminal for the active path.
@@ -613,64 +627,6 @@ class RayDeploymentManager:
             return
 
         app_name = facts.app_name
-
-        # Desired stopped/deleted: converge by deleting the named app.
-        if deployment.desired_state in (
-            DeploymentDesiredState.STOPPED.value,
-            DeploymentDesiredState.DELETED.value,
-        ):
-            is_stop = (deployment.desired_state == DeploymentDesiredState.STOPPED.value)
-            converged_phase = DeploymentPhase.STOPPED if is_stop else DeploymentPhase.DELETED
-            action_name = "stop" if is_stop else "delete"
-            # Resolve failure is fine here: without a head there is
-            # nothing remote to delete; mark stopped/deleted observed.
-            if facts.head_node_id is None:
-                self._observe(
-                    deployment, converged_phase,
-                    f"no head node bound; nothing to {action_name}", True,
-                    observed={"reconciled": True, "action": f"no-op-{action_name}"},
-                    ready_replicas=0,
-                    total_replicas=0,
-                )
-                return
-            reason: str | None = None
-            try:
-                result = await self._client_for(node_control).delete_serve_app(
-                    head_node_id=facts.head_node_id,
-                    app_name=app_name,
-                    runtime_bundle=facts.runtime_bundle_payload,
-                )
-                ok = bool(result.get("deleted"))
-                reason = result.get("error") or result.get("detail")
-            except RayCommandError as exc:
-                # Deleting a not-yet-deployed app is a common first pass
-                # after a never-applied active->deleted transition; treat as
-                # converged (the desired absence already holds locally).
-                log.info("delete_serve_app(%s) on %s: %s", app_name, facts.head_node_id, exc.detail)
-                ok = True
-            if not ok:
-                self._observe_stopping(deployment, app_name, action_name, reason)
-                return
-            observed_status = dict(deployment.observed_status_json or {})
-            observed_status.pop("stopping_since", None)
-            observed_status.pop("stopping_generation", None)
-            deployment.observed_status_json = observed_status
-            self._observe(
-                deployment, converged_phase,
-                f"serve.delete({app_name}) ok",
-                True,
-                observed={"reconciled": True, "action": action_name, "app": app_name},
-                # Nothing is serving once the application is gone. Without
-                # this the row kept the counts it had while it was running,
-                # so a stopped deployment's page read "Copies (ready /
-                # wanted) 1 / 1" over a cluster with no Serve application on
-                # it at all -- and the screen an operator checks to confirm a
-                # stop told them it had not happened.
-                ready_replicas=0,
-                total_replicas=0,
-            )
-            await self._retire_endpoints(session, deployment.id)
-            return
 
         # ------------------------------------------------------------------
         # Desired ACTIVE
@@ -1415,6 +1371,136 @@ class RayDeploymentManager:
         )
 
     # ------------------------------------------------------------------
+    # Teardown (desired stopped or deleted)
+    # ------------------------------------------------------------------
+
+    async def _reconcile_absent(
+        self,
+        session: Any,
+        deployment: InferenceDeployment,
+        node_control: NodeControlService,
+    ) -> None:
+        """Converge *deployment* to no application on its cluster.
+
+        Asks the head to delete the application whether or not this row ever
+        recorded applying it: an apply can be on its way to the head when
+        the deployment is deleted, and the head runs its commands in the
+        order they were issued, so this delete lands after that apply.
+        Deciding from the row alone left that application running with no
+        deployment to own it.
+        """
+        is_stop = deployment.desired_state == DeploymentDesiredState.STOPPED.value
+        converged_phase = DeploymentPhase.STOPPED if is_stop else DeploymentPhase.DELETED
+        action_name = "stop" if is_stop else "delete"
+        app_name = app_name_for(deployment)
+
+        environment = await self._environment_of(session, deployment.environment_id)
+        head = await self._head_node_of(session, environment) if environment is not None else None
+        if head is None:
+            # Nothing remote to delete without a head.
+            nothing = "its cluster is gone" if environment is None else "no head node bound"
+            await self._observe_absent(
+                session, deployment, converged_phase, f"{nothing}; nothing to {action_name}",
+                action=f"no-op-{action_name}",
+            )
+            return
+        if not await self._cluster_wanted(session, environment):
+            # Stopping the cluster takes Ray down, and every application with
+            # it; a stopped head has no helper to ask, and the delete would
+            # wait out its deadline over an application that is not there.
+            await self._observe_absent(
+                session, deployment, converged_phase,
+                f"its cluster is stopped; nothing to {action_name}",
+                action=f"no-op-{action_name}",
+            )
+            return
+        if not is_stop and await self._node_away(session, head):
+            # The delete would wait the whole command budget for a machine
+            # that is not there, holding up every other cluster's pass. An
+            # application it still runs when it is back has no owner, and the
+            # cluster page lists it to be removed (takeover.note_stray_apps).
+            await self._observe_absent(
+                session, deployment, converged_phase,
+                f"the head machine is away; nothing to {action_name} now",
+                action=f"no-op-{action_name}",
+            )
+            return
+
+        runtime = await runtime_bundle_payload_for(session, head, driver="ray", environment=environment)
+        reason: str | None = None
+        try:
+            result = await self._client_for(node_control).delete_serve_app(
+                head_node_id=head,
+                app_name=app_name,
+                runtime_bundle=runtime,
+            )
+            ok = bool(result.get("deleted"))
+            reason = result.get("error") or result.get("detail")
+        except RayCommandError as exc:
+            # The head has no such application (never applied), or could not
+            # be reached within the budget. Either way the deployment
+            # converges; a leftover is listed on the cluster page.
+            log.info("delete_serve_app(%s) on %s: %s", app_name, head, exc.detail)
+            ok = True
+        if not ok:
+            gave_up = self._observe_stopping(deployment, app_name, action_name, reason)
+            if gave_up and not is_stop:
+                # A delete always finishes: a failed one was never purged, and
+                # its row sat hidden with its name taken. What the head still
+                # runs has no owner now, and the cluster page lists it.
+                await self._observe_absent(
+                    session, deployment, converged_phase,
+                    f"serve.delete({app_name}) did not finish within {int(STOP_DEADLINE_SEC // 60)} minutes; "
+                    "deleted here, and listed on its cluster's page if it still runs",
+                    action=action_name, app=app_name,
+                )
+            return
+        await self._observe_absent(
+            session, deployment, converged_phase, f"serve.delete({app_name}) ok",
+            action=action_name, app=app_name,
+        )
+
+    async def _observe_absent(
+        self,
+        session: Any,
+        deployment: InferenceDeployment,
+        phase: DeploymentPhase,
+        message: str,
+        *,
+        action: str,
+        app: str | None = None,
+    ) -> None:
+        """Record a converged stop/delete: nothing serving, endpoints retired."""
+        observed_status = dict(deployment.observed_status_json or {})
+        observed_status.pop("stopping_since", None)
+        observed_status.pop("stopping_generation", None)
+        deployment.observed_status_json = observed_status
+        observed: dict[str, Any] = {"reconciled": True, "action": action}
+        if app:
+            observed["app"] = app
+        self._observe(
+            deployment, phase, message, True,
+            observed=observed,
+            # Nothing is serving once the application is gone. Without this
+            # the row kept the counts it had while it was running, so a
+            # stopped deployment's page read "Copies (ready / wanted) 1 / 1"
+            # over a cluster with no Serve application on it at all -- and the
+            # screen an operator checks to confirm a stop told them it had not
+            # happened.
+            ready_replicas=0,
+            total_replicas=0,
+        )
+        await self._retire_endpoints(session, deployment.id)
+
+    @staticmethod
+    async def _node_away(session: Any, node_id: uuid.UUID) -> bool:
+        """Whether *node_id* has no agent connected, as the database says now (not the pass's copy)."""
+        status = (
+            await session.execute(select(InfraNode.status).where(InfraNode.id == node_id))
+        ).scalar_one_or_none()
+        return str(getattr(status, "value", status) or "").lower() == NodeHealthStatus.OFFLINE.value
+
+    # ------------------------------------------------------------------
     # Resolution
     # ------------------------------------------------------------------
 
@@ -2137,13 +2223,14 @@ class RayDeploymentManager:
         app_name: str,
         action_name: str,
         reason: str | None,
-    ) -> None:
+    ) -> bool:
         """Serve has not removed *app_name* yet: still stopping, or failed once past the deadline.
 
         Stopping stays in the reconciler's queue (not observed), so the next
         pass asks again -- by then the copies have usually let go and the
         application is gone. The clock runs from the first pass that found
-        it still there, for this generation of the deployment.
+        it still there, for this generation of the deployment. True once it
+        has given up.
         """
         now = datetime.now(tz=UTC)
         status = dict(deployment.observed_status_json or {})
@@ -2166,7 +2253,7 @@ class RayDeploymentManager:
                 observed=observed,
                 mark_observed=False,
             )
-            return
+            return False
         # Given up on: a stop asked for again starts a new wait.
         status.pop("stopping_since", None)
         status.pop("stopping_generation", None)
@@ -2178,6 +2265,7 @@ class RayDeploymentManager:
             False,
             observed=observed,
         )
+        return True
 
     def _observe(
         self,

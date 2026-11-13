@@ -190,9 +190,11 @@ Grund für den Vorschlag.
 - **Stopp** auf der Seite der Bereitstellung nimmt die Kopien von den Maschinen und gibt ihre Beschleuniger frei;
   bei einem großen Modell kann das einige Minuten dauern. Die Bereitstellung behält ihre Einstellungen. **Start**
   lädt sie wieder.
-- **Löschen** in den Aktionen der Zeile unter **Deployments** stoppt sie und entfernt sie aus ihrem Cluster. Das
-  Modell bleibt auf diesem Server unter **Modell-Marktplatz → Auf diesem Server**, sodass es ohne erneuten
-  Download wieder bereitgestellt werden kann.
+- **Löschen** in den Aktionen der Zeile unter **Deployments** stoppt sie und entfernt sie aus ihrem Cluster. Sie
+  verschwindet sofort aus der Liste; ihr Name ist wieder frei, sobald ihr Modell vom Cluster genommen ist,
+  meist innerhalb einer Minute, und ebenso lässt sich dann ihr Cluster löschen. Das Modell bleibt auf diesem
+  Server unter **Modell-Marktplatz → Auf diesem Server**, sodass es ohne erneuten Download wieder bereitgestellt
+  werden kann.
 
 ## Zustände {#states}
 

@@ -3569,7 +3569,7 @@
     },
     "stray": {
       "title": "Models running here without a deployment",
-      "description": "A deployment deleted while its cluster could not be reached leaves its model running: it holds GPUs and still answers at the gateway. Look for such models and take one over to manage it again -- keep it, or delete it properly.",
+      "description": "A deployment deleted while its cluster could not be reached leaves its model running: it holds GPUs and still answers at the gateway. Look for such models, then take one over to manage it again, or remove it from the cluster.",
       "check": "Look for them",
       "checking": "Asking the cluster...",
       "none": "Every model this cluster runs has its deployment here.",
@@ -3577,7 +3577,13 @@
       "col_model": "Model",
       "col_running": "Copies running",
       "col_alias": "Name at the gateway",
-      "take_over": "Take over"
+      "take_over": "Take over",
+      "noted_one": "The cluster's last health check found a model running here with no deployment. Look for it to take it over or remove it.",
+      "noted_other": "The cluster's last health check found {{count}} models running here with no deployment. Look for them to take them over or remove them.",
+      "remove": "Remove",
+      "remove_title": "Remove this model from the cluster?",
+      "remove_confirm": "{{name}} ({{app}}) stops on the cluster and frees its accelerators. Requests to it at the gateway fail from then on. This cannot be undone; to use the model again, host it again.",
+      "removing": "{{name}} is being removed from the cluster. Look again in a minute to confirm it is gone."
     },
     "model_tls": {
       "title": "Model traffic",

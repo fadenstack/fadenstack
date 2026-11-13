@@ -254,10 +254,16 @@ den Cluster kommt.
 
 ## Modelle, die ohne Bereitstellung laufen {#models-running-without-a-deployment}
 
-Eine Bereitstellung, die gelöscht wurde, während ihr Cluster nicht erreichbar war, kann ihr Modell weiterlaufen
-lassen: Es belegt GPUs und antwortet weiterhin am Gateway. Wählen Sie unter **Modelle, die hier ohne Deployment
-laufen** die Option **Danach suchen** und dann bei einem Modell **Übernehmen**, um es wieder zu verwalten: Behalten
-Sie es, oder löschen Sie es ordnungsgemäß.
+Eine Bereitstellung, die gelöscht wurde, während die Head-Maschine ihres Clusters nicht erreichbar war, kann ihr
+Modell weiterlaufen lassen: Es belegt GPUs und antwortet weiterhin am Gateway. Die Zustandsprüfung des Clusters
+bemerkt solche Modelle jede Minute, und die Karte **Modelle, die hier ohne Deployment laufen** nennt dann, wie
+viele sie gefunden hat. Wählen Sie **Danach suchen**, um sie aufzulisten, und dann bei jedem Modell:
+
+- **Übernehmen** verwaltet es wieder als normale Bereitstellung: Behalten Sie es, oder löschen Sie es
+  ordnungsgemäß.
+- **Entfernen** löscht es auf dem Cluster und gibt seine Beschleuniger frei. Anfragen an das Modell am Gateway
+  schlagen danach fehl. Die Kopien eines Modells brauchen bis zu einer Minute, um zu stoppen; wählen Sie erneut
+  **Danach suchen**, um zu prüfen, ob es weg ist.
 
 ## Wenn es nicht funktioniert {#when-it-does-not-work}
 

@@ -8,10 +8,10 @@ node is contacted.
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
@@ -549,6 +549,37 @@ async def take_over_stray_models(
         return await takeover.take_over_models(
             session, _command_gateway(request),
             environment_id=environment_id, app_names=body.app_names, aliases=body.aliases, user_id=user.id,
+        )
+    except takeover.TakeoverError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+class RemoveStrayModelsRequest(BaseModel):
+    """Which of a cluster's stray models to delete on its head."""
+
+    #: The Ray apps, as the list names them (``faden-<id>``).
+    app_names: list[Annotated[str, StringConstraints(pattern=r"^faden-[0-9a-f-]{36}$")]] = Field(
+        min_length=1, max_length=32,
+    )
+
+
+@router.post("/{environment_id}/stray-models/remove", status_code=status.HTTP_202_ACCEPTED)
+async def remove_stray_models(
+    environment_id: uuid.UUID,
+    body: RemoveStrayModelsRequest,
+    request: Request,
+    user: User = Depends(require_permission("inference.deployments", "delete")),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Delete them on the cluster: what deleting their deployments would have done.
+
+    Only models the cluster runs now and no deployment here owns; the deletes
+    are queued on the head, and the list shows them gone once they are.
+    """
+    try:
+        return await takeover.remove_stray_models(
+            session, _command_gateway(request),
+            environment_id=environment_id, app_names=list(dict.fromkeys(body.app_names)), user_id=user.id,
         )
     except takeover.TakeoverError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc

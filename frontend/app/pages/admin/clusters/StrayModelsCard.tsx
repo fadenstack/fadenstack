@@ -4,7 +4,12 @@
  * A deployment deleted while its cluster could not be reached leaves its model
  * running: it holds GPUs and still answers at the gateway, and nothing else in
  * the console shows it. Asking the cluster takes its head machine some
- * seconds, so the check runs when asked, not on every visit.
+ * seconds, so the check runs when asked, not on every visit -- but the
+ * cluster's minute health check notes them from what it reads anyway
+ * (``noted``), so the card says when there is something to look for.
+ *
+ * Each is taken over (an ordinary deployment again) or removed: deleted on the
+ * cluster, which is what deleting its deployment would have done.
  */
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -26,14 +31,17 @@ import Typography from "@mui/material/Typography";
 import SearchIcon from "@mui/icons-material/Search";
 
 import { inferenceApi, type FoundClusterApp } from "~/api/inference";
+import { ConfirmDialog } from "~/components/ConfirmDialog";
 
 interface StrayModelsCardProps {
   environmentId: string;
+  /** Apps the cluster's last health check found with no deployment here. */
+  noted?: string[];
   /** A model was taken over: it is a deployment of this cluster now. */
   onTakenOver?: () => void;
 }
 
-export default function StrayModelsCard({ environmentId, onTakenOver }: StrayModelsCardProps) {
+export default function StrayModelsCard({ environmentId, noted = [], onTakenOver }: StrayModelsCardProps) {
   const { t } = useTranslation();
   const [models, setModels] = useState<FoundClusterApp[] | null>(null);
   const [aliases, setAliases] = useState<Record<string, string>>({});
@@ -41,6 +49,8 @@ export default function StrayModelsCard({ environmentId, onTakenOver }: StrayMod
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [taken, setTaken] = useState<string | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<FoundClusterApp | null>(null);
+  const [removed, setRemoved] = useState<string | null>(null);
 
   const failure = (err: unknown) => (err instanceof Error ? err.message : t("common.action_failed"));
 
@@ -48,6 +58,7 @@ export default function StrayModelsCard({ environmentId, onTakenOver }: StrayMod
     setChecking(true);
     setError(null);
     setTaken(null);
+    setRemoved(null);
     try {
       const found = await inferenceApi.strayModels(environmentId);
       setModels(found.models);
@@ -78,6 +89,22 @@ export default function StrayModelsCard({ environmentId, onTakenOver }: StrayMod
     }
   }
 
+  async function remove(model: FoundClusterApp) {
+    setBusy(model.app_name);
+    setError(null);
+    setTaken(null);
+    try {
+      await inferenceApi.removeStrayModels(environmentId, [model.app_name]);
+      setRemoved(model.model_id);
+      setModels((current) => (current ?? []).filter((m) => m.app_name !== model.app_name));
+    } catch (err: unknown) {
+      setError(failure(err));
+    } finally {
+      setBusy(null);
+      setRemoveTarget(null);
+    }
+  }
+
   return (
     <Card variant="outlined" data-testid="stray-models">
       <CardContent>
@@ -102,6 +129,11 @@ export default function StrayModelsCard({ environmentId, onTakenOver }: StrayMod
           </Button>
         </Stack>
 
+        {models === null && noted.length > 0 && (
+          <Alert severity="warning" sx={{ mt: 2 }} data-testid="stray-models-noted">
+            {t("clusters.stray.noted", { count: noted.length })}
+          </Alert>
+        )}
         {error && (
           <Alert severity="error" sx={{ mt: 2 }}>
             {error}
@@ -112,7 +144,12 @@ export default function StrayModelsCard({ environmentId, onTakenOver }: StrayMod
             {t("clusters.stray.taken", { name: taken })}
           </Alert>
         )}
-        {models && models.length === 0 && !error && !taken && (
+        {removed && (
+          <Alert severity="success" sx={{ mt: 2 }}>
+            {t("clusters.stray.removing", { name: removed })}
+          </Alert>
+        )}
+        {models && models.length === 0 && !error && !taken && !removed && (
           <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
             {t("clusters.stray.none")}
           </Typography>
@@ -154,15 +191,25 @@ export default function StrayModelsCard({ environmentId, onTakenOver }: StrayMod
                     />
                   </TableCell>
                   <TableCell align="right">
-                    <Button
-                      size="small"
-                      variant="contained"
-                      onClick={() => takeOver(model)}
-                      disabled={busy !== null || checking}
-                      startIcon={busy === model.app_name ? <CircularProgress size={14} /> : undefined}
-                    >
-                      {t("clusters.stray.take_over")}
-                    </Button>
+                    <Stack direction="row" spacing={1} justifyContent="flex-end">
+                      <Button
+                        size="small"
+                        variant="contained"
+                        onClick={() => takeOver(model)}
+                        disabled={busy !== null || checking}
+                        startIcon={busy === model.app_name ? <CircularProgress size={14} /> : undefined}
+                      >
+                        {t("clusters.stray.take_over")}
+                      </Button>
+                      <Button
+                        size="small"
+                        color="error"
+                        onClick={() => setRemoveTarget(model)}
+                        disabled={busy !== null || checking}
+                      >
+                        {t("clusters.stray.remove")}
+                      </Button>
+                    </Stack>
                   </TableCell>
                 </TableRow>
               ))}
@@ -170,6 +217,21 @@ export default function StrayModelsCard({ environmentId, onTakenOver }: StrayMod
           </Table>
         )}
       </CardContent>
+      <ConfirmDialog
+        open={removeTarget !== null}
+        title={t("clusters.stray.remove_title")}
+        message={t("clusters.stray.remove_confirm", {
+          name: removeTarget?.model_id ?? "",
+          app: removeTarget?.app_name ?? "",
+        })}
+        confirmLabel={t("clusters.stray.remove")}
+        cancelLabel={t("common.cancel")}
+        loading={busy !== null}
+        onConfirm={() => {
+          if (removeTarget) void remove(removeTarget);
+        }}
+        onClose={() => setRemoveTarget(null)}
+      />
     </Card>
   );
 }

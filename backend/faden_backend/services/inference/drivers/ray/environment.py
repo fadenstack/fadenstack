@@ -491,6 +491,7 @@ class RayEnvironmentManager:
                 address=status.cluster_address or head_address,
                 version=status.version or config.ray_version,
             )
+            await self._note_stray_models(session, environment, status)
             # Machines being drained, leaving or rejoining: one step each,
             # on a cluster that is healthy enough to take it.
             from faden_backend.services.inference import membership  # noqa: PLC0415
@@ -1697,6 +1698,20 @@ class RayEnvironmentManager:
         for worker, cmd in issued:
             await self._await_result(gateway, cmd, what=f"join_ray_cluster on node {worker.node_id}")
         self._remember_launch(environment, launched)
+
+    @staticmethod
+    async def _note_stray_models(session: Any, environment: Any, status: RayClusterStatus) -> None:
+        """Note the models the cluster runs that no deployment owns, for the cluster page.
+
+        Left by a deployment deleted while its head was away. Read from the
+        Serve status this look already carries: nothing more is asked.
+        """
+        from faden_backend.services.inference import takeover  # noqa: PLC0415
+
+        try:
+            await takeover.note_stray_apps(session, environment, status.serve)
+        except Exception:  # noqa: BLE001 - a note never fails a health check
+            log.warning("Environment %s: could not note stray models", environment.id, exc_info=True)
 
     async def _verify_cluster(self, session, environment, head, node_control) -> RayClusterStatus:
         """Step 6: probe the head for authoritative cluster membership.

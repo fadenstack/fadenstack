@@ -3571,7 +3571,7 @@
     },
     "stray": {
       "title": "Modelos que se ejecutan aquí sin despliegue",
-      "description": "Un despliegue eliminado mientras su clúster no era accesible deja su modelo en ejecución: ocupa GPU y sigue respondiendo en el gateway. Busque estos modelos y tome uno para gestionarlo de nuevo: conservarlo o eliminarlo correctamente.",
+      "description": "Un despliegue eliminado mientras su clúster no era accesible deja su modelo en ejecución: ocupa GPU y sigue respondiendo en el gateway. Busque estos modelos y tome el control de uno para gestionarlo de nuevo, o elimínelo del clúster.",
       "check": "Buscarlos",
       "checking": "Consultando el clúster...",
       "none": "Cada modelo de este clúster tiene aquí su despliegue.",
@@ -3579,7 +3579,13 @@
       "col_model": "Modelo",
       "col_running": "Copias en ejecución",
       "col_alias": "Nombre en el gateway",
-      "take_over": "Tomar el control"
+      "take_over": "Tomar el control",
+      "noted_one": "La última comprobación del clúster encontró un modelo que se ejecuta aquí sin despliegue. Búsquelo para tomar el control o eliminarlo.",
+      "noted_other": "La última comprobación del clúster encontró {{count}} modelos que se ejecutan aquí sin despliegue. Búsquelos para tomar el control o eliminarlos.",
+      "remove": "Eliminar",
+      "remove_title": "¿Eliminar este modelo del clúster?",
+      "remove_confirm": "{{name}} ({{app}}) se detiene en el clúster y libera sus aceleradores. Desde ese momento, las solicitudes a él en el gateway fallan. No se puede deshacer; para volver a usar el modelo, alójelo de nuevo.",
+      "removing": "{{name}} se está eliminando del clúster. Vuelva a buscar en un minuto para confirmar que ya no está."
     },
     "model_tls": {
       "title": "Tráfico de modelos",

@@ -175,9 +175,10 @@ is one, otherwise from rules for the model's family. Each says why it was sugges
 
 - **Stop** on the deployment's page takes the copies off the machines and frees their accelerators; a large
   model can take a few minutes. The deployment keeps its settings. **Start** loads it again.
-- **Delete** in the row's actions under **Deployments** stops it and removes it from its cluster. The model
-  stays on this server under **Model marketplace → On this server**, so it can be hosted again without a
-  download.
+- **Delete** in the row's actions under **Deployments** stops it and removes it from its cluster. It leaves the
+  list at once; its name is free again once its model is off the cluster, usually within a minute, and so is
+  its cluster for deleting. The model stays on this server under **Model marketplace → On this server**, so it
+  can be hosted again without a download.
 
 ## States
 

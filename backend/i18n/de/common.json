@@ -3571,7 +3571,7 @@
     },
     "stray": {
       "title": "Modelle, die hier ohne Deployment laufen",
-      "description": "Ein Deployment, das gelöscht wurde, während sein Cluster nicht erreichbar war, lässt sein Modell weiterlaufen: Es belegt GPUs und antwortet weiter am Gateway. Suchen Sie nach solchen Modellen und übernehmen Sie eines, um es wieder zu verwalten -- behalten oder sauber löschen.",
+      "description": "Ein Deployment, das gelöscht wurde, während sein Cluster nicht erreichbar war, lässt sein Modell weiterlaufen: Es belegt GPUs und antwortet weiter am Gateway. Suchen Sie nach solchen Modellen, und übernehmen Sie eines, um es wieder zu verwalten, oder entfernen Sie es vom Cluster.",
       "check": "Danach suchen",
       "checking": "Cluster wird gefragt...",
       "none": "Jedes Modell dieses Clusters hat hier sein Deployment.",
@@ -3579,7 +3579,13 @@
       "col_model": "Modell",
       "col_running": "Laufende Kopien",
       "col_alias": "Name am Gateway",
-      "take_over": "Übernehmen"
+      "take_over": "Übernehmen",
+      "noted_one": "Die letzte Prüfung des Clusters hat ein Modell gefunden, das hier ohne Deployment läuft. Suchen Sie danach, um es zu übernehmen oder zu entfernen.",
+      "noted_other": "Die letzte Prüfung des Clusters hat {{count}} Modelle gefunden, die hier ohne Deployment laufen. Suchen Sie danach, um sie zu übernehmen oder zu entfernen.",
+      "remove": "Entfernen",
+      "remove_title": "Dieses Modell vom Cluster entfernen?",
+      "remove_confirm": "{{name}} ({{app}}) wird auf dem Cluster beendet und gibt seine Beschleuniger frei. Anfragen an das Modell am Gateway schlagen danach fehl. Das lässt sich nicht rückgängig machen; um das Modell wieder zu nutzen, stellen Sie es erneut bereit.",
+      "removing": "{{name}} wird vom Cluster entfernt. Suchen Sie in einer Minute erneut, um zu prüfen, ob es weg ist."
     },
     "model_tls": {
       "title": "Modellverkehr",

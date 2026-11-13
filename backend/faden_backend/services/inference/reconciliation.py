@@ -601,25 +601,19 @@ async def reconcile_deployment(
         if cp is not None:
             driver_cls = registry.get(cp.driver)
 
-    if driver_cls is None:
-        # No registered driver → delegate to the domain service, which records
-        # an honest no-op observation at the current generation.
-        await context.deployments.reconcile(deployment.id)
-        return {
-            "id": str(deployment.id),
-            "reconciled": False,
-            "reason": "no driver registered",
-        }
-
-    driver = driver_cls()
+    driver = driver_cls() if driver_cls is not None else None
     mgr = getattr(driver, "deployment_manager", None)
     if mgr is None:
+        reason = "no driver registered" if driver is None else "driver exposes no deployment manager"
+        if getattr(deployment, "desired_state", None) == DeploymentDesiredState.DELETED.value:
+            # Nothing here can have started an application for it, so there
+            # is nothing to take down: the delete is done.
+            await context.deployments.purge(deployment.id)
+            return {"id": str(deployment.id), "reconciled": True, "reason": "deleted"}
+        # Delegate to the domain service, which records an honest no-op
+        # observation at the current generation.
         await context.deployments.reconcile(deployment.id)
-        return {
-            "id": str(deployment.id),
-            "reconciled": False,
-            "reason": "driver exposes no deployment manager",
-        }
+        return {"id": str(deployment.id), "reconciled": False, "reason": reason}
 
     # The manager protocol declares ``reconcile_deployment(session,
     # deployment)``; the Ray manager extends it with ``node_control``.  Pass
@@ -652,14 +646,13 @@ async def reconcile_deployment(
             deployment.id,
         )
 
-    # A deployment deleted while its application ran is kept until the
-    # application is gone from the cluster; now it is, the row goes too, so
-    # its name can be used again.
+    # A deleted deployment is kept until its application is gone from the
+    # cluster; now it is, the row goes too, so its name can be used again.
     if (
         deployment.desired_state == DeploymentDesiredState.DELETED.value
         and deployment.phase == DeploymentPhase.DELETED.value
     ):
-        await context.deployments.delete(deployment.id)
+        await context.deployments.purge(deployment.id)
         return {"id": str(deployment.id), "reconciled": True, "reason": "deleted"}
 
     return {

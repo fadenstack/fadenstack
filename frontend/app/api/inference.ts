@@ -685,6 +685,12 @@ export interface StrayTakeOverResult {
   deployments: TakeOverResult["deployments"];
 }
 
+export interface StrayRemoveResult {
+  environment_id: string;
+  /** Apps whose delete is queued on the cluster's head. */
+  removing: string[];
+}
+
 // ---------------------------------------------------------------------------
 // Transport
 // ---------------------------------------------------------------------------
@@ -1119,6 +1125,13 @@ export const inferenceApi = {
     return request<StrayTakeOverResult>(`/environments/${enc(environmentId)}/stray-models/take-over`, {
       method: "POST",
       body: JSON.stringify({ app_names: appNames, aliases }),
+    });
+  },
+  /** Delete them on the cluster (202): only apps it runs now that no deployment here owns. */
+  removeStrayModels(environmentId: string, appNames: string[]) {
+    return request<StrayRemoveResult>(`/environments/${enc(environmentId)}/stray-models/remove`, {
+      method: "POST",
+      body: JSON.stringify({ app_names: appNames }),
     });
   },
 };
