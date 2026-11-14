@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from faden_gateway.db.models.gateway import LLMGatewayRequestLog, ProviderType
 from faden_gateway.services.gateway.context_assembler import _replayed_exchange
 from faden_gateway.services.gateway.service import _assistant_turn
-from tests.test_gateway_knowledge_tools import _ask, _Model, _say
+from tests.test_gateway_knowledge_tools import _ask, _Model, _say, _streamed
 from tests.test_gateway_pipeline_combined import ALIAS, _Observability, _seed, _session, _token
 from tests.test_llm_adapter_direct import _engine
 from tests.test_session_tool_switches import _MCP, _ready
@@ -72,6 +72,32 @@ async def test_the_round_after_a_malformed_call_is_sent_parseable(
     assert (await _ask(client, session_id=str(sid))).status_code == 200
     call = next(m for m in model.sent[1]["messages"] if m.get("tool_calls"))
     assert json.loads(call["tool_calls"][0]["function"]["arguments"]) == {}
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("stream", [False, True], ids=["whole", "streamed"])
+async def test_a_chat_gets_a_turn_that_only_called_tools_as_openai_sends_it(
+    stream: bool,
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``content: null`` beside ``tool_calls`` in a chat's request: answered, not a 500."""
+    await _ready(fastapi_app, db_session)
+    model = _Model(monkeypatch, _say("It is sunny."))
+    sid = await _session(db_session)
+    weather = {"type": "function", "function": {"name": "get_weather", "parameters": {"type": "object"}}}
+    turn = {"role": "assistant", "content": None, "tool_calls": [
+        {"id": "c1", "type": "function", "function": {"name": "get_weather", "arguments": "{}"}},
+    ]}
+    messages = [
+        {"role": "user", "content": "The weather in Bonn?"},
+        turn,
+        {"role": "tool", "tool_call_id": "c1", "content": "sunny"},
+    ]
+
+    r = await _ask(client, session_id=str(sid), messages=messages, tools=[weather], stream=stream)
+    assert r.status_code == 200, r.text
+    assert (_streamed(r.text)[0] if stream else r.json()["choices"][0]["message"]["content"]) == "It is sunny."
+    assert turn in model.sent[0]["messages"]
 
 
 @pytest.mark.anyio

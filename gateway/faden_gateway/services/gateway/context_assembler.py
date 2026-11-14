@@ -281,7 +281,8 @@ class ContextAssembler:
 
         # 5. Current request messages (always included)
         for msg in current_messages:
-            content = msg.get("content", "")
+            # A turn that only called tools has "content": null (OpenAI's format).
+            content = msg.get("content") or ""
             msg_tokens = _estimate_tokens(content)
             result.messages.append(msg)
             total_tokens += msg_tokens
