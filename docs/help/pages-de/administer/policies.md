@@ -225,8 +225,10 @@ auf **Sperren** oder **Erst nachfragen**, oder löschen Sie sie.
 
 **Agenten → Governance → Tool-Klassen** legt nach Muster fest, was Tools tun: **lesen**, **schreiben**,
 **zerstörend** oder **Wie sein MCP-Server angibt** (dem vertrauen, was der MCP-Server des Tools über das Tool
-angibt). **Wirkt nach außen** hält fest, ob ein Tool über die Organisation hinaus wirkt. Ein Tool, das niemand
-einstuft, ist nicht eingestuft. Die eigenen Tools eines Agenten bekommen ihre Klasse aus seinen **Host-Tools**;
+angibt). **Wirkt nach außen** kennzeichnet ein Tool, das über die Organisation hinaus wirkt: Unterhalb von
+**Automatisch** fragt ein Aufruf nach, auch bei einem lesenden Tool, und die Person kann ihn nur für diesen Chat
+erlauben, nicht immer, denn was das Tool bekommt, verlässt die Organisation. **Automatisch** führt es aus, wie seine
+Klasse sagt. Ein Tool, das niemand einstuft, ist nicht eingestuft. Die eigenen Tools eines Agenten bekommen ihre Klasse aus seinen **Host-Tools**;
 bei einem Agenten, dessen Version keine nennt, ist jedes Tool nicht eingestuft.
 
 Benutzer wählen pro Chat einen Tool-Modus, und die Klasse entscheidet, was läuft:

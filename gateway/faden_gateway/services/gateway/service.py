@@ -1020,7 +1020,7 @@ class ToolModeCheck:
             outcome="block" if decision is tool_classes.Decision.HIDDEN else "approval_required",
             policy_id=f"tool_mode:{self.mode.value}:{tool.tool_class.value}",
             category="tool_mode",
-            message=tool_classes.reason(self.mode, decision, tool.approval),
+            message=tool_classes.reason(self.mode, decision, tool.approval, open_world=tool.open_world is True),
             policy_name=f"Tool mode {self.mode.value}",
         )
 
@@ -2445,7 +2445,7 @@ class GatewayService:
                 verdict.decision.message
                 if verdict
                 else (
-                    tool_classes.reason(req.tool_mode.mode, decision, classified.approval)
+                    tool_classes.reason(req.tool_mode.mode, decision, classified.approval, open_world=classified.open_world is True)
                     if blocked or asks
                     else "Allowed by current tool policy."
                 )
@@ -2678,6 +2678,7 @@ class GatewayService:
             tool_class, rule = self._class_of(req, name), _floor(req, name, verdict)
             yield faden_events.sse_event(gov.approval_event(
                 approval_id, call, name, verdict.decision.message, timeout, tool_class=tool_class, rule=rule,
+                open_world=self._open_world_of(req, name),
             ))
             answer = await gov.approvals.wait(
                 tenant_id=auth.tenant_id, user_id=auth.user_id, approval_id=approval_id, timeout=timeout,
@@ -2721,6 +2722,11 @@ class GatewayService:
     def _class_of(req: _Prepared, name: str) -> str:
         """The class the gateway holds for *name*: a rule's, the agent's contract's, else unknown."""
         return req.classifier.classify(name).tool_class.value if req.classifier is not None else "unknown"
+
+    @staticmethod
+    def _open_world_of(req: _Prepared, name: str) -> bool:
+        """Whether the gateway holds *name* open-world (an admin's rule, the server's hint under one, the SDKs' search)."""
+        return req.classifier is not None and req.classifier.classify(name).open_world is True
 
     async def _client_call_events(
         self, req: _Prepared, calls: list[dict[str, Any]], *, auth: AuthContext, request_id: str,
@@ -2771,6 +2777,7 @@ class GatewayService:
                 gov.tool_denied_event(call, name, message, decision_id) if verdict.blocked
                 else gov.client_approval_event(
                     call, name, message, decision_id, tool_class=self._class_of(req, name), rule=rule,
+                    open_world=self._open_world_of(req, name),
                 ),
             )
         return events

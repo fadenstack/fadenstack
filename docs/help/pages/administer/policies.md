@@ -207,7 +207,9 @@ listed as **No effect**: change them to **Deny** or **Ask first**, or delete the
 
 **Agents → Governance → Tool classes** says what tools do, by pattern: **read**, **write**, **destructive**,
 or **As its MCP server says** (trust what the tool's MCP server declares about itself). **Reaches outside**
-records whether a tool reaches outside the organisation. A tool nobody classifies is unclassified. An agent's own
+marks a tool that reaches outside the organisation: below **Auto** a call to it asks, a read tool's too, and the person
+can allow it for that chat only, not always, since what it is given leaves the organisation. **Auto** runs it as its
+class says. A tool nobody classifies is unclassified. An agent's own
 tools take their class from its **Host tools**; an agent whose version lists none has every tool unclassified.
 
 People pick a tool mode per chat, and the class decides what runs:

@@ -440,12 +440,14 @@ def tool_denied_event(
 
 def approval_event(
     approval_id: str, call: Mapping[str, Any], name: str, message: str, timeout_s: float,
-    *, tool_class: str = "unknown", rule: bool = True,
+    *, tool_class: str = "unknown", rule: bool = True, open_world: bool = False,
 ) -> dict[str, Any]:
     """A gateway tool call waits for the user: answer at ``/v1/approvals/{approvalId}``.
 
     *tool_class* is the class the gateway holds for the tool; *rule* says whether an admin's rule (or a
     policy) asks, rather than the chat's tool mode: then the client asks every time, never "for this chat".
+    *open_world* (sent only when true): the gateway holds the tool open-world, so below Auto the client
+    offers "for this chat" at most, never "always" (sdk/51 F08 §4).
     """
     return {"type": "CUSTOM", "name": "faden.approval_required", "value": {
         "approvalId": approval_id,
@@ -455,17 +457,18 @@ def approval_event(
         "timeoutS": int(timeout_s),
         "toolClass": tool_class,
         "rule": rule,
+        **({"openWorld": True} if open_world else {}),
     }}
 
 
 def client_approval_event(
     call: Mapping[str, Any], name: str, message: str, decision_id: uuid.UUID | None,
-    *, tool_class: str, rule: bool,
+    *, tool_class: str, rule: bool, open_world: bool = False,
 ) -> dict[str, Any]:
     """A call of the client's own tool the user must approve first: the client asks; nothing waits here.
 
     The same event as :func:`approval_event`, without an ``approvalId``. An older client that only answers
-    events with an ``approvalId`` ignores it.
+    events with an ``approvalId`` ignores it; one before 0.3.0 ignores ``openWorld`` and decides by the class.
     """
     return {"type": "CUSTOM", "name": "faden.approval_required", "value": {
         "toolCallId": call.get("id", ""),
@@ -474,6 +477,7 @@ def client_approval_event(
         "decisionId": str(decision_id) if decision_id else None,
         "toolClass": tool_class,
         "rule": rule,
+        **({"openWorld": True} if open_world else {}),
     }}
 
 

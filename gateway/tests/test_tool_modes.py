@@ -63,8 +63,12 @@ async def _setup(fastapi_app: FastAPI, db: AsyncSession) -> uuid.UUID:
     return sess.id
 
 
-async def _classify(db: AsyncSession, pattern: str, tool_class: str, priority: int = 10) -> None:
-    db.add(ToolClassification(tenant_id="tenant-a", tool_pattern=pattern, tool_class=tool_class, priority=priority))
+async def _classify(
+    db: AsyncSession, pattern: str, tool_class: str, priority: int = 10, *, open_world: bool | None = None,
+) -> None:
+    db.add(ToolClassification(
+        tenant_id="tenant-a", tool_pattern=pattern, tool_class=tool_class, priority=priority, open_world=open_world,
+    ))
     await db.flush()
 
 
@@ -123,11 +127,36 @@ def test_the_contract_says_each_tools_approval() -> None:
     assert classifier.classify("other").approval is None
 
 
-def test_an_unknown_tool_never_runs_unasked_and_open_world_is_not_acted_on() -> None:
+def test_an_unknown_tool_never_runs_unasked_and_an_open_world_one_runs_in_auto() -> None:
     for mode in M:
         assert tc.decide(mode, tc.Classified("t", C.UNKNOWN, "none", open_world=True)) is not D.RUN
-    assert tc.OPEN_WORLD_ENFORCED is False
+    assert tc.OPEN_WORLD_ENFORCED is True
     assert tc.decide(M.AUTO, tc.Classified("t", C.WRITE, "rule", open_world=True)) is D.RUN
+
+
+@pytest.mark.parametrize(("mode", "tool_class", "expected"), [
+    (M.OFF, C.READ, D.HIDDEN), (M.READ_ONLY, C.READ, D.ASK), (M.ASK, C.READ, D.ASK), (M.AUTO, C.READ, D.RUN),
+    (M.BYPASS, C.READ, D.RUN), (M.READ_ONLY, C.WRITE, D.HIDDEN), (M.ASK, C.WRITE, D.ASK), (M.AUTO, C.WRITE, D.RUN),
+    (M.BYPASS, C.WRITE, D.RUN), (M.AUTO, C.DESTRUCTIVE, D.ASK),
+])
+def test_below_auto_an_open_world_tool_asks_and_auto_and_bypass_run_it(
+    mode: tc.ToolMode, tool_class: tc.ToolClass, expected: tc.Decision,
+) -> None:
+    """What it is given leaves the organisation (sdk/51 F08 §4): the mode asks where its table says run."""
+    tool = tc.Classified("search", tool_class, "rule", open_world=True)
+    assert tc.decide(mode, tool) is expected
+    assert tc.asks_as_open_world(mode, tool) is (mode in (M.OFF, M.READ_ONLY, M.ASK))
+    assert tc.decide(mode, tc.Classified("search", tool_class, "rule", open_world=False)) is tc._TABLE[mode][tool_class]
+    assert tc.decide(mode, tc.Classified("search", tool_class, "rule", open_world=None)) is tc._TABLE[mode][tool_class]
+
+
+def test_an_open_world_tool_the_author_never_asks_about_runs_and_the_reason_says_what_leaves() -> None:
+    assert tc.decide(M.ASK, tc.Classified("search", C.READ, "agent", open_world=True, approval="never")) is D.RUN
+    assert tc.reason(M.ASK, D.ASK, open_world=True) == (
+        "What this tool is given leaves your organisation: it needs your approval in this chat's tool mode."
+    )
+    assert tc.reason(M.ASK, D.ASK, "ask", open_world=True) == "This agent asks for your approval before it uses this tool."
+    assert tc.reason(M.ASK, D.ASK) == "This tool needs your approval in this chat's tool mode."
 
 
 def test_where_a_class_comes_from() -> None:
@@ -395,7 +424,7 @@ async def test_an_agents_host_tools_are_classed_by_its_contract(
     assert "read_page" in offered and "delete_page" not in offered, "its contract says which is which"
     profile = (await client.get("/v1/agents/eplan-assistant/profile",
                                 headers={"Authorization": f"Bearer {_agent_token()}"})).json()
-    assert profile["tool_modes"] == {"default": "ask", "ceiling": None, "max": "auto", "open_world_enforced": False}
+    assert profile["tool_modes"] == {"default": "ask", "ceiling": None, "max": "auto", "open_world_enforced": True}
 
 
 # -- each agent's default and highest level (sdk/38 §5, D1, D2) -------------------------------------------

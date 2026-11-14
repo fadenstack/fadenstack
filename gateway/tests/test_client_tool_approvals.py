@@ -145,6 +145,38 @@ async def test_the_tool_mode_asks_about_an_unclassified_client_tool_and_an_admin
 
 
 @pytest.mark.anyio
+@pytest.mark.parametrize(("mode", "marks"), [
+    ("ask", [("read", False, True)]), ("read_only", [("read", False, True)]), ("auto", []),
+])
+async def test_a_client_tool_an_admin_marks_open_world_asks_below_auto_and_the_mark_says_so(
+    mode: str, marks: list[tuple[str, bool, bool]],
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """What it is given leaves the organisation (sdk/51 F08 §4): the client asks, and offers "for this chat" at most."""
+    await _setup(fastapi_app, db_session, gateway_tools=False)
+    await _classify(db_session, "get_weather", "read", open_world=True)
+    _Model(monkeypatch, _call("get_weather", {"city": "Munich"}))
+    r = await client.post("/v1/chat/completions", headers=_headers(**EVENTS, **{"X-Faden-Tool-Mode": mode}), json={
+        "model": ALIAS, "stream": True, "tools": [WEATHER], "messages": [{"role": "user", "content": "Weather?"}],
+    })
+    assert r.status_code == 200, r.text
+    found = _marks(_faden(r.text))
+    assert [(m["toolClass"], m["rule"], m.get("openWorld", False)) for m in found] == marks
+    assert all("leaves your organisation" in m["message"] for m in found)
+    assert await _decisions(db_session) == [], "the user's mode is not an admin's decision"
+
+
+def test_the_approval_events_say_open_world_only_when_it_is() -> None:
+    call = {"id": "c1"}
+    assert gov.approval_event("a1", call, "mcp.search.web", "m", 300, tool_class="read", rule=False, open_world=True)[
+        "value"]["openWorld"] is True
+    assert "openWorld" not in gov.approval_event("a1", call, "mcp.search.web", "m", 300, tool_class="read", rule=False)["value"]
+    assert gov.client_approval_event(call, "get_weather", "m", None, tool_class="read", rule=False, open_world=True)[
+        "value"]["openWorld"] is True
+    assert "openWorld" not in gov.client_approval_event(call, "get_weather", "m", None, tool_class="read", rule=False)["value"]
+
+
+@pytest.mark.anyio
 @pytest.mark.parametrize(("contract", "expected"), [
     ((), [("unknown", False)]),
     (({"name": "read_page"},), [("unknown", False)]),

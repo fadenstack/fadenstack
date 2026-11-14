@@ -30,8 +30,12 @@ rules (an admin's), the gateway's own tools (all read), the agent's host tool
 contract (``risk``), else ``unknown``. MCP annotations are hints from the
 server; they count only where a rule says to trust them (``annotations``).
 
-``open_world`` -- a tool that reaches outside the organisation -- is carried
-and shown but not acted on yet (``OPEN_WORLD_ENFORCED``).
+``open_world`` -- a tool that reaches outside the organisation -- asks below
+Auto where the table says run (``OPEN_WORLD_ENFORCED``): what it is given
+leaves the organisation, and injected text can put private data into it
+(sdk/51 F08 §4; OWASP Top 10 for LLM Applications 2025, LLM02, LLM06). Auto and
+Bypass run it. The client is told (``openWorld`` on ``faden.approval_required``)
+and offers "for this chat" at most for it.
 
 Ceilings (EE) narrow the mode: ``registry.tool_mode_ceilings``. Core applies
 whatever is registered; with nothing registered the session's mode is the
@@ -55,8 +59,8 @@ from faden_gateway.db.models.gateway import ToolClassification
 
 logger = logging.getLogger(__name__)
 
-#: ``open_world`` is recorded and reported, and no mode acts on it -- yet.
-OPEN_WORLD_ENFORCED = False
+#: ``open_world`` asks below Auto (:func:`decide`), and the clients are told so (the profile's ``tool_modes``).
+OPEN_WORLD_ENFORCED = True
 #: What a request without a session setting or header gets.
 DEFAULT_MODE = "ask"
 MODE_HEADER = "x-faden-tool-mode"
@@ -112,9 +116,11 @@ _TABLE[ToolMode.BYPASS] = dict(_TABLE[ToolMode.AUTO])
 
 
 def decide(mode: ToolMode, tool: Classified) -> Decision:
-    """What *mode* does with *tool*, with its author's ``approval`` on top (38 §4.3, D7)."""
-    # if OPEN_WORLD_ENFORCED and tool.open_world: ...  -- a mode or an EE
-    # policy on external calls goes here, when open_world is switched on.
+    """What *mode* does with *tool*, with its author's ``approval`` on top (38 §4.3, D7).
+
+    An open-world tool asks below Auto where the table says run (:func:`asks_as_open_world`); the author's
+    ``never`` still runs a read or write tool, as for any ask of the mode.
+    """
     decision = _TABLE[mode][tool.tool_class]
     if decision is Decision.HIDDEN:
         return decision
@@ -122,7 +128,14 @@ def decide(mode: ToolMode, tool: Classified) -> Decision:
         return Decision.ASK
     if tool.approval == "never" and tool.tool_class in (ToolClass.READ, ToolClass.WRITE):
         return Decision.RUN  # pre-approved by the author; never for a destructive or unclassified tool
+    if decision is Decision.RUN and asks_as_open_world(mode, tool):
+        return Decision.ASK
     return decision
+
+
+def asks_as_open_world(mode: ToolMode, tool: Classified) -> bool:
+    """Whether *tool* is open-world and *mode* below Auto: then it asks, and the client takes "for this chat" at most."""
+    return OPEN_WORLD_ENFORCED and tool.open_world is True and _ORDER[mode] < _ORDER[ToolMode.AUTO]
 
 
 def narrowest(*modes: ToolMode | None) -> ToolMode:
@@ -360,8 +373,8 @@ async def effective(
     return EffectiveMode(mode=mode, chosen=picked, ceiling=top)
 
 
-def reason(mode: ToolMode, decision: Decision, approval: str | None = None) -> str:
-    """What the user is told about a tool the mode keeps back, or that its author has asked about."""
+def reason(mode: ToolMode, decision: Decision, approval: str | None = None, *, open_world: bool = False) -> str:
+    """What the user is told about a tool the mode keeps back, that its author has asked about, or that is open-world."""
     if decision is Decision.HIDDEN:
         return {
             ToolMode.OFF: "Tools are off in this chat.",
@@ -371,4 +384,6 @@ def reason(mode: ToolMode, decision: Decision, approval: str | None = None) -> s
         return "This agent asks for your approval every time it uses this tool."
     if approval == "ask":
         return "This agent asks for your approval before it uses this tool."
+    if open_world:
+        return "What this tool is given leaves your organisation: it needs your approval in this chat's tool mode."
     return "This tool needs your approval in this chat's tool mode."
