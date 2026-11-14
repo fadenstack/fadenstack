@@ -12,6 +12,14 @@ A destructive or unclassified call, or one a rule asks about, takes ``once``
 only: another scope is refused (409), and so is none while
 ``approvals_require_answer_scope`` is on. The call goes on waiting for an
 answer it takes. A "no" is always taken.
+
+The first answer taken stands. Sending the same answer again (the same
+``approved`` and ``scope``) is answered as the first was, 200 with the same
+body, for ten minutes after it was taken, also once the call no longer
+waits: a client may retry when the response to its answer was lost. Another
+answer is refused (409 ``approval_already_answered``). While the call waits,
+its stream carries a ``: keep-alive`` comment every
+``governance_approval_keepalive_s`` (15 s by default).
 """
 
 from __future__ import annotations
@@ -45,6 +53,9 @@ _REFUSED = {
     Answered.SCOPE_REQUIRED: (
         409, "approval_scope_required",
         "Say what the approval covers: this call can be approved for itself only (scope 'once').",
+    ),
+    Answered.ALREADY_ANSWERED: (
+        409, "approval_already_answered", "This call was answered already with another answer, which stands.",
     ),
 }
 

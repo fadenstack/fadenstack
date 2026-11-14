@@ -47,7 +47,7 @@ import secrets
 import time
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Literal, Protocol
 
@@ -609,6 +609,19 @@ def content_filter_chunk(head: Mapping[str, Any]) -> bytes:
 #: What an approval says it covers: this call, this chat, or always (on the device that answered).
 ApprovalScope = Literal["once", "chat", "always"]
 
+#: What the gateway sends while a call waits for the person: an SSE comment, which readers skip (a line that
+#: starts with ``:``), so that a client's idle limit or a proxy does not take the quiet stream for a dead one.
+KEEPALIVE = b": keep-alive\n\n"
+
+#: How long a taken answer is kept, so that the same answer sent again -- a client's retry after the response
+#: to its first try was lost -- is answered as the first was, also after the call stopped waiting.
+ANSWER_KEPT_S = 600
+
+#: How often a waiting call reads its stored answer itself, besides being woken on the answer's channel.
+_POLL_S = 1.0
+#: How long registering a call waits for Redis to confirm the subscription to the answer's channel.
+_SUBSCRIBE_WAIT_S = 2.0
+
 
 @dataclass(frozen=True, slots=True)
 class Answer:
@@ -622,13 +635,16 @@ class Answer:
 class Answered(StrEnum):
     """What became of an answer."""
 
+    #: Taken; also for the same answer sent again, while :data:`ANSWER_KEPT_S` keeps the first.
     TAKEN = "taken"
-    #: No call of this user's waits for it (or it was answered already).
+    #: No call of this user's waits for it (it never did, or its wait ended without an answer).
     UNKNOWN = "unknown"
     #: The call takes ``once`` only, and the approval named another scope.
     ONCE_ONLY = "once_only"
     #: The call takes ``once`` only, the approval named no scope, and the gateway is set to refuse that.
     SCOPE_REQUIRED = "scope_required"
+    #: The call was answered already, differently: the first answer stands.
+    ALREADY_ANSWERED = "already_answered"
 
 
 def refusal(*, once_only: bool, approved: bool, scope: str | None, require_scope: bool) -> Answered | None:
@@ -645,108 +661,307 @@ def refusal(*, once_only: bool, approved: bool, scope: str | None, require_scope
     return None if scope == "once" else Answered.ONCE_ONLY
 
 
-@dataclass
-class _Waiting:
+@dataclass(frozen=True, slots=True)
+class _Taken:
+    """An answer taken for a call: whose call it was, and what was answered."""
+
     tenant_id: str
     user_id: str
-    #: Takes an approval for this call alone (:func:`refusal`).
-    once_only: bool = False
-    future: asyncio.Future[Answer] = field(default_factory=lambda: asyncio.get_running_loop().create_future())
+    answer: Answer
+    #: Until when it is kept here (``time.monotonic``); Redis keeps its own copy for :data:`ANSWER_KEPT_S`.
+    until: float = 0.0
+
+
+#: Closing a wait runs to its end even when the request is cancelled meanwhile (the client went away).
+_closing: set[asyncio.Future[None]] = set()
+
+
+def _owner_key(approval_id: str) -> str:
+    """Whose call waits for *approval_id*, and whether it takes ``once`` only; set while it waits."""
+    return f"faden:approval:{approval_id}"
+
+
+def _answer_key(approval_id: str) -> str:
+    """The first answer taken for *approval_id*, or the mark that its wait ended without one."""
+    return f"faden:approval:{approval_id}:answer"
+
+
+def _channel(approval_id: str) -> str:
+    """Where the waiting worker is woken when an answer is taken on another."""
+    return f"faden:approval:{approval_id}"
+
+
+def _record(stored: Any) -> _Taken | None:
+    """A stored answer record read back; ``None`` for none, for the mark of a wait that ended, or garbage."""
+    if not stored:
+        return None
+    try:
+        said = json.loads(stored.decode() if isinstance(stored, bytes) else stored)
+    except (ValueError, UnicodeDecodeError):
+        return None
+    if not isinstance(said, dict) or said.get("ended") or not isinstance(said.get("approved"), bool):
+        return None
+    scope = said.get("scope")
+    return _Taken(
+        tenant_id=str(said.get("tenant") or ""), user_id=str(said.get("user") or ""),
+        answer=Answer(approved=said["approved"], scope=scope if isinstance(scope, str) else None),
+    )
+
+
+def _repeat(taken: _Taken | None, tenant_id: str, user_id: str, said: Answer) -> Answered:
+    """An answer to a call that was answered already, or no longer waits: the first answer stands.
+
+    The same answer again is taken, as the first was (a client's retry); another one is refused. Another
+    person's answer is told nothing about the call (ASVS 5.0 V8.3.1).
+    """
+    if taken is None or (taken.tenant_id, taken.user_id) != (tenant_id, user_id):
+        return Answered.UNKNOWN
+    return Answered.TAKEN if taken.answer == said else Answered.ALREADY_ANSWERED
+
+
+class PendingApproval:
+    """One call waiting for the person, from before it is announced to the end of its wait.
+
+    Made by :meth:`Approvals.open`. The caller announces the call only then, so an answer that comes at once
+    -- on this worker or another -- finds it. :meth:`answer` waits a while for the person's answer, so the
+    caller can send :data:`KEEPALIVE` in between; :meth:`close` ends the wait and says what was answered.
+    """
+
+    def __init__(
+        self, approvals: Approvals, *, approval_id: str, tenant_id: str, user_id: str, once_only: bool,
+        timeout: float,
+    ) -> None:
+        loop = asyncio.get_running_loop()
+        self.approval_id = approval_id
+        self.tenant_id = tenant_id
+        self.user_id = user_id
+        #: Takes an approval for this call alone (:func:`refusal`).
+        self.once_only = once_only
+        self.future: asyncio.Future[Answer] = loop.create_future()
+        self._deadline = loop.time() + timeout
+        self._ran_out = False
+        self._approvals = approvals
+        #: Its channel's subscription and the task that listens on it (with Redis).
+        self.pubsub: Any = None
+        self.listener: asyncio.Task[None] | None = None
+        self._closed = False
+
+    @property
+    def expired(self) -> bool:
+        """Whether the call's time to wait is over (also when the loop's timer ran out a tick early)."""
+        return self._ran_out or asyncio.get_running_loop().time() >= self._deadline
+
+    @property
+    def answered(self) -> Answer | None:
+        """The answer taken for the call, if one was."""
+        return self.future.result() if self.future.done() and not self.future.cancelled() else None
+
+    async def answer(self, within: float) -> Answer | None:
+        """The person's answer, waiting at most *within* seconds, and never past the call's time."""
+        remaining = self._deadline - asyncio.get_running_loop().time()
+        left = min(within, remaining)
+        if self.future.done() or left <= 0:
+            self._ran_out = self._ran_out or not self.future.done()
+            return self.answered
+        try:
+            return await asyncio.wait_for(asyncio.shield(self.future), left)
+        except TimeoutError:
+            # Waited to the call's end: over, even if the timer fired a clock tick before it.
+            self._ran_out = self._ran_out or left >= remaining
+            return None
+
+    async def close(self) -> Answer | None:
+        """End the wait: no answer is taken for the call from now on. The answer taken, or ``None``.
+
+        Ending is settled as an answer is taken -- whichever comes first counts -- so an answer that came at
+        the last moment still counts, and none is taken for a call that no longer waits. It runs to its end
+        even when the request is cancelled meanwhile.
+        """
+        if not self._closed:
+            self._closed = True
+            ending = asyncio.ensure_future(self._approvals.finish(self))
+            _closing.add(ending)
+            ending.add_done_callback(_closing.discard)
+            await asyncio.shield(ending)
+        return self.answered
 
 
 class Approvals:
     """Calls waiting for a person, answered on any worker.
 
-    The request waits here; ``POST /v1/approvals/{id}`` answers it. With
-    Redis, the answer may arrive on another worker: it is published on the
-    approval's own channel, which the waiting worker listens to. The
-    approval's key says whose call it is and whether it takes ``once``
-    only, so the answering worker checks both.
+    A call is registered (:meth:`open`) before it is announced, and waits there; ``POST /v1/approvals/{id}``
+    answers it. With Redis, the answer may arrive on another worker: the first answer is stored once
+    (``SET NX``) under the approval, and the waiting worker is woken on the approval's channel. It also
+    reads the stored answer every second, so an answer whose wake-up it missed is still found. The
+    approval's key says whose call it is and whether it takes ``once`` only, so the answering worker checks
+    both. The first answer stands; the same answer sent again is taken as the first was, so a client may
+    send it again when the response to it was lost (ASVS 5.0 V2.3.3, V2.3.4: one decision, recorded once).
     """
 
     def __init__(self) -> None:
-        self._waiting: dict[str, _Waiting] = {}
+        self._waiting: dict[str, PendingApproval] = {}
+        #: Answers taken on this worker without Redis, kept for a repeat (:data:`ANSWER_KEPT_S`).
+        self._taken: dict[str, _Taken] = {}
         self._redis: Any = None
 
     def use(self, redis: Any | None) -> None:
         self._redis = redis
 
+    async def open(
+        self, *, tenant_id: str, user_id: str, approval_id: str, timeout: float, once_only: bool = False,
+    ) -> PendingApproval:
+        """Register a call that waits for its user's answer, before the call is announced to them.
+
+        With Redis the call's key is set and the worker subscribed to its channel, confirmed by Redis, before
+        this returns: an answer that comes as soon as the person sees the call is taken and heard.
+        """
+        pending = PendingApproval(
+            self, approval_id=approval_id, tenant_id=tenant_id, user_id=user_id, once_only=once_only,
+            timeout=timeout,
+        )
+        self._waiting[approval_id] = pending
+        if self._redis is None:
+            return pending
+        try:
+            await self._redis.set(
+                _owner_key(approval_id),
+                json.dumps({"tenant": tenant_id, "user": user_id, "once_only": once_only}),
+                ex=int(timeout) + 60,
+            )
+            pending.pubsub = self._redis.pubsub()
+            await pending.pubsub.subscribe(_channel(approval_id))
+            subscribed = asyncio.Event()
+            pending.listener = asyncio.create_task(self._listen(pending, subscribed))
+            try:
+                await asyncio.wait_for(subscribed.wait(), _SUBSCRIBE_WAIT_S)
+            except TimeoutError:
+                logger.warning("Redis did not confirm an approval's channel in time; its answer is polled")
+        except BaseException:
+            await pending.close()
+            raise
+        return pending
+
     async def wait(
         self, *, tenant_id: str, user_id: str, approval_id: str, timeout: float, once_only: bool = False,
     ) -> Answer | None:
-        """The user's answer; ``None`` when nobody answered in time."""
-        waiting = _Waiting(tenant_id=tenant_id, user_id=user_id, once_only=once_only)
-        self._waiting[approval_id] = waiting
-        listener: asyncio.Task[None] | None = None
-        pubsub = None
+        """The user's answer; ``None`` when nobody answered in time (:meth:`open`, then the whole wait)."""
+        pending = await self.open(
+            tenant_id=tenant_id, user_id=user_id, approval_id=approval_id, timeout=timeout,
+            once_only=once_only,
+        )
         try:
-            if self._redis is not None:
-                await self._redis.set(
-                    f"faden:approval:{approval_id}",
-                    json.dumps({"tenant": tenant_id, "user": user_id, "once_only": once_only}),
-                    ex=int(timeout) + 60,
-                )
-                pubsub = self._redis.pubsub()
-                await pubsub.subscribe(f"faden:approval:{approval_id}")
-                listener = asyncio.create_task(self._listen(pubsub, waiting))
-            try:
-                return await asyncio.wait_for(asyncio.shield(waiting.future), timeout)
-            except TimeoutError:
-                return None
+            await pending.answer(timeout)
         finally:
-            self._waiting.pop(approval_id, None)
-            if listener is not None:
-                listener.cancel()
-                with contextlib.suppress(asyncio.CancelledError, Exception):
-                    await listener
-            if pubsub is not None:
+            said = await pending.close()
+        return said
+
+    async def _listen(self, pending: PendingApproval, subscribed: asyncio.Event) -> None:
+        """Give *pending* its answer: woken on its channel, or reading the stored answer every second."""
+        complained = False
+        while not pending.future.done():
+            try:
+                message = await pending.pubsub.get_message(timeout=_POLL_S)
+                if message and message.get("type") == "subscribe":
+                    subscribed.set()
+                taken = _record(await self._redis.get(_answer_key(pending.approval_id)))
+            except Exception:  # Redis away for a moment: the next round tries again
+                if not complained:
+                    complained = True
+                    logger.warning("An approval's wait could not read Redis; it tries again", exc_info=True)
+                await asyncio.sleep(_POLL_S)
+                continue
+            if taken is not None and not pending.future.done():
+                pending.future.set_result(taken.answer)
+
+    async def finish(self, pending: PendingApproval) -> None:
+        """End *pending* (:meth:`PendingApproval.close`): ended, unless an answer was stored first."""
+        approval_id = pending.approval_id
+        try:
+            if self._redis is not None and not pending.future.done():
                 with contextlib.suppress(Exception):
-                    await pubsub.unsubscribe()
-                    await pubsub.aclose()
+                    ended = await self._redis.set(
+                        _answer_key(approval_id), json.dumps({"ended": True}), nx=True, ex=ANSWER_KEPT_S,
+                    )
+                    taken = None if ended else _record(await self._redis.get(_answer_key(approval_id)))
+                    if taken is not None and not pending.future.done():
+                        pending.future.set_result(taken.answer)
+        finally:
+            if self._waiting.get(approval_id) is pending:
+                del self._waiting[approval_id]
+            if pending.listener is not None:
+                pending.listener.cancel()
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    await pending.listener
+            if pending.pubsub is not None:
+                with contextlib.suppress(Exception):
+                    await pending.pubsub.unsubscribe()
+                    await pending.pubsub.aclose()
             if self._redis is not None:
                 with contextlib.suppress(Exception):
-                    await self._redis.delete(f"faden:approval:{approval_id}")
-
-    @staticmethod
-    async def _listen(pubsub: Any, waiting: _Waiting) -> None:
-        while not waiting.future.done():
-            message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
-            if message and message.get("type") == "message" and not waiting.future.done():
-                said = json.loads(message["data"])
-                answer = Answer(approved=bool(said.get("approved")), scope=said.get("scope"))
-                waiting.future.set_result(answer)
+                    await self._redis.delete(_owner_key(approval_id))
 
     def waiting(self) -> list[str]:
-        """The approvals this worker waits for."""
-        return list(self._waiting)
+        """The approvals this worker waits for, and has not had an answer for yet."""
+        return [approval_id for approval_id, pending in self._waiting.items() if not pending.future.done()]
 
     async def answer(
         self, *, tenant_id: str, user_id: str, approval_id: str, approved: bool, scope: str | None = None,
         require_scope: bool = False,
     ) -> Answered:
-        """Answer a waiting call of this user's. A refused answer leaves the call waiting for another."""
+        """Answer a call of this user's. A refused answer leaves the call waiting for another.
+
+        The first answer taken stands. The same answer sent again is taken as the first was, also once the
+        call no longer waits (for :data:`ANSWER_KEPT_S`); another answer is :attr:`Answered.ALREADY_ANSWERED`.
+        """
+        said = Answer(approved=approved, scope=scope)
+        if self._redis is None:
+            return self._answer_here(tenant_id, user_id, approval_id, said, require_scope=require_scope)
         local = self._waiting.get(approval_id)
         owner = await self._owner(approval_id, local)
-        if owner is None or owner[:2] != (tenant_id, user_id):
+        if owner is None:
+            return _repeat(_record(await self._redis.get(_answer_key(approval_id))), tenant_id, user_id, said)
+        if owner[:2] != (tenant_id, user_id):
             return Answered.UNKNOWN
         refused = refusal(once_only=owner[2], approved=approved, scope=scope, require_scope=require_scope)
         if refused is not None:
             return refused
-        if local is not None:
-            local.future.set_result(Answer(approved=approved, scope=scope))
+        record = json.dumps({"tenant": tenant_id, "user": user_id, "approved": approved, "scope": scope})
+        if not await self._redis.set(_answer_key(approval_id), record, nx=True, ex=ANSWER_KEPT_S):
+            # Answered already, or the wait ended first: the stored record says which.
+            return _repeat(_record(await self._redis.get(_answer_key(approval_id))), tenant_id, user_id, said)
+        if local is not None and not local.future.done():
+            local.future.set_result(said)
         else:
-            await self._redis.publish(
-                f"faden:approval:{approval_id}", json.dumps({"approved": approved, "scope": scope}),
-            )
+            # A wake-up: the waiting worker reads the stored answer (it would find it within a second anyway).
+            woken = json.dumps({"approved": approved, "scope": scope})
+            await self._redis.publish(_channel(approval_id), woken)
         return Answered.TAKEN
 
-    async def _owner(self, approval_id: str, local: _Waiting | None) -> tuple[str, str, bool] | None:
+    def _answer_here(
+        self, tenant_id: str, user_id: str, approval_id: str, said: Answer, *, require_scope: bool,
+    ) -> Answered:
+        """:meth:`answer` without Redis: one worker, so nothing awaits between the check and the answer."""
+        now = time.monotonic()
+        for kept in [k for k, taken in self._taken.items() if taken.until <= now]:
+            del self._taken[kept]
+        pending = self._waiting.get(approval_id)
+        if pending is None or pending.future.done():
+            return _repeat(self._taken.get(approval_id), tenant_id, user_id, said)
+        if (pending.tenant_id, pending.user_id) != (tenant_id, user_id):
+            return Answered.UNKNOWN
+        refused = refusal(once_only=pending.once_only, approved=said.approved, scope=said.scope,
+                          require_scope=require_scope)
+        if refused is not None:
+            return refused
+        pending.future.set_result(said)
+        self._taken[approval_id] = _Taken(tenant_id, user_id, said, until=now + ANSWER_KEPT_S)
+        return Answered.TAKEN
+
+    async def _owner(self, approval_id: str, local: PendingApproval | None) -> tuple[str, str, bool] | None:
         """Whose call waits for *approval_id* -- tenant, user -- and whether it takes ``once`` only."""
         if local is not None:
-            return None if local.future.done() else (local.tenant_id, local.user_id, local.once_only)
-        if self._redis is None:
-            return None
-        stored = await self._redis.get(f"faden:approval:{approval_id}")
+            return local.tenant_id, local.user_id, local.once_only
+        stored = await self._redis.get(_owner_key(approval_id))
         if not stored:
             return None
         who = json.loads(stored.decode() if isinstance(stored, bytes) else stored)

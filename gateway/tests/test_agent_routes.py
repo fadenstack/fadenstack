@@ -1540,6 +1540,7 @@ async def test_features_answer_any_signed_in_caller(client: AsyncClient, backend
         assert r.status_code == 200
         assert r.json()["edition"] == "community"
         assert {"agents", "streaming", "client_events.trigger"} <= set(r.json()["features"])
+        assert {"approvals.keepalive", "approvals.idempotent"} <= set(r.json()["features"])
         assert "approval_scopes.time" not in r.json()["features"]
     assert (await client.get("/v1/features")).status_code == 401
 

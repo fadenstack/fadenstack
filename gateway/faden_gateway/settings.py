@@ -230,6 +230,9 @@ class Settings(BaseSettings):
     #: How long a tool call that needs approval waits for the user (streamed
     #: answers to clients that asked for events); then it is refused.
     governance_approval_timeout_s: int = 300
+    #: While such a call waits, an SSE comment (``: keep-alive``) goes out this often, so that the client's
+    #: idle limit or a proxy does not end the quiet stream. 0 sends none.
+    governance_approval_keepalive_s: float = 15.0
     #: Refuse an approval that names no scope for a call that takes ``once`` only (destructive, unclassified,
     #: or asked for by a rule). One that names a scope is always checked; this is for clients that send none,
     #: and stays off until every agent in use sends scopes.

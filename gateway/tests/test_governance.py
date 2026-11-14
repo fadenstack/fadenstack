@@ -679,6 +679,207 @@ async def test_an_answer_on_another_worker_is_held_to_the_same_scope() -> None:
     assert await asyncio.wait_for(waiting, 5) == gov.Answer(approved=True, scope="once")
 
 
+# -- an answer is heard at once and may come again (LiveCheck on rc16, 14 Nov) ------------------------------
+#
+# The lost decline: the device declined within milliseconds of seeing the call; the answer reached the other
+# worker, which answered 200, but it was published before the waiting worker had subscribed, and nobody heard
+# it. The gateway waited 300 s on a quiet stream.
+
+
+def _two_workers(*, wake_ups_lost: bool = False) -> tuple[gov.Approvals, gov.Approvals, FakeRedis]:
+    """A waiting and an answering worker on one Redis; *wake_ups_lost*: the answering one's publish reaches nobody."""
+    server = FakeServer()
+    waiting_worker, answering_worker = gov.Approvals(), gov.Approvals()
+    redis, answering_redis = FakeRedis(server=server), FakeRedis(server=server)
+    if wake_ups_lost:
+        async def nobody_heard(*_: Any) -> int:
+            return 0
+
+        answering_redis.publish = nobody_heard  # type: ignore[method-assign]
+    waiting_worker.use(redis)
+    answering_worker.use(answering_redis)
+    return waiting_worker, answering_worker, redis
+
+
+def _answers(worker: gov.Approvals, approval_id: str = "a1") -> Any:
+    async def answer(approved: bool, scope: str | None = None, user: str = "user-1") -> gov.Answered:
+        return await worker.answer(
+            tenant_id="tenant-a", user_id=user, approval_id=approval_id, approved=approved, scope=scope,
+        )
+    return answer
+
+
+@pytest.mark.anyio
+async def test_a_call_is_registered_and_subscribed_before_it_is_announced() -> None:
+    waiting_worker, answering_worker, redis = _two_workers()
+    pending = await waiting_worker.open(tenant_id="tenant-a", user_id="user-1", approval_id="a1", timeout=5)
+    assert await redis.get("faden:approval:a1"), "any worker can tell whose call it is"
+    assert (await redis.pubsub_numsub("faden:approval:a1"))[0][1] == 1, "listening before anyone is asked"
+    # Declined on the other worker the moment the call is announced, as LiveCheck's device did.
+    assert await _answers(answering_worker)(False) is gov.Answered.TAKEN
+    assert await asyncio.wait_for(pending.answer(within=5), 2) == gov.Answer(approved=False)
+    assert await pending.close() == gov.Answer(approved=False)
+
+
+@pytest.mark.anyio
+async def test_an_answer_whose_wake_up_reached_nobody_is_still_found() -> None:
+    waiting_worker, answering_worker, _ = _two_workers(wake_ups_lost=True)
+    pending = await waiting_worker.open(tenant_id="tenant-a", user_id="user-1", approval_id="a1", timeout=10)
+    assert await _answers(answering_worker)(False) is gov.Answered.TAKEN
+    assert await asyncio.wait_for(pending.answer(within=10), 3) == gov.Answer(approved=False), (
+        "read from the store within a second, not left to wait 300 s"
+    )
+    await pending.close()
+
+
+@pytest.mark.anyio
+async def test_the_stream_waits_for_the_answer_before_it_asks_the_person(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await _setup(fastapi_app, db_session)
+    await _rule(db_session, "knowledge_search", "approval_required", "Searching needs your OK.")
+    _Knowledge(monkeypatch)
+    _Model(monkeypatch, _call("knowledge_search", {"query": "launch"}), _say("Done."))
+    waiting_when_asked: list[list[str]] = []
+    event = gov.approval_event
+
+    def asking(approval_id: str, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        waiting_when_asked.append(gov.approvals.waiting())
+        return event(approval_id, *args, **kwargs)
+
+    monkeypatch.setattr(gov, "approval_event", asking)
+    ask = client.post("/v1/chat/completions", headers=_headers(**EVENTS), json={
+        "model": ALIAS, "stream": True, "messages": [{"role": "user", "content": "When?"}],
+    })
+    r, answered = await asyncio.wait_for(asyncio.gather(ask, _approve_when_asked(client, False)), 10)
+    assert answered == 200
+    [asked] = [e for e in _faden(r.text) if e.get("name") == "faden.approval_required"]
+    assert waiting_when_asked == [[asked["value"]["approvalId"]]]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("every", [0.05, 0], ids=["keep-alive", "off"])
+async def test_while_the_person_decides_the_stream_carries_keep_alive_comments(
+    every: float, fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "governance_approval_keepalive_s", every)
+    await _setup(fastapi_app, db_session)
+    await _rule(db_session, "knowledge_search", "approval_required", "Searching needs your OK.")
+    knowledge = _Knowledge(monkeypatch)
+    _Model(monkeypatch, _call("knowledge_search", {"query": "launch"}), _say("Done."))
+
+    async def answer_after_a_while() -> int:
+        while not gov.approvals.waiting():
+            await asyncio.sleep(0.01)
+        await asyncio.sleep(0.4)
+        return await _approve_when_asked(client, True)
+
+    ask = client.post("/v1/chat/completions", headers=_headers(**EVENTS), json={
+        "model": ALIAS, "stream": True, "messages": [{"role": "user", "content": "When?"}],
+    })
+    r, answered = await asyncio.wait_for(asyncio.gather(ask, answer_after_a_while()), 10)
+    assert answered == 200 and len(knowledge.searches) == 1
+    blocks = r.text.split("\n\n")
+    asked = next(i for i, block in enumerate(blocks) if "faden.approval_required" in block)
+    beats = [i for i, block in enumerate(blocks) if block == ": keep-alive"]
+    ran = next(i for i, block in enumerate(blocks) if "TOOL_CALL_END" in block)
+    if every:
+        assert len(beats) >= 3 and all(asked < i < ran for i in beats), "after the question, while it waits"
+    else:
+        assert beats == []
+    assert _text(r.text) == "Done.", "readers skip the comments"
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("workers", ["one", "two"])
+async def test_the_same_answer_again_is_taken_as_the_first_and_another_is_refused(workers: str) -> None:
+    if workers == "one":
+        waiting_worker = answering_worker = gov.Approvals()
+        redis = None
+    else:
+        waiting_worker, answering_worker, redis = _two_workers()
+    pending = await waiting_worker.open(
+        tenant_id="tenant-a", user_id="user-1", approval_id="a1", timeout=5, once_only=True,
+    )
+    answer, here = _answers(answering_worker), _answers(waiting_worker)
+    assert await answer(False) is gov.Answered.TAKEN
+    assert await answer(False) is gov.Answered.TAKEN, "a client's retry"
+    assert await here(False) is gov.Answered.TAKEN, "the retry on the waiting worker"
+    assert await answer(True, "once") is gov.Answered.ALREADY_ANSWERED, "the first answer stands"
+    assert await answer(False, user="user-2") is gov.Answered.UNKNOWN, "nothing said to another person"
+    assert await asyncio.wait_for(pending.answer(within=5), 3) == gov.Answer(approved=False)
+    assert await pending.close() == gov.Answer(approved=False)
+    assert await answer(False) is gov.Answered.TAKEN, "also once the call stopped waiting"
+    assert await answer(True, "once") is gov.Answered.ALREADY_ANSWERED
+    assert gov.approvals.waiting() == [] and waiting_worker.waiting() == []
+    if redis is not None:
+        assert 0 < await redis.ttl("faden:approval:a1:answer") <= gov.ANSWER_KEPT_S
+        assert not await redis.exists("faden:approval:a1"), "nobody waits for it any more"
+
+
+@pytest.mark.anyio
+async def test_a_kept_answer_is_forgotten_after_its_time(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(gov, "ANSWER_KEPT_S", 0.1)
+    worker = gov.Approvals()
+    pending = await worker.open(tenant_id="tenant-a", user_id="user-1", approval_id="a1", timeout=5)
+    assert await _answers(worker)(False) is gov.Answered.TAKEN
+    await pending.close()
+    await asyncio.sleep(0.2)
+    assert await _answers(worker)(False) is gov.Answered.UNKNOWN
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("workers", ["one", "two"])
+async def test_a_wait_that_ended_takes_no_answer(workers: str) -> None:
+    if workers == "one":
+        waiting_worker = answering_worker = gov.Approvals()
+    else:
+        waiting_worker, answering_worker, _ = _two_workers()
+    pending = await waiting_worker.open(tenant_id="tenant-a", user_id="user-1", approval_id="a1", timeout=0.05)
+    assert await pending.answer(within=5) is None and pending.expired
+    assert await pending.close() is None
+    assert await _answers(answering_worker)(False) is gov.Answered.UNKNOWN, "404, as before: it timed out"
+
+
+@pytest.mark.anyio
+async def test_an_answer_taken_as_the_wait_ends_still_counts() -> None:
+    # Taken on the other worker, its wake-up lost, and the wait ends before it reads the store again.
+    waiting_worker, answering_worker, _ = _two_workers(wake_ups_lost=True)
+    pending = await waiting_worker.open(tenant_id="tenant-a", user_id="user-1", approval_id="a1", timeout=5)
+    assert await _answers(answering_worker)(False) is gov.Answered.TAKEN
+    assert await pending.close() == gov.Answer(approved=False)
+
+
+@pytest.mark.anyio
+async def test_a_decline_sent_twice_is_taken_once_and_answered_alike(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await _setup(fastapi_app, db_session)
+    await _rule(db_session, "knowledge_search", "approval_required", "Searching needs your OK.")
+    knowledge = _Knowledge(monkeypatch)
+    model = _Model(monkeypatch, _call("knowledge_search", {"query": "launch"}), _say("I did not search."))
+
+    async def answer_three_times() -> list[httpx.Response]:
+        while not gov.approvals.waiting():
+            await asyncio.sleep(0.01)
+        url = f"/v1/approvals/{gov.approvals.waiting()[0]}"
+        sent = [await client.post(url, headers=_headers(), json={"approved": False, "scope": None})]
+        sent.append(await client.post(url, headers=_headers(), json={"approved": False, "scope": None}))
+        sent.append(await client.post(url, headers=_headers(), json={"approved": True, "scope": "once"}))
+        return sent
+
+    ask = client.post("/v1/chat/completions", headers=_headers(**EVENTS), json={
+        "model": ALIAS, "stream": True, "messages": [{"role": "user", "content": "When?"}],
+    })
+    r, sent = await asyncio.wait_for(asyncio.gather(ask, answer_three_times()), 10)
+    assert [s.status_code for s in sent] == [200, 200, 409], r.text
+    assert sent[1].json() == sent[0].json() and sent[0].json()["approved"] is False, "the retry, answered alike"
+    assert sent[2].json()["error"]["code"] == "approval_already_answered"
+    assert knowledge.searches == [] and "The user declined." in model.sent[1]["messages"][-1]["content"]
+    assert [d.outcome for d in await _decisions(db_session)] == ["rejected"], "decided and recorded once"
+
+
 # -- core's tool checks fail closed (38 §4.3; 39 F5) --------------------------------------------------
 
 

@@ -2665,10 +2665,16 @@ class GatewayService:
         call is refused, saying it needs approval. A destructive or
         unclassified call, or one a rule asks about, takes an approval for
         itself alone (``gov.refusal``); the answer's scope is recorded.
+
+        The call waits for its answer from before it is announced, so an
+        answer that comes at once -- on any worker -- is heard. While the
+        person decides, ``gov.KEEPALIVE`` goes out every
+        ``governance_approval_keepalive_s``: the stream is quiet, not gone.
         """
         if not req.faden_events:
             return
         timeout = float(settings.governance_approval_timeout_s)
+        keepalive = float(settings.governance_approval_keepalive_s) or timeout
         for call in calls:
             call_id = call.get("id", "")
             name, verdict = screened.get(call_id, ("", None))  # type: ignore[assignment]
@@ -2676,14 +2682,19 @@ class GatewayService:
                 continue
             approval_id = uuid.uuid4().hex
             tool_class, rule = self._class_of(req, name), _floor(req, name, verdict)
-            yield faden_events.sse_event(gov.approval_event(
-                approval_id, call, name, verdict.decision.message, timeout, tool_class=tool_class, rule=rule,
-                open_world=self._open_world_of(req, name),
-            ))
-            answer = await gov.approvals.wait(
+            pending = await gov.approvals.open(
                 tenant_id=auth.tenant_id, user_id=auth.user_id, approval_id=approval_id, timeout=timeout,
                 once_only=rule or tool_class in _ONCE_ONLY_CLASSES,
             )
+            try:
+                yield faden_events.sse_event(gov.approval_event(
+                    approval_id, call, name, verdict.decision.message, timeout,
+                    tool_class=tool_class, rule=rule, open_world=self._open_world_of(req, name),
+                ))
+                while await pending.answer(within=keepalive) is None and not pending.expired:
+                    yield gov.KEEPALIVE
+            finally:
+                answer = await pending.close()
             answered[call_id] = bool(answer and answer.approved)
             ctx = self._context(req, auth, request_id, gov.GovernanceStage.TOOL, tool_id=name)
             outcome = "expired" if answer is None else "approved" if answer.approved else "rejected"

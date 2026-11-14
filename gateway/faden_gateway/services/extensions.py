@@ -65,6 +65,9 @@ log = logging.getLogger(__name__)
 CORE_FEATURES = (
     "agents", "agent_tokens", "agent_events", "skills", "sessions", "streaming", "approval_scopes.grant",
     "client_events.trigger",
+    # A call waiting for the person: its stream carries ``: keep-alive`` comments, and its answer may be sent
+    # again (the same answer is taken as the first was).
+    "approvals.keepalive", "approvals.idempotent",
 )
 
 #: ``(user_id, agent_id) -> reason`` to deny, or ``None`` to allow.
