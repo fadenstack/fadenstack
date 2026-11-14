@@ -55,6 +55,9 @@ def _tools_are_read(monkeypatch: pytest.MonkeyPatch) -> None:
 
 SEARCH = "mcp.github.search_repositories"
 CREATE = "mcp.github.create_repository"
+#: The names the model gets for them, and calls them by (tool_names.py).
+SEARCH_SEEN = "mcp_github_search_repositories"
+CREATE_SEEN = "mcp_github_create_repository"
 SERVICE_TOKEN = "service-token"
 #: What every chat on a route that calls tools is offered, with MCP tools to find.
 SYSTEM = [FIND, TIME]
@@ -151,7 +154,7 @@ async def test_the_model_gets_the_mcp_tools_the_chat_has_on_and_no_others(
 
     assert (await _ask(client, session_id=str(narrowed))).status_code == 200
     assert (await _ask(client, session_id=str(untouched))).status_code == 200
-    assert _tool_names(model.sent[0]) == [*SYSTEM, SEARCH]
+    assert _tool_names(model.sent[0]) == [*SYSTEM, SEARCH_SEEN]
     assert _tool_names(model.sent[1]) == SYSTEM
 
 
@@ -216,14 +219,14 @@ async def test_a_tool_the_model_calls_without_finding_it_is_switched_on_and_runs
     """Named from an earlier turn, or from a search's list: it may be used, so it runs and stays on."""
     await _ready(fastapi_app, db_session)
     mcp = _MCP(monkeypatch, SEARCH, CREATE)
-    model = _Model(monkeypatch, _call(CREATE, {"name": "x"}), _say("Created."))
+    model = _Model(monkeypatch, _call(CREATE_SEEN, {"name": "x"}), _say("Created."))
     sid = await _session(db_session)
     if switched_off:
         await _switch_off(db_session, sid, CREATE)
 
     assert (await _ask(client, session_id=str(sid))).status_code == 200
     assert [c["qualified_name"] for c in mcp.calls] == [CREATE]
-    assert _tool_names(model.sent[1]) == [*SYSTEM, CREATE]
+    assert _tool_names(model.sent[1]) == [*SYSTEM, CREATE_SEEN]
     rows = await GatewayDAO(db_session).get_session_tool_overrides(sid)
     assert [(o.tool_id, o.enabled, o.updated_by) for o in rows] == [(CREATE, True, "model")]
 
@@ -232,7 +235,7 @@ async def test_a_tool_the_model_calls_without_finding_it_is_switched_on_and_runs
 async def test_a_tool_the_chat_cannot_use_is_refused_as_unknown(
     fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A name outside the catalog: the MCP service is not asked."""
+    """A name outside the catalog: the MCP service is not asked, and the model hears of it by its own kind of name."""
     await _ready(fastapi_app, db_session)
     mcp = _MCP(monkeypatch, SEARCH)
     model = _Model(monkeypatch, _call("mcp.github.delete_everything", {}), _say("ok"))
@@ -240,7 +243,7 @@ async def test_a_tool_the_chat_cannot_use_is_refused_as_unknown(
 
     await _ask(client, session_id=str(sid))
     assert mcp.calls == []
-    assert "There is no tool named 'mcp.github.delete_everything'" in model.sent[1]["messages"][-1]["content"]
+    assert "There is no tool named 'mcp_github_delete_everything'" in model.sent[1]["messages"][-1]["content"]
 
 
 @pytest.mark.anyio
@@ -354,7 +357,7 @@ async def test_the_next_turn_sees_the_tool_call_and_its_result(
 
     second_turn = model.sent[2]["messages"]
     assert _roles(second_turn) == [
-        "user", "assistant+calls(mcp.everything.get-sum)", "tool", "assistant", "user",
+        "user", "assistant+calls(mcp_everything_get-sum)", "tool", "assistant", "user",
     ]
     tool = next(m for m in second_turn if m["role"] == "tool")
     call = next(m for m in second_turn if m.get("tool_calls"))

@@ -24,7 +24,16 @@ from faden_gateway.services.gateway.skills_client import ResolvedSkill
 from faden_gateway.services.gateway.system_tools import FIND, TIME
 from tests.test_gateway_knowledge_tools import _ask, _call, _Model, _say, _streamed, _tool_names
 from tests.test_gateway_pipeline_combined import _session, _token
-from tests.test_session_tool_switches import CREATE, SEARCH, SYSTEM, _MCP, _ready, _switch_on
+from tests.test_session_tool_switches import (
+    CREATE,
+    CREATE_SEEN,
+    SEARCH,
+    SEARCH_SEEN,
+    SYSTEM,
+    _MCP,
+    _ready,
+    _switch_on,
+)
 
 
 
@@ -135,7 +144,7 @@ async def test_a_tool_the_model_finds_is_offered_next_round_and_stays_on(
     model = _Model(
         monkeypatch,
         _call(FIND, {"query": "search repositories"}),
-        _call(SEARCH, {"query": "llm"}, call_id="call_2"),
+        _call(SEARCH_SEEN, {"query": "llm"}, call_id="call_2"),
         _say("Found none."),
         _say("ok"),
     )
@@ -144,15 +153,15 @@ async def test_a_tool_the_model_finds_is_offered_next_round_and_stays_on(
     r = await _ask(client, session_id=str(sid), stream=stream)
     reply = _streamed(r.text)[0] if stream else r.json()["choices"][0]["message"]["content"]
     assert reply == "Found none."
-    assert [_tool_names(p) for p in model.sent] == [SYSTEM, [*SYSTEM, SEARCH], [*SYSTEM, SEARCH]]
+    assert [_tool_names(p) for p in model.sent] == [SYSTEM, [*SYSTEM, SEARCH_SEEN], [*SYSTEM, SEARCH_SEEN]]
     found = json.loads(model.sent[1]["messages"][-1]["content"])
-    assert [t["name"] for t in found["switched_on"]] == [SEARCH]
+    assert [t["name"] for t in found["switched_on"]] == [SEARCH_SEEN]
     assert [c["qualified_name"] for c in mcp.calls] == [SEARCH]
 
     rows = await GatewayDAO(db_session).get_session_tool_overrides(sid)
     assert [(o.tool_id, o.enabled, o.updated_by) for o in rows] == [(SEARCH, True, "model")]
     await _ask(client, session_id=str(sid))
-    assert _tool_names(model.sent[3]) == [*SYSTEM, SEARCH]
+    assert _tool_names(model.sent[3]) == [*SYSTEM, SEARCH_SEEN]
 
 
 @pytest.mark.anyio
@@ -172,7 +181,7 @@ async def test_a_request_without_a_chat_finds_tools_for_itself(
 
     await _ask(client)
     await _ask(client)
-    assert [_tool_names(p) for p in model.sent] == [SYSTEM, [*SYSTEM, CREATE], [*SYSTEM, CREATE], SYSTEM]
+    assert [_tool_names(p) for p in model.sent] == [SYSTEM, [*SYSTEM, CREATE_SEEN], [*SYSTEM, CREATE_SEEN], SYSTEM]
     assert [c["qualified_name"] for c in mcp.calls] == [CREATE]
 
 
@@ -264,7 +273,7 @@ async def test_a_tool_the_model_invents_finds_the_one_it_meant(
     model = _Model(
         monkeypatch,
         _call("add_numbers", {"num1": 17, "num2": 25}),
-        _call(get_sum, {"a": 17, "b": 25}, call_id="call_2"),
+        _call("mcp_everything_get-sum", {"a": 17, "b": 25}, call_id="call_2"),
         _say("42"),
     )
     sid = await _session(db_session)
@@ -272,8 +281,8 @@ async def test_a_tool_the_model_invents_finds_the_one_it_meant(
     await _ask(client, session_id=str(sid))
     told = json.loads(model.sent[1]["messages"][-1]["content"])
     assert told["error"] == "There is no tool named 'add_numbers'."
-    assert [t["name"] for t in told["switched_on"]] == [get_sum]
-    assert _tool_names(model.sent[1]) == [*SYSTEM, get_sum]
+    assert [t["name"] for t in told["switched_on"]] == ["mcp_everything_get-sum"]
+    assert _tool_names(model.sent[1]) == [*SYSTEM, "mcp_everything_get-sum"]
     assert [c["qualified_name"] for c in mcp.calls] == [get_sum]
 
 
@@ -294,7 +303,7 @@ async def test_a_tool_called_by_its_name_without_the_prefix_runs(
 
     await _ask(client, session_id=str(sid))
     assert [c["qualified_name"] for c in mcp.calls] == ["mcp.everything.get-sum"]
-    assert _tool_names(model.sent[1]) == [*SYSTEM, "mcp.everything.get-sum"]
+    assert _tool_names(model.sent[1]) == [*SYSTEM, "mcp_everything_get-sum"]
     assert "There is no tool named 'echo'" in model.sent[2]["messages"][-1]["content"]
 
 
@@ -338,8 +347,9 @@ async def test_a_tool_the_question_names_is_offered_and_kept_when_used(
     await _ask(client, session_id=str(sid), messages=asked("Use the get-sum tool to add 17 and 25."))
     await _ask(client, session_id=str(sid), messages=asked("Use the echo tool to echo: done."))
     await _ask(client, session_id=str(sid), messages=asked("Thanks."))
+    seen_sum, seen_echo = "mcp_everything_get-sum", "mcp_everything_echo"
     assert [_tool_names(p) for p in model.sent] == [
-        [*SYSTEM, get_sum], [*SYSTEM, get_sum], [*SYSTEM, echo, get_sum], [*SYSTEM, get_sum],
+        [*SYSTEM, seen_sum], [*SYSTEM, seen_sum], [*SYSTEM, seen_echo, seen_sum], [*SYSTEM, seen_sum],
     ]
     assert [c["qualified_name"] for c in mcp.calls] == [get_sum]
     rows = await GatewayDAO(db_session).get_session_tool_overrides(sid)

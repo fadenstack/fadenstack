@@ -13,6 +13,14 @@ export function isHttp(transport: MCPTransportType): boolean {
   return transport === "sse" || transport === "streamable_http";
 }
 
+/** The longest tool prefix the service takes for a new server: lowercase letters, digits, "_" and "-". */
+export const PREFIX_MAX = 32;
+
+/** The tool prefix made from a server's name when none is given: lowercase letters, digits and "_". */
+export function prefixFrom(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, "_").slice(0, PREFIX_MAX);
+}
+
 /** A command line as the service stores it: one list, split on spaces. */
 export function splitCommand(line: string): string[] {
   return line.split(/\s+/).filter(Boolean);

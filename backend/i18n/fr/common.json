@@ -2847,7 +2847,7 @@
     "command": "Commande",
     "command_help": "Commande et arguments séparés par des espaces",
     "tool_prefix": "Préfixe d'outil",
-    "prefix_help": "Préfixe unique pour les noms d'outils (p. ex. 'brave'). Généré automatiquement si vide.",
+    "prefix_help": "Préfixe unique pour les noms d'outils (p. ex. 'brave') : minuscules, chiffres, '_' et '-', jusqu'à 32 caractères. Généré à partir du nom si vide.",
     "delete_server": "Supprimer le serveur",
     "delete_confirm": "Êtes-vous sûr de vouloir supprimer \"{{name}}\" ? Cela supprimera tous les outils associés.",
     "tools_title": "Outils découverts",

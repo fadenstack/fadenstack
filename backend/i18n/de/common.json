@@ -2654,7 +2654,7 @@
     "command": "Befehl",
     "command_help": "Leerzeichen-getrennte Befehlszeile und Argumente",
     "tool_prefix": "Tool-Präfix",
-    "prefix_help": "Eindeutiges Präfix für Tool-Namen (z.B. 'brave'). Wird automatisch generiert wenn leer.",
+    "prefix_help": "Eindeutiges Präfix für Tool-Namen (z. B. 'brave'): Kleinbuchstaben, Ziffern, '_' und '-', bis zu 32 Zeichen. Wird aus dem Namen gebildet, wenn leer.",
     "delete_server": "Server löschen",
     "delete_confirm": "Sind Sie sicher, dass Sie \"{{name}}\" löschen möchten? Alle zugeordneten Tools werden entfernt.",
     "tools_title": "Entdeckte Tools",

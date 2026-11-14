@@ -76,6 +76,7 @@ from faden_gateway.services.gateway.routing import RouterService, RoutingDecisio
 from faden_gateway.services.gateway.skills_client import ResolvedSkill, SkillsClient
 from faden_gateway.services.gateway.stream import StreamStats, wrap_sse_stream
 from faden_gateway.services.gateway.stream_buffer import StreamBuffer
+from faden_gateway.services.gateway.tool_names import ToolNames
 from faden_gateway.services.gateway.tool_stream import DONE, ToolCalls, sse, sse_events
 from faden_gateway.services.gateway.usage import (
     NO_USAGE,
@@ -1239,6 +1240,8 @@ class _Prepared:
     #: Every tool the client sent, also those a rule or the mode then left out: a call of any of them is
     #: screened as it is handed to the client.
     client_offered: frozenset[str] = frozenset()
+    #: The names the model gets for the MCP tools, and the names it calls them by (tool_names.py).
+    tool_names: ToolNames = field(default_factory=ToolNames)
     #: Whether the system tools were offered (current_time, get_available_tools).
     system_tools: bool = False
     #: The MCP tools the chat may use, in the catalog's order: what
@@ -1488,6 +1491,7 @@ class GatewayService:
                         )
                     else:
                         adapter_result = await self._whole_chat(req)
+                        req.tool_names.answer_back(adapter_result.payload)
                     from faden_gateway.services.gateway.llm_adapter import CompletionResult  # noqa: PLC0415
                     assert isinstance(adapter_result, CompletionResult)  # noqa: S101
                     result = UpstreamResult(
@@ -1917,7 +1921,7 @@ class GatewayService:
             else:
                 raw_stream = self.adapter.completion(
                     **_candidate_adapter_kwargs(decision.candidate),
-                    payload=egress_payload,
+                    payload=req.tool_names.out(egress_payload),
                     stream=True,
                     first_token_timeout_sec=_first_token_wait(decision.candidate),
                 )
@@ -2953,6 +2957,7 @@ class GatewayService:
         payload = req.payload
         req.client_tools = {_tool_definition_name(t) for t in payload.get("tools") or []}
         req.client_offered = frozenset(req.client_tools)
+        req.tool_names = ToolNames(taken=req.client_offered | _GATEWAY_TOOLS)
         if "rag" in payload:
             # Retrieval before the model, on every turn that asked for it, is
             # gone: the model searches when it needs to (knowledge_search).
@@ -3031,6 +3036,8 @@ class GatewayService:
             self._knowledge_to_search(req, auth, payload, candidates) if chat else _value(None),
         )
         self._book_on(req, team)
+        # The tenant's whole catalog, so that a tool keeps its name from chat to chat (tool_names.py).
+        req.tool_names.add(t.get("qualified_name", "") for t in mcp_tools or [])
         if req.skills:
             blocks = [skill_files.skill_block(skill, as_tool=searchable) for skill in req.skills]
             payload = _with_skills(payload, blocks)
@@ -3946,8 +3953,8 @@ class GatewayService:
         head: dict[str, Any] = {}
         for iteration in range(settings.mcp_tool_loop_max_iterations + 1):
             raw = await self.adapter.completion(
-                **_candidate_adapter_kwargs(req.decision.candidate), payload=payload, stream=True,
-                first_token_timeout_sec=_first_token_wait(req.decision.candidate),
+                **_candidate_adapter_kwargs(req.decision.candidate), payload=req.tool_names.out(payload),
+                stream=True, first_token_timeout_sec=_first_token_wait(req.decision.candidate),
             )
             raw = self._pictures_marked(
                 req, raw, model_alias=str(payload.get("model") or ""), request_id=request_id,
@@ -3997,6 +4004,8 @@ class GatewayService:
             said_out = restore_sse(answer(), req.token_mapping)
             async for chunk in answer_variety.strip_sse(said_out) if req.answer_varied else said_out:
                 yield chunk
+            # The round's calls are whole: from here on they carry the gateway's names (tool_names.py).
+            req.tool_names.calls_back(calls.calls())
             if ended["failed"]:
                 yield sse(DONE)
                 return
@@ -4084,13 +4093,15 @@ class GatewayService:
         candidate = req.decision.candidate
         if req.split_choices is None or req.unvaried_payload is None:
             return await self.adapter.completion(
-                **_candidate_adapter_kwargs(candidate), payload=req.egress_payload, stream=False,
+                **_candidate_adapter_kwargs(candidate), payload=req.tool_names.out(req.egress_payload),
+                stream=False,
             )
         # Each call its own kwargs: the adapter takes the headers out of the extra parameters it is given.
         results = await asyncio.gather(*(
             self.adapter.completion(
                 **_candidate_adapter_kwargs(candidate),
-                payload=answer_variety.one_of(req.unvaried_payload, candidate, index), stream=False,
+                payload=req.tool_names.out(answer_variety.one_of(req.unvaried_payload, candidate, index)),
+                stream=False,
             )
             for index in range(req.split_choices)
         ))
@@ -4107,9 +4118,11 @@ class GatewayService:
 
         assert req.decision is not None  # noqa: S101
         adapter_result = await self.adapter.completion(
-            **_candidate_adapter_kwargs(req.decision.candidate), payload=payload, stream=False,
+            **_candidate_adapter_kwargs(req.decision.candidate), payload=req.tool_names.out(payload),
+            stream=False,
         )
         assert isinstance(adapter_result, CompletionResult)  # noqa: S101
+        req.tool_names.answer_back(adapter_result.payload)
         if adapter_result.status_code >= 400:
             error = (adapter_result.payload or {}).get("error", {})
             raise GatewayError(

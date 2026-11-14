@@ -2845,7 +2845,7 @@
     "command": "Command",
     "command_help": "Space-separated command and arguments",
     "tool_prefix": "Tool Prefix",
-    "prefix_help": "Unique prefix for tool names (e.g. 'brave'). Auto-generated if empty.",
+    "prefix_help": "Unique prefix for tool names (e.g. 'brave'): lowercase letters, digits, '_' and '-', up to 32 characters. Made from the name if empty.",
     "delete_server": "Delete Server",
     "delete_confirm": "Are you sure you want to delete \"{{name}}\"? This will remove all associated tools.",
     "tools_title": "Discovered Tools",

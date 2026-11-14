@@ -24,7 +24,7 @@ import {
   type SecretEdits,
 } from "./SecretPairsEditor";
 import { PiiServiceWarning } from "./PiiServiceWarning";
-import { isHttp, splitCommand } from "./serverForm";
+import { isHttp, PREFIX_MAX, prefixFrom, splitCommand } from "./serverForm";
 
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -152,8 +152,7 @@ export default function MCPServersPage() {
       const server = await registerServer({
         name: newName,
         transport: newTransport,
-        tool_prefix:
-          newPrefix || newName.toLowerCase().replace(/[^a-z0-9]/g, "_"),
+        tool_prefix: newPrefix || prefixFrom(newName),
         ...(isHttp(newTransport)
           ? { url: newUrl.trim(), headers: toSecretMap(newHeaders) }
           : { command: splitCommand(newCommand), env: toSecretMap(newEnv) }),
@@ -244,7 +243,8 @@ export default function MCPServersPage() {
         .toLowerCase()
         .replace(/[^a-z0-9]/g, "_")
         .replace(/_+/g, "_")
-        .replace(/^_|_$/g, "");
+        .replace(/^_|_$/g, "")
+        .slice(0, PREFIX_MAX);
       const registered = await registerServer({
         name: server.server_name,
         transport: "streamable_http",
@@ -505,14 +505,13 @@ export default function MCPServersPage() {
             label={t("mcp.tool_prefix", "Tool Prefix")}
             value={newPrefix}
             onChange={(e) => setNewPrefix(e.target.value)}
-            placeholder={
-              newName.toLowerCase().replace(/[^a-z0-9]/g, "_") || "my_server"
-            }
+            placeholder={prefixFrom(newName) || "my_server"}
             fullWidth
             disabled={creating}
+            slotProps={{ htmlInput: { maxLength: PREFIX_MAX, spellCheck: false } }}
             helperText={t(
               "mcp.prefix_help",
-              "Unique prefix for tool names (e.g. 'brave'). Auto-generated if empty.",
+              "Unique prefix for tool names (e.g. 'brave'): lowercase letters, digits, '_' and '-', up to 32 characters. Made from the name if empty.",
             )}
           />
           <TextField

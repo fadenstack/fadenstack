@@ -2654,7 +2654,7 @@
     "command": "命令",
     "command_help": "空格分隔的命令和参数",
     "tool_prefix": "工具前缀",
-    "prefix_help": "工具名称的唯一前缀（例如 'brave'）。留空则自动生成。",
+    "prefix_help": "工具名称的唯一前缀（例如 'brave'）：小写字母、数字、'_' 和 '-'，最多 32 个字符。留空则根据名称生成。",
     "delete_server": "删除服务器",
     "delete_confirm": "您确定要删除 \"{{name}}\" 吗？这将移除所有关联的工具。",
     "tools_title": "已发现的工具",

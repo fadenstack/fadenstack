@@ -46,7 +46,7 @@ or choose the network when you [create](../operate/containers.md#create-a-contai
     | **Transport** | **Streamable HTTP** for current servers, **SSE (legacy HTTP)** for older ones, or **Stdio (command)** for a server the MCP service starts itself. |
     | **Server URL** | For HTTP: the server's MCP address, usually ending in `/mcp` (or `/sse`), for example `https://tools.example.internal/mcp`. |
     | **Command** | For stdio: the command and its arguments, for example `uvx mcp-server-time`. |
-    | **Tool Prefix** | A short, unique name. The server's tools are named `mcp.<prefix>.<tool>`, for example `mcp.github.search_repositories`. Made up if left empty. |
+    | **Tool Prefix** | A short, unique name: lowercase letters, digits, `_` and `-`, up to 32 characters. The server's tools are named `mcp.<prefix>.<tool>`, for example `mcp.github.search_repositories`: tool rules and the audit use that name, and the model gets it as `mcp_github_search_repositories`, a name every provider takes. Made from the server's name if left empty. |
     | **PII Mode** | What the server may see of personal data (see [Personal data](#personal-data-pii-mode)). |
     | **Timeout (seconds)** | How long connecting and each tool call may take: 5 to 600 seconds. |
 

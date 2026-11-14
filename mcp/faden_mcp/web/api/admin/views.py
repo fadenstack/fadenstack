@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
@@ -36,6 +37,26 @@ router = APIRouter()
 
 def _connection_manager(request: Request) -> MCPConnectionManager:
     return request.app.state.connection_manager  # type: ignore[no-any-return]
+
+
+#: A new tool prefix: lowercase letters, digits, "_" and "-", up to 32 characters.
+#: A tool is named ``mcp.<prefix>.<tool>``, and the gateway gives the model
+#: ``mcp_<prefix>_<tool>``, which providers take up to 64 characters: a prefix with
+#: a dot was read wrongly, one of 128 left no room for the tool. Prefixes made
+#: before the rule stay as they are.
+_TOOL_PREFIX = re.compile(r"[a-z0-9_-]{1,32}")
+
+
+def _check_tool_prefix(prefix: str, *, stored: str | None = None) -> None:
+    """Refuse a new prefix outside the rule; *stored*, the one a server has, stays."""
+    if prefix != stored and not _TOOL_PREFIX.fullmatch(prefix):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "A tool prefix has 1 to 32 characters: lowercase letters, digits, "
+                "'_' and '-'."
+            ),
+        )
 
 
 def _tool_to_response(tool: Any) -> ToolResponse:
@@ -158,6 +179,7 @@ async def register_server(
     session: AsyncSession = Depends(get_db_session),
 ) -> ServerResponse:
     """Register a new MCP server and optionally discover its tools."""
+    _check_tool_prefix(body.tool_prefix)
     # Validate transport-specific requirements
     if body.transport == "stdio" and not body.command:
         raise HTTPException(
@@ -304,6 +326,8 @@ async def update_server(
     server = await dao.get_server(server_id)
     if server is None:
         raise HTTPException(status_code=404, detail="Server not found.")
+    asked = server.tool_prefix if body.tool_prefix is None else body.tool_prefix
+    _check_tool_prefix(asked, stored=server.tool_prefix)
 
     update_data: dict[str, Any] = {}
     for field_name in (

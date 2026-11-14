@@ -2654,7 +2654,7 @@
     "command": "Comando",
     "command_help": "Comando y argumentos separados por espacios",
     "tool_prefix": "Prefijo de herramienta",
-    "prefix_help": "Prefijo único para nombres de herramientas (ej. 'brave'). Se genera automáticamente si está vacío.",
+    "prefix_help": "Prefijo único para nombres de herramientas (ej. 'brave'): minúsculas, dígitos, '_' y '-', hasta 32 caracteres. Se genera a partir del nombre si está vacío.",
     "delete_server": "Eliminar servidor",
     "delete_confirm": "¿Está seguro de que desea eliminar \"{{name}}\"? Esto eliminará todas las herramientas asociadas.",
     "tools_title": "Herramientas descubiertas",

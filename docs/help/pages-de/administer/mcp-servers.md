@@ -47,7 +47,7 @@ Registrieren in seiner Zeile eine dieser Klassen, oder wählen Sie das Netzwerk,
     | **Transport** | **Streamable HTTP** für aktuelle Server, **SSE (älteres HTTP)** für ältere oder **Stdio (Befehl)** für einen Server, den der MCP-Dienst selbst startet. |
     | **Server-URL** | Bei HTTP: die MCP-Adresse des Servers, meist mit `/mcp` (oder `/sse`) am Ende, z. B. `https://tools.example.internal/mcp`. |
     | **Befehl** | Bei Stdio: der Befehl und seine Argumente, z. B. `uvx mcp-server-time`. |
-    | **Tool-Präfix** | Ein kurzer, eindeutiger Name. Die Tools des Servers heißen `mcp.<prefix>.<tool>`, z. B. `mcp.github.search_repositories`. Bleibt das Feld leer, wird einer erzeugt. |
+    | **Tool-Präfix** | Ein kurzer, eindeutiger Name aus Kleinbuchstaben, Ziffern, `_` und `-`, bis zu 32 Zeichen. Die Tools des Servers heißen `mcp.<prefix>.<tool>`, z. B. `mcp.github.search_repositories`: Tool-Regeln und das Audit nutzen diesen Namen, das Modell bekommt ihn als `mcp_github_search_repositories`, einen Namen, den jeder Anbieter annimmt. Bleibt das Feld leer, wird er aus dem Servernamen gebildet. |
     | **PII-Modus** | Was der Server von personenbezogenen Daten sehen darf (siehe [Personenbezogene Daten](#personal-data-pii-mode)). |
     | **Zeitlimit (Sekunden)** | Wie lange der Verbindungsaufbau und jeder Tool-Aufruf dauern dürfen: 5 bis 600 Sekunden. |
 
