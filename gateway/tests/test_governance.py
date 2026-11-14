@@ -791,6 +791,102 @@ async def test_while_the_person_decides_the_stream_carries_keep_alive_comments(
     assert _text(r.text) == "Done.", "readers skip the comments"
 
 
+async def _checked_stream(
+    gate: asyncio.Event, said: str, check: Any,
+) -> tuple[list[bytes], asyncio.Task[None]]:
+    """``govern_sse`` over a round that says *said*, asks the person and waits at *gate*; what it let out."""
+    async def stream() -> AsyncIterator[bytes]:
+        yield f"data: {json.dumps({'choices': [{'delta': {'content': said}}]})}\n\n".encode()
+        yield b'event: faden\ndata: {"type": "CUSTOM", "name": "faden.approval_required"}\n\n'
+        yield gov.KEEPALIVE
+        await gate.wait()  # the gateway waits for the person here
+        yield b'data: {"choices": [{"delta": {"content": " Done."}, "finish_reason": "stop"}]}\n\n'
+        yield b"data: [DONE]\n\n"
+
+    async def on_block(verdict: gov.Verdict, text: str) -> AsyncIterator[bytes]:
+        yield b"data: refused\n\n"
+
+    out: list[bytes] = []
+
+    async def read() -> None:
+        async for piece in gov.govern_sse(stream(), window=200, check=check, on_block=on_block):
+            out.append(piece)
+
+    reading = asyncio.create_task(read())
+    for _ in range(100):
+        if len(out) >= 3 or reading.done():
+            break
+        await asyncio.sleep(0.01)
+    return out, reading
+
+
+@pytest.mark.anyio
+async def test_an_output_check_lets_the_question_and_keep_alives_out_while_the_call_waits() -> None:
+    checked: list[str] = []
+
+    async def check(text: str) -> gov.Verdict | None:
+        checked.append(text)
+        return None
+
+    gate = asyncio.Event()
+    out, reading = await _checked_stream(gate, "Let me", check)
+    assert [piece.split(b"\n")[0] for piece in out] == [
+        b'data: {"choices": [{"delta": {"content": "Let me"}}]}', b"event: faden", b": keep-alive",
+    ], "the text shorter than the window, checked, then the question: all out while it waits"
+    assert checked == ["Let me"]
+    gate.set()
+    await asyncio.wait_for(reading, 5)
+    assert out[-1] == b"data: [DONE]\n\n"
+
+
+@pytest.mark.anyio
+async def test_a_comment_goes_out_at_once_while_text_waits_for_its_check() -> None:
+    gate = asyncio.Event()
+
+    async def stream() -> AsyncIterator[bytes]:
+        yield b'data: {"choices": [{"delta": {"content": "Let me"}}]}\n\n'
+        yield gov.KEEPALIVE
+        await gate.wait()
+        yield b"data: [DONE]\n\n"
+
+    async def check(text: str) -> gov.Verdict | None:
+        return None
+
+    async def on_block(verdict: gov.Verdict, text: str) -> AsyncIterator[bytes]:
+        yield b""
+
+    out: list[bytes] = []
+
+    async def read() -> None:
+        async for piece in gov.govern_sse(stream(), window=200, check=check, on_block=on_block):
+            out.append(piece)
+
+    reading = asyncio.create_task(read())
+    for _ in range(100):
+        if out:
+            break
+        await asyncio.sleep(0.01)
+    assert out == [gov.KEEPALIVE], "the text waits for its window; the comment does not"
+    gate.set()
+    await asyncio.wait_for(reading, 5)
+    assert out[1:] == [b'data: {"choices": [{"delta": {"content": "Let me"}}]}\n\n', b"data: [DONE]\n\n"]
+
+
+@pytest.mark.anyio
+async def test_text_refused_before_the_question_ends_the_stream_there() -> None:
+    policy = _Policy(stages={gov.GovernanceStage.OUTPUT}, word="bluebird")
+
+    async def check(text: str) -> gov.Verdict | None:
+        return await gov.decide([policy], gov.GovernanceContext(
+            stage=gov.GovernanceStage.OUTPUT, tenant_id="tenant-a", user_id="user-1", agent_id=None, session_id=None,
+            request_id="r", text=text,
+        ))
+
+    out, reading = await _checked_stream(asyncio.Event(), "BLUEBIRD", check)
+    await asyncio.wait_for(reading, 5)
+    assert out == [b"data: refused\n\n"], "neither the text nor the question went out"
+
+
 @pytest.mark.anyio
 @pytest.mark.parametrize("workers", ["one", "two"])
 async def test_the_same_answer_again_is_taken_as_the_first_and_another_is_refused(workers: str) -> None:

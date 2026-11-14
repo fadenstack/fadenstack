@@ -524,7 +524,11 @@ async def govern_sse(  # noqa: C901, PLR0912, PLR0915 - one loop, kept readable 
     characters, which wait for the next check: a phrase up to a window long is
     always checked whole before any of it leaves. Refused: nothing more goes
     out and *on_block* ``(verdict, the answer so far)`` ends the stream.
-    Events without text go straight through while nothing waits.
+    Events without text go straight through while nothing waits. A comment
+    (a keep-alive) always does: it carries nothing to check. The gateway's
+    own events (``event: faden``: a tool round starting, a call waiting for
+    the person) end the text before them, which is checked and goes out
+    first: a call that waits for an answer is seen while it waits.
     """
     held: list[tuple[bytes, str]] = []
     passed = ""
@@ -561,10 +565,24 @@ async def govern_sse(  # noqa: C901, PLR0912, PLR0915 - one loop, kept readable 
             while "\n\n" in buffer:
                 raw, buffer = buffer.split("\n\n", 1)
                 event = (raw + "\n\n").encode()
+                if all(line.startswith(":") for line in raw.split("\n")):
+                    yield event  # a comment: nothing to check, nothing to keep in order
+                    continue
                 text, ended = _text_and_end(raw)
                 done = raw == "data: [DONE]"
                 if not held and not text and not done:
                     yield event  # nothing waits on a check
+                    continue
+                if raw.startswith("event: faden\n"):
+                    # The text before the gateway's own event is complete: checked, it goes out first.
+                    verdict, out = await checked(final=True)
+                    if verdict is not None:
+                        async for piece in on_block(verdict, passed + waiting()):
+                            yield piece
+                        return
+                    for piece in out:
+                        yield piece
+                    yield event
                     continue
                 held.append((event, text))
                 unchecked += len(text)
