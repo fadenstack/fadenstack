@@ -38,12 +38,15 @@ releases:
   #   summary: >-
   #     Skills for agents: the organisation's skills assigned to the agents that should have them, from the
   #     skill or the agent's page, and an agent may allow the person's own skills. The agent SDKs' tool
-  #     search runs without asking. The anonymous health check says only "ok".
+  #     search runs without asking; a tool that reaches outside asks below Auto. The anonymous health check
+  #     says only "ok".
   #   highlights:
   #     - "Local skills: an agent version can allow the skills kept on the person's own computer beside your organisation's (Agents → the agent → Local skills). Off unless allowed."
   #     - "Skills assigned to an agent reach that agent only, in every chat with it; assigned to everyone, a skill reaches every agent."
   #     - "Assigning skills to agents: a skill's Assignments tab and an agent's Skills tab pick from searchable lists and save the whole set at once. An agent the skill does not have yet must be one you can see; a deleted agent's assignments go."
   #     - "The agent SDKs' tool search, find_tool, is a read tool: with local MCP servers allowed it finds a tool without asking, and the tool it finds still asks first, every time."
+  #     - "The gateway knows the agent SDKs' own tools: load_skill and read_skill_resource are read tools where an agent allows local skills, web_search a read tool that reaches outside where it allows local MCP servers; run_skill_script never reaches the model. Where the agent does not allow them, they are held back."
+  #     - "A tool that reaches outside the organisation (Agents → Governance → Tool classes → Reaches outside, and the SDKs' web_search) asks in Read only and Ask, a read tool too, and can be allowed for that chat only; Auto runs it as its class says."
   #     - "The anonymous GET /api/health answers only {\"status\": \"ok\"}: it no longer says `environment`. Anything that read that field (a monitor, a script) stops getting it; read the status code or `status`."
   #   upgrade_from: 0.4.0
   #   components:

@@ -50,6 +50,7 @@ import time
 from collections.abc import Awaitable, Callable, Iterable, Mapping
 from dataclasses import dataclass, replace
 from enum import StrEnum
+from types import MappingProxyType
 from typing import Any
 
 from sqlalchemy import select
@@ -201,6 +202,42 @@ def from_annotations(annotations: Mapping[str, Any] | None) -> tuple[ToolClass, 
 #: the name for it: an app cannot give it to a tool of its own. (sdk/51, the owner, 13 Nov 2026; Claude's and
 #: Copilot's tool search does not ask either.)
 SDK_TOOL_SEARCH = "find_tool"
+#: The person's own skills on the device: load one, read one of its files (sdk/51 F04).
+SDK_LOAD_SKILL = "load_skill"
+SDK_READ_SKILL_RESOURCE = "read_skill_resource"
+#: Kept by the SDKs and never offered: a skill's scripts stay off. Held back here too, should a client send it.
+SDK_RUN_SKILL_SCRIPT = "run_skill_script"
+#: A web search from the device (sdk/51 F06): read, and open-world, since the query leaves the organisation.
+SDK_WEB_SEARCH = "web_search"
+
+#: The SDKs' own tools, with the class and open-world mark the gateway gives each (sdk/52 §10.5, the owner, 14 Nov
+#: 2026). The SDKs keep these names (0.3.0): an app cannot give one to a tool of its own, so the word reaches no other
+#: tool. An admin's rule or the agent's contract still decides the class; the open-world mark stays whatever they say.
+#: ``run_skill_script`` has no class here (unknown): it is always held back (:func:`sdk_tools_allowed`).
+SDK_TOOLS: Mapping[str, tuple[ToolClass, bool]] = MappingProxyType({
+    SDK_TOOL_SEARCH: (ToolClass.READ, False),
+    SDK_LOAD_SKILL: (ToolClass.READ, False),
+    SDK_READ_SKILL_RESOURCE: (ToolClass.READ, False),
+    SDK_WEB_SEARCH: (ToolClass.READ, True),
+})
+#: Every name the SDKs keep for their own tools.
+SDK_TOOL_NAMES = frozenset({*SDK_TOOLS, SDK_RUN_SKILL_SCRIPT})
+
+
+def sdk_tools_allowed(*, local_mcp: bool, local_skills: bool) -> frozenset[str]:
+    """The SDKs' tools the agent's profile lets reach the model; the others are held back, whatever the contract says.
+
+    ``find_tool`` always; the skill tools where the person's own skills may run (*local_skills*: the profile's
+    ``local_skills``, or developer mode); ``web_search`` where the device may attach local MCP servers (*local_mcp*),
+    until core has a switch of its own for it; ``run_skill_script`` never (fail closed). The server holds them back,
+    not only the SDK, so a forged request gains nothing (ASVS 5.0 V8.3.1).
+    """
+    allowed = {SDK_TOOL_SEARCH}
+    if local_skills:
+        allowed |= {SDK_LOAD_SKILL, SDK_READ_SKILL_RESOURCE}
+    if local_mcp:
+        allowed.add(SDK_WEB_SEARCH)
+    return frozenset(allowed)
 
 
 @dataclass(frozen=True)
@@ -219,6 +256,8 @@ class Classifier:
 
     def classify(self, name: str) -> Classified:
         found = self._classify(name)
+        if SDK_TOOLS.get(name, (None, False))[1] and found.open_world is not True:
+            found = replace(found, open_world=True)  # the SDKs' web search reaches outside, whoever set the class
         approval = (self.approvals or {}).get(name)
         return replace(found, approval=approval) if approval else found
 
@@ -235,8 +274,9 @@ class Classifier:
         risk = (self.contract or {}).get(name)
         if risk in ("read", "write", "destructive"):
             return Classified(name, ToolClass(risk), "agent")
-        if name == SDK_TOOL_SEARCH:
-            return Classified(name, ToolClass.READ, "sdk", False)
+        if name in SDK_TOOLS:
+            tool_class, open_world = SDK_TOOLS[name]
+            return Classified(name, tool_class, "sdk", open_world)
         open_world = ((self.annotations or {}).get(name) or {}).get("openWorldHint")
         return Classified(name, ToolClass.UNKNOWN, "none", open_world)
 

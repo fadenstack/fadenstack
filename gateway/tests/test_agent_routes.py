@@ -767,6 +767,86 @@ async def test_the_sdks_tool_search_is_never_held_back_though_the_contract_does_
     assert r.headers["x-faden-held-tools"] == "merge_pull_request"
 
 
+#: The names the agent SDKs keep for their own tools (sdk/52 §10.5).
+SDK_TOOLS = ["find_tool", "load_skill", "read_skill_resource", "run_skill_script", "web_search"]
+
+
+def _names(payload: dict[str, Any]) -> list[str]:
+    return [t["function"]["name"] for t in payload.get("tools") or []]
+
+
+@pytest.mark.parametrize("contract", [(), ({"name": "read_page", "risk": "read"},)], ids=["no-contract", "contract"])
+@pytest.mark.parametrize(("local_mcp", "local_skills", "kept"), [
+    (False, False, ["find_tool"]),
+    (False, True, ["find_tool", "load_skill", "read_skill_resource"]),
+    (True, False, ["find_tool", "web_search"]),
+    (True, True, ["find_tool", "load_skill", "read_skill_resource", "web_search"]),
+], ids=["neither", "local-skills", "local-mcp", "both"])
+def test_the_sdks_tools_the_profile_allows_are_never_held_back_and_the_others_always_are(
+    contract: tuple[dict[str, str], ...], local_mcp: bool, local_skills: bool, kept: list[str],
+) -> None:
+    """The skill tools follow local_skills, web_search local MCP (until core has its own switch), run_skill_script never
+    reaches the model; the contract, which does not list them, holds back none the profile allows."""
+    tools = [_tool("read_page"), *(_tool(n) for n in SDK_TOOLS)]
+    shaped, held = apply_agent(_profile(host_tool_contract=contract), {"messages": [], "tools": tools},
+                               local_mcp=local_mcp, local_skills=local_skills)
+    assert _names(shaped) == ["read_page", *kept]
+    assert sorted(t["function"]["name"] for t in held) == sorted(set(SDK_TOOLS) - set(kept))
+
+
+def test_a_contract_that_lists_an_sdk_tool_does_not_release_it_where_the_profile_forbids_its_feature() -> None:
+    contract = ({"name": "read_page", "risk": "read"}, {"name": "load_skill", "risk": "read"},
+                {"name": "run_skill_script", "risk": "read"}, {"name": "web_search", "risk": "read"})
+    tools = [_tool("read_page"), _tool("load_skill"), _tool("run_skill_script"), _tool("web_search")]
+    shaped, held = apply_agent(_profile(host_tool_contract=contract), {"messages": [], "tools": tools})
+    assert _names(shaped) == ["read_page"]
+    assert [t["function"]["name"] for t in held] == ["load_skill", "run_skill_script", "web_search"]
+    shaped, _ = apply_agent(_profile(host_tool_contract=contract), {"messages": [], "tools": tools},
+                            local_mcp=True, local_skills=True)
+    assert _names(shaped) == ["read_page", "load_skill", "web_search"], "run_skill_script: never"
+
+
+@pytest.mark.anyio
+async def test_the_sdks_tools_the_profile_forbids_are_named_held_but_not_kept_for_review(
+    client: AsyncClient, db_session: AsyncSession, backend: _Backend, monkeypatch: pytest.MonkeyPatch,
+    manifests: None,
+) -> None:
+    """Listing them in the contract would not allow them: the profile's switch does, so the review is not the place."""
+    await _seed(db_session, provider=ProviderType.REMOTE_OPENAI, pii=None)
+    sent: list[dict[str, Any]] = []
+    _model(monkeypatch, sent)
+    tools = [_tool("read_page"), _tool("load_skill"), _tool("web_search"), _tool("delete_page")]
+
+    r = await client.post(URL, headers=_headers(), json=_chat(tools=tools))
+
+    assert r.status_code == 200, r.text
+    assert [n for n in _names(sent[-1]) if n in {"read_page", "load_skill", "web_search", "delete_page"}] == ["read_page"]
+    assert r.headers["x-faden-held-tools"] == "delete_page,load_skill,web_search"
+    [row] = await _kept(db_session)
+    assert [t["name"] for t in row.manifest["tools"]] == ["delete_page"]
+
+
+@pytest.mark.anyio
+async def test_the_skill_tools_reach_the_model_where_the_profile_allows_local_skills(
+    client: AsyncClient, db_session: AsyncSession, backend: _Backend, monkeypatch: pytest.MonkeyPatch,
+    manifests: None, fastapi_app: FastAPI,
+) -> None:
+    await _seed(db_session, provider=ProviderType.REMOTE_OPENAI, pii=None)
+    backend.put(_profile(local_skills_mode="allow"))
+    fastapi_app.state.agent_directory.invalidate()
+    sent: list[dict[str, Any]] = []
+    _model(monkeypatch, sent)
+    tools = [_tool("read_page"), _tool("load_skill"), _tool("read_skill_resource"), _tool("run_skill_script")]
+
+    r = await client.post(URL, headers=_headers(), json=_chat(tools=tools))
+
+    assert r.status_code == 200, r.text
+    assert [n for n in _names(sent[-1]) if n in {t["function"]["name"] for t in tools}] == [
+        "read_page", "load_skill", "read_skill_resource",
+    ]
+    assert r.headers["x-faden-held-tools"] == "run_skill_script"
+
+
 @pytest.mark.anyio
 async def test_an_agent_deleted_and_made_again_under_its_address_is_read_again_for_its_tokens(
     client: AsyncClient, db_session: AsyncSession, backend: _Backend, monkeypatch: pytest.MonkeyPatch,

@@ -247,6 +247,18 @@ Ebenso `find_tool`, die Suche, die die Agenten-SDKs mitbringen, wenn ein Agent *
 [Agenten](agents.md)): Sie findet nur die Tools der MCP-Server auf dem Computer der Person und schaltet sie für den Chat
 ein. Jedes Tool, das sie findet, ist nicht eingestuft und fragt jedes Mal zuerst.
 
+Die Agenten-SDKs halten fünf Tool-Namen für ihre eigenen Tools frei, sodass kein Tool einer App einen davon tragen kann,
+und das Gateway gibt jedem seine Klasse, solange Ihre Regel oder die **Host-Tools** des Agenten nichts anderes sagen:
+
+| Tool | Klasse | Erreicht das Modell, wo der Agent erlaubt |
+|---|---|---|
+| `find_tool` | lesen | immer |
+| `load_skill`, `read_skill_resource` (die eigenen Skills der Person) | lesen | **Lokale Skills** |
+| `web_search` | lesen, wirkt nach außen: fragt unterhalb von **Automatisch** nach | **Lokale MCP-Server** |
+| `run_skill_script` | | nie: Skript-Ausführung bleibt aus |
+
+Wo der Agent es nicht erlaubt, wird das Tool zurückgehalten, egal was seine Host-Tools nennen.
+
 ### Grenzen für den Tool-Modus {#tool-mode-limits}
 
 <span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span>

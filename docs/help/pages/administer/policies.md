@@ -228,6 +228,18 @@ So is `find_tool`, the search the agent SDKs bring when an agent allows **Local 
 [Agents](agents.md)): it only finds the tools of the MCP servers on the person's computer and switches them on for the
 chat. Each tool it finds is unclassified and asks first, every time.
 
+The agent SDKs keep five tool names for their own tools, so no app's tool can take one, and the gateway gives each its
+class unless your rule or the agent's **Host tools** say otherwise:
+
+| Tool | Class | Reaches the model where the agent allows |
+|---|---|---|
+| `find_tool` | read | always |
+| `load_skill`, `read_skill_resource` (the person's own skills) | read | **Local skills** |
+| `web_search` | read, reaches outside: asks below **Auto** | **Local MCP servers** |
+| `run_skill_script` | | never: skill scripts stay off |
+
+Where the agent does not allow it, the tool is held back, whatever its Host tools list.
+
 ### Tool mode limits {#tool-mode-limits}
 
 <span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span>

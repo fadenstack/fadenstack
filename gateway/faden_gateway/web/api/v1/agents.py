@@ -328,7 +328,7 @@ def cap_reasoning(payload: dict[str, Any], top: str | None) -> dict[str, Any]:
 
 
 def apply_agent(
-    profile: AgentProfile, payload: dict[str, Any], *, local_mcp: bool = False,
+    profile: AgentProfile, payload: dict[str, Any], *, local_mcp: bool = False, local_skills: bool = False,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """The request body as the agent's version shapes it, and the tools it held back.
 
@@ -337,6 +337,10 @@ def apply_agent(
     the device may attach local MCP servers (*local_mcp*): their tools are in no contract, and the tool mode
     treats them as unclassified. With no contract at all nothing is held back, and every tool is
     unclassified: the gateway marks its calls for the client to ask (``faden.approval_required``).
+
+    The SDKs' own tools (``tool_classes.SDK_TOOLS``) are not the app's: the contract never holds back the
+    ones the profile allows, and the ones it does not allow (*local_mcp*, *local_skills*:
+    ``tool_classes.sdk_tools_allowed``) are held back with or without a contract.
 
     The version's ``ui.reasoning.max`` caps ``reasoning_effort``: see ``cap_reasoning``.
     """
@@ -347,10 +351,14 @@ def apply_agent(
             code="session_not_supported",
             param="session_id",
         )
-    held: list[dict[str, Any]] = []
+    sdk_allowed = tool_classes.sdk_tools_allowed(local_mcp=local_mcp, local_skills=local_skills)
+    names = {_tool_name(t) for t in payload.get("tools") or [] if isinstance(t, dict)}
+    # The SDKs' tools the profile does not allow: held back whatever the contract says (see tool_classes).
+    payload, held = hold_back(payload, frozenset(names - (tool_classes.SDK_TOOL_NAMES - sdk_allowed)))
     if profile.host_tool_contract and not local_mcp:
-        # The SDKs' tool search is theirs, not a host tool the contract lists: never held back (see tool_classes).
-        payload, held = hold_back(payload, profile.host_tools | {tool_classes.SDK_TOOL_SEARCH})
+        # The SDKs' tools are theirs, not host tools the contract lists: the allowed ones are never held back.
+        payload, more = hold_back(payload, profile.host_tools | sdk_allowed)
+        held += more
     shaped = cap_reasoning(dict(payload), reasoning_max(profile))
     if profile.model_alias:
         shaped["model"] = profile.model_alias
@@ -377,7 +385,8 @@ async def _keep_held(
 
     On a session of their own: the request's may still serve a stream.
     """
-    manifest = agent_manifests.held_manifest(held)
+    # The SDKs' own tools the profile switched off are not the app's tools to review: listing them would not allow them.
+    manifest = agent_manifests.held_manifest([t for t in held if _tool_name(t) not in tool_classes.SDK_TOOL_NAMES])
     digest = agent_manifests.sha256_of(manifest)
     if not manifest["tools"] or agent_manifests.recently_recorded(agent.id, digest):
         return
@@ -407,7 +416,9 @@ async def agent_chat_completions(
     held: list[dict[str, Any]] = []
 
     def prepare(payload: dict[str, Any]) -> dict[str, Any]:
-        shaped, held_now = apply_agent(agent.agent, payload, local_mcp=agent.local_mcp_allowed)
+        shaped, held_now = apply_agent(
+            agent.agent, payload, local_mcp=agent.local_mcp_allowed, local_skills=agent.local_skills_allowed,
+        )
         held.extend(held_now)
         return shaped
 

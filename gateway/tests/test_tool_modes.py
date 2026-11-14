@@ -196,6 +196,37 @@ def test_the_sdks_tool_search_is_read_unless_a_rule_or_the_contract_says_otherwi
     assert tc.decide(M.ASK, tc.Classifier().classify("find_tool")) is D.RUN
 
 
+@pytest.mark.parametrize("name", ["load_skill", "read_skill_resource", "web_search"])
+def test_the_sdks_tools_are_read_unless_a_rule_or_the_contract_says_otherwise(name: str) -> None:
+    """The SDKs keep these names (sdk/52 §10.5): read, and web_search open-world (it asks below Auto)."""
+    found = tc.Classifier().classify(name)
+    assert (found.tool_class, found.source) == (C.READ, "sdk")
+    assert tc.decide(M.AUTO, found) is D.RUN, "runs unasked"
+    assert tc.decide(M.ASK, found) is (D.ASK if name == "web_search" else D.RUN)
+    assert tc.Classifier(contract={name: "write"}).classify(name).tool_class is C.WRITE, "the contract's word"
+    rule = tc.Classifier(rules=(tc.ClassRule(name, "destructive"),), contract={name: "read"}).classify(name)
+    assert (rule.tool_class, rule.source) == (C.DESTRUCTIVE, "rule"), "the admin's word first"
+    assert tc.Classifier().classify(name + "s").tool_class is C.UNKNOWN, "only that name"
+
+
+def test_web_search_stays_open_world_whoever_sets_its_class_and_the_skill_tools_are_not() -> None:
+    assert tc.Classifier().classify("web_search").open_world is True
+    assert tc.Classifier(contract={"web_search": "read"}).classify("web_search").open_world is True
+    rule = tc.ClassRule("web_*", "read", open_world=False)
+    assert tc.Classifier(rules=(rule,)).classify("web_search").open_world is True, "the stricter mark"
+    assert tc.Classifier().classify("load_skill").open_world is False
+    assert tc.Classifier().classify("find_tool").open_world is False
+
+
+def test_run_skill_script_has_no_class_of_its_own_and_the_profile_never_allows_it() -> None:
+    assert tc.Classifier().classify("run_skill_script").tool_class is C.UNKNOWN
+    assert tc.SDK_TOOL_NAMES == {"find_tool", "load_skill", "read_skill_resource", "run_skill_script", "web_search"}
+    assert tc.sdk_tools_allowed(local_mcp=True, local_skills=True) == {
+        "find_tool", "load_skill", "read_skill_resource", "web_search",
+    }
+    assert tc.sdk_tools_allowed(local_mcp=False, local_skills=False) == {"find_tool"}
+
+
 @pytest.mark.anyio
 async def test_ceilings_narrow_and_a_failing_one_counts_as_read_only() -> None:
     ctx = tc.CeilingContext(tenant_id="t", user_id="u")

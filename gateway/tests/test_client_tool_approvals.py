@@ -221,6 +221,28 @@ async def test_the_sdks_tool_search_runs_unasked_and_the_tool_it_found_is_asked_
     assert asked == [[], [("convert_time", "unknown")]]
 
 
+@pytest.mark.anyio
+@pytest.mark.parametrize(("mode", "marks"), [("ask", [("web_search", "read", True)]), ("auto", [])])
+async def test_the_sdks_web_search_is_read_and_open_world_it_asks_below_auto(
+    mode: str, marks: list[tuple[str, str, bool]],
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+    backend: _Backend,  # noqa: F811 - the fixture
+) -> None:
+    """Where the device may attach local MCP servers web_search reaches the model: read, so it runs in Auto; open-world,
+    so it asks in Ask, and the mark says so (the client offers "for this chat" at most)."""
+    await _seed(db_session, provider=ProviderType.REMOTE_OPENAI, pii=None)
+    backend.put(_profile(host_tool_contract=({"name": "read_page", "risk": "read"},), local_mcp_mode="allow"))
+    fastapi_app.state.agent_directory.invalidate()
+    _Model(monkeypatch, _call("web_search", {"query": "rates"}))
+    tools = [{"type": "function", "function": {"name": "web_search", "parameters": {"type": "object"}}}]
+    r = await client.post("/v1/agents/eplan-assistant/chat/completions", json={
+        "model": "x", "stream": True, "tools": tools, "messages": [{"role": "user", "content": "Rates?"}],
+    }, headers={"Authorization": f"Bearer {_agent_token()}", "X-Faden-Tool-Mode": mode, **EVENTS})
+    assert r.status_code == 200, r.text
+    assert "x-faden-held-tools" not in r.headers
+    assert [(m["toolCallName"], m["toolClass"], m.get("openWorld", False)) for m in _marks(_faden(r.text))] == marks
+
+
 class _AskingPolicy:
     """A policy, as EE would register one, that asks about every tool call."""
 
