@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ClientEvent } from "~/api/agents";
 
-import { summarizeEvent } from "./agentEvents";
+import { EVENT_TYPES, summarizeEvent } from "./agentEvents";
 
 const event = (type: string, data: Record<string, unknown>, conversation_id: string | null = null): ClientEvent => ({
   id: "e1",
@@ -46,6 +46,21 @@ describe("summarizeEvent", () => {
       facts: ["mcp-files"],
       count: { key: "tools", value: 2 },
     });
+  });
+
+  it("plain http on the local network: the server's origin, switched on (a warning) or off", () => {
+    expect(summarizeEvent(event("local_mcp.plain_http", { source: "http://192.168.1.20:8080", state: "on" }))).toEqual({
+      subject: "http://192.168.1.20:8080",
+      result: "on",
+      tone: "warning",
+      facts: [],
+    });
+    expect(summarizeEvent(event("local_mcp.plain_http", { source: "http://nas.local", state: "off" }))).toMatchObject({
+      subject: "http://nas.local",
+      result: "off",
+      tone: "default",
+    });
+    expect(EVENT_TYPES).toContain("local_mcp.plain_http"); // the Activity tab's type filter offers it
   });
 
   it("session counts, and anything unknown without failing", () => {

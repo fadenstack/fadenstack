@@ -534,6 +534,9 @@ async def agent_profile(
             # The user's developer mode lets them attach any local server,
             # unless an Enterprise lock says otherwise (in ``extensions``).
             "developer_mode": agent.developer_mode,
+            # Whether such a server may be reached over plain http on the local network (sdk/51 F05): the
+            # agent's ``allow`` or ``deny``, which developer mode does not override. The SDK keeps to it.
+            "plain_http": profile.local_mcp_plain_http,
         },
         # Whether the person's own skills, kept on the device, may run (sdk/50 R3-7): ``allow``, or the user's
         # developer mode, as for local MCP. The SDK runs them; the gateway does nothing else with this.
@@ -917,6 +920,23 @@ class LocalMcpAttached(_Event):
     tools: list[str] = Field(default_factory=list, max_length=500)
 
 
+#: An HTTP server's origin over plain http, ``http://host[:port]``: no user, path, query or fragment, so no
+#: secret or content travels in the event (ASVS 5.0 V2.2.1).
+_PLAIN_HTTP_SOURCE = r"^http://[A-Za-z0-9._~%\[\]:-]+$"
+
+
+class LocalMcpPlainHttp(_Event):
+    """A person switched plain http on the local network on or off for one of their MCP servers (sdk/51 F05).
+
+    The SDK sends it only where the profile's ``features`` list ``client_events.local_mcp_plain_http``.
+    """
+
+    type: Literal["local_mcp.plain_http"]
+    #: The server's source: its origin.
+    source: str = Field(max_length=300, pattern=_PLAIN_HTTP_SOURCE)
+    state: Literal["on", "off"]
+
+
 class SessionStats(_Event):
     """Counts of one local session, and the local retention settings."""
 
@@ -928,7 +948,7 @@ class SessionStats(_Event):
 
 
 ClientEvent = Annotated[
-    ToolExecuted | ApprovalDecided | LocalMcpAttached | SessionStats,
+    ToolExecuted | ApprovalDecided | LocalMcpAttached | LocalMcpPlainHttp | SessionStats,
     Field(discriminator="type"),
 ]
 

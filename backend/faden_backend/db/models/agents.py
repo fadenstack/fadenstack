@@ -57,6 +57,18 @@ class LocalMcpMode(enum.StrEnum):
     ALLOW = "allow"
 
 
+class LocalMcpPlainHttp(enum.StrEnum):
+    """Whether an SDK may reach a local MCP server over plain http on the local network (sdk/51 F05).
+
+    Off unless the agent's author allows it: what goes to and from such a server crosses the network
+    unencrypted (ASVS 5.0 V12.2.1, V12.3.1). Developer mode does not override it. The gateway only reports it
+    in the agent's profile; the SDK keeps to it.
+    """
+
+    DENY = "deny"
+    ALLOW = "allow"
+
+
 class LocalSkillsMode(enum.StrEnum):
     """Whether an SDK may run the person's own skills, kept on their device, for this agent (sdk/50 R3-7).
 
@@ -170,6 +182,17 @@ class AgentVersion(Base):
         Enum(LocalMcpMode, name="agent_local_mcp_mode", values_callable=lambda e: [m.value for m in e]),
         nullable=False,
         default=LocalMcpMode.DISABLE,
+    )
+    #: Whether a local MCP server may be reached over plain http on the local network (``LocalMcpPlainHttp``).
+    local_mcp_plain_http: Mapped[LocalMcpPlainHttp] = mapped_column(
+        Enum(
+            LocalMcpPlainHttp,
+            name="agent_local_mcp_plain_http",
+            values_callable=lambda e: [m.value for m in e],
+        ),
+        nullable=False,
+        default=LocalMcpPlainHttp.DENY,
+        server_default=LocalMcpPlainHttp.DENY.value,
     )
     #: Whether the person's own skills may run beside the organisation's (``LocalSkillsMode``).
     local_skills_mode: Mapped[LocalSkillsMode] = mapped_column(

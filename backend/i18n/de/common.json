@@ -4501,6 +4501,7 @@
       "server_tools": "Server-Tools",
       "host_tool_contract": "Host-Tools",
       "local_mcp_mode": "Lokale MCP-Server",
+      "local_mcp_plain_http": "Unverschlüsseltes HTTP im lokalen Netz",
       "local_skills_mode": "Lokale Skills",
       "ui": "Darstellung",
       "pii": "Datenschutz",
@@ -4547,6 +4548,12 @@
       "local_mcp_allow": "Erlaubt",
       "local_mcp_disable_help": "Das SDK bindet keine lokalen MCP-Server ein, außer für Nutzer im Entwicklermodus.",
       "local_mcp_allow_help": "Das SDK darf MCP-Server auf dem Rechner des Nutzers einbinden. Ihre Tools sind nicht klassifiziert und fragen deshalb immer nach.",
+      "local_mcp_advanced": "Erweitert",
+      "local_mcp_plain_http": "Unverschlüsseltes HTTP im lokalen Netz erlauben",
+      "local_mcp_plain_http_help": "Aus: Die Anwendung erreicht die MCP-Server einer Person über https oder auf ihrem eigenen Computer. An: auch über unverschlüsseltes HTTP, zu Adressen im lokalen Netz. Jeder im Netz kann lesen und ändern, was zu einem solchen Server geht und von ihm kommt; nutzen Sie es nie mit Geheimnissen. Der Entwicklermodus ändert daran nichts.",
+      "local_mcp_plain_http_confirm_title": "Unverschlüsseltes HTTP im lokalen Netz erlauben?",
+      "local_mcp_plain_http_warning": "Jeder im Netz kann lesen und ändern, was zu einem solchen Server geht und von ihm kommt: die Tool-Aufrufe, ihre Argumente und ihre Ergebnisse, die Inhalte von Dokumenten enthalten können. Eine veränderte Antwort kann den Agenten lenken. Nutzen Sie es nie mit Geheimnissen: Über unverschlüsseltes HTTP lehnt die Anwendung einen Server ab, der einen Schlüssel oder eine Anmeldung braucht. Nutzen Sie https, wo der Server es anbietet.",
+      "local_mcp_plain_http_confirm": "Erlauben",
       "local_skills": "Lokale Skills",
       "local_skills_disable": "Nicht erlaubt",
       "local_skills_allow": "Erlaubt",
@@ -4703,6 +4710,7 @@
         "tool.executed": "Tool ausgeführt",
         "approval.decided": "Freigabe",
         "local_mcp.attached": "Lokaler MCP-Server",
+        "local_mcp.plain_http": "Unverschlüsseltes HTTP im lokalen Netz",
         "session.stats": "Sitzung"
       },
       "result": {
@@ -4711,7 +4719,9 @@
         "denied": "abgelehnt",
         "cancelled": "abgebrochen",
         "approved": "freigegeben",
-        "timeout": "Zeit abgelaufen"
+        "timeout": "Zeit abgelaufen",
+        "on": "eingeschaltet",
+        "off": "ausgeschaltet"
       },
       "scope": {
         "once": "einmal",

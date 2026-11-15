@@ -159,6 +159,33 @@ describe("local skills (sdk/50 R3-7)", () => {
   });
 });
 
+describe("plain http on the local network (sdk/51 F05)", () => {
+  it("is denied unless the version allows it; only allow allows", () => {
+    expect(EMPTY_DEFINITION.local_mcp_plain_http).toBe("deny");
+    const missing = { ...VERSION, local_mcp_plain_http: undefined } as unknown as AgentVersion;
+    expect(definitionOf(missing).local_mcp_plain_http).toBe("deny");
+    for (const odd of ["everything", "ALLOW", "disable", true]) {
+      const version = { ...VERSION, local_mcp_plain_http: odd } as unknown as AgentVersion;
+      expect(definitionOf(version).local_mcp_plain_http).toBe("deny");
+    }
+    expect(definitionOf({ ...VERSION, local_mcp_plain_http: "allow" }).local_mcp_plain_http).toBe("allow");
+  });
+
+  it("is a field of the definition, compared and versioned on its own", () => {
+    const before = definitionOf(VERSION);
+    expect(changedFields(before, { ...before, local_mcp_plain_http: "allow" })).toEqual(["local_mcp_plain_http"]);
+    expect(cleanDefinition({ ...before, local_mcp_plain_http: "allow" }).local_mcp_plain_http).toBe("allow");
+  });
+
+  it("comes through an import, and an unknown value denies", () => {
+    expect(parseAgentImport('{"instructions": "x"}').definition.local_mcp_plain_http).toBe("deny");
+    expect(parseAgentImport('{"version": {"local_mcp_plain_http": "allow"}}').definition.local_mcp_plain_http).toBe(
+      "allow",
+    );
+    expect(parseAgentImport('{"local_mcp_plain_http": "yes"}').definition.local_mcp_plain_http).toBe("deny");
+  });
+});
+
 describe("the PII mode setting", () => {
   it("is null (the tenant decides), true or false", () => {
     expect(EMPTY_DEFINITION.pii).toEqual({ allow_mode_override: null });

@@ -9,7 +9,13 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator, model_validator
 
-from faden_backend.db.models.agents import AgentStatus, LocalMcpMode, LocalSkillsMode, PrincipalType
+from faden_backend.db.models.agents import (
+    AgentStatus,
+    LocalMcpMode,
+    LocalMcpPlainHttp,
+    LocalSkillsMode,
+    PrincipalType,
+)
 
 SLUG_PATTERN = r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$"
 #: The most chat sessions one agent may run at once on a device (``ui.max_running_sessions``).
@@ -90,6 +96,9 @@ class AgentVersionFields(BaseModel):
     server_tools: list[str] | None = None
     host_tool_contract: list[HostTool] = Field(default_factory=list)
     local_mcp_mode: LocalMcpMode = LocalMcpMode.DISABLE
+    #: Whether a local MCP server may be reached over plain http on the local network (sdk/51 F05): only
+    #: an explicit ``allow`` allows it (ASVS 5.0 V8.2.1), and developer mode does not override it.
+    local_mcp_plain_http: LocalMcpPlainHttp = LocalMcpPlainHttp.DENY
     #: Whether the person's own skills may run (sdk/50 R3-7): off unless allowed (ASVS 5.0 V8, deny by default).
     local_skills_mode: LocalSkillsMode = LocalSkillsMode.DISABLE
     ui: dict[str, Any] = Field(default_factory=dict)

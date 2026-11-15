@@ -1,18 +1,26 @@
 /**
  * An agent's definition: its instructions and model, what it may use (knowledge,
- * the gateway's tools, the host's tools, local MCP servers, the person's own
- * skills on their device), the tool modes its
+ * the gateway's tools, the host's tools, local MCP servers and, under Advanced,
+ * plain http to them on the local network, the person's own skills on their
+ * device), the tool modes its
  * conversations start in and may reach, and what the SDKs show. Controlled: the
  * parent owns the value and decides when to save it.
  */
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import Autocomplete from "@mui/material/Autocomplete";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import Collapse from "@mui/material/Collapse";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import MenuItem from "@mui/material/MenuItem";
 import Radio from "@mui/material/Radio";
 import RadioGroup from "@mui/material/RadioGroup";
 import Stack from "@mui/material/Stack";
+import Switch from "@mui/material/Switch";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 
@@ -27,6 +35,7 @@ import {
 import { chatApi } from "~/api/chatClient";
 import { ragLite } from "~/api/rag";
 import { ChipListField } from "~/components/ChipListField";
+import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { SectionCard as Section } from "~/components/SectionCard";
 import { useAsyncData } from "~/lib/useAsyncData";
 
@@ -87,6 +96,12 @@ export function AgentDefinitionEditor({ value, onChange, readOnly = false }: Age
   const set = <K extends keyof AgentDefinition>(key: K, next: AgentDefinition[K]) => onChange({ ...value, [key]: next });
   const toolsMode = serverToolsMode(value);
   const piiSwitch = piiModeSwitch(value);
+  // Plain http on the local network (sdk/51 F05): under Advanced, never hidden while it is on; the warning comes
+  // before it turns on, and turning it off needs none.
+  const plainHttp = value.local_mcp_plain_http === "allow";
+  const [advanced, setAdvanced] = useState(false);
+  const [askPlainHttp, setAskPlainHttp] = useState(false);
+  const advancedOpen = advanced || plainHttp;
 
   return (
     <Stack spacing={2.5}>
@@ -172,6 +187,49 @@ export function AgentDefinitionEditor({ value, onChange, readOnly = false }: Age
             </MenuItem>
           ))}
         </TextField>
+        <Box>
+          <Button
+            size="small"
+            onClick={() => setAdvanced((open) => !open)}
+            disabled={plainHttp}
+            endIcon={advancedOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            aria-expanded={advancedOpen}
+            aria-controls="agent-local-mcp-advanced"
+          >
+            {t("agents.definition.local_mcp_advanced")}
+          </Button>
+          <Collapse in={advancedOpen} id="agent-local-mcp-advanced" unmountOnExit>
+            <Stack spacing={0.5} sx={{ pl: 1, pt: 0.5 }}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={plainHttp}
+                    disabled={readOnly}
+                    onChange={(e) => (e.target.checked ? setAskPlainHttp(true) : set("local_mcp_plain_http", "deny"))}
+                  />
+                }
+                label={t("agents.definition.local_mcp_plain_http")}
+              />
+              <Typography variant="caption" color="text.secondary">
+                {t("agents.definition.local_mcp_plain_http_help")}
+              </Typography>
+            </Stack>
+          </Collapse>
+        </Box>
+        <ConfirmDialog
+          open={askPlainHttp}
+          title={t("agents.definition.local_mcp_plain_http_confirm_title")}
+          message={t("agents.definition.local_mcp_plain_http_warning")}
+          confirmLabel={t("agents.definition.local_mcp_plain_http_confirm")}
+          confirmColor="warning"
+          cancelLabel={t("common.cancel")}
+          maxWidth="sm"
+          onConfirm={() => {
+            set("local_mcp_plain_http", "allow");
+            setAskPlainHttp(false);
+          }}
+          onClose={() => setAskPlainHttp(false)}
+        />
         <TextField
           select
           size="small"

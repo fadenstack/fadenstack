@@ -53,11 +53,11 @@ The agent's page opens. Its list status is **Draft**, **Published** or **Retired
 
 | Tab | What it holds |
 |---|---|
-| **Definition** | The version people get: **Instructions**, **Model**, **Knowledge** (collections it may search), **Server tools** (**What a chat gets**, **Only these**, or **None**), **Local MCP servers**, **Local skills**, **Host tools** (the application's tools and their classes), **Approval levels** (the tool mode conversations start in, and the highest), **Appearance** (greeting and suggested prompts) and **Privacy**. |
+| **Definition** | The version people get: **Instructions**, **Model**, **Knowledge** (collections it may search), **Server tools** (**What a chat gets**, **Only these**, or **None**), **Local MCP servers** (with **Advanced** → **Allow plain http on the local network**), **Local skills**, **Host tools** (the application's tools and their classes), **Approval levels** (the tool mode conversations start in, and the highest), **Appearance** (greeting and suggested prompts) and **Privacy**. |
 | **Versions** | Every version. **Publish** one, **Roll back** to an earlier one, see the **Changes**. |
 | **Access** | **Who may use it**, the **Excluded people** <span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span> and its **Maintainers** (with Enterprise: **Maintainers and auditors** <span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span>). **Check someone's access** says whether a person may use the agent, and why. |
 | **Skills** | The organisation's skills that come into the agent's conversations without anyone picking them: those assigned to everyone, and those assigned to this agent. For those who manage the agent. |
-| **Activity** | Usage over a time range (requests, errors, tokens, users, conversations: counts only, never content), shown only when at least five people used the agent in the range; the owner of a personal agent sees its figures all the same. What the applications reported (tools that ran, approvals), and the **Signed-in devices**. It names nobody but you. |
+| **Activity** | Usage over a time range (requests, errors, tokens, users, conversations: counts only, never content), shown only when at least five people used the agent in the range; the owner of a personal agent sees its figures all the same. What the applications reported (tools that ran, approvals, plain http switched on or off for a server), and the **Signed-in devices**. It names nobody but you. |
 | **Apps** | What the applications bring, compared with the agent's version (see [When an application brings new tools](#when-an-application-brings-new-tools)). |
 
 ??? info "More about server tools"
@@ -75,6 +75,15 @@ The agent's page opens. Its list status is **Draft**, **Published** or **Retired
     **Allowed** lets it attach MCP servers on the person's computer; their tools are unclassified, so they always
     ask first. People in **Developer mode** (see [Users, groups and roles](users.md#developer-mode)) may attach
     them either way.
+
+    **Advanced** → **Allow plain http on the local network** is off by default. Without it, the application
+    reaches a person's MCP servers over https, or on their own computer. With it, the application may also reach
+    a server over plain http at an address on the local network, once the person switches that on for the server
+    and confirms a warning. Anyone on the network can read and change what goes to and from such a server: the
+    tool calls, their arguments and their results, which may hold document content. Never use it with secrets:
+    over plain http, the application refuses a server that needs a key or a sign-in. **Developer mode** does not
+    override this setting. When a person switches plain http on or off for a server, the application reports it,
+    with the server's address, on the **Activity** tab.
 
 ??? info "More about local skills"
     **Local skills**: **Not allowed** (the default) keeps the agent to your organisation's skills. The skills a

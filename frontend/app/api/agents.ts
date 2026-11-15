@@ -17,6 +17,8 @@ const request = requester("/api/agents");
 
 export type AgentStatus = "draft" | "published" | "retired";
 export type LocalMcpMode = "disable" | "allow";
+/** Whether a local MCP server may be reached over plain http on the local network (sdk/51 F05). Off unless allowed. */
+export type LocalMcpPlainHttp = "deny" | "allow";
 /** Whether an SDK may run the person's own skills, kept on their device (sdk/50 R3-7). Off unless allowed. */
 export type LocalSkillsMode = "disable" | "allow";
 /** A host tool's class; absent: unclassified (always asks). */
@@ -69,6 +71,7 @@ export interface AgentDefinition {
   server_tools: string[] | null;
   host_tool_contract: HostTool[];
   local_mcp_mode: LocalMcpMode;
+  local_mcp_plain_http: LocalMcpPlainHttp;
   local_skills_mode: LocalSkillsMode;
   /** What the SDKs show: `greeting`, `suggestions`. */
   ui: Record<string, unknown>;
@@ -146,7 +149,12 @@ export interface AgentUsage {
 }
 
 /** What the SDKs reported -- names, counts, durations, never content. */
-export type ClientEventType = "tool.executed" | "approval.decided" | "local_mcp.attached" | "session.stats";
+export type ClientEventType =
+  | "tool.executed"
+  | "approval.decided"
+  | "local_mcp.attached"
+  | "local_mcp.plain_http"
+  | "session.stats";
 
 export interface ClientEvent {
   id: string;

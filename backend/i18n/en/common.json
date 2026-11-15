@@ -4499,6 +4499,7 @@
       "server_tools": "Server tools",
       "host_tool_contract": "Host tools",
       "local_mcp_mode": "Local MCP servers",
+      "local_mcp_plain_http": "Plain http on the local network",
       "local_skills_mode": "Local skills",
       "ui": "Appearance",
       "pii": "Privacy",
@@ -4545,6 +4546,12 @@
       "local_mcp_allow": "Allowed",
       "local_mcp_disable_help": "The SDK attaches no local MCP servers, except for users in developer mode.",
       "local_mcp_allow_help": "The SDK may attach MCP servers on the user's machine. Their tools are unclassified, so they always ask first.",
+      "local_mcp_advanced": "Advanced",
+      "local_mcp_plain_http": "Allow plain http on the local network",
+      "local_mcp_plain_http_help": "Off: the application reaches a person's MCP servers over https, or on their own computer. On: also over plain http, to addresses on the local network. Anyone on the network can read and change what goes to and from such a server; never use it with secrets. Developer mode does not change this.",
+      "local_mcp_plain_http_confirm_title": "Allow plain http on the local network?",
+      "local_mcp_plain_http_warning": "Anyone on the network can read and change what goes to and from such a server: the tool calls, their arguments and their results, which may hold document content. A changed answer can steer the agent. Never use it with secrets: over plain http, the application refuses a server that needs a key or a sign-in. Use https where the server offers it.",
+      "local_mcp_plain_http_confirm": "Allow",
       "local_skills": "Local skills",
       "local_skills_disable": "Not allowed",
       "local_skills_allow": "Allowed",
@@ -4701,6 +4708,7 @@
         "tool.executed": "Tool ran",
         "approval.decided": "Approval",
         "local_mcp.attached": "Local MCP server",
+        "local_mcp.plain_http": "Plain http on the local network",
         "session.stats": "Session"
       },
       "result": {
@@ -4709,7 +4717,9 @@
         "denied": "denied",
         "cancelled": "cancelled",
         "approved": "approved",
-        "timeout": "timed out"
+        "timeout": "timed out",
+        "on": "switched on",
+        "off": "switched off"
       },
       "scope": {
         "once": "once",

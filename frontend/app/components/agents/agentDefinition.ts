@@ -11,6 +11,7 @@ import type {
   AgentVersion,
   ApprovalLevel,
   HostTool,
+  LocalMcpPlainHttp,
   LocalSkillsMode,
 } from "~/api/agents";
 
@@ -30,6 +31,7 @@ export const EMPTY_DEFINITION: AgentDefinition = {
   server_tools: null,
   host_tool_contract: [],
   local_mcp_mode: "disable",
+  local_mcp_plain_http: "deny",
   local_skills_mode: "disable",
   ui: {},
   pii: { allow_mode_override: null },
@@ -46,6 +48,7 @@ export const DEFINITION_FIELDS = [
   "host_tool_contract",
   "approvals",
   "local_mcp_mode",
+  "local_mcp_plain_http",
   "local_skills_mode",
   "ui",
   "pii",
@@ -64,6 +67,7 @@ export function definitionOf(version: AgentVersion | null | undefined): AgentDef
     server_tools: version.server_tools ?? null,
     host_tool_contract: version.host_tool_contract ?? [],
     local_mcp_mode: version.local_mcp_mode ?? "disable",
+    local_mcp_plain_http: plainHttpOf(version.local_mcp_plain_http),
     local_skills_mode: localSkillsModeOf(version.local_skills_mode),
     ui: version.ui ?? {},
     pii: piiOf(version.pii),
@@ -75,6 +79,11 @@ export function definitionOf(version: AgentVersion | null | undefined): AgentDef
 /** Local skills as the console keeps them: only "allow" allows; anything else, or nothing, is off. */
 function localSkillsModeOf(value: unknown): LocalSkillsMode {
   return value === "allow" ? "allow" : "disable";
+}
+
+/** Plain http on the local network as the console keeps it: only "allow" allows; anything else, or nothing, denies. */
+function plainHttpOf(value: unknown): LocalMcpPlainHttp {
+  return value === "allow" ? "allow" : "deny";
 }
 
 /** The PII settings as the console keeps them: anything but true or false follows the tenant. */
@@ -336,6 +345,7 @@ export function parseAgentImport(text: string): ImportedAgent {
   definition.pii = piiOf(definition.pii);
   definition.approvals = approvalsOf(definition.approvals);
   definition.local_skills_mode = localSkillsModeOf(definition.local_skills_mode);
+  definition.local_mcp_plain_http = plainHttpOf(definition.local_mcp_plain_http);
   return {
     slug: typeof record.slug === "string" ? record.slug : undefined,
     name: typeof record.name === "string" ? record.name : undefined,

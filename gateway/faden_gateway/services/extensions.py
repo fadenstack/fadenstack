@@ -61,10 +61,11 @@ log = logging.getLogger(__name__)
 
 #: ``approval_scopes.grant``: grants held by the server (``/v1/agents/{agent}/grants``, sdk/38 §6) -- a client
 #: offers its grant card only where the profile lists it. ``client_events.trigger``: client events may say
-#: what started a tool call (the model, the user, or a UI module).
+#: what started a tool call (the model, the user, or a UI module). ``client_events.local_mcp_plain_http``: the
+#: events take ``local_mcp.plain_http`` (an MCP server's plain http switched on or off; sdk/51 F05).
 CORE_FEATURES = (
     "agents", "agent_tokens", "agent_events", "skills", "sessions", "streaming", "approval_scopes.grant",
-    "client_events.trigger",
+    "client_events.trigger", "client_events.local_mcp_plain_http",
     # A call waiting for the person: its stream carries ``: keep-alive`` comments, and its answer may be sent
     # again (the same answer is taken as the first was).
     "approvals.keepalive", "approvals.idempotent",

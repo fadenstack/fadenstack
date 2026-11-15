@@ -56,11 +56,11 @@ Die Seite des Agenten öffnet sich. Sein Status in der Liste ist **Entwurf**, **
 
 | Reiter | Was er enthält |
 |---|---|
-| **Definition** | Die Version, die Benutzer erhalten: **Anweisungen**, **Modell**, **Wissen** (Sammlungen, die er durchsuchen darf), **Server-Tools** (**Wie im Chat**, **Nur diese** oder **Keine**), **Lokale MCP-Server**, **Lokale Skills**, **Host-Tools** (die Tools der Anwendung und ihre Klassen), **Freigabestufen** (der Tool-Modus, in dem Unterhaltungen beginnen, und der höchste), **Darstellung** (Begrüßung und vorgeschlagene Prompts) und **Datenschutz**. |
+| **Definition** | Die Version, die Benutzer erhalten: **Anweisungen**, **Modell**, **Wissen** (Sammlungen, die er durchsuchen darf), **Server-Tools** (**Wie im Chat**, **Nur diese** oder **Keine**), **Lokale MCP-Server** (mit **Erweitert** → **Unverschlüsseltes HTTP im lokalen Netz erlauben**), **Lokale Skills**, **Host-Tools** (die Tools der Anwendung und ihre Klassen), **Freigabestufen** (der Tool-Modus, in dem Unterhaltungen beginnen, und der höchste), **Darstellung** (Begrüßung und vorgeschlagene Prompts) und **Datenschutz**. |
 | **Versionen** | Jede Version. Mit **Veröffentlichen** eine Version veröffentlichen, mit **Zurücksetzen** zu einer früheren zurückkehren, unter **Änderungen** die Unterschiede sehen. |
 | **Zugriff** | **Wer ihn nutzen darf**, die Liste **Ausgeschlossene Personen** <span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span> und seine **Betreuer** (mit Enterprise: **Betreuer und Prüfer** <span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span>). **Zugriff prüfen** zeigt, ob eine Person den Agenten nutzen darf, und warum. |
 | **Skills** | Die Skills der Organisation, die in die Chats des Agenten kommen, ohne dass jemand sie auswählt: die allen zugewiesenen und die diesem Agenten zugewiesenen. Für alle, die den Agenten verwalten. |
-| **Aktivität** | Nutzung über einen Zeitraum (Anfragen, Fehler, Tokens, Benutzer, Unterhaltungen: nur Zahlen, nie Inhalte), nur, wenn mindestens fünf Personen den Agenten im Zeitraum genutzt haben; der Eigentümer eines persönlichen Agenten sieht dessen Zahlen trotzdem. Was die Anwendungen gemeldet haben (ausgeführte Tools, Zustimmungen) und **Angemeldete Geräte**. Der Reiter nennt niemanden außer Ihnen selbst. |
+| **Aktivität** | Nutzung über einen Zeitraum (Anfragen, Fehler, Tokens, Benutzer, Unterhaltungen: nur Zahlen, nie Inhalte), nur, wenn mindestens fünf Personen den Agenten im Zeitraum genutzt haben; der Eigentümer eines persönlichen Agenten sieht dessen Zahlen trotzdem. Was die Anwendungen gemeldet haben (ausgeführte Tools, Zustimmungen, unverschlüsseltes HTTP für einen Server ein- oder ausgeschaltet) und **Angemeldete Geräte**. Der Reiter nennt niemanden außer Ihnen selbst. |
 | **Apps** | Was die Anwendungen mitbringen, verglichen mit der Version des Agenten (siehe [Wenn eine Anwendung neue Tools mitbringt](#when-an-application-brings-new-tools)). |
 
 ??? info "Mehr zu Server-Tools"
@@ -78,6 +78,16 @@ Die Seite des Agenten öffnet sich. Sein Status in der Liste ist **Entwurf**, **
     lässt ihn MCP-Server auf dem Computer der Person einbinden; deren Tools sind nicht
     eingestuft und fragen deshalb immer zuerst. Personen im **Entwicklermodus** (siehe
     [Benutzer, Gruppen und Rollen](users.md#developer-mode)) dürfen sie in jedem Fall einbinden.
+
+    **Erweitert** → **Unverschlüsseltes HTTP im lokalen Netz erlauben** ist in der Voreinstellung aus. Ohne diese
+    Einstellung erreicht die Anwendung die MCP-Server einer Person über https oder auf ihrem eigenen Computer. Mit
+    ihr darf die Anwendung einen Server auch über unverschlüsseltes HTTP unter einer Adresse im lokalen Netz
+    erreichen, sobald die Person das für den Server einschaltet und eine Warnung bestätigt. Jeder im Netz kann
+    lesen und ändern, was zu einem solchen Server geht und von ihm kommt: die Tool-Aufrufe, ihre Argumente und ihre
+    Ergebnisse, die Inhalte von Dokumenten enthalten können. Nutzen Sie es nie mit Geheimnissen: Über
+    unverschlüsseltes HTTP lehnt die Anwendung einen Server ab, der einen Schlüssel oder eine Anmeldung braucht. Der
+    **Entwicklermodus** setzt diese Einstellung nicht außer Kraft. Schaltet eine Person unverschlüsseltes HTTP für
+    einen Server ein oder aus, meldet die Anwendung das mit der Adresse des Servers auf dem Reiter **Aktivität**.
 
 ??? info "Mehr zu lokalen Skills"
     **Lokale Skills**: **Nicht erlaubt** (die Voreinstellung) beschränkt den Agenten auf die Skills Ihrer

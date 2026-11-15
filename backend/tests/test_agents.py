@@ -33,6 +33,7 @@ from faden_backend.db.models.agents import (
     AgentMember,
     AgentRefreshToken,
     AgentVersion,
+    LocalMcpPlainHttp,
     LocalSkillsMode,
 )
 from faden_backend.db.models.containers import AuditEvent
@@ -357,8 +358,48 @@ async def test_the_apps_own_agents_keep_local_skills_off(
         assert template["definition"]["version"]["local_skills_mode"] == "disable", template["id"]
 
 
+async def test_plain_http_on_the_local_network_is_denied_unless_the_version_allows_it(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession,
+) -> None:
+    """sdk/51 F05: ``local_mcp_plain_http`` is ``deny`` unless set, versioned like ``local_mcp_mode``."""
+    signed_in.user = await _user(dbsession, admin=True)
+    agent = await _agent(client, slug="lan-helper")
+    first = (await client.get("/api/agents/lan-helper/versions/1")).json()
+    assert first["local_mcp_plain_http"] == "deny", "unset: such a server is reached over https only"
+
+    r = await client.post("/api/agents/lan-helper/versions", json={"local_mcp_plain_http": "allow"})
+    assert r.status_code == status.HTTP_201_CREATED, r.text
+    assert r.json()["local_mcp_plain_http"] == "allow"
+    assert r.json()["local_mcp_mode"] == "disable", "its own field: local MCP itself does not follow it"
+    assert (await client.get("/api/agents/lan-helper/versions/1")).json()["local_mcp_plain_http"] == "deny"
+
+    row = (await dbsession.execute(
+        select(AgentVersion).where(AgentVersion.agent_id == uuid.UUID(agent["id"]), AgentVersion.version == 2),
+    )).scalar_one()
+    assert row.local_mcp_plain_http == LocalMcpPlainHttp.ALLOW, "as the gateway reads it"
+
+
+@pytest.mark.parametrize("value", ["maybe", "ALLOW", "disable", "", None, True])
+async def test_plain_http_takes_deny_or_allow_only(
+    value: Any, signed_in: _As, client: AsyncClient, dbsession: AsyncSession,
+) -> None:
+    signed_in.user = await _user(dbsession, admin=True)
+    r = await client.post("/api/agents", json={"slug": "odd-lan", "name": "x", "version": {"local_mcp_plain_http": value}})
+    assert r.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT, r.text
+
+
+async def test_the_apps_own_agents_keep_plain_http_off(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession,
+) -> None:
+    """The templates say it, so an administrator sees the choice in the JSON they start from."""
+    signed_in.user = await _user(dbsession, admin=True)
+    for template in (await client.get("/api/agents/templates")).json():
+        assert template["definition"]["version"]["local_mcp_plain_http"] == "deny", template["id"]
+
+
 MIGRATIONS = Path(__file__).resolve().parents[1] / "faden_backend" / "db" / "migrations" / "versions"
 LOCAL_SKILLS_MIGRATION = MIGRATIONS / "2026-11-13-15-00_l0c4lsk.py"
+PLAIN_HTTP_MIGRATION = MIGRATIONS / "2026-11-15-10-00_pl41nht.py"
 
 
 def _migration(path: Path, name: str) -> Any:
@@ -426,13 +467,78 @@ async def test_the_local_skills_migration_upgrades_and_downgrades(dbsession: Asy
     await connection.run_sync(run)
 
 
-def test_the_local_skills_migration_is_the_one_head() -> None:
+def test_the_local_skills_migration_follows_the_pairing_migrations() -> None:
     """It follows 0.7.1's pairing migrations (``p41r4gs``)."""
     from alembic.script import ScriptDirectory
 
     scripts = ScriptDirectory(str(MIGRATIONS.parent))
-    assert scripts.get_heads() == ["l0c4lsk"]
     assert scripts.get_revision("l0c4lsk").down_revision == "p41r4gs"
+
+
+async def test_the_plain_http_migration_upgrades_and_downgrades(dbsession: AsyncSession) -> None:
+    """Down and up again on the test database (made from the models), inside the test's transaction."""
+    from alembic.autogenerate import compare_metadata
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+
+    from faden_backend.db.meta import meta
+
+    migration = _migration(PLAIN_HTTP_MIGRATION, "pl41nht")
+    assert (migration.revision, migration.down_revision) == ("pl41nht", "l0c4lsk")
+
+    def columns(sync_conn: Any) -> set[str]:
+        return {c["name"] for c in sa.inspect(sync_conn).get_columns("agent_versions")}
+
+    def enum_exists(sync_conn: Any) -> bool:
+        found = sync_conn.execute(sa.text("SELECT 1 FROM pg_type WHERE typname = 'agent_local_mcp_plain_http'"))
+        return found.first() is not None
+
+    def run(sync_conn: Any) -> None:
+        # Server defaults compared too: the model says ``deny`` as the migration does.
+        context = MigrationContext.configure(sync_conn, opts={"compare_server_default": True})
+        with Operations.context(context):
+            agent_id = uuid.uuid4()
+            sync_conn.execute(
+                sa.text("INSERT INTO agents (id, tenant_id, slug, name, status) "
+                        "VALUES (:id, 'default', :slug, 'x', 'draft')"),
+                {"id": agent_id, "slug": f"mig-{agent_id.hex[:8]}"},
+            )
+            migration.downgrade()
+            assert "local_mcp_plain_http" not in columns(sync_conn) and not enum_exists(sync_conn)
+            # A version written before the column: the upgrade gives it ``deny``.
+            sync_conn.execute(
+                sa.text(
+                    "INSERT INTO agent_versions (id, agent_id, version, instructions, knowledge, host_tool_contract, "
+                    "local_mcp_mode, ui, extensions) VALUES (:id, :agent, 1, '', '[]', '[]', 'allow', '{}', '{}')",
+                ),
+                {"id": uuid.uuid4(), "agent": agent_id},
+            )
+
+            migration.upgrade()
+            assert "local_mcp_plain_http" in columns(sync_conn) and enum_exists(sync_conn)
+            stored = sync_conn.execute(
+                sa.text("SELECT local_mcp_plain_http::text FROM agent_versions WHERE agent_id = :agent"),
+                {"agent": agent_id},
+            ).scalar_one()
+            assert stored == "deny", "also where local MCP was allowed"
+            # What the migration made is what the models describe.
+            diffs = [d for d in compare_metadata(context, meta) if "plain_http" in repr(d)]
+            assert diffs == []
+
+            migration.downgrade()
+            migration.upgrade()
+
+    connection = await dbsession.connection()
+    await connection.run_sync(run)
+
+
+def test_the_plain_http_migration_is_the_one_head() -> None:
+    """It follows the local skills migration (``l0c4lsk``)."""
+    from alembic.script import ScriptDirectory
+
+    scripts = ScriptDirectory(str(MIGRATIONS.parent))
+    assert scripts.get_heads() == ["pl41nht"]
+    assert scripts.get_revision("pl41nht").down_revision == "l0c4lsk"
 
 
 @pytest.mark.parametrize("pii", [

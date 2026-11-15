@@ -40,6 +40,7 @@ SELECT a.id::text AS id, a.tenant_id, a.slug, a.name, a.status::text AS status,
        (a.published_version_id IS NOT NULL) AS published, a.restricted_by,
        v.version, v.instructions, v.model_alias, v.knowledge, v.server_tools,
        v.host_tool_contract, v.local_mcp_mode::text AS local_mcp_mode,
+       v.local_mcp_plain_http::text AS local_mcp_plain_http,
        v.local_skills_mode::text AS local_skills_mode, v.ui, v.pii, v.approvals, v.extensions,
        ARRAY(SELECT m.user_id::text FROM agent_members m
              WHERE m.agent_id = a.id AND m.role = 'maintainer') AS maintainers,
@@ -180,6 +181,10 @@ class AgentProfile:
     #: Whether the person's own skills may run in the client (``allow`` | ``disable``; sdk/50 R3-7). Only
     #: ``allow`` allows: a missing or unknown value reads as ``disable``. The gateway only reports it.
     local_skills_mode: str = "disable"
+    #: Whether a local MCP server may be reached over plain http on the local network (``allow`` | ``deny``;
+    #: sdk/51 F05). Only ``allow`` allows: a missing or unknown value reads as ``deny``, and the user's
+    #: developer mode does not override it. The gateway only reports it; the SDK keeps to it.
+    local_mcp_plain_http: str = "deny"
 
     def levels(self) -> tuple[tool_classes.ToolMode, tool_classes.ToolMode]:
         """The level conversations start in, and the highest.
@@ -241,6 +246,8 @@ class AgentProfile:
             grant_classes=_strings(approvals.get("grant_classes")),
             # Fail closed (ASVS 5.0 V8): only ``allow`` allows.
             local_skills_mode="allow" if row.get("local_skills_mode") == "allow" else "disable",
+            # Fail closed too (ASVS 5.0 V8.2.1): plain http needs the explicit ``allow``.
+            local_mcp_plain_http="allow" if row.get("local_mcp_plain_http") == "allow" else "deny",
         )
 
 

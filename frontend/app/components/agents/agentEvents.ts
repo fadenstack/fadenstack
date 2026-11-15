@@ -5,7 +5,13 @@
  */
 import type { ClientEvent } from "~/api/agents";
 
-export const EVENT_TYPES = ["tool.executed", "approval.decided", "local_mcp.attached", "session.stats"] as const;
+export const EVENT_TYPES = [
+  "tool.executed",
+  "approval.decided",
+  "local_mcp.attached",
+  "local_mcp.plain_http",
+  "session.stats",
+] as const;
 
 export type EventTone = "success" | "error" | "warning" | "default";
 
@@ -32,6 +38,9 @@ const TONES: Record<string, EventTone> = {
   denied: "warning",
   cancelled: "default",
   timeout: "warning",
+  // Plain http switched on for a server: what goes to and from it crosses the network unencrypted.
+  on: "warning",
+  off: "default",
 };
 
 const text = (value: unknown): string | undefined =>
@@ -66,6 +75,9 @@ export function summarizeEvent(event: ClientEvent): EventSummary {
         facts: facts(d.command ?? d.url),
         count: { key: "tools", value: Array.isArray(d.tools) ? d.tools.length : 0 },
       };
+    case "local_mcp.plain_http":
+      // The server's origin, and whether plain http to it was switched on or off.
+      return { subject: text(d.source) ?? "?", ...outcome(text(d.state)), facts: [] };
     case "session.stats":
       return {
         subject: event.conversation_id ?? "",

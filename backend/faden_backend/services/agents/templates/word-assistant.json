@@ -47,6 +47,7 @@
       }
     ],
     "local_mcp_mode": "disable",
+    "local_mcp_plain_http": "deny",
     "local_skills_mode": "disable",
     "ui": {
       "greeting": "I work in this document. Select a passage and ask, or tell me what to write or revise.",

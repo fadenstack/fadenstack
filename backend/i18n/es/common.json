@@ -4501,6 +4501,7 @@
       "server_tools": "Herramientas del servidor",
       "host_tool_contract": "Herramientas del anfitrión",
       "local_mcp_mode": "Servidores MCP locales",
+      "local_mcp_plain_http": "HTTP sin cifrar en la red local",
       "local_skills_mode": "Skills locales",
       "ui": "Apariencia",
       "pii": "Privacidad",
@@ -4547,6 +4548,12 @@
       "local_mcp_allow": "Permitidos",
       "local_mcp_disable_help": "El SDK no conecta servidores MCP locales, salvo para usuarios en modo desarrollador.",
       "local_mcp_allow_help": "El SDK puede conectar servidores MCP en el equipo del usuario. Sus herramientas no están clasificadas, así que siempre preguntan.",
+      "local_mcp_advanced": "Avanzado",
+      "local_mcp_plain_http": "Permitir HTTP sin cifrar en la red local",
+      "local_mcp_plain_http_help": "Desactivado: la aplicación accede a los servidores MCP de una persona por https o en su propio equipo. Activado: también por HTTP sin cifrar, a direcciones de la red local. Cualquiera en la red puede leer y cambiar lo que va a un servidor así y lo que viene de él; no lo use nunca con secretos. El modo desarrollador no cambia esto.",
+      "local_mcp_plain_http_confirm_title": "¿Permitir HTTP sin cifrar en la red local?",
+      "local_mcp_plain_http_warning": "Cualquiera en la red puede leer y cambiar lo que va a un servidor así y lo que viene de él: las llamadas a herramientas, sus argumentos y sus resultados, que pueden contener el contenido de documentos. Una respuesta cambiada puede dirigir al agente. No lo use nunca con secretos: por HTTP sin cifrar, la aplicación rechaza un servidor que necesita una clave o un inicio de sesión. Use https donde el servidor lo ofrezca.",
+      "local_mcp_plain_http_confirm": "Permitir",
       "local_skills": "Skills locales",
       "local_skills_disable": "No permitidos",
       "local_skills_allow": "Permitidos",
@@ -4703,6 +4710,7 @@
         "tool.executed": "Herramienta ejecutada",
         "approval.decided": "Aprobación",
         "local_mcp.attached": "Servidor MCP local",
+        "local_mcp.plain_http": "HTTP sin cifrar en la red local",
         "session.stats": "Sesión"
       },
       "result": {
@@ -4711,7 +4719,9 @@
         "denied": "denegado",
         "cancelled": "cancelado",
         "approved": "aprobado",
-        "timeout": "tiempo agotado"
+        "timeout": "tiempo agotado",
+        "on": "activado",
+        "off": "desactivado"
       },
       "scope": {
         "once": "una vez",

@@ -4501,6 +4501,7 @@
       "server_tools": "Outils du serveur",
       "host_tool_contract": "Outils de l'hôte",
       "local_mcp_mode": "Serveurs MCP locaux",
+      "local_mcp_plain_http": "HTTP non chiffré sur le réseau local",
       "local_skills_mode": "Skills locaux",
       "ui": "Apparence",
       "pii": "Confidentialité",
@@ -4547,6 +4548,12 @@
       "local_mcp_allow": "Autorisés",
       "local_mcp_disable_help": "Le SDK n'attache aucun serveur MCP local, sauf pour les utilisateurs en mode développeur.",
       "local_mcp_allow_help": "Le SDK peut attacher des serveurs MCP sur la machine de l'utilisateur. Leurs outils ne sont pas classés et demandent donc toujours.",
+      "local_mcp_advanced": "Avancé",
+      "local_mcp_plain_http": "Autoriser le HTTP non chiffré sur le réseau local",
+      "local_mcp_plain_http_help": "Désactivé : l'application atteint les serveurs MCP d'une personne en https ou sur son propre ordinateur. Activé : aussi en HTTP non chiffré, vers des adresses du réseau local. N'importe qui sur le réseau peut lire et modifier ce qui va vers un tel serveur et ce qui en vient ; ne l'utilisez jamais avec des secrets. Le mode développeur n'y change rien.",
+      "local_mcp_plain_http_confirm_title": "Autoriser le HTTP non chiffré sur le réseau local ?",
+      "local_mcp_plain_http_warning": "N'importe qui sur le réseau peut lire et modifier ce qui va vers un tel serveur et ce qui en vient : les appels d'outils, leurs arguments et leurs résultats, qui peuvent contenir le contenu de documents. Une réponse modifiée peut orienter l'agent. Ne l'utilisez jamais avec des secrets : en HTTP non chiffré, l'application refuse un serveur qui demande une clé ou une connexion. Utilisez https lorsque le serveur le propose.",
+      "local_mcp_plain_http_confirm": "Autoriser",
       "local_skills": "Skills locaux",
       "local_skills_disable": "Non autorisés",
       "local_skills_allow": "Autorisés",
@@ -4703,6 +4710,7 @@
         "tool.executed": "Outil exécuté",
         "approval.decided": "Approbation",
         "local_mcp.attached": "Serveur MCP local",
+        "local_mcp.plain_http": "HTTP non chiffré sur le réseau local",
         "session.stats": "Session"
       },
       "result": {
@@ -4711,7 +4719,9 @@
         "denied": "refusé",
         "cancelled": "annulé",
         "approved": "approuvé",
-        "timeout": "délai dépassé"
+        "timeout": "délai dépassé",
+        "on": "activé",
+        "off": "désactivé"
       },
       "scope": {
         "once": "une fois",

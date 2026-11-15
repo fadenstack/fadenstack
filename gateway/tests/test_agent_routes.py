@@ -1029,11 +1029,14 @@ async def test_the_profile_carries_what_the_sdk_caches_not_the_instructions(
     assert INSTRUCTIONS not in json.dumps(profile)
     assert profile["instructions_sha256"] == "abc"
     assert profile["host_tool_contract"] == [{"name": "read_page", "risk": "read"}]
-    assert profile["local_mcp"] == {"mode": "disable", "developer_mode": True}
+    assert profile["local_mcp"] == {"mode": "disable", "developer_mode": True, "plain_http": "deny"}, (
+        "developer mode does not override plain http (sdk/51 F05)"
+    )
     assert profile["local_skills"] == {"mode": "disable", "developer_mode": True}
     assert profile["required_client_modules"] == []
     assert profile["edition"] == "community" and "agents" in profile["features"]
     assert "client_events.trigger" in profile["features"]
+    assert "client_events.local_mcp_plain_http" in profile["features"]
     assert "approval_scopes.time" not in profile["features"], "no approval for a time held by the app"
     assert profile["user"] == {"language": None}
     assert profile["skills"] is False, "no Skills module here: the SDK shows no skill picker"
@@ -1050,7 +1053,7 @@ async def test_the_profile_says_whether_the_persons_own_skills_may_run(
     r = await client.get("/v1/agents/eplan-assistant/profile", headers=_headers())
     assert r.status_code == 200, r.text
     assert r.json()["local_skills"] == {"mode": "allow", "developer_mode": False}
-    assert r.json()["local_mcp"] == {"mode": "disable", "developer_mode": False}, "its own field"
+    assert r.json()["local_mcp"] == {"mode": "disable", "developer_mode": False, "plain_http": "deny"}, "its own field"
 
 
 @pytest.mark.parametrize(("mode", "dev", "allowed"), [
@@ -1068,8 +1071,8 @@ def _row(**overrides: Any) -> dict[str, Any]:
         "id": AGENT_ID, "tenant_id": "tenant-a", "slug": "eplan-assistant", "name": "EPLAN assistant",
         "status": "published", "published": True, "restricted_by": [], "version": 3, "instructions": INSTRUCTIONS,
         "model_alias": ALIAS, "knowledge": "[]", "server_tools": None, "host_tool_contract": "[]",
-        "local_mcp_mode": "disable", "local_skills_mode": "disable", "ui": "{}", "pii": "{}", "approvals": "{}",
-        "extensions": "{}", "maintainers": [], "grant_users": [], "grant_groups": [],
+        "local_mcp_mode": "disable", "local_mcp_plain_http": "deny", "local_skills_mode": "disable", "ui": "{}",
+        "pii": "{}", "approvals": "{}", "extensions": "{}", "maintainers": [], "grant_users": [], "grant_groups": [],
     }
     row.update(overrides)
     return row
@@ -1084,6 +1087,31 @@ def test_a_local_skills_mode_the_gateway_does_not_know_reads_as_disable(stored: 
     row = _row()
     del row["local_skills_mode"]
     assert AgentProfile.from_row(row).local_skills_mode == "disable", "a row without the column"
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("dev", [False, True], ids=["user", "developer-mode"])
+async def test_the_profile_says_whether_plain_http_on_the_local_network_is_allowed(
+    dev: bool, client: AsyncClient, fastapi_app: FastAPI, backend: _Backend,
+) -> None:
+    """sdk/51 F05: ``local_mcp.plain_http`` is the agent's own ``allow``, also without developer mode."""
+    backend.put(_profile(local_mcp_plain_http="allow"))
+    fastapi_app.state.agent_directory.invalidate()
+    r = await client.get("/v1/agents/eplan-assistant/profile", headers=_headers(_agent_token(dev=dev)))
+    assert r.status_code == 200, r.text
+    assert r.json()["local_mcp"] == {"mode": "disable", "developer_mode": dev, "plain_http": "allow"}
+    assert "client_events.local_mcp_plain_http" in r.json()["features"]
+
+
+@pytest.mark.parametrize(("stored", "read"), [
+    ("allow", "allow"), ("deny", "deny"), (None, "deny"), ("disable", "deny"), ("everything", "deny"), ("ALLOW", "deny"),
+])
+def test_a_plain_http_setting_the_gateway_does_not_know_reads_as_deny(stored: Any, read: str) -> None:
+    """Fail closed (ASVS 5.0 V8.2.1): only ``allow`` allows; a missing or unknown value denies."""
+    assert AgentProfile.from_row(_row(local_mcp_plain_http=stored)).local_mcp_plain_http == read
+    row = _row()
+    del row["local_mcp_plain_http"]
+    assert AgentProfile.from_row(row).local_mcp_plain_http == "deny", "a row without the column"
 
 
 @pytest.mark.anyio
@@ -1534,6 +1562,53 @@ async def test_events_are_stored_without_content(
 
 
 @pytest.mark.anyio
+async def test_a_plain_http_switch_is_stored_with_the_servers_origin_only(
+    client: AsyncClient, db_session: AsyncSession, backend: _Backend,
+) -> None:
+    """sdk/51 F05: content-free, as the other events: which server, on or off."""
+    body = {"events": [
+        {"type": "local_mcp.plain_http", "source": "http://192.168.1.20:8080", "state": "on"},
+        {"type": "local_mcp.plain_http", "source": "http://[fd00::7]:3000", "state": "off", "conversation_id": "c-1"},
+    ]}
+    r = await client.post("/v1/agents/eplan-assistant/events", headers=_headers(), json=body)
+    assert r.status_code == 202, r.text
+    rows = sorted((await db_session.execute(select(AgentClientEvent))).scalars().all(), key=lambda e: e.data["source"])
+    assert [(e.type, e.user_id, e.device_id, e.data) for e in rows] == [
+        ("local_mcp.plain_http", USER, "device-7", {"source": "http://192.168.1.20:8080", "state": "on"}),
+        ("local_mcp.plain_http", USER, "device-7", {"source": "http://[fd00::7]:3000", "state": "off"}),
+    ]
+    assert rows[1].conversation_id == "c-1"
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("event", [
+    {"source": "http://192.168.1.20:8080/mcp", "state": "on"},  # a path
+    {"source": "http://192.168.1.20:8080?token=abc", "state": "on"},  # a query
+    {"source": "http://user:secret@192.168.1.20", "state": "on"},  # a user and password
+    {"source": "http://192.168.1.20#x", "state": "on"},  # a fragment
+    {"source": "https://192.168.1.20", "state": "on"},  # not plain http
+    {"source": "192.168.1.20:8080", "state": "on"},  # no scheme
+    {"source": "http://", "state": "on"},
+    {"source": "http://a b", "state": "on"},
+    {"source": "http://" + "a" * 300, "state": "on"},
+    {"source": "http://192.168.1.20", "state": "maybe"},
+    {"source": "http://192.168.1.20"},
+    {"state": "on"},
+    {"source": "http://192.168.1.20", "state": "on", "label": "notes"},  # nothing else
+], ids=lambda e: next(iter(e.items()))[1][:40] if e else "empty")
+async def test_a_plain_http_switch_with_more_than_an_origin_refuses_the_batch(
+    event: dict[str, Any], client: AsyncClient, db_session: AsyncSession, backend: _Backend,
+) -> None:
+    """ASVS 5.0 V2.2.1: the origin's form, or the whole batch is refused (no secret or content in the store)."""
+    good = {"type": "tool.executed", "tool": "x", "duration_ms": 1, "outcome": "ok"}
+    body = {"events": [good, {"type": "local_mcp.plain_http", **event}]}
+    r = await client.post("/v1/agents/eplan-assistant/events", headers=_headers(), json=body)
+    assert r.status_code == 400, r.text
+    assert r.json()["error"]["code"] == "invalid_events"
+    assert (await db_session.execute(select(AgentClientEvent))).scalars().all() == []
+
+
+@pytest.mark.anyio
 async def test_features_answer_any_signed_in_caller(client: AsyncClient, backend: _Backend) -> None:
     for token in (_agent_token(), _login_token(USER)):
         r = await client.get("/v1/features", headers=_headers(token))
@@ -1541,6 +1616,7 @@ async def test_features_answer_any_signed_in_caller(client: AsyncClient, backend
         assert r.json()["edition"] == "community"
         assert {"agents", "streaming", "client_events.trigger"} <= set(r.json()["features"])
         assert {"approvals.keepalive", "approvals.idempotent"} <= set(r.json()["features"])
+        assert "client_events.local_mcp_plain_http" in r.json()["features"]
         assert "approval_scopes.time" not in r.json()["features"]
     assert (await client.get("/v1/features")).status_code == 401
 

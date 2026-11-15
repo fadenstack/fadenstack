@@ -4501,6 +4501,7 @@
       "server_tools": "服务器工具",
       "host_tool_contract": "宿主工具",
       "local_mcp_mode": "本地 MCP 服务器",
+      "local_mcp_plain_http": "本地网络中的未加密 HTTP",
       "local_skills_mode": "本地技能",
       "ui": "外观",
       "pii": "隐私",
@@ -4547,6 +4548,12 @@
       "local_mcp_allow": "允许",
       "local_mcp_disable_help": "SDK 不连接本地 MCP 服务器，开发者模式下的用户除外。",
       "local_mcp_allow_help": "SDK 可以连接用户电脑上的 MCP 服务器。它们的工具未分类，因此总会先询问。",
+      "local_mcp_advanced": "高级",
+      "local_mcp_plain_http": "允许在本地网络中使用未加密的 HTTP",
+      "local_mcp_plain_http_help": "关闭：应用通过 https 或在用户自己的电脑上访问其 MCP 服务器。开启：也可以通过未加密的 HTTP 访问本地网络中的地址。网络中的任何人都能读取和更改发往此类服务器以及来自它的内容；切勿用于机密信息。开发者模式不会改变这一点。",
+      "local_mcp_plain_http_confirm_title": "允许在本地网络中使用未加密的 HTTP？",
+      "local_mcp_plain_http_warning": "网络中的任何人都能读取和更改发往此类服务器以及来自它的内容：工具调用、其参数和结果，其中可能包含文档内容。被更改的回答可能会操纵智能体。切勿用于机密信息：通过未加密的 HTTP，应用会拒绝需要密钥或登录的服务器。服务器提供 https 时请使用 https。",
+      "local_mcp_plain_http_confirm": "允许",
       "local_skills": "本地技能",
       "local_skills_disable": "不允许",
       "local_skills_allow": "允许",
@@ -4703,6 +4710,7 @@
         "tool.executed": "工具已运行",
         "approval.decided": "审批",
         "local_mcp.attached": "本地 MCP 服务器",
+        "local_mcp.plain_http": "本地网络中的未加密 HTTP",
         "session.stats": "会话"
       },
       "result": {
@@ -4711,7 +4719,9 @@
         "denied": "已拒绝",
         "cancelled": "已取消",
         "approved": "已批准",
-        "timeout": "已超时"
+        "timeout": "已超时",
+        "on": "已开启",
+        "off": "已关闭"
       },
       "scope": {
         "once": "仅此一次",

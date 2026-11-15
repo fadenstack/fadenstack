@@ -671,7 +671,8 @@ async def test_the_migrations_upgrade_and_downgrade(dbsession: AsyncSession) -> 
 def test_the_pairing_migrations_follow_the_second_sign_in_in_one_head() -> None:
     """``p41r1ng`` comes right after 0.7.0's head ``st3pup0``, ``p41r4gs`` (several agents) after it: one head.
 
-    The local skills field (``l0c4lsk``, ``test_agents.py``) follows ``p41r4gs`` and is the head now.
+    The local skills field (``l0c4lsk``, ``test_agents.py``) follows ``p41r4gs``, and plain http on the local
+    network (``pl41nht``, ``test_agents.py``) follows it as the head.
     """
     from alembic.script import ScriptDirectory
 

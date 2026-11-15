@@ -1,7 +1,7 @@
 /**
  * The definition editor: its "Chat sessions running at once" setting (shown, chosen, back to the default), the local
- * skills switch (off unless allowed), and the approval levels (Bypass can be the highest level, never the one a
- * conversation starts in).
+ * skills switch (off unless allowed), plain http on the local network (under Advanced, asked before it turns on),
+ * and the approval levels (Bypass can be the highest level, never the one a conversation starts in).
  */
 import { useState } from "react";
 import { render, screen, within } from "@testing-library/react";
@@ -88,6 +88,62 @@ describe("AgentDefinitionEditor local skills", () => {
       expect.objectContaining({ local_skills_mode: "allow", local_mcp_mode: "disable" }),
     );
     expect(screen.getByText(/Nobody in your organisation has reviewed them/)).toBeInTheDocument();
+  });
+});
+
+describe("AgentDefinitionEditor plain http on the local network", () => {
+  const PLAIN_HTTP = "Allow plain http on the local network";
+
+  it("sits under Advanced, off, with what it means", async () => {
+    render(<AgentDefinitionEditor value={EMPTY_DEFINITION} onChange={vi.fn()} />);
+    expect(screen.queryByRole("switch", { name: PLAIN_HTTP })).not.toBeInTheDocument();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Advanced" }));
+    expect(screen.getByRole("switch", { name: PLAIN_HTTP })).not.toBeChecked();
+    expect(screen.getByText(/Anyone on the network can read and change/)).toBeInTheDocument();
+    expect(screen.getByText(/Developer mode does not change this/)).toBeInTheDocument();
+  });
+
+  it("warns before it turns on, and Cancel keeps it off", async () => {
+    const onChange = vi.fn();
+    render(<Harness initial={EMPTY_DEFINITION} onChange={onChange} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Advanced" }));
+
+    await userEvent.click(screen.getByRole("switch", { name: PLAIN_HTTP }));
+    const dialog = await screen.findByRole("dialog", { name: "Allow plain http on the local network?" });
+    expect(within(dialog).getByText(/the tool calls, their arguments and their results/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Never use it with secrets/)).toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(onChange).not.toHaveBeenCalled();
+    // Found again once the dialog has gone (the page is hidden from assistive technology while it closes).
+    expect(await screen.findByRole("switch", { name: PLAIN_HTTP })).not.toBeChecked();
+  });
+
+  it("saves Allow as the version's local_mcp_plain_http, leaves local MCP as it was, and turns off at once", async () => {
+    const onChange = vi.fn();
+    render(<Harness initial={EMPTY_DEFINITION} onChange={onChange} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Advanced" }));
+
+    await userEvent.click(screen.getByRole("switch", { name: PLAIN_HTTP }));
+    const dialog = await screen.findByRole("dialog", { name: "Allow plain http on the local network?" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Allow" }));
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ local_mcp_plain_http: "allow", local_mcp_mode: "disable" }),
+    );
+    expect(await screen.findByRole("switch", { name: PLAIN_HTTP })).toBeChecked();
+
+    await userEvent.click(screen.getByRole("switch", { name: PLAIN_HTTP }));
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ local_mcp_plain_http: "deny" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("is never hidden while it is on", async () => {
+    render(<AgentDefinitionEditor value={{ ...EMPTY_DEFINITION, local_mcp_plain_http: "allow" }} onChange={vi.fn()} readOnly />);
+    expect(await screen.findByRole("switch", { name: PLAIN_HTTP })).toBeChecked();
+    expect(screen.getByRole("switch", { name: PLAIN_HTTP })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Advanced" })).toBeDisabled();
   });
 });
 

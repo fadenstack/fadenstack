@@ -68,3 +68,19 @@ def test_core_features_list_the_trigger_and_no_time_scope() -> None:
     features = ExtensionRegistry().features
     assert "client_events.trigger" in features
     assert "approval_scopes.time" not in features
+
+
+@pytest.mark.parametrize("source", [
+    "http://192.168.1.20", "http://192.168.1.20:8080", "http://nas.local:3000", "http://[fd00::7]:3000",
+    "http://[fe80::1%25eth0]:80",
+])
+def test_a_plain_http_switch_takes_an_origin(source: str) -> None:
+    event = _parse({"type": "local_mcp.plain_http", "source": source, "state": "on"}).events[0]
+    assert event.model_dump(mode="json", exclude={"type", "occurred_at", "conversation_id"}) == {
+        "source": source, "state": "on",
+    }
+
+
+def test_core_features_list_the_plain_http_event() -> None:
+    """sdk/51 F05: the SDK sends ``local_mcp.plain_http`` only where the features list it."""
+    assert "client_events.local_mcp_plain_http" in ExtensionRegistry().features
