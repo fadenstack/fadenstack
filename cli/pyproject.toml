@@ -35,13 +35,13 @@ classifiers = [
 ]
 dependencies = [
     "click >=8.1,<9",
-    "rich >=13.0,<14",
-    "textual >=1.0,<2",
+    "rich >=13.0,<16",
+    "textual >=1.0,<9",
     "InquirerPy >=0.3,<1",
     "httpx >=0.27,<1",
     "pyyaml >=6.0,<7",
     "jinja2 >=3.1,<4",
-    "psutil >=6.0,<7",
+    "psutil >=6.0,<8",
     # faden tls: certificates made here, and checks of the operator's own; the release feed's signature.
     "cryptography >=43",
     # Release versions in the update check and upgrade (0.5.0rc1 < 0.5.0).
@@ -63,7 +63,7 @@ fadenstack = "faden_cli.cli:main"
 dev = [
     "pytest >=9.0,<10",
     "ruff >=0.14,<1",
-    "mypy >=1.19,<2",
+    "mypy >=1.19,<3",
     "pytest-cov >=7.0,<8",
 ]
 
