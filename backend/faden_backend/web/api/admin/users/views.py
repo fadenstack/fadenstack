@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.responses import JSONResponse
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
@@ -494,13 +495,17 @@ async def _refuse_last_superuser(session: AsyncSession, target: User) -> None:
         )
 
 
-@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT, name="delete_user")
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT, name="delete_user", response_model=None)
 async def delete_user(
     user_id: uuid.UUID,
     admin: Annotated[User, Depends(require_superuser)],
     session: AsyncSession = Depends(get_db_session),
-) -> None:
-    """Delete a user by ID -- never yourself, and never the last active superuser."""
+) -> JSONResponse | None:
+    """Delete a user by ID -- never yourself, and never the last active superuser.
+
+    202 with ``partial`` when a file of theirs could not be deleted yet: the account and everything else
+    are gone; the gateway's next purge tries the file again.
+    """
     result = await session.execute(select(User).where(User.id == user_id))
     target = result.scalar_one_or_none()
     if target is None:
@@ -533,6 +538,12 @@ async def delete_user(
         severity="high",
         metadata_json=json.dumps({"email": email, "administrator": was_admin, "chat_data_erased": erased}),
     )
+    if erased.get("partial"):
+        return JSONResponse(
+            status_code=status.HTTP_202_ACCEPTED,
+            content={"partial": True, "failed_files": int(erased.get("failed_files") or 0)},
+        )
+    return None
 
 
 async def _require_root_mode(root_mode: bool, what: str) -> None:

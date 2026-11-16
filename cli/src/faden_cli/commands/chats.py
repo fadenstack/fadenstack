@@ -9,7 +9,7 @@ import sys
 
 import click
 
-from faden_cli.core.console import console, error, info, success
+from faden_cli.core.console import console, error, info, success, warning
 
 
 def _orphans(*, erase: bool) -> dict:
@@ -66,3 +66,8 @@ def orphans_cmd(*, erase: bool, yes: bool) -> None:
 
     record_event("chat.orphans.erase", "install", "chat", metadata={"accounts": list(accounts)})
     success(f"Erased the chat data of {len(accounts)} deleted account(s).")
+    if done.get("failed_files"):
+        warning(
+            f"{done['failed_files']} file(s) could not be deleted yet; the gateway tries again at its next "
+            "hourly purge."
+        )

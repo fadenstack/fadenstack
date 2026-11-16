@@ -58,8 +58,12 @@ async def erase(
     request: Request,
     grant: str | None = Header(default=None, alias=ERASE_GRANT_HEADER),
     session: AsyncSession = Depends(get_db_session),
-) -> dict[str, int]:
-    """Erase what the grant names, files first; returns what went."""
+) -> dict[str, int | bool]:
+    """Erase what the grant names, files first; returns what went.
+
+    ``partial``: a file could not be deleted (``failed_files`` of them). Its row waits, emptied, for the
+    next purge, which tries again (``erasure``); everything else is gone.
+    """
     if not _granted(grant, body):
         raise HTTPException(status_code=403, detail="No erase grant for this.")
     file_store = getattr(request.app.state, "chat_file_store", None)
@@ -82,4 +86,5 @@ async def erase(
         "memory_facts": erased.memory_facts,
         # An account's usage: its request-log rows and person-level usage days.
         "request_logs": erased.request_logs, "usage_days": erased.usage_days,
+        "failed_files": erased.failed_files, "partial": erased.partial,
     }

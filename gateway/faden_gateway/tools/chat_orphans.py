@@ -70,16 +70,22 @@ async def run(
         async with async_sessionmaker(engine, expire_on_commit=False)() as session:
             accounts = await find(session, known)
             erased: dict[str, int] = {}
+            failed_files = 0
             if erase:
                 store = LocalFileStore(settings.chat_file_store_root)
                 for user_id in accounts:
                     done = await erasure.erase_user(session, store, user_id)
                     erased[user_id] = done.chats
+                    failed_files += done.failed_files
                 await session.commit()
     finally:
         if own:
             await engine.dispose()
-    return {"ok": True, "accounts": accounts, "erased": erased if erase else None}
+    # failed_files: files that could not be deleted; their rows wait, emptied, for the gateway's next purge.
+    return {
+        "ok": True, "accounts": accounts, "erased": erased if erase else None,
+        "failed_files": failed_files if erase else None,
+    }
 
 
 def main(argv: list[str] | None = None) -> int:

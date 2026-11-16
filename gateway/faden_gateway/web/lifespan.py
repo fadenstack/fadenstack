@@ -359,6 +359,11 @@ async def _purge_loop(app: FastAPI) -> None:
                         "Erased %d chat(s) deleted more than %d days ago (%d file(s))",
                         erased.chats, days, erased.files,
                     )
+                if erased.partial:
+                    log.warning(
+                        "%d attachment file(s) could not be deleted; their rows wait for the next purge",
+                        erased.failed_files,
+                    )
                 if erased.chats < erasure.PURGE_BATCH:
                     break
         except Exception:

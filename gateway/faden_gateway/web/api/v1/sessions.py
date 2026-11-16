@@ -121,13 +121,17 @@ async def update_project(
     return JSONResponse(status_code=200, content=data)
 
 
-@router.delete("/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_project(
     project_id: uuid.UUID,
     request: Request,
     auth: AuthContext = Depends(require_chat("chat.projects:delete")),
     dao: SessionDAO = Depends(),
-) -> None:
+) -> JSONResponse | None:
+    """Erase the project at once: 204; 202 with ``partial`` when a file could not be deleted yet.
+
+    Everything else of it is gone then; the file's row waits, emptied, for the next purge (``erasure``).
+    """
     # Only the caller's own project, before anything of it is touched.
     if await dao.get_project(project_id=project_id, tenant_id=auth.tenant_id, user_id=auth.user_id) is None:
         raise GatewayError(
@@ -145,6 +149,12 @@ async def delete_project(
             message="Project not found.",
             code="project_not_found",
         )
+    if erased.partial:
+        return JSONResponse(
+            status_code=status.HTTP_202_ACCEPTED,
+            content={"partial": True, "failed_files": erased.failed_files},
+        )
+    return None
 
 
 # ── Capacity ──────────────────────────────────────────────────────

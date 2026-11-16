@@ -16,6 +16,7 @@ from collections.abc import AsyncGenerator
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,17 +47,26 @@ async def _get_gateway_session(request: Request) -> AsyncGenerator[AsyncSession,
 # ── Projects ──────────────────────────────────────────────────────
 
 
-async def _erase(scope: str, target: str, not_found: str) -> None:
-    """Erase through the gateway, which alone reaches the files; 404 when nothing was there."""
+async def _erase(scope: str, target: str, not_found: str) -> JSONResponse | None:
+    """Erase through the gateway, which alone reaches the files; 404 when nothing was there.
+
+    A file the gateway could not delete yet makes the erase partial: 202 with ``partial`` and
+    ``failed_files``. Everything else is gone; the gateway's next purge tries the file again.
+    """
     from faden_backend.services.chat.gateway_client import EraseFailed, shared_client  # noqa: PLC0415
 
     try:
         erased = await shared_client().erase(scope, target, secret=settings.users_secret)
     except EraseFailed as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from None
+    if erased.get("partial"):
+        return JSONResponse(
+            status_code=202, content={"partial": True, "failed_files": int(erased.get("failed_files") or 0)},
+        )
     counts = {"session": "chats", "project": "projects", "attachment": "files"}
     if not erased.get(counts[scope]) and not (scope == "attachment" and erased):
         raise HTTPException(status_code=404, detail=not_found)
+    return None
 
 
 @router.get("/projects")
@@ -88,13 +98,13 @@ async def list_projects(
     return {"data": rows}
 
 
-@router.delete("/projects/{project_id}", status_code=204)
+@router.delete("/projects/{project_id}", status_code=204, response_model=None)
 async def delete_project(
     project_id: uuid.UUID,
     _user: Annotated[User, Depends(require_superuser)],
-) -> None:
+) -> JSONResponse | None:
     """Erase it for good through the gateway: its files go with its rows (recorded in the audit trail)."""
-    await _erase("project", str(project_id), "Project not found")
+    return await _erase("project", str(project_id), "Project not found")
 
 
 # ── Sessions ──────────────────────────────────────────────────────
@@ -135,13 +145,13 @@ async def list_sessions(
     return {"data": rows}
 
 
-@router.delete("/sessions/{session_id}", status_code=204)
+@router.delete("/sessions/{session_id}", status_code=204, response_model=None)
 async def delete_session(
     session_id: uuid.UUID,
     _user: Annotated[User, Depends(require_superuser)],
-) -> None:
+) -> JSONResponse | None:
     """Erase it for good through the gateway: its files go with its rows (recorded in the audit trail)."""
-    await _erase("session", str(session_id), "Session not found")
+    return await _erase("session", str(session_id), "Session not found")
 
 
 # ── Attachments ───────────────────────────────────────────────────
@@ -190,13 +200,13 @@ async def list_attachments(
     return {"data": rows}
 
 
-@router.delete("/attachments/{attachment_id}", status_code=204)
+@router.delete("/attachments/{attachment_id}", status_code=204, response_model=None)
 async def delete_attachment(
     attachment_id: uuid.UUID,
     _user: Annotated[User, Depends(require_superuser)],
-) -> None:
+) -> JSONResponse | None:
     """Erase it for good through the gateway: its files go with its rows (recorded in the audit trail)."""
-    await _erase("attachment", str(attachment_id), "Attachment not found")
+    return await _erase("attachment", str(attachment_id), "Attachment not found")
 
 
 # ── Stats ─────────────────────────────────────────────────────────

@@ -224,3 +224,220 @@ async def test_chat_data_of_accounts_that_no_longer_exist_is_listed_then_erased_
         assert await chat_orphans.find(session, await known()) == {}
         await session.close()
         await tx.rollback()
+
+
+# ── A file that cannot be deleted (GDPR Art. 17): its row stays, emptied, until the next purge ──
+
+
+class _Flaky(_Store):
+    """A store that cannot delete the files of *failing* (OSError) and has none of *missing*."""
+
+    def __init__(self, *, failing: set[str] = frozenset(), missing: set[str] = frozenset()) -> None:  # type: ignore[assignment]
+        super().__init__()
+        self.failing, self.missing = set(failing), set(missing)
+
+    async def delete(self, key: str) -> bool:
+        if key in self.failing:
+            raise OSError("read-only file system")
+        if key in self.missing:
+            return False
+        return await super().delete(key)
+
+
+async def _file(db: AsyncSession, key: str, *, user: str = "u1", chat: ChatSession | None = None,
+                project: ChatProject | None = None) -> ChatAttachment:
+    row = ChatAttachment(
+        tenant_id="t1", user_id=user, session_id=chat.id if chat else None, project_id=project.id if project else None,
+        filename="contract-huber.pdf", content_type="application/pdf", size_bytes=10, storage_key=key,
+        extracted_text="Mr Huber's contract", extraction_status=ExtractionStatus.COMPLETED,
+        scope=AttachmentScope.PROJECT if project and not chat else AttachmentScope.SESSION,
+    )
+    db.add(row)
+    await db.flush()
+    return row
+
+
+async def _rows(db: AsyncSession) -> dict[str, ChatAttachment]:
+    found = await db.execute(select(ChatAttachment).execution_options(populate_existing=True))
+    return {row.storage_key: row for row in found.scalars()}
+
+
+async def _purge_with_a_working_store(db: AsyncSession) -> tuple[erasure.Erased, _Store]:
+    store = _Store()
+    erased = await erasure.purge_deleted(db, store, deleted_before=datetime.now(UTC) - timedelta(days=30))
+    return erased, store
+
+
+def _waits(row: ChatAttachment) -> None:
+    """A row kept for its file: nothing of what it held but the key, under a tombstone."""
+    assert row.filename == "" and row.extracted_text is None and row.message_id is None and row.project_id is None
+
+
+async def _tombstone(db: AsyncSession, chat_id: uuid.UUID) -> ChatSession:
+    chat = (await db.execute(
+        select(ChatSession).where(ChatSession.id == chat_id).execution_options(populate_existing=True),
+    )).scalar_one()
+    assert chat.status == SessionStatus.DELETED and chat.deleted_at is not None
+    assert chat.deleted_at.replace(tzinfo=UTC) == erasure.RETRY_DUE, "due at once, whatever the retention"
+    assert chat.title is None and chat.project_id is None
+    return chat
+
+
+async def test_a_chats_file_that_cannot_be_deleted_keeps_its_row_until_the_next_purge(db_session: AsyncSession) -> None:
+    chat = await _chat(db_session)  # its file: t1/<chat>/f
+    stuck = await _file(db_session, "t1/stuck", chat=chat)
+    store = _Flaky(failing={"t1/stuck"})
+
+    erased = await erasure.erase_session(db_session, store, chat.id)
+
+    assert erased.partial and erased.failed_files == 1 and erased.chats == 0
+    assert store.deleted == [f"t1/{chat.id}/f"], "the other file goes"
+    rows = await _rows(db_session)
+    assert list(rows) == ["t1/stuck"] and rows["t1/stuck"].session_id == chat.id
+    _waits(rows["t1/stuck"])
+    await _tombstone(db_session, chat.id)
+    assert await _count(db_session, ChatMessage) == 0 and await _count(db_session, MemoryFact) == 0
+
+    erased, store = await _purge_with_a_working_store(db_session)
+
+    assert erased.chats == 1 and not erased.partial and store.deleted == ["t1/stuck"]
+    assert await _rows(db_session) == {} and await _count(db_session, ChatSession) == 0
+    del stuck
+
+
+async def test_a_projects_files_that_cannot_be_deleted_wait_in_tombstones(db_session: AsyncSession) -> None:
+    project = ChatProject(tenant_id="t1", user_id="u1", name="Huber")
+    db_session.add(project)
+    await db_session.flush()
+    chat = await _chat(db_session, project=project)
+    await _file(db_session, "t1/chat-stuck", chat=chat, project=project)
+    await _file(db_session, "t1/project-stuck", project=project)
+    await _file(db_session, "t1/project-ok", project=project)
+    store = _Flaky(failing={"t1/chat-stuck", "t1/project-stuck"})
+
+    erased = await erasure.erase_project(db_session, store, project.id)
+
+    assert erased.projects == 1 and erased.failed_files == 2 and erased.partial
+    assert sorted(store.deleted) == sorted([f"t1/{chat.id}/f", "t1/project-ok"])
+    assert await _count(db_session, ChatProject) == 0, "the project goes"
+    rows = await _rows(db_session)
+    assert sorted(rows) == ["t1/chat-stuck", "t1/project-stuck"]
+    for row in rows.values():
+        _waits(row)
+        await _tombstone(db_session, row.session_id)
+    assert rows["t1/chat-stuck"].session_id == chat.id, "the chat itself is the tombstone"
+    assert rows["t1/project-stuck"].session_id != chat.id, "the project's own file gets one of its own"
+
+    erased, store = await _purge_with_a_working_store(db_session)
+
+    assert erased.chats == 2 and sorted(store.deleted) == ["t1/chat-stuck", "t1/project-stuck"]
+    assert await _rows(db_session) == {} and await _count(db_session, ChatSession) == 0
+
+
+async def test_a_single_file_that_cannot_be_deleted_leaves_its_chat(db_session: AsyncSession) -> None:
+    chat = await _chat(db_session)
+    stuck = await _file(db_session, "t1/stuck", chat=chat)
+
+    erased = await erasure.erase_attachment(db_session, _Flaky(failing={"t1/stuck"}), stuck.id)
+
+    assert erased.failed_files == 1 and erased.files == 0
+    rows = await _rows(db_session)
+    _waits(rows["t1/stuck"])
+    assert rows["t1/stuck"].session_id != chat.id, "out of the chat its person still has"
+    await _tombstone(db_session, rows["t1/stuck"].session_id)
+    await db_session.refresh(chat)
+    assert chat.status == SessionStatus.ACTIVE and f"t1/{chat.id}/f" in rows
+
+    erased, store = await _purge_with_a_working_store(db_session)
+
+    assert store.deleted == ["t1/stuck"] and set(await _rows(db_session)) == {f"t1/{chat.id}/f"}
+    assert set((await db_session.execute(select(ChatSession.id))).scalars()) == {chat.id}
+
+
+async def test_a_persons_files_that_cannot_be_deleted_wait_and_nothing_else_of_theirs_stays(
+    db_session: AsyncSession,
+) -> None:
+    project = ChatProject(tenant_id="t1", user_id="u1", name="Huber")
+    db_session.add(project)
+    await db_session.flush()
+    await _file(db_session, "t1/project-stuck", project=project)
+    chat = await _chat(db_session)
+    await _file(db_session, "t1/chat-stuck", chat=chat)
+    await _file(db_session, "t1/unscoped-stuck")
+    await _file(db_session, "t1/unscoped-ok")
+    theirs = await _chat(db_session, user="u2")
+    store = _Flaky(failing={"t1/project-stuck", "t1/chat-stuck", "t1/unscoped-stuck"})
+
+    erased = await erasure.erase_user(db_session, store, "u1")
+
+    assert erased.failed_files == 3 and erased.projects == 1
+    assert sorted(store.deleted) == sorted([f"t1/{chat.id}/f", "t1/unscoped-ok"]), "each file tried once"
+    rows = await _rows(db_session)
+    assert sorted(rows) == sorted(["t1/project-stuck", "t1/chat-stuck", "t1/unscoped-stuck", f"t1/{theirs.id}/f"])
+    for key in ("t1/project-stuck", "t1/chat-stuck", "t1/unscoped-stuck"):
+        _waits(rows[key])
+        await _tombstone(db_session, rows[key].session_id)
+    assert set((await db_session.execute(select(MemoryFact.user_id))).scalars()) == {"u2"}
+    assert await _count(db_session, ChatProject) == 0
+
+    erased, store = await _purge_with_a_working_store(db_session)
+
+    assert sorted(store.deleted) == sorted(["t1/project-stuck", "t1/chat-stuck", "t1/unscoped-stuck"])
+    assert set(await _rows(db_session)) == {f"t1/{theirs.id}/f"}
+    assert set((await db_session.execute(select(ChatSession.user_id))).scalars()) == {"u2"}
+
+
+async def test_a_missing_file_counts_as_deleted(db_session: AsyncSession) -> None:
+    chat = await _chat(db_session)
+
+    erased = await erasure.erase_session(db_session, _Flaky(missing={f"t1/{chat.id}/f"}), chat.id)
+
+    assert erased.chats == 1 and not erased.partial and erased.files == 0
+    assert await _rows(db_session) == {} and await _count(db_session, ChatSession) == 0
+
+
+async def test_without_a_file_store_no_file_counts_as_deleted(db_session: AsyncSession) -> None:
+    chat = await _chat(db_session)
+
+    erased = await erasure.erase_session(db_session, None, chat.id)
+
+    assert erased.partial and erased.failed_files == 1
+    _waits((await _rows(db_session))[f"t1/{chat.id}/f"])
+
+
+async def test_files_that_keep_failing_never_hold_the_purge_back(db_session: AsyncSession) -> None:
+    stuck = await _chat(db_session)
+    await erasure.erase_session(db_session, _Flaky(failing={f"t1/{stuck.id}/f"}), stuck.id)
+    due = [await _chat(db_session), await _chat(db_session)]
+    for chat in due:
+        chat.status, chat.deleted_at = SessionStatus.DELETED, datetime.now(UTC) - timedelta(days=40)
+    await db_session.flush()
+    store = _Flaky(failing={f"t1/{stuck.id}/f"})
+    before = datetime.now(UTC) - timedelta(days=30)
+
+    first = await erasure.purge_deleted(db_session, store, deleted_before=before, limit=2)
+    assert first.chats == 2 and not first.partial, "the chats due first, the tombstone after"
+    second = await erasure.purge_deleted(db_session, store, deleted_before=before, limit=2)
+    assert (second.chats, second.failed_files) == (0, 1), "tried again: a short pass, so the loop stops"
+    assert set((await db_session.execute(select(ChatSession.id))).scalars()) == {stuck.id}
+
+
+async def test_the_erase_apis_say_when_it_is_partial(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession,
+) -> None:
+    chat = await _chat(db_session)
+    fastapi_app.state.chat_file_store = _Flaky(failing={f"t1/{chat.id}/f"})
+    r = await client.post("/internal/chat-erase", json={"scope": "session", "target": str(chat.id)},
+                          headers={ERASE_GRANT_HEADER: _grant("session", str(chat.id))})
+    assert r.status_code == 200, r.text
+    assert (r.json()["partial"], r.json()["failed_files"], r.json()["chats"]) == (True, 1, 0)
+
+    project = ChatProject(tenant_id="t1", user_id="u1", name="mine")
+    db_session.add(project)
+    await db_session.flush()
+    inside = await _chat(db_session, project=project)
+    fastapi_app.state.chat_file_store = _Flaky(failing={f"t1/{inside.id}/f"})
+    fastapi_app.dependency_overrides[get_auth_context] = lambda: AuthContext(user_id="u1", tenant_id="t1", raw_claims={})
+    r = await client.delete(f"/v1/sessions/projects/{project.id}")
+    assert r.status_code == 202, r.text
+    assert r.json() == {"partial": True, "failed_files": 1}
