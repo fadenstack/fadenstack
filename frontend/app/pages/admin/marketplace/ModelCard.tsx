@@ -117,17 +117,25 @@ export function modelFacts(model: MarketModel): string {
     .join(" · ");
 }
 
+/** A model that makes pictures: it has the picture task or the picture capability. */
+export function isPictureModel(model: MarketModel): boolean {
+  return model.task === "images" || model.capabilities.includes("images");
+}
+
 export interface ModelCardProps {
   model: MarketModel;
   onOpen: (repoId: string) => void;
   onHost: (repoId: string) => void;
   canHost: boolean;
+  /** Whether the server allows image generation; off (the default) hides Host on picture models. */
+  imagesOn?: boolean;
 }
 
-export function ModelCard({ model, onOpen, onHost, canHost }: ModelCardProps) {
+export function ModelCard({ model, onOpen, onHost, canHost, imagesOn = false }: ModelCardProps) {
   const { t } = useTranslation();
   const blurb = model.curated?.blurb ? t(model.curated.blurb, { defaultValue: "" }) : "";
-  const hostBlocked = !model.runnable || model.fit?.status === "too_large" || model.fit?.status === "no_accelerators";
+  const imagesOff = isPictureModel(model) && !imagesOn;
+  const hostBlocked = imagesOff || !model.runnable || model.fit?.status === "too_large" || model.fit?.status === "no_accelerators";
 
   return (
     <Card
@@ -227,7 +235,12 @@ export function ModelCard({ model, onOpen, onHost, canHost }: ModelCardProps) {
             <Typography variant="caption">{formatCount(model.likes)}</Typography>
           </Stack>
         )}
-        {canHost && (
+        {canHost && imagesOff && (
+          <Typography variant="caption" color="text.secondary" data-testid={`images-off-${model.repo_id}`}>
+            {t("images_off.short")}
+          </Typography>
+        )}
+        {canHost && !imagesOff && (
           <Button
             size="small"
             variant="contained"

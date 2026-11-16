@@ -93,6 +93,32 @@ class ForbiddenError(InferenceError):
         self.detail = detail
 
 
+class ImagesDisabledError(InferenceError):
+    """A new picture model, while image generation is off in this version (HTTP 403, ``images_disabled``)."""
+
+    def __init__(self) -> None:
+        from faden_backend.services.llm import image_generation  # noqa: PLC0415
+
+        super().__init__(image_generation.NOTE)
+        self.detail = image_generation.refusal_detail()
+
+
+def refuse_new_pictures(spec: dict[str, Any] | None, *, previous: dict[str, Any] | None = None) -> None:
+    """Refuse a spec that makes a deployment a picture model, while image generation is off.
+
+    One that already was (*previous*) may change: an existing image deployment is not touched, and its
+    administrator may still stop, scale or delete it.
+    """
+    from faden_backend.services.llm import image_generation  # noqa: PLC0415
+    from faden_backend.services.llm.kinds import IMAGES, deployment_kind  # noqa: PLC0415
+
+    if image_generation.ENABLED or deployment_kind(spec) != IMAGES:
+        return
+    if previous is not None and deployment_kind(previous) == IMAGES:
+        return
+    raise ImagesDisabledError
+
+
 def _enum(value: str, enum_cls: type, *, what: str) -> Any:
     """Coerce a string into ``enum_cls`` or raise :class:`ConflictError`."""
     try:
@@ -732,6 +758,7 @@ class DeploymentService:
         # Re-validate so the DB only ever holds well-formed documents; any
         # malformed document surfaces as a 409, not a 500.
         self.validate_spec(spec)
+        refuse_new_pictures(spec)
         self._guard_spec(spec, previous=None, allow_guarded=allow_guarded)
         try:
             return await self.dao.create(
@@ -825,6 +852,7 @@ class DeploymentService:
                 raise ConflictError("spec cannot be cleared; omit it to keep the current spec")
             self.validate_spec(spec)
             current = await self.dao.get(deployment_id)
+            refuse_new_pictures(spec, previous=dict(current.spec_json or {}) if current is not None else None)
             self._guard_spec(
                 spec,
                 previous=dict(current.spec_json or {}) if current is not None else None,

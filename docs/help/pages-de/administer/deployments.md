@@ -121,7 +121,8 @@ Das Modell läuft weiter, während Sie das ändern.
     viele, wie der Cluster hat. Ein Modell, das für einen Beschleuniger zu groß ist, braucht das. Bei Maschinen
     mit je einem Beschleuniger erstreckt sich eine Kopie dann über so viele Maschinen. Von einer ganzen Zahl zu
     einer anderen bleibt die Speichereinstellung der Engine, wie sie ist. Ein Bildmodell läuft immer auf einem
-    Beschleuniger.
+    Beschleuniger. Solange die Bilderzeugung ausgeschaltet ist, beantwortet es keine Anfragen (siehe
+    [Die Bilderzeugung ist ausgeschaltet](models.md#image-generation-is-off)).
 
 | Sie ändern | Was passiert |
 |---|---|

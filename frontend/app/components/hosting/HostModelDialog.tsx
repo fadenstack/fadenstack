@@ -18,10 +18,12 @@ import { useNavigate } from "react-router";
 
 import { inferenceApi } from "~/api/inference";
 import type { Model } from "~/api/llm";
-import { marketplaceApi, type Fit, type MarketCluster, type MarketDetail } from "~/api/marketplace";
+import { errorCode, marketplaceApi, type Fit, type MarketCluster, type MarketDetail } from "~/api/marketplace";
 import { EngineSettingsEditor } from "~/components/engine/EngineSettingsEditor";
 import { PictureSettings } from "~/components/hosting/PictureSettings";
+import { ImagesOffNote } from "~/components/hosting/ImagesOffNote";
 import { RecipeNotice } from "~/components/hosting/RecipeNotice";
+import { useImageGeneration } from "~/lib/useImageGeneration";
 import { formatBytes, parseExtraFlags, type EngineConfig } from "~/lib/engine";
 import {
   DEPLOYMENT_NAME,
@@ -202,6 +204,9 @@ export function HostModelDialog({
   useEffect(() => setMachine(""), [cluster]);
   const fit: Fit | null = (cluster && detail?.fits[cluster]) || null;
   const pictures = detail?.model?.task === "images";
+  // Off (or not yet known) means a picture model cannot be hosted from here.
+  const imagesOn = useImageGeneration();
+  const imagesBlocked = pictures && !imagesOn;
   // A picture model runs on one device or a share of one: never split across several.
   const choices = useMemo(
     () => gpuChoices(fit, chosen).filter((c) => !pictures || c.value <= 1),
@@ -262,9 +267,9 @@ export function HostModelDialog({
   const fitBlocks = fit?.status === "too_large" || fit?.status === "no_accelerators" || cannotRun;
   const canNext: Record<StepId, boolean> = {
     model: Boolean(kept),
-    where: Boolean(chosen) && !fitBlocks && detailState !== "loading",
+    where: Boolean(chosen) && !fitBlocks && !imagesBlocked && detailState !== "loading",
     settings: extraIssues.length === 0,
-    review: nameOk && !busy,
+    review: nameOk && !busy && !imagesBlocked,
   };
 
   function next() {
@@ -313,7 +318,9 @@ export function HostModelDialog({
       await inferenceApi.reconcileDeployment(deploymentId).catch(() => undefined);
       onHosted(deploymentId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      // The server's refusal is in English; the console shows the note in its own language.
+      if (errorCode(err) === "images_disabled") setError(t("images_off.note"));
+      else setError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
     }
@@ -345,6 +352,7 @@ export function HostModelDialog({
       </Box>
       <DialogContent dividers sx={{ minHeight: 380 }}>
         <Stack spacing={2}>
+          {imagesBlocked && <ImagesOffNote />}
           {error && <Alert severity="error">{error}</Alert>}
 
           {step === "model" && (
@@ -414,7 +422,7 @@ export function HostModelDialog({
             </Box>
           )}
 
-          {step === "settings" && pictures && (
+          {step === "settings" && pictures && !imagesBlocked && (
             <Box data-tour-id="hosting.settings">
               <PictureSettings
                 value={config}

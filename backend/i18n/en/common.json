@@ -5855,5 +5855,10 @@
       "nextcloud": "The Nextcloud administrator turns the app on. Then open Fadenstack in Nextcloud and sign in.",
       "chrome": "Install the extension. Enter this server's address on its first screen, then sign in."
     }
+  },
+  "images_off": {
+    "title": "Image generation is off",
+    "note": "Image generation is turned off in this version. From 2 December 2026 the EU AI Act (Article 5) requires safeguards against generating harmful images, and this version does not have them yet. Image generation will return in a later version, with those safeguards.",
+    "short": "Off in this version (EU AI Act)"
   }
 }

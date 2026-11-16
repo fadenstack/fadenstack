@@ -2,6 +2,9 @@
 
 The prompt goes through the pipeline like any text (limits, the PII check, the audit); the pictures come
 back in the answer and stay out of traces and logs.
+
+0.7.1 ships with image generation off (``image_generation``; test_image_generation_off.py): these tests
+switch it on, so the code a later version switches back on stays tested.
 """
 
 from __future__ import annotations
@@ -15,11 +18,18 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_gateway.db.models.gateway import ProviderType
+from faden_gateway.services.gateway import image_generation
 from faden_gateway.services.gateway.llm_adapter import CompletionResult, LLMAdapter
 from tests.test_gateway_pipeline_combined import ALIAS, _install_pii, _Observability, _pii, _seed, _token
 
 IMAGES = {"task": "images"}
 PICTURE = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=="
+
+
+@pytest.fixture(autouse=True)
+def _image_generation_on(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Image generation on, as a later version has it (0.7.1 ships it off)."""
+    monkeypatch.setattr(image_generation, "ENABLED", True)
 
 
 class _Recording(_Observability):

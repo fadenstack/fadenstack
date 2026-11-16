@@ -15,8 +15,10 @@ import { useTranslation } from "react-i18next";
 import { inferenceApi, type InferenceDeployment } from "~/api/inference";
 import { marketplaceApi, type MarketDetail } from "~/api/marketplace";
 import { EngineSettingsEditor } from "~/components/engine/EngineSettingsEditor";
+import { ImagesOffNote } from "~/components/hosting/ImagesOffNote";
 import { PictureSettings, pictureSettingLabels } from "~/components/hosting/PictureSettings";
 import { PICTURE_SETTINGS } from "~/lib/hosting";
+import { useImageGeneration } from "~/lib/useImageGeneration";
 import { toClusterConfig, toFlag, type EngineConfig, type EngineValue } from "~/lib/engine";
 
 import Alert from "@mui/material/Alert";
@@ -96,6 +98,8 @@ function pictureConfig(config: EngineConfig): EngineConfig {
 export function DeploymentEngineCard({ deployment, repoId, onSaved }: DeploymentEngineCardProps) {
   const { t } = useTranslation();
   const pictures = isPictureDeployment(deployment);
+  // A picture deployment that was already running keeps running; the admin is told why no new one can start.
+  const imagesOn = useImageGeneration();
   const current = engineConfigOf(deployment);
   const entries = Object.entries(current);
   const [open, setOpen] = useState(false);
@@ -139,7 +143,9 @@ export function DeploymentEngineCard({ deployment, repoId, onSaved }: Deployment
       setOpen(false);
       await onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("common.save_failed"));
+      // The server's refusal is in English; show the note in the console's language.
+      if ((err as { code?: string } | null)?.code === "images_disabled") setError(t("images_off.note"));
+      else setError(err instanceof Error ? err.message : t("common.save_failed"));
     } finally {
       setSaving(false);
     }
@@ -159,6 +165,7 @@ export function DeploymentEngineCard({ deployment, repoId, onSaved }: Deployment
   return (
     <Card variant="outlined">
       <CardContent>
+        {pictures && !imagesOn && <ImagesOffNote sx={{ mb: 1.5 }} />}
         <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
           <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
             {pictures ? t("hosting.pictures_title") : t("inference.engine.title")}

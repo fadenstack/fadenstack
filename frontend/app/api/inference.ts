@@ -786,14 +786,22 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     // FastAPI puts the human-readable message in `detail`; showing the raw
     // body meant operators read `API 409: {"detail":"Stale plan: ..."}`.
     let message = text;
+    let code: string | undefined;
     try {
       const parsed = JSON.parse(text) as { detail?: unknown };
       if (typeof parsed.detail === "string") message = parsed.detail;
+      else if (parsed.detail && typeof parsed.detail === "object") {
+        // A refusal with a machine-readable code, e.g. {"code": "images_disabled", "message": "..."}.
+        const d = parsed.detail as { code?: unknown; message?: unknown };
+        if (typeof d.message === "string") message = d.message;
+        if (typeof d.code === "string") code = d.code;
+      }
     } catch {
       // Not JSON — keep the body as-is.
     }
-    const error = new Error(message) as Error & { status?: number };
+    const error = new Error(message) as Error & { status?: number; code?: string };
     error.status = res.status;
+    if (code) error.code = code;
     throw error;
   }
   if (res.status === 204) return undefined as T;

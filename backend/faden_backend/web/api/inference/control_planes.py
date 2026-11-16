@@ -15,6 +15,7 @@ from faden_backend.db.models.users import User
 from faden_backend.services.inference.service import (
     ConflictError,
     ForbiddenError,
+    ImagesDisabledError,
     ControlPlaneService,
     InferenceError,
     NotFoundError,
@@ -37,6 +38,9 @@ def _map_inference_error(exc: InferenceError) -> HTTPException:
     if isinstance(exc, ConflictError):
         return HTTPException(status.HTTP_409_CONFLICT, detail=exc.detail)
     if isinstance(exc, ForbiddenError):
+        return HTTPException(status.HTTP_403_FORBIDDEN, detail=exc.detail)
+    if isinstance(exc, ImagesDisabledError):
+        # A new picture model while image generation is off: the stable code and the note.
         return HTTPException(status.HTTP_403_FORBIDDEN, detail=exc.detail)
     return HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc))
 

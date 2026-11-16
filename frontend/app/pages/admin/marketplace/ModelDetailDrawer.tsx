@@ -29,7 +29,7 @@ import VerifiedIcon from "@mui/icons-material/Verified";
 
 import { RecipeNotice } from "~/components/hosting/RecipeNotice";
 
-import { CapabilityChips, OwnerAvatar } from "./ModelCard";
+import { CapabilityChips, isPictureModel, OwnerAvatar } from "./ModelCard";
 
 const TONE = { success: "success", info: "info", warning: "warning", error: "error", default: "default" } as const;
 const FILES_SHOWN = 12;
@@ -40,11 +40,13 @@ export interface ModelDetailDrawerProps {
   onClose: () => void;
   onHost: (repoId: string) => void;
   canHost: boolean;
+  /** Whether the server allows image generation; off (the default) disables Host on picture models. */
+  imagesOn?: boolean;
   /** With this, a model not on the server yet can be downloaded without hosting it. */
   onDownloaded?: () => void;
 }
 
-export function ModelDetailDrawer({ repoId, clusterId, onClose, onHost, canHost, onDownloaded }: ModelDetailDrawerProps) {
+export function ModelDetailDrawer({ repoId, clusterId, onClose, onHost, canHost, imagesOn = false, onDownloaded }: ModelDetailDrawerProps) {
   const { t } = useTranslation();
   const [downloading, setDownloading] = useState(false);
   const [downloadNote, setDownloadNote] = useState<{ ok: boolean; text: string } | null>(null);
@@ -130,7 +132,9 @@ export function ModelDetailDrawer({ repoId, clusterId, onClose, onHost, canHost,
             )}
             <Button
               variant="contained"
-              disabled={!state.data || !state.data.model.runnable}
+              disabled={
+                !state.data || !state.data.model.runnable || (isPictureModel(state.data.model) && !imagesOn)
+              }
               onClick={() => onHost(repoId)}
               data-testid="detail-host"
             >

@@ -17,7 +17,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
 from faden_backend.db.dependencies import get_db_session
-from faden_backend.db.models.users import User
+from faden_backend.db.models.users import User, current_active_user
+from faden_backend.services.llm import image_generation
 from faden_backend.services.marketplace import compat as compat_mod
 from faden_backend.services.marketplace import curated as curated_mod
 from faden_backend.services.marketplace import fit as fit_mod
@@ -110,6 +111,16 @@ def _curated_card(entry: curated_mod.Curated) -> dict[str, Any]:
         "runnable": True,
         "format": "diffusers" if entry.group == "images" else "safetensors",
     }
+
+
+@router.get("/image-generation")
+async def image_generation_state(_user: User = Depends(current_active_user)) -> dict[str, Any]:
+    """Whether this version makes pictures; any signed-in person may ask.
+
+    Off in 0.7.1 (``services/llm/image_generation``): the console then offers no image hosting and
+    shows the note.
+    """
+    return {"enabled": image_generation.ENABLED, "code": image_generation.CODE}
 
 
 @router.get("/clusters")
@@ -430,7 +441,11 @@ async def host_model(
 
     Engine settings that run code or read node files are a superuser's to set (403 otherwise).
     """
-    from faden_backend.services.inference.service import ForbiddenError, InferenceError  # noqa: PLC0415
+    from faden_backend.services.inference.service import (  # noqa: PLC0415
+        ForbiddenError,
+        ImagesDisabledError,
+        InferenceError,
+    )
 
     if not body.ignore_compatibility:
         await _refuse_if_it_cannot_run(session, body.repo_id.strip(), body.environment_id)
@@ -451,6 +466,8 @@ async def host_model(
         ), allow_guarded=bool(_can_deploy.is_superuser))
     except HostError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+    except ImagesDisabledError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=exc.detail) from exc
     except ForbiddenError as exc:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail=exc.detail) from exc
     except InferenceError as exc:

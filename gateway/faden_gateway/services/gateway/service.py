@@ -32,6 +32,7 @@ from faden_gateway.services.gateway import (
     answer_variety,
     attachment_search,
     faden_events,
+    image_generation,
     knowledge,
     media_fetch,
     picture_marking,
@@ -1417,6 +1418,9 @@ class GatewayService:
         if endpoint == "/v1/rerank":
             rerank, payload = payload, _as_input(payload)
         elif endpoint == "/v1/images/generations":
+            if not image_generation.ENABLED:
+                # The routes refuse first; this holds for any other caller too: no image model is asked.
+                raise image_generation.refusal()
             # The prompt as the pipeline knows texts (``input``): PII, limits and the trace read it there.
             prompt = str(payload.get("prompt") or "")
             images, payload = payload, {"model": payload.get("model"), "input": [prompt]}
@@ -1710,7 +1714,17 @@ class GatewayService:
         As it is with the module off, and for an answer with no pictures. A
         picture that cannot be marked raises the 503 (``picture_marking``):
         none of the answer's pictures leaves.
+
+        While image generation is off, a chat answer that carries a picture is refused instead
+        (``image_generation``): neither it nor the rest of the answer leaves, nor is it stored.
         """
+        if (
+            not image_generation.ENABLED and endpoint == "/v1/chat/completions"
+            and result.status_code == 200 and image_generation.answer_carries_pictures(result.payload)
+        ):
+            logger.warning("Request %s: the model answered with a picture; refused (image generation is off)",
+                           request_id)
+            raise image_generation.refusal()
         client = self.provenance_client
         if client is None or result.status_code != 200 or not isinstance(result.payload, dict):
             return result, ()
@@ -1732,7 +1746,13 @@ class GatewayService:
     def _pictures_marked(
         self, req: _Prepared, stream: Any, *, model_alias: str, request_id: str,
     ) -> Any:
-        """A streamed answer whose pictures leave marked, as a whole answer's do; as it is, the module off."""
+        """A streamed answer whose pictures leave marked, as a whole answer's do; as it is, the module off.
+
+        While image generation is off, the stream ends with the refusal where a picture would come
+        (``image_generation.refuse_pictures``), with the module on or off.
+        """
+        if not image_generation.ENABLED:
+            return image_generation.refuse_pictures(stream)
         if self.provenance_client is None or req.decision is None:
             return stream
         return picture_marking.mark_stream(
@@ -2971,6 +2991,9 @@ class GatewayService:
                 code="unsupported_parameter",
                 param="rag",
             )
+        if chat and not image_generation.ENABLED and image_generation.asks_for_pictures(payload):
+            # A chat that asks for pictures in its answer is refused before any model is asked.
+            raise image_generation.refusal()
         # A provider at a link-local or cloud metadata address gets no prompt (provider_address.py).
         candidates = await provider_address.usable(candidates)
         # With the provenance module on, a chat answer that would carry no mark is refused, unless an

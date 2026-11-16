@@ -154,6 +154,8 @@
 "How do I host a model on our own machines?" = "host-a-model"
 "How do I use a gated model with a Hugging Face token?" = "gated-models-and-the-hugging-face-token"
 "Can I get models without internet access?" = "without-internet-access"
+"Why can I not host a picture model?" = "image-generation-is-off"
+"Why is image generation turned off?" = "image-generation-is-off"
 
 ["administer/deployments.md"]
 "How do I make a model available in the chat?" = "offer-it-in-the-chat"

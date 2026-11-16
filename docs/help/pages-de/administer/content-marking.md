@@ -56,6 +56,11 @@ verlangt, hängt von ihr ab.
 
 ## Bilder {#pictures}
 
+!!! note "Die Bilderzeugung ist in dieser Version ausgeschaltet"
+    Diese Version erzeugt keine Bilder und lehnt das Bild eines Chatmodells ab (siehe
+    [Die Bilderzeugung ist ausgeschaltet](models.md#image-generation-is-off)): Es wird kein Bild
+    gekennzeichnet. Das Folgende gilt wieder, wenn die Bilderzeugung zurückkommt.
+
 Jedes Bild, das ein Bildmodell über Fadenstack zurückgibt, wird gekennzeichnet, bevor es den Server verlässt:
 
 - ein **unsichtbares Wasserzeichen** (TrustMark) in den Pixeln, das erneutes Komprimieren und Screenshots

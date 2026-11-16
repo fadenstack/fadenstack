@@ -50,6 +50,11 @@ This page says what Fadenstack does; it is not legal advice, and whether your us
 
 ## Pictures
 
+!!! note "Image generation is off in this version"
+    This version makes no pictures, and refuses a chat model's picture (see
+    [Image generation is off](models.md#image-generation-is-off)): no picture is marked. What follows applies
+    again when image generation returns.
+
 Every picture that an image model returns through Fadenstack is marked before it leaves:
 
 - an **invisible watermark** (TrustMark) in the pixels, which survives re-encoding and screenshots in most cases;

@@ -124,11 +124,13 @@ async def host(
     The check runs before the download starts, so a refused request fetches nothing.
     """
     from faden_backend.db.dao.llm_dao import DownloadJobDAO, ModelDAO  # noqa: PLC0415
-    from faden_backend.services.inference.service import DeploymentService  # noqa: PLC0415
+    from faden_backend.services.inference.service import DeploymentService, refuse_new_pictures  # noqa: PLC0415
 
     if not re.fullmatch(r"[\w.-]+/[\w.-]+", request.repo_id or ""):
         raise HostError("Not a Hugging Face repository id.")
     spec = build_spec(request)
+    # A picture model while image generation is off: refused before anything is downloaded.
+    refuse_new_pictures(spec)
     DeploymentService._guard_spec(spec, previous=None, allow_guarded=allow_guarded)
 
     model_dao = ModelDAO(session)

@@ -597,7 +597,12 @@ async def test_the_profile_says_whether_the_agents_model_sees_pictures(
 @pytest.mark.parametrize(("task", "images"), [("images", True), ("chat", False)])
 async def test_the_profile_says_whether_the_agents_tools_can_make_pictures(
     task: str, images: bool, client: AsyncClient, db_session: AsyncSession, backend: _Backend,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """With image generation on, as a later version has it; 0.7.1 says no (test_image_generation_off)."""
+    from faden_gateway.services.gateway import image_generation
+
+    monkeypatch.setattr(image_generation, "ENABLED", True)
     await _seed(db_session, provider=ProviderType.VLLM, pii=None, node_metadata={"task": task})
     backend.put(_profile())
     r = await client.get("/v1/agents/eplan-assistant/profile", headers=_headers())

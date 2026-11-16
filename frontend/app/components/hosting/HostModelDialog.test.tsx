@@ -113,6 +113,42 @@ function renderDialog(props: Partial<React.ComponentProps<typeof HostModelDialog
 
 afterEach(() => vi.restoreAllMocks());
 
+const PICTURE_DETAIL: MarketDetail = {
+  ...DETAIL,
+  model: { ...DETAIL.model, repo_id: "Tongyi-MAI/Z-Image-Turbo", name: "Z-Image-Turbo", task: "images", capabilities: ["images"] },
+};
+
+describe("HostModelDialog image generation", () => {
+  it("while off, shows the note for a picture model and cannot go on to host it", async () => {
+    vi.spyOn(marketplaceApi, "imageGeneration").mockResolvedValue({ enabled: false, code: "images_disabled" });
+    vi.spyOn(marketplaceApi, "clusters").mockResolvedValue([PAIR]);
+    vi.spyOn(marketplaceApi, "detail").mockResolvedValue({ ...PICTURE_DETAIL, clusters: [PAIR] });
+    const host = vi.spyOn(marketplaceApi, "host");
+    renderDialog({ repoId: "Tongyi-MAI/Z-Image-Turbo" });
+
+    expect(await screen.findByTestId("images-off-note")).toHaveTextContent("Image generation is off");
+    await waitFor(() => expect(screen.getByTestId("host-next")).toBeDisabled());
+    expect(screen.queryByTestId("host-picture-steps")).not.toBeInTheDocument();
+    expect(host).not.toHaveBeenCalled();
+  });
+
+  it("shows the translated note when the server refuses with images_disabled", async () => {
+    vi.spyOn(marketplaceApi, "imageGeneration").mockResolvedValue({ enabled: true });
+    vi.spyOn(marketplaceApi, "clusters").mockResolvedValue([PAIR]);
+    vi.spyOn(marketplaceApi, "detail").mockResolvedValue({ ...DETAIL, clusters: [PAIR] });
+    const refused = Object.assign(new Error("Raw English text from the server"), { status: 403, code: "images_disabled" });
+    vi.spyOn(marketplaceApi, "host").mockRejectedValue(refused);
+    renderDialog({ repoId: "Qwen/Qwen3-8B" });
+
+    await waitFor(() => expect(screen.getByTestId("host-next")).toBeEnabled());
+    await userEvent.click(screen.getByTestId("host-next"));
+    await userEvent.click(screen.getByTestId("host-next"));
+    await userEvent.click(screen.getByTestId("host-submit"));
+    expect(await screen.findByText(/Image generation is turned off in this version/)).toBeInTheDocument();
+    expect(screen.queryByText("Raw English text from the server")).not.toBeInTheDocument();
+  });
+});
+
 describe("HostModelDialog", () => {
   it("does not host a model the cluster's runtime cannot load, and says why before any download", async () => {
     // nvidia/Qwen3.8-Flash-Next-NVFP4: 132.7 GB downloaded to both DGX Sparks, then vLLM did not know its model type.

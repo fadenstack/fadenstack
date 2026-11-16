@@ -5857,5 +5857,10 @@
       "nextcloud": "Die Nextcloud-Administration schaltet die App ein. Öffnen Sie dann Fadenstack in Nextcloud und melden Sie sich an.",
       "chrome": "Installieren Sie die Erweiterung. Geben Sie die Adresse dieses Servers auf ihrem ersten Bildschirm ein und melden Sie sich an."
     }
+  },
+  "images_off": {
+    "title": "Bilderzeugung ausgeschaltet",
+    "note": "Die Bilderzeugung ist in dieser Version ausgeschaltet. Ab dem 2. Dezember 2026 verlangt die EU-KI-Verordnung (Artikel 5) Schutzmaßnahmen gegen das Erzeugen schädlicher Bilder, und diese Version hat sie noch nicht. Die Bilderzeugung kommt in einer späteren Version mit diesen Schutzmaßnahmen zurück.",
+    "short": "In dieser Version aus (EU-KI-Verordnung)"
   }
 }

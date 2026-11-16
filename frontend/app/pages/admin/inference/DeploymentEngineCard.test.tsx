@@ -38,6 +38,29 @@ const DEPLOYMENT = {
 
 afterEach(() => vi.restoreAllMocks());
 
+describe("DeploymentEngineCard image generation", () => {
+  const PICTURES = {
+    ...DEPLOYMENT,
+    spec: { ...DEPLOYMENT.spec, engine: { name: "diffusers", config: {} } },
+  } as InferenceDeployment;
+
+  it("while off, a picture deployment shows the note and a chat deployment does not", async () => {
+    const ask = vi.spyOn(marketplaceApi, "imageGeneration").mockResolvedValue({ enabled: false, code: "images_disabled" });
+    const { unmount } = render(<DeploymentEngineCard deployment={PICTURES} repoId={null} onSaved={() => {}} />);
+    expect(screen.getByTestId("images-off-note")).toHaveTextContent("Image generation is off");
+    unmount();
+    render(<DeploymentEngineCard deployment={DEPLOYMENT} repoId={null} onSaved={() => {}} />);
+    await waitFor(() => expect(ask).toHaveBeenCalledTimes(2));
+    expect(screen.queryByTestId("images-off-note")).not.toBeInTheDocument();
+  });
+
+  it("while on, a picture deployment has no note", async () => {
+    vi.spyOn(marketplaceApi, "imageGeneration").mockResolvedValue({ enabled: true });
+    render(<DeploymentEngineCard deployment={PICTURES} repoId={null} onSaved={() => {}} />);
+    await waitFor(() => expect(screen.queryByTestId("images-off-note")).not.toBeInTheDocument());
+  });
+});
+
 describe("DeploymentEngineCard", () => {
   it("shows what differs from vLLM's defaults, as flags", () => {
     render(<DeploymentEngineCard deployment={DEPLOYMENT} repoId={null} onSaved={() => {}} />);

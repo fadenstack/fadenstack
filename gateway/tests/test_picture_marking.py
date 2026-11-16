@@ -4,6 +4,10 @@ With the provenance module on, each picture goes to the engine's mark route
 and leaves with the marked bytes, its receipt in ``X-Faden-Provenance``. A
 picture the engine cannot mark fails the request with a 503 and no picture
 of it; the module off, everything is as before.
+
+0.7.1 ships with image generation off (``image_generation``): no picture
+leaves at all. These tests switch it on, so the marking a later version
+needs again stays tested; test_image_generation_off.py tests it off.
 """
 
 from __future__ import annotations
@@ -23,7 +27,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_gateway.db.models.gateway import LLMGatewayRequestLog, ProviderType
-from faden_gateway.services.gateway import picture_marking
+from faden_gateway.services.gateway import image_generation, picture_marking
 from faden_gateway.services.gateway.errors import GatewayError
 from faden_gateway.services.gateway.llm_adapter import CompletionResult, LLMAdapter
 from faden_gateway.services.gateway.provenance_client import (
@@ -50,6 +54,12 @@ LAYERS = [
     {"layer": "metadata", "method": "c2pa", "applied": True},
 ]
 MARK_PATH = "/api/v1/provenance/images/mark"
+
+
+@pytest.fixture(autouse=True)
+def _image_generation_on(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Image generation on, as a later version has it (0.7.1 ships it off)."""
+    monkeypatch.setattr(image_generation, "ENABLED", True)
 
 
 def _marked(picture: str) -> str:

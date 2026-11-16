@@ -79,6 +79,27 @@ Select **Host** on the card. The dialog has three steps:
 The server downloads the model, copies it to the cluster's machines and starts it. Nothing waits in the
 dialog: the deployment page shows each step.
 
+## Image generation is off
+
+!!! note "Image generation is off in this version"
+    Image generation is turned off in this version. From 2 December 2026 the EU AI Act (Article 5) requires
+    safeguards against generating harmful images, and this version does not have them yet. Image generation will
+    return in a later version, with those safeguards.
+
+While it is off:
+
+- The **Pictures** group on **Recommended**, and **Pictures** in the search, show this note, and no picture
+  model can be hosted.
+- A picture model this server already hosts is left as it is: it keeps its accelerators, but no request
+  reaches it. Its deployment page shows the note; stop or delete it there to free its accelerators (see
+  [Stop, start and delete](deployments.md#stop-start-and-delete)).
+- Apps and agents that ask for a picture get this note as an error (403, `images_disabled`), and agents offer
+  no picture tools.
+- A chat model that answers with a picture is refused in its place: the person sees the note instead of the
+  reply.
+
+No setting turns image generation on again.
+
 ## Gated models and the Hugging Face token
 
 Public models need no token. Gated models (Llama, Gemma and some Mistral models among them) need a token from

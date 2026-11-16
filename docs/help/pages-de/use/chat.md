@@ -88,3 +88,4 @@ Die Seitenleiste öffnen Sie mit der runden Menü-Schaltfläche in einer unteren
 | **Anfragelimit erreicht** mit **Erneut versuchen in N s.** | Ihre Organisation begrenzt, wie viele Anfragen in einem Zeitraum gesendet werden können. Warten Sie, und wählen Sie dann **Erneut versuchen**. |
 | **The model did not start its reply within … s; it may be busy.** | Viele Personen nutzen gerade dieses Modell. Wählen Sie **Erneut versuchen**, versuchen Sie es später oder wählen Sie ein anderes Modell. |
 | **Der Server wurde neu gestartet, während diese Antwort geschrieben wurde.** | Wählen Sie **Erneut versuchen**. |
+| **Image generation is turned off in this version. …** | Das Modell hat mit einem Bild geantwortet, oder die Anfrage hat eines verlangt. Diese Version erzeugt keine Bilder: Bitten Sie um eine Antwort in Worten, oder wählen Sie ein anderes Modell. |

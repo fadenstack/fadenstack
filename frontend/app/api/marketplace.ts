@@ -173,6 +173,17 @@ export interface HostPayload {
   machine?: string | null;
 }
 
+export interface ImageGeneration {
+  enabled: boolean;
+  /** "images_disabled" while it is off. */
+  code?: string;
+}
+
+/** The error code of a refused request (`images_disabled`), when the server sent one. */
+export function errorCode(err: unknown): string | undefined {
+  return err && typeof err === "object" && "code" in err ? String((err as { code: unknown }).code) : undefined;
+}
+
 export interface HostResult {
   deployment_id: string;
   model_id: string;
@@ -213,17 +224,24 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
     let message = text;
+    let code: string | undefined;
     try {
       const parsed = JSON.parse(text) as { detail?: unknown };
       if (typeof parsed.detail === "string") message = parsed.detail;
       else if (Array.isArray(parsed.detail)) {
         message = parsed.detail.map((d: { msg?: string }) => d.msg ?? "").filter(Boolean).join("; ");
+      } else if (parsed.detail && typeof parsed.detail === "object") {
+        // A refusal with a machine-readable code, e.g. {"code": "images_disabled", "message": "..."}.
+        const d = parsed.detail as { code?: unknown; message?: unknown };
+        if (typeof d.message === "string") message = d.message;
+        if (typeof d.code === "string") code = d.code;
       }
     } catch {
       // not JSON
     }
-    const error = new Error(message) as Error & { status?: number };
+    const error = new Error(message) as Error & { status?: number; code?: string };
     error.status = res.status;
+    if (code) error.code = code;
     throw error;
   }
   return res.json() as Promise<T>;
@@ -276,6 +294,10 @@ export const marketplaceApi = {
   },
   detail(repoId: string, clusterId?: string | null, context?: number | null) {
     return request<MarketDetail>(`/models/${repoId}${query({ cluster_id: clusterId, context })}`);
+  },
+  /** Whether this install may generate pictures. The one source of truth for the console. */
+  imageGeneration() {
+    return request<ImageGeneration>("/image-generation");
   },
   host(payload: HostPayload) {
     return request<HostResult>("/host", { method: "POST", body: JSON.stringify(payload) });

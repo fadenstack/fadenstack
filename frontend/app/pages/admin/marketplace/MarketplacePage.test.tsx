@@ -188,4 +188,93 @@ describe("MarketplacePage", () => {
     await userEvent.click(chip);
     expect(await screen.findByTestId("download-m9")).toHaveTextContent("63%");
   });
+
+  describe("image generation", () => {
+    const PICTURE = model("Tongyi-MAI/Z-Image-Turbo", {
+      task: "images",
+      capabilities: ["images"],
+      curated: { group: "images", blurb: "marketplace.blurb.tiny_verified", verified: null },
+    });
+    const CHAT = model("Qwen/Qwen3-8B", {
+      curated: { group: "chat", blurb: "marketplace.blurb.tiny_verified", verified: null },
+    });
+
+    function recommended() {
+      vi.spyOn(marketplaceApi, "recommended").mockResolvedValue({
+        hub: "online", cluster_id: PAIR.environment_id, groups: ["chat", "images"], items: [CHAT, PICTURE],
+      });
+    }
+
+    it("while off, the images group shows the note and a picture model has no Host button", async () => {
+      vi.spyOn(marketplaceApi, "imageGeneration").mockResolvedValue({ enabled: false, code: "images_disabled" });
+      recommended();
+      renderPage();
+
+      const group = await screen.findByTestId("market-group-images");
+      expect(within(group).getByTestId("images-off-note")).toHaveTextContent("Image generation is off");
+      expect(within(group).getByTestId("images-off-note")).toHaveTextContent("EU AI Act (Article 5)");
+      expect(within(group).queryByTestId("host-Tongyi-MAI/Z-Image-Turbo")).not.toBeInTheDocument();
+      expect(within(group).getByTestId("images-off-Tongyi-MAI/Z-Image-Turbo")).toHaveTextContent(
+        "Off in this version (EU AI Act)",
+      );
+      // A chat model keeps its Host button, and the chat group has no note.
+      expect(screen.getByTestId("host-Qwen/Qwen3-8B")).toBeInTheDocument();
+      expect(within(screen.getByTestId("market-group-chat")).queryByTestId("images-off-note")).not.toBeInTheDocument();
+    });
+
+    it("treats a failed answer as off", async () => {
+      vi.spyOn(marketplaceApi, "imageGeneration").mockRejectedValue(new Error("offline"));
+      recommended();
+      renderPage();
+      const group = await screen.findByTestId("market-group-images");
+      expect(within(group).getByTestId("images-off-note")).toBeInTheDocument();
+      expect(within(group).queryByTestId("host-Tongyi-MAI/Z-Image-Turbo")).not.toBeInTheDocument();
+    });
+
+    it("while on, a picture model is hosted as before", async () => {
+      vi.spyOn(marketplaceApi, "imageGeneration").mockResolvedValue({ enabled: true });
+      recommended();
+      renderPage();
+      expect(await screen.findByTestId("host-Tongyi-MAI/Z-Image-Turbo")).toBeInTheDocument();
+      expect(screen.queryByTestId("images-off-note")).not.toBeInTheDocument();
+    });
+
+    it.each([
+      [false, true],
+      [true, false],
+    ])("the details of a picture model, image generation on: %s, offer Host disabled: %s", async (on, disabled) => {
+      vi.spyOn(marketplaceApi, "imageGeneration").mockResolvedValue({ enabled: on });
+      recommended();
+      vi.spyOn(marketplaceApi, "detail").mockResolvedValue({
+        hub: "online",
+        model: { ...PICTURE, max_context: null, kv_bytes_per_token: null },
+        clusters: [PAIR],
+        cluster_id: PAIR.environment_id,
+        fits: { [PAIR.environment_id]: fit() },
+        suggested: { config: {}, reasons: {} },
+        local: null,
+      } as never);
+      renderPage();
+      const card = await screen.findByTestId("model-card-Tongyi-MAI/Z-Image-Turbo");
+      fireEvent.click(within(card).getByText("Z-Image-Turbo"));
+      const host = await screen.findByTestId("detail-host");
+      await waitFor(() => expect(host).toHaveTextContent("Host on a cluster"));
+      if (disabled) await waitFor(() => expect(host).toBeDisabled());
+      else await waitFor(() => expect(host).toBeEnabled());
+    });
+
+    it("the search view for pictures shows the note", async () => {
+      vi.spyOn(marketplaceApi, "imageGeneration").mockResolvedValue({ enabled: false, code: "images_disabled" });
+      vi.spyOn(marketplaceApi, "recommended").mockResolvedValue({ hub: "online", cluster_id: null, groups: [], items: [] });
+      vi.spyOn(marketplaceApi, "search").mockResolvedValue({
+        hub: "online", cluster_id: PAIR.environment_id, items: [PICTURE],
+      });
+      renderPage("/admin/marketplace?tab=search");
+      await screen.findByTestId("model-card-Tongyi-MAI/Z-Image-Turbo");
+      expect(screen.queryByTestId("images-off-note")).not.toBeInTheDocument();
+      await userEvent.click(screen.getByTestId("market-task-images"));
+      expect(await screen.findByTestId("images-off-note")).toBeInTheDocument();
+      expect(screen.queryByTestId("host-Tongyi-MAI/Z-Image-Turbo")).not.toBeInTheDocument();
+    });
+  });
 });

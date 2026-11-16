@@ -111,7 +111,8 @@ The model keeps running while this changes.
     2, 4, 8 or 16 split each copy across that many accelerators (tensor parallel), up to the number the
     cluster has. A model too large for one accelerator needs this. On machines with one accelerator each, a
     copy then spans that many machines. Going from one whole number to another keeps the engine's memory
-    setting. A picture model always runs on one accelerator.
+    setting. A picture model always runs on one accelerator. While image generation is off, it answers no
+    requests (see [Image generation is off](models.md#image-generation-is-off)).
 
 | You change | What happens |
 |---|---|

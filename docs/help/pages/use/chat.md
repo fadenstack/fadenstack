@@ -88,3 +88,4 @@ The sidebar opens from the round menu button in a bottom corner, or from the log
 | **Rate limit reached** with **Try again in N s.** | Your organisation limits how many requests can be sent in a given time. Wait, then select **Retry**. |
 | **The model did not start its reply within … s; it may be busy.** | Many people are using that model. Select **Retry**, try again later, or pick another model. |
 | **The server restarted while this reply was being written.** | Select **Retry**. |
+| **Image generation is turned off in this version. …** | The model answered with a picture, or the request asked for one. This version makes no pictures: ask for the answer in words, or pick another model. |

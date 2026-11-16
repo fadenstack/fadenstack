@@ -34,7 +34,14 @@ from starlette import status
 from faden_gateway.db.dao.gateway_dao import GatewayDAO
 from faden_gateway.db.models.gateway import AgentClientEvent
 from faden_gateway.services.extensions import GrantContext, registry
-from faden_gateway.services.gateway import agent_manifests, approval_settings, grants, step_up, tool_classes
+from faden_gateway.services.gateway import (
+    agent_manifests,
+    approval_settings,
+    grants,
+    image_generation,
+    step_up,
+    tool_classes,
+)
 from faden_gateway.services.gateway import governance as gov
 from faden_gateway.services.gateway.agents import (
     AgentLookupError,
@@ -523,8 +530,9 @@ async def agent_profile(
         "model": profile.model_alias,
         # Whether that model sees pictures, so the SDK sends a tool's picture (a rendered slide) or not.
         "vision": await dao.alias_vision(profile.model_alias) if profile.model_alias else None,
-        # Whether its tools can make pictures (an image model is set up for the tenant).
-        "images": await dao.image_alias(auth.tenant_id) is not None,
+        # Whether its tools can make pictures (an image model is set up for the tenant). Never while image
+        # generation is off in this version (``image_generation``): the SDKs then offer no picture tools.
+        "images": image_generation.ENABLED and await dao.image_alias(auth.tenant_id) is not None,
         "instructions_sha256": profile.instructions_sha256,
         "host_tool_contract": list(profile.host_tool_contract),
         "server_tools": list(profile.server_tools) if profile.server_tools is not None else None,

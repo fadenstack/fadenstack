@@ -152,6 +152,8 @@
 "Wie stelle ich ein Modell auf unseren eigenen Maschinen bereit?" = "host-a-model"
 "Wie nutze ich ein geschütztes Modell mit einem Hugging-Face-Token?" = "gated-models-and-the-hugging-face-token"
 "Bekomme ich Modelle auch ohne Internetzugang?" = "without-internet-access"
+"Warum kann ich kein Bildmodell bereitstellen?" = "image-generation-is-off"
+"Warum ist die Bilderzeugung ausgeschaltet?" = "image-generation-is-off"
 
 ["administer/deployments.md"]
 "Wie mache ich ein Modell im Chat verfügbar?" = "offer-it-in-the-chat"

@@ -99,7 +99,11 @@ def test_a_body_that_is_not_json_has_no_field_to_name() -> None:
 
 
 @pytest.mark.anyio
-async def test_a_route_refuses_a_body_in_those_words(client: AsyncClient) -> None:
+async def test_a_route_refuses_a_body_in_those_words(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    from faden_gateway.services.gateway import image_generation
+
+    # The images route validates its body when image generation is on; 0.7.1 refuses before that.
+    monkeypatch.setattr(image_generation, "ENABLED", True)
     r = await client.post(
         "/v1/images/generations",
         headers={"Authorization": f"Bearer {_token()}"},

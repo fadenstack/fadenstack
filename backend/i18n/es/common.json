@@ -5857,5 +5857,10 @@
       "nextcloud": "El administrador de Nextcloud activa la app. Después abra Fadenstack en Nextcloud e inicie sesión.",
       "chrome": "Instale la extensión. Introduzca la dirección de este servidor en su primera pantalla e inicie sesión."
     }
+  },
+  "images_off": {
+    "title": "Generación de imágenes desactivada",
+    "note": "La generación de imágenes está desactivada en esta versión. A partir del 2 de diciembre de 2026, el Reglamento de IA de la UE (artículo 5) exige salvaguardas contra la generación de imágenes dañinas, y esta versión aún no las tiene. La generación de imágenes volverá en una versión posterior, con esas salvaguardas.",
+    "short": "Desactivada en esta versión (Reglamento de IA de la UE)"
   }
 }

@@ -17,7 +17,13 @@ from starlette import status
 from faden_gateway.db.dao.gateway_dao import GatewayDAO
 from faden_gateway.db.dao.session_dao import SessionDAO
 from faden_gateway.db.models.gateway import TURN_INTERRUPTED_ERROR, TURNS_RETRYABLE, ChatMessage, TurnStatus
-from faden_gateway.services.gateway import faden_events, picture_marking, text_marking, tool_classes
+from faden_gateway.services.gateway import (
+    faden_events,
+    image_generation,
+    picture_marking,
+    text_marking,
+    tool_classes,
+)
 from faden_gateway.services.gateway.agents import AgentRequest
 from faden_gateway.services.gateway.audit import AuditService
 from faden_gateway.services.gateway.auth import (
@@ -673,7 +679,13 @@ async def create_images(
 async def serve_images(
     request: Request, *, auth: AuthContext, service: GatewayService, agent: AgentRequest | None = None,
 ) -> JSONResponse:
-    """An images request through the shared pipeline: limits, the prompt's PII check, routing, audit."""
+    """An images request through the shared pipeline: limits, the prompt's PII check, routing, audit.
+
+    While image generation is off (``image_generation.ENABLED``), every request is refused first, whatever
+    it holds: nothing is validated, routed or charged, and no image model is asked.
+    """
+    if not image_generation.ENABLED:
+        return error_from(image_generation.refusal())
     try:
         body = ImagesRequest.model_validate(await _get_json_payload(request))
         if body.model is None:

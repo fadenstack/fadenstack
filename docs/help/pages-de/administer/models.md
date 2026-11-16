@@ -84,6 +84,28 @@ Wählen Sie auf der Karte **Bereitstellen**. Der Dialog hat drei Schritte:
 Der Server lädt das Modell herunter, kopiert es auf die Maschinen des Clusters und startet es. Sie müssen im
 Dialog nicht warten: Die Seite der Bereitstellung zeigt jeden Schritt.
 
+## Die Bilderzeugung ist ausgeschaltet {#image-generation-is-off}
+
+!!! note "Die Bilderzeugung ist in dieser Version ausgeschaltet"
+    Die Bilderzeugung ist in dieser Version ausgeschaltet. Ab dem 2. Dezember 2026 verlangt die
+    EU-KI-Verordnung (Artikel 5) Schutzmaßnahmen gegen das Erzeugen schädlicher Bilder, und diese Version hat
+    sie noch nicht. Die Bilderzeugung kommt in einer späteren Version mit diesen Schutzmaßnahmen zurück.
+
+Solange sie ausgeschaltet ist:
+
+- Die Gruppe **Bilder** unter **Empfohlen** und **Bilder** in der Suche zeigen diesen Hinweis, und kein
+  Bildmodell lässt sich bereitstellen.
+- Ein Bildmodell, das dieser Server schon bereitstellt, bleibt, wie es ist: Es belegt weiter seine
+  Beschleuniger, aber keine Anfrage erreicht es. Seine Bereitstellungsseite zeigt den Hinweis; halten Sie es
+  dort an oder löschen Sie es, um seine Beschleuniger freizugeben (siehe
+  [Stoppen, starten und löschen](deployments.md#stop-start-and-delete)).
+- Apps und Agenten, die ein Bild anfordern, erhalten diesen Hinweis als Fehler (403, `images_disabled`), und
+  Agenten bieten keine Bildwerkzeuge an.
+- Antwortet ein Chatmodell mit einem Bild, wird die Antwort an seiner Stelle abgelehnt: Die Person sieht den
+  Hinweis statt der Antwort.
+
+Keine Einstellung schaltet die Bilderzeugung wieder ein.
+
 ## Zugangsbeschränkte Modelle und das Hugging-Face-Token {#gated-models-and-the-hugging-face-token}
 
 Öffentliche Modelle brauchen kein Token. Zugangsbeschränkte Modelle (darunter Llama, Gemma und einige

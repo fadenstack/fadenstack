@@ -24,8 +24,10 @@ import {
 } from "~/api/marketplace";
 import { HuggingFaceAccessButton } from "~/components/HuggingFaceAccess";
 import { HostModelDialog } from "~/components/hosting/HostModelDialog";
+import { ImagesOffNote } from "~/components/hosting/ImagesOffNote";
 import { formatBytes } from "~/lib/engine";
 import { useAsyncData } from "~/lib/useAsyncData";
+import { useImageGeneration } from "~/lib/useImageGeneration";
 import { useCan } from "~/lib/useCan";
 
 import Alert from "@mui/material/Alert";
@@ -98,17 +100,19 @@ function ModelGrid({
   onOpen,
   onHost,
   canHost,
+  imagesOn,
 }: {
   items: MarketModel[];
   onOpen: (repo: string) => void;
   onHost: (repo: string) => void;
   canHost: boolean;
+  imagesOn: boolean;
 }) {
   return (
     <Grid container spacing={2}>
       {items.map((m) => (
         <Grid key={m.repo_id} size={{ xs: 12, sm: 6, lg: 4, xl: 3 }}>
-          <ModelCard model={m} onOpen={onOpen} onHost={onHost} canHost={canHost} />
+          <ModelCard model={m} onOpen={onOpen} onHost={onHost} canHost={canHost} imagesOn={imagesOn} />
         </Grid>
       ))}
     </Grid>
@@ -128,6 +132,7 @@ export default function MarketplacePage() {
   const navigate = useNavigate();
   const can = useCan();
   const canHost = can("llm.models:download") && can("inference.deployments:create");
+  const imagesOn = useImageGeneration();
   const [params, setParams] = useSearchParams();
 
   const tab = (TABS.includes(params.get("tab") as TabId) ? params.get("tab") : "recommended") as TabId;
@@ -375,6 +380,8 @@ export default function MarketplacePage() {
         </Stack>
       )}
 
+      {tab === "search" && task === "images" && !imagesOn && <ImagesOffNote />}
+
       {tab !== "local" && (
         <FormControlLabel
           control={<Switch size="small" checked={onlyFits} onChange={(e) => setOnlyFits(e.target.checked)} />}
@@ -407,7 +414,8 @@ export default function MarketplacePage() {
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
                   {t(`marketplace.group_help.${group}`)}
                 </Typography>
-                <ModelGrid items={inGroup} onOpen={open} onHost={host} canHost={canHost} />
+                {group === "images" && !imagesOn && <ImagesOffNote sx={{ mb: 1.5 }} />}
+                <ModelGrid items={inGroup} onOpen={open} onHost={host} canHost={canHost} imagesOn={imagesOn} />
               </Box>
             );
           })}
@@ -423,7 +431,7 @@ export default function MarketplacePage() {
               <CircularProgress size={16} />
             </Box>
           )}
-          <ModelGrid items={shown} onOpen={open} onHost={host} canHost={canHost} />
+          <ModelGrid items={shown} onOpen={open} onHost={host} canHost={canHost} imagesOn={imagesOn} />
         </Box>
       )}
 
@@ -447,6 +455,7 @@ export default function MarketplacePage() {
         onClose={() => setOpenRepo(null)}
         onHost={host}
         canHost={canHost}
+        imagesOn={imagesOn}
         onDownloaded={() => void kept.refresh(true)}
       />
       <HostModelDialog
