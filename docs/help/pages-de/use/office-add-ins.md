@@ -108,7 +108,7 @@ Den Modus ändern Sie im Aufgabenbereich: **Off**, **Read only**, **Ask** oder *
 ## Wohin Ihre Daten gehen {#where-your-data-goes}
 
 - Was Sie fragen und die Teile des Dokuments, die der Agent liest, um zu antworten, gehen an den Server Ihrer Organisation und an das Modell, das Ihr Administrator für den Agenten ausgewählt hat.
-- Ihre Unterhaltungen bleiben verschlüsselt auf Ihrem Computer. Der Server protokolliert, welche Tools liefen, nicht, was sie gelesen haben.
+- Ihre Unterhaltungen bleiben verschlüsselt auf Ihrem Computer. Die Ereignisse, die die Add-ins an den Server senden, nennen, welche Tools liefen, nicht, was sie gelesen haben. Was die Tools lesen, erreicht den Server trotzdem, mit den Anfragen an das KI-Modell, wie im ersten Punkt beschrieben.
 - Ihre Anmeldung wird auf Ihrem Computer gespeichert, geschützt durch Windows.
 
 Mehr dazu: [Ihre Daten und Datenschutz](privacy.md).

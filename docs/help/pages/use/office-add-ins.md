@@ -113,7 +113,7 @@ Change the mode in the pane: **Off**, **Read only**, **Ask** or **Auto**. Even i
 ## Where your data goes
 
 - What you ask, and the parts of the document the agent reads to answer, go to your organisation's server and to the model your administrator chose for the agent.
-- Your conversations stay on your computer, encrypted. The server records which tools ran, not what they read.
+- Your conversations stay on your computer, encrypted. The events the add-ins send to the server say which tools ran, not what they read. What the tools read still reaches the server, in the requests to the AI model, as the first point says.
 - Your sign-in is kept on your computer, protected by Windows.
 
 More: [Your data and privacy](privacy.md).

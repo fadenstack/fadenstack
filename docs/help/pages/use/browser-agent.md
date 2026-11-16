@@ -190,7 +190,7 @@ At installation, Chrome lets the extension open its side panel, keep its setting
 - With web search switched on, a search you allow goes to the search engine set in Chrome.
 - A video's captions are fetched from the video's own site, as its player does. With tools that sites offer switched on, what a site's tool is given goes to that site.
 - PDFs are read inside your browser. Pictures are made smaller in your browser before they go. CSV and Markdown files you save stay on your computer.
-- Your conversations stay in this browser, encrypted, each signed-in person's on their own. The key stays in the browser and cannot be read out of it. Your saved prompts stay in this browser too. The server records which tools ran and how long they took, not what they read.
+- Your conversations stay in this browser, encrypted, each signed-in person's on their own. The key stays in the browser and cannot be read out of it. Your saved prompts stay in this browser too. The events the extension sends to the server say which tools ran and how long they took, not what they read. What the tools read still reaches the server, in the requests to the AI model, as the first point says.
 - Your sign-in is kept in this browser and, unlike the conversations, is not encrypted there. On a computer others use, sign out when you are done: select the gear (**Settings**) at the top of the panel, then **Sign out on this device**. To remove your conversations and saved prompts as well, select **Delete my data on this device**.
 
 More on what is kept and who sees it: [Your data and privacy](privacy.md).
