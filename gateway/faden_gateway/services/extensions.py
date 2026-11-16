@@ -63,9 +63,11 @@ log = logging.getLogger(__name__)
 #: offers its grant card only where the profile lists it. ``client_events.trigger``: client events may say
 #: what started a tool call (the model, the user, or a UI module). ``client_events.local_mcp_plain_http``: the
 #: events take ``local_mcp.plain_http`` (an MCP server's plain http switched on or off; sdk/51 F05).
+#: ``client_events.arguments_sha256``: ``approval.decided`` and ``tool.executed`` events, and the answer to a call
+#: that waits, take ``arguments_sha256`` (sdk/51 8.10); an older gateway refuses a batch with an event that has it.
 CORE_FEATURES = (
     "agents", "agent_tokens", "agent_events", "skills", "sessions", "streaming", "approval_scopes.grant",
-    "client_events.trigger", "client_events.local_mcp_plain_http",
+    "client_events.trigger", "client_events.local_mcp_plain_http", "client_events.arguments_sha256",
     # A call waiting for the person: its stream carries ``: keep-alive`` comments, and its answer may be sent
     # again (the same answer is taken as the first was).
     "approvals.keepalive", "approvals.idempotent",

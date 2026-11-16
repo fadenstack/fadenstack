@@ -84,3 +84,9 @@ def test_a_plain_http_switch_takes_an_origin(source: str) -> None:
 def test_core_features_list_the_plain_http_event() -> None:
     """sdk/51 F05: the SDK sends ``local_mcp.plain_http`` only where the features list it."""
     assert "client_events.local_mcp_plain_http" in ExtensionRegistry().features
+
+
+def test_core_features_list_the_arguments_hash() -> None:
+    """sdk/51 8.10: the SDK sends ``arguments_sha256`` only where the features list it (an older gateway refuses
+    the whole batch)."""
+    assert "client_events.arguments_sha256" in ExtensionRegistry().features
