@@ -38,8 +38,11 @@ Security fixes go into the latest release. Keep your installation current with `
 
 | Version | Security fixes |
 | --- | --- |
-| 0.4.x (latest) | Yes |
-| older | No: upgrade first |
+| Fadenstack 0.7.1 (latest) | Yes |
+| Fadenstack 0.7.0 and older | No: upgrade to 0.7.1 first |
+| The Fadenstack SDKs for .NET and TypeScript, 0.3.0 | Yes |
+| The SDKs before 0.3.0 | No: upgrade first |
+| The Fadenstack agents: the Chrome extension, the Office add-ins, the desktop agent and the Nextcloud app | The latest release of each; report a problem in them as above |
 
 ## Scope
 

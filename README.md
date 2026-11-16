@@ -64,7 +64,7 @@ Fadenstack was called LLM.Port up to release 0.3.
 - An OpenAI-compatible `/v1` for chat completions (streamed or whole), embeddings and the model list. Any OpenAI SDK works: change the base URL and the key.
 - Every request goes through the same steps as the chat: limits, routing, skills, PII, tools and the audit log. See [what happens to a request](docs/help/pages/administer/requests.md).
 - **Tools on the server and on the user's side.** MCP servers are registered once on the server. Agents can also connect over a WebSocket and offer local tools, such as the open document or files on the user's machine. Each session's policy decides where its tools run: on the server, locally or both.
-- SDKs for .NET (`Fadenstack.Client`, `Fadenstack.Agents`) and TypeScript (`@fadenstack/client`, `@fadenstack/agents`) run agents inside other software, with their tools and approvals on the user's device, governed by the server. They live in their own repositories and need a server newer than 0.4.1.
+- SDKs for .NET (`Fadenstack.Client`, `Fadenstack.Agents`) and TypeScript (`@fadenstack/client`, `@fadenstack/agents`) run agents inside other software, with their tools and approvals on the user's device, governed by the server. They live in their own repositories and need Fadenstack 0.7.1 or later.
 
 ### For IT: one console for all of it
 
@@ -171,7 +171,7 @@ The Help pages are in [docs/help](docs/help/README.md); they become `help.fadens
 | `cli` | Installer and management tool (`faden`) | PyPI (`fadenstack`) | Apache-2.0 |
 | `docs` | The guides linked above | | Apache-2.0; its fonts are SIL OFL 1.1, two templates are MIT ([notices](THIRD-PARTY-NOTICES.md)) |
 
-A release publishes the images to `ghcr.io/fadenstack/{gateway,backend,frontend,pii,mcp,skills,base}`, tagged with its version (`0.4.1`, `0.4`, `latest`). The CLI of a release deploys the images of its own version. The machines' runtime images are `ghcr.io/fadenstack/ray-runtime-x86_64` and `ray-runtime-gb10` (DGX Spark); the machines download them from your server, not from the internet.
+A release publishes the images to `ghcr.io/fadenstack/{gateway,backend,frontend,pii,mcp,skills,base}`, tagged with its version (`0.7.1`, `0.7`, `latest`). The CLI of a release deploys the images of its own version. The machines' runtime images are `ghcr.io/fadenstack/ray-runtime-x86_64` and `ray-runtime-gb10` (DGX Spark); the machines download them from your server, not from the internet.
 
 ## Building and developing
 

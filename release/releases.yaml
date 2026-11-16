@@ -30,17 +30,21 @@ releases:
   # and the release workflow would accept a 0.7.1 tag. At the release: finish it (the rest of 0.7.1, sign-in
   # by pairing and the clients' server side, see fadenstack-dev release/0.7.1-release-plan.md; the agent's
   # components version), then uncomment it.
+  # Owner, 16 Nov 2026: severity critical, with the EU reason, so installs on 0.4.4 to 0.7.0 are told to upgrade
+  # (installs hear the most urgent severity of every newer release). Release by 1 December 2026.
   #
   # - version: 0.7.1
   #   channel: stable
   #   date: ""
-  #   severity: normal
+  #   severity: critical
   #   summary: >-
-  #     Skills for agents: the organisation's skills assigned to the agents that should have them, from the
-  #     skill or the agent's page, and an agent may allow the person's own skills. The agent SDKs' tool
-  #     search runs without asking; a tool that reaches outside asks below Auto. The anonymous health check
-  #     says only "ok".
+  #     Installs on 0.4.4 to 0.7.0 should upgrade before 2 December 2026: from then, the EU AI Act (Article 5)
+  #     requires safeguards against generating harmful images, which those versions do not have. 0.7.1 turns
+  #     image generation off. It also brings skills for agents, plain http to MCP servers on the local network
+  #     where an agent allows it, and the agent SDKs' server side.
   #   highlights:
+  #     - "Image generation is turned off in this version. From 2 December 2026 the EU AI Act (Article 5) requires safeguards against generating harmful images, and this version does not have them yet. Image generation will return in a later version, with those safeguards. No picture model can be hosted; one hosted before keeps running but answers no requests (stop it to free its accelerators); apps and agents that ask for a picture get 403 images_disabled, and a chat model's picture is refused. No setting turns it on again."
+  #     - "A chat's file that cannot be deleted when its chat, project or account is erased no longer stays on disk with nothing pointing to it: its record waits, emptied of the file's name and text, and the next hourly cleanup tries again. The erase says it is partial (202 with partial and failed_files)."
   #     - "Local skills: an agent version can allow the skills kept on the person's own computer beside your organisation's (Agents → the agent → Local skills). Off unless allowed."
   #     - "Skills assigned to an agent reach that agent only, in every chat with it; assigned to everyone, a skill reaches every agent."
   #     - "Assigning skills to agents: a skill's Assignments tab and an agent's Skills tab pick from searchable lists and save the whole set at once. An agent the skill does not have yet must be one you can see; a deleted agent's assignments go."
