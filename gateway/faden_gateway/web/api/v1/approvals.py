@@ -66,9 +66,9 @@ class ApprovalAnswer(BaseModel):
     approved: bool
     #: What an approval covers: this call, this chat, or always on the device. Older clients send none.
     scope: ApprovalScope | None = None
-    #: The call's arguments' SHA-256 as the device's audit log hashes them (sdk/51 8.10): their JSON text
-    #: exactly as the tool call carried it, UTF-8, lowercase hex. Kept on the decision record as sent, never
-    #: recomputed.
+    #: The call's arguments' SHA-256 (sdk/51 8.10). Taken, but not needed: the gateway holds the call, shows
+    #: its arguments in ``faden.approval_required`` with ``argumentsSha256``, and its decision record keeps
+    #: that hash, its own.
     arguments_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
 
 

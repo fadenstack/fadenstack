@@ -444,9 +444,14 @@ def tool_denied_event(
     }}
 
 
+#: How much of a waiting call's arguments its approval event shows; ``argumentsSha256`` is of the whole text.
+APPROVAL_ARGUMENTS_CHARS = 8000
+
+
 def approval_event(
     approval_id: str, call: Mapping[str, Any], name: str, message: str, timeout_s: float,
     *, tool_class: str = "unknown", rule: bool = True, open_world: bool = False,
+    arguments: str | None = None, arguments_sha256: str | None = None,
 ) -> dict[str, Any]:
     """A gateway tool call waits for the user: answer at ``/v1/approvals/{approvalId}``.
 
@@ -454,7 +459,17 @@ def approval_event(
     policy) asks, rather than the chat's tool mode: then the client asks every time, never "for this chat".
     *open_world* (sent only when true): the gateway holds the tool open-world, so below Auto the client
     offers "for this chat" at most, never "always" (sdk/51 F08 §4).
+
+    *arguments* (sdk/51 8.10): the call's arguments as the person's app gets them anyway in
+    ``faden.gateway_round`` (PII values put back), so the card shows what is approved; cut at
+    :data:`APPROVAL_ARGUMENTS_CHARS` (``argumentsTruncated``). *arguments_sha256*: SHA-256 of the whole
+    text, which the decision record keeps and the device's audit log takes.
     """
+    shown = {}
+    if arguments is not None:
+        shown = {"arguments": arguments[:APPROVAL_ARGUMENTS_CHARS], "argumentsSha256": arguments_sha256}
+        if len(arguments) > APPROVAL_ARGUMENTS_CHARS:
+            shown["argumentsTruncated"] = True
     return {"type": "CUSTOM", "name": "faden.approval_required", "value": {
         "approvalId": approval_id,
         "toolCallId": call.get("id", ""),
@@ -464,6 +479,7 @@ def approval_event(
         "toolClass": tool_class,
         "rule": rule,
         **({"openWorld": True} if open_world else {}),
+        **shown,
     }}
 
 

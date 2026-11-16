@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import mimetypes
@@ -834,6 +835,19 @@ def _replayable(messages: list[dict[str, Any]], mapping: dict[str, str] | None) 
             restored["tool_calls"] = restore_tool_calls(restored["tool_calls"], mapping)
         out.append(restored)
     return out
+
+
+def _approval_arguments(call: dict[str, Any], mapping: dict[str, str] | None) -> tuple[str, str]:
+    """A waiting call's arguments as the person's app gets them, and their SHA-256 (sdk/51 8.10).
+
+    As ``faden.gateway_round`` gives them: PII values put back.
+    """
+    restored = restore_tool_calls([call], mapping)[0] if mapping else call
+    function = restored.get("function") if isinstance(restored, dict) else None
+    text = function.get("arguments") if isinstance(function, dict) else None
+    if not isinstance(text, str):
+        text = json.dumps(text if isinstance(text, dict) else {})
+    return text, hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def _mcp_arguments(req: _Prepared, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
@@ -2706,6 +2720,7 @@ class GatewayService:
                 continue
             approval_id = uuid.uuid4().hex
             tool_class, rule = self._class_of(req, name), _floor(req, name, verdict)
+            arguments, digest = _approval_arguments(call, req.token_mapping)
             pending = await gov.approvals.open(
                 tenant_id=auth.tenant_id, user_id=auth.user_id, approval_id=approval_id, timeout=timeout,
                 once_only=rule or tool_class in _ONCE_ONLY_CLASSES,
@@ -2714,6 +2729,7 @@ class GatewayService:
                 yield faden_events.sse_event(gov.approval_event(
                     approval_id, call, name, verdict.decision.message, timeout,
                     tool_class=tool_class, rule=rule, open_world=self._open_world_of(req, name),
+                    arguments=arguments, arguments_sha256=digest,
                 ))
                 while await pending.answer(within=keepalive) is None and not pending.expired:
                     yield gov.KEEPALIVE
@@ -2722,10 +2738,10 @@ class GatewayService:
             answered[call_id] = bool(answer and answer.approved)
             ctx = self._context(req, auth, request_id, gov.GovernanceStage.TOOL, tool_id=name)
             outcome = "expired" if answer is None else "approved" if answer.approved else "rejected"
+            # The gateway holds the arguments it showed: the record keeps its own hash, not a client's.
             await gov.record_on_own_session(
                 self.dao.session.bind, ctx, verdict, text=None, outcome=outcome,
-                answer_scope=answer.scope if answer else None,
-                arguments_sha256=answer.arguments_sha256 if answer else None,
+                answer_scope=answer.scope if answer else None, arguments_sha256=digest,
             )
 
     async def _recheck_after_wait(

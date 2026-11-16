@@ -631,8 +631,15 @@ async def test_a_waiting_call_takes_the_scopes_its_class_allows_and_the_scope_is
 async def test_an_answer_carries_the_arguments_hash_into_the_decision_record(
     fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """sdk/51 8.10: the record matches the device's audit log entry; a bad hash is refused, the call waits on."""
-    digest = "c0ffee" + "0" * 58
+    """sdk/51 8.10: the approval shows the call's arguments with their SHA-256, and the record keeps that hash.
+
+    The gateway holds the call, so it hashes the text itself: a hash the answer carries is not what is recorded.
+    A bad one is still refused, and the call waits on.
+    """
+    import hashlib  # noqa: PLC0415
+
+    sent_by_the_model = json.dumps({"query": "launch"})
+    expected = hashlib.sha256(sent_by_the_model.encode()).hexdigest()
     await _setup(fastapi_app, db_session)
     await _make(db_session, "write")
     _Knowledge(monkeypatch)
@@ -641,13 +648,39 @@ async def test_an_answer_carries_the_arguments_hash_into_the_decision_record(
     ask = client.post("/v1/chat/completions", headers=_headers(**EVENTS), json={
         "model": ALIAS, "stream": True, "messages": [{"role": "user", "content": "When?"}],
     })
-    _, sent = await asyncio.wait_for(asyncio.gather(ask, _post_answers(
+    r, sent = await asyncio.wait_for(asyncio.gather(ask, _post_answers(
         client, {"approved": True, "scope": "once", "arguments_sha256": "NOT-A-HASH"},
-        {"approved": True, "scope": "once", "arguments_sha256": digest},
+        {"approved": True, "scope": "once", "arguments_sha256": "c0ffee" + "0" * 58},
     )), 10)
     assert [s.status_code for s in sent] == [422, 200]
+    [shown] = [e["value"] for e in _faden(r.text) if e.get("name") == "faden.approval_required"]
+    assert (shown["arguments"], shown["argumentsSha256"]) == (sent_by_the_model, expected)
+    assert "argumentsTruncated" not in shown
     [approved] = [d for d in await _decisions(db_session) if d.outcome == "approved"]
-    assert approved.arguments_sha256 == digest
+    assert approved.arguments_sha256 == expected, "the gateway's own hash, not the answer's"
+
+
+def test_the_card_shows_the_persons_values_as_the_round_gives_them() -> None:
+    """In tokenize mode the model sent tokens; the card, and the hash, are of the text the person's app gets."""
+    import hashlib  # noqa: PLC0415
+
+    from faden_gateway.services.gateway.service import _approval_arguments  # noqa: PLC0415
+
+    call = {"id": "c1", "type": "function",
+            "function": {"name": "send_mail", "arguments": '{"to": "[EMAIL_1]", "body": "Hi [PERSON_1]"}'}}
+    text, digest = _approval_arguments(call, {"[EMAIL_1]": "ann@example.com", "[PERSON_1]": "Ann \"A\""})
+    assert text == '{"to": "ann@example.com", "body": "Hi Ann \\"A\\""}'
+    assert digest == hashlib.sha256(text.encode()).hexdigest()
+    assert _approval_arguments(call, None)[0] == call["function"]["arguments"], "no PII policy: as the model sent it"
+
+
+def test_long_arguments_are_cut_on_the_card_and_hashed_whole() -> None:
+    long_text = json.dumps({"text": "x" * (gov.APPROVAL_ARGUMENTS_CHARS + 100)})
+    event = gov.approval_event("a1", {"id": "c1"}, "write_doc", "OK?", 60, arguments=long_text,
+                               arguments_sha256="d" * 64)["value"]
+    assert len(event["arguments"]) == gov.APPROVAL_ARGUMENTS_CHARS and event["argumentsTruncated"] is True
+    assert event["argumentsSha256"] == "d" * 64
+    assert "arguments" not in gov.approval_event("a1", {"id": "c1"}, "x", "OK?", 60)["value"], "an older caller"
 
 
 def test_a_repeated_answer_is_the_same_answer_whatever_hash_it_carries() -> None:
