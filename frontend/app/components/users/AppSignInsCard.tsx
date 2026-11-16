@@ -13,9 +13,11 @@ import CardContent from "@mui/material/CardContent";
 import CardHeader from "@mui/material/CardHeader";
 import CircularProgress from "@mui/material/CircularProgress";
 import Divider from "@mui/material/Divider";
+import Stack from "@mui/material/Stack";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
+import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
@@ -23,6 +25,7 @@ import DevicesIcon from "@mui/icons-material/Devices";
 
 import { agentsApi, mySignIns, revokeSignIn, type AgentSignIn } from "~/api/agents";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { DeviceReportToggle } from "~/components/agents/DeviceReport";
 import { fmtAgo } from "~/components/dashboard/format";
 import { useAction } from "~/lib/useAction";
 import { useAsyncData } from "~/lib/useAsyncData";
@@ -77,32 +80,39 @@ export function AppSignInsCard() {
           </Typography>
         )}
         {data.signIns.length > 0 && (
-          <Table size="small" data-testid="app-sign-ins">
-            <TableHead>
-              <TableRow>
-                <TableCell>{t("app_sign_ins.col_app")}</TableCell>
-                <TableCell>{t("app_sign_ins.col_device")}</TableCell>
-                <TableCell>{t("app_sign_ins.col_signed_in")}</TableCell>
-                <TableCell>{t("app_sign_ins.col_last_used")}</TableCell>
-                <TableCell />
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {data.signIns.map((s) => (
-                <TableRow key={s.device_id}>
-                  <TableCell>{appName(s)}</TableCell>
-                  <TableCell>{device(s)}</TableCell>
-                  <TableCell>{new Date(s.created_at).toLocaleDateString(lang)}</TableCell>
-                  <TableCell>{s.last_used_at ? fmtAgo(s.last_used_at, lang) : t("app_sign_ins.never_used")}</TableCell>
-                  <TableCell align="right">
-                    <Button size="small" color="error" disabled={action.busy} onClick={() => setTarget(s)}>
-                      {t("app_sign_ins.sign_out")}
-                    </Button>
-                  </TableCell>
+          <TableContainer>
+            <Table size="small" data-testid="app-sign-ins">
+              <TableHead>
+                <TableRow>
+                  <TableCell>{t("app_sign_ins.col_app")}</TableCell>
+                  <TableCell>{t("app_sign_ins.col_device")}</TableCell>
+                  <TableCell>{t("app_sign_ins.col_signed_in")}</TableCell>
+                  <TableCell>{t("app_sign_ins.col_last_used")}</TableCell>
+                  <TableCell />
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHead>
+              <TableBody>
+                {data.signIns.map((s) => (
+                  <TableRow key={s.device_id}>
+                    <TableCell>{appName(s)}</TableCell>
+                    <TableCell sx={{ minWidth: 200 }}>
+                      <Stack spacing={0.5} alignItems="flex-start">
+                        <span>{device(s)}</span>
+                        <DeviceReportToggle device={s.device} />
+                      </Stack>
+                    </TableCell>
+                    <TableCell>{new Date(s.created_at).toLocaleDateString(lang)}</TableCell>
+                    <TableCell>{s.last_used_at ? fmtAgo(s.last_used_at, lang) : t("app_sign_ins.never_used")}</TableCell>
+                    <TableCell align="right">
+                      <Button size="small" color="error" disabled={action.busy} onClick={() => setTarget(s)}>
+                        {t("app_sign_ins.sign_out")}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
         )}
       </CardContent>
 

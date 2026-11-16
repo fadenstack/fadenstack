@@ -4745,10 +4745,21 @@
       "sign_out_confirm": "{{device}} ({{user}}) devra se reconnecter pour utiliser l'agent.",
       "suppressed": "Moins de {{k}} personnes ont utilisé cet agent sur cette période : ses chiffres ne sont donc pas affichés, ils désigneraient des personnes précises.",
       "day_suppressed": "Les jours avec moins de {{k}} personnes sont omis.",
-      "user_hidden": "Non affiché"
+      "user_hidden": "Non affiché",
+      "report_show": "Afficher le rapport de l’appareil",
+      "report_hide": "Masquer le rapport de l’appareil",
+      "arguments_sha256": "SHA-256 des arguments"
     },
     "back_to_chat": "Retour au chat",
-    "no_access": "Vous ne gérez aucun agent. Demandez à un administrateur de vous désigner comme responsable d'un agent."
+    "no_access": "Vous ne gérez aucun agent. Demandez à un administrateur de vous désigner comme responsable d'un agent.",
+    "off": "Éteint",
+    "turn_off": "Éteindre",
+    "turn_on": "Allumer",
+    "turn_off_title": "Éteindre {{name}} ?",
+    "turn_off_confirm": "Ses applications s’arrêtent aussitôt : chaque discussion et chaque appel d’outil est refusé avec « Votre organisation a éteint cet agent », et les autorisations en cours prennent fin. Les connexions restent, donc les applications refonctionnent dès que vous l’allumez.",
+    "off_notice": "Éteint le {{when}}.",
+    "off_notice_by": "Éteint le {{when}} par {{name}}.",
+    "off_notice_help": "Ses applications sont refusées tant qu’il n’est pas rallumé ; leurs connexions restent."
   },
   "governance": {
     "title": "Gouvernance",
@@ -5862,5 +5873,20 @@
     "title": "Génération d'images désactivée",
     "note": "La génération d'images est désactivée dans cette version. À partir du 2 décembre 2026, le règlement européen sur l'IA (article 5) exige des garde-fous contre la génération d'images préjudiciables, et cette version n'en dispose pas encore. La génération d'images reviendra dans une version ultérieure, avec ces garde-fous.",
     "short": "Désactivée dans cette version (règlement européen sur l'IA)"
+  },
+  "device_report": {
+    "title": "Rapport de l’appareil",
+    "system": "Système",
+    "app_version": "Version de l’application",
+    "plugins": "Modules",
+    "mcp_programs": "Programmes MCP",
+    "sha256": "SHA-256",
+    "file": "Fichier",
+    "unknown": "Inconnu",
+    "none_plugins": "Aucun module.",
+    "none_mcp": "Aucun programme MCP.",
+    "not_reported": "Pas encore signalé",
+    "reported": "Signalé le {{when}}",
+    "copy": "Copier le SHA-256 de {{name}}"
   }
 }

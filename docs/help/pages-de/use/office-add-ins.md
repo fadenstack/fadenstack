@@ -127,6 +127,7 @@ Damit melden Sie sich auf diesem Computer in allen vier Anwendungen ab.
 | Die Schaltfläche **Agent** ist ausgegraut | Das Dokument ist in der geschützten Ansicht geöffnet. Wählen Sie **Bearbeitung aktivieren**, dann **Agent**. |
 | In Outlook gibt es keine Gruppe **Fadenstack** | Sie verwenden das neue Outlook für Windows. Wechseln Sie zum klassischen Outlook zurück. |
 | **E-Mail oder Passwort stimmen nicht.** | Nur bei der Anmeldung mit Passwort: Prüfen Sie beides und melden Sie sich erneut an. Passwort vergessen? Siehe [Ihr Konto](account.md#forgot-your-password). |
+| Eine Meldung, dass Ihre Organisation diesen Agenten ausgeschaltet hat | Ihr Administrator hat den Agenten vorerst gestoppt. Ihre Unterhaltungen bleiben auf Ihrem Computer; sobald er wieder eingeschaltet ist, fragen Sie erneut. |
 | **Sie haben keinen Zugriff auf diesen Agenten.** | Ihr Administrator hat ihn Ihnen noch nicht freigegeben, oder die für diese Anwendung eingestellte Adresse des Agenten ist falsch. |
 | **Office is busy (a cell may be in edit mode, or a dialog is open). Finish that and try again.** | Verlassen Sie die Zelle oder schließen Sie das Dialogfeld, und fragen Sie erneut. |
 | **Der Agent konnte nicht starten**, mit einer Begründung | Wählen Sie **Erneut versuchen**. Wenn es weiterhin fehlschlägt, teilen Sie Ihrer IT-Abteilung mit, was in der Begründung steht. |

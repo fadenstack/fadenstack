@@ -532,12 +532,13 @@ async def test_the_plain_http_migration_upgrades_and_downgrades(dbsession: Async
     await connection.run_sync(run)
 
 
-def test_the_plain_http_migration_is_the_one_head() -> None:
-    """It follows the local skills migration (``l0c4lsk``)."""
+def test_the_plain_http_migration_follows_the_local_skills_migration() -> None:
+    """It follows the local skills migration (``l0c4lsk``); the off-switch's (``0ffsw1t``) is the one head."""
     from alembic.script import ScriptDirectory
 
     scripts = ScriptDirectory(str(MIGRATIONS.parent))
-    assert scripts.get_heads() == ["pl41nht"]
+    assert scripts.get_heads() == ["0ffsw1t"]
+    assert scripts.get_revision("0ffsw1t").down_revision == "pl41nht"
     assert scripts.get_revision("pl41nht").down_revision == "l0c4lsk"
 
 

@@ -28,7 +28,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from faden_gateway.services.gateway.agents import AgentRequest
 from faden_gateway.services.gateway.auth import AuthContext, get_auth_context
@@ -66,12 +66,17 @@ class ApprovalAnswer(BaseModel):
     approved: bool
     #: What an approval covers: this call, this chat, or always on the device. Older clients send none.
     scope: ApprovalScope | None = None
+    #: The call's arguments' SHA-256 as the device's audit log hashes them (sdk/51 8.10): their JSON text
+    #: exactly as the tool call carried it, UTF-8, lowercase hex. Kept on the decision record as sent, never
+    #: recomputed.
+    arguments_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
 
 
 async def _answer(auth: AuthContext, approval_id: str, body: ApprovalAnswer) -> JSONResponse:
     answered = await approvals.answer(
         tenant_id=auth.tenant_id, user_id=auth.user_id, approval_id=approval_id, approved=body.approved,
         scope=body.scope, require_scope=settings.approvals_require_answer_scope,
+        arguments_sha256=body.arguments_sha256,
     )
     if answered is not Answered.TAKEN:
         status, code, message = _REFUSED[answered]

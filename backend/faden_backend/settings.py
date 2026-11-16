@@ -350,8 +350,9 @@ class Settings(BaseSettings):
     api_token_use_retention_days: int = 90
 
     # Agent tokens, tenant-wide (system settings "agents.*"). Enterprise can
-    # set them per agent, under a ceiling.
-    agent_access_token_ttl_s: int = 600
+    # set them per agent, under a ceiling. An access token lives 300 s at most
+    # (services/agents/tokens.py ACCESS_TOKEN_MAX_S), whatever is set.
+    agent_access_token_ttl_s: int = 300
     agent_refresh_token_ttl_s: int = 30 * 24 * 3600
     agent_refresh_idle_s: int = 7 * 24 * 3600
 

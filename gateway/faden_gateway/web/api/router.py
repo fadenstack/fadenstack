@@ -1,6 +1,7 @@
 from fastapi.routing import APIRouter
 
 from faden_gateway.web.api import docs, monitoring
+from faden_gateway.web.api.internal_agent_grants import router as internal_agent_grants_router
 from faden_gateway.web.api.internal_erase import router as internal_erase_router
 from faden_gateway.web.api.internal_evidence import router as internal_evidence_router
 from faden_gateway.web.api.v1 import router as v1_router
@@ -30,3 +31,5 @@ public_router.include_router(attachments_router)
 public_router.include_router(internal_erase_router)
 # A grant's evidence for the backend's auditors (decrypted here): signed grants only.
 public_router.include_router(internal_evidence_router)
+# An agent turned off or on again: its running grants end. Signed grants only.
+public_router.include_router(internal_agent_grants_router)

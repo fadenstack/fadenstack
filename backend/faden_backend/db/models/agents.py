@@ -151,6 +151,19 @@ class Agent(Base):
     restricted_by: Mapped[list[str]] = mapped_column(
         ARRAY(String(64)), nullable=False, default=list, server_default="{}",
     )
+    #: When someone who manages the agent turned it off (sdk/51 8.3): its apps are refused with
+    #: ``agent_disabled`` until it is turned on again; its sign-ins stay. ``None``: on.
+    turned_off_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    turned_off_by: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("user.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    @property
+    def enabled(self) -> bool:
+        """Whether the agent is on (not turned off)."""
+        return self.turned_off_at is None
 
 
 class AgentVersion(Base):

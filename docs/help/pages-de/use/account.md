@@ -80,6 +80,9 @@ Eine Anmeldung, die hier schon zu einem anderen Konto gehört, wird nicht mit Ih
 **Mein Profil** zeigt unter **Angemeldete Apps** jede App und jedes Gerät, auf dem Sie angemeldet sind: Die
 Desktop-App, die Office-Add-ins und die Browser-Erweiterung melden sich jeweils einmal pro Gerät an. Zu jeder sehen
 Sie die **App**, das **Gerät**, wann Sie **Angemeldet** wurden und wann sie **Zuletzt verwendet** wurde.
+**Gerätebericht anzeigen** zeigt, was die App zuletzt über das Gerät gemeldet hat: das System, die Version der App
+und die Plugins und MCP-Programme, die sie lädt, jedes mit seinem SHA-256. Die Administratoren Ihrer Organisation
+sehen dasselbe für die Geräte, die bei ihren Agenten angemeldet sind.
 
 Um eine zu beenden, wählen Sie daneben **Abmelden** und bestätigen Sie. Die App auf diesem Gerät muss dann erneut
 angemeldet werden (siehe [Eine Desktop-App anmelden](sign-in-an-app.md)). Beenden Sie die Anmeldung eines Computers,

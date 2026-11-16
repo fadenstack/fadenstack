@@ -4743,10 +4743,21 @@
       "sign_out_confirm": "{{device}} ({{user}}) must sign in again to use the agent.",
       "suppressed": "Fewer than {{k}} people used this agent in this period, so its figures are not shown: they would point to single people.",
       "day_suppressed": "Days with fewer than {{k}} people are left out.",
-      "user_hidden": "Not shown"
+      "user_hidden": "Not shown",
+      "report_show": "Show device report",
+      "report_hide": "Hide device report",
+      "arguments_sha256": "Arguments SHA-256"
     },
     "back_to_chat": "Back to the chat",
-    "no_access": "You do not look after any agents. Ask an administrator to make you a maintainer of one."
+    "no_access": "You do not look after any agents. Ask an administrator to make you a maintainer of one.",
+    "off": "Off",
+    "turn_off": "Turn off",
+    "turn_on": "Turn on",
+    "turn_off_title": "Turn off {{name}}?",
+    "turn_off_confirm": "Its apps stop at once: every chat and tool call is refused with “Your organisation turned this agent off”, and running grants end. Sign-ins stay, so the apps work again as soon as you turn it on.",
+    "off_notice": "Turned off {{when}}.",
+    "off_notice_by": "Turned off {{when}} by {{name}}.",
+    "off_notice_help": "Its apps are refused until it is turned on again; their sign-ins stay."
   },
   "governance": {
     "title": "Governance",
@@ -5860,5 +5871,20 @@
     "title": "Image generation is off",
     "note": "Image generation is turned off in this version. From 2 December 2026 the EU AI Act (Article 5) requires safeguards against generating harmful images, and this version does not have them yet. Image generation will return in a later version, with those safeguards.",
     "short": "Off in this version (EU AI Act)"
+  },
+  "device_report": {
+    "title": "Device report",
+    "system": "System",
+    "app_version": "App version",
+    "plugins": "Plugins",
+    "mcp_programs": "MCP programs",
+    "sha256": "SHA-256",
+    "file": "File",
+    "unknown": "Unknown",
+    "none_plugins": "No plugins.",
+    "none_mcp": "No MCP programs.",
+    "not_reported": "Not reported yet",
+    "reported": "Reported {{when}}",
+    "copy": "Copy SHA-256 of {{name}}"
   }
 }

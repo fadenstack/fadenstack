@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { hasFeature } from "~/api/about";
 import { AGENT_TOKEN_LIFETIMES, agentsApi } from "~/api/agents";
+import { ApiError } from "~/api/http";
 import { agentSkills, skillsStatus } from "~/api/skills";
 import { agentFixture, appSeenFixture, appsReviewFixture, toolReviewFixture, versionFixture } from "~/test/agentFixtures";
 import { renderPage } from "~/test/renderPage";
@@ -26,6 +27,9 @@ vi.mock("~/api/agents", async (importOriginal) => {
       addVersion: vi.fn(),
       publish: vi.fn(),
       retire: vi.fn(),
+      turnOff: vi.fn(),
+      turnOn: vi.fn(),
+      namePrincipals: vi.fn(),
       remove: vi.fn(),
       apps: vi.fn(),
     },
@@ -171,6 +175,97 @@ describe("AgentDetail", () => {
 
     await waitFor(() => expect(api.retire).toHaveBeenCalledWith("excel-assistant"));
     expect(await screen.findByRole("button", { name: "Restore" })).toBeInTheDocument();
+  });
+
+  describe("turning the agent off and on", () => {
+    const OFF = { enabled: false, turned_off_at: "2026-11-16T09:30:00Z", turned_off_by: null };
+
+    it("asks first, then turns the agent off and reloads it", async () => {
+      api.turnOff.mockResolvedValue(agentFixture(OFF));
+      openAgent();
+
+      await userEvent.click(await screen.findByRole("button", { name: "Turn off" }));
+      const dialog = await screen.findByRole("dialog");
+      expect(within(dialog).getByText("Turn off Excel assistant?")).toBeInTheDocument();
+      expect(within(dialog).getByText(/Your organisation turned this agent off/)).toBeInTheDocument();
+      expect(api.turnOff).not.toHaveBeenCalled();
+      api.get.mockResolvedValue(agentFixture(OFF));
+      await userEvent.click(within(dialog).getByRole("button", { name: "Turn off" }));
+
+      await waitFor(() => expect(api.turnOff).toHaveBeenCalledWith("excel-assistant"));
+      expect(await screen.findByRole("button", { name: "Turn on" })).toBeInTheDocument();
+      expect(screen.getByTestId("agent-off-notice")).toBeInTheDocument();
+    });
+
+    it("turns on without asking", async () => {
+      api.get.mockResolvedValue(agentFixture(OFF));
+      api.turnOn.mockImplementation(async () => {
+        api.get.mockResolvedValue(agentFixture());
+        return agentFixture();
+      });
+      openAgent();
+
+      await userEvent.click(await screen.findByRole("button", { name: "Turn on" }));
+      await waitFor(() => expect(api.turnOn).toHaveBeenCalledWith("excel-assistant"));
+      expect(await screen.findByRole("button", { name: "Turn off" })).toBeInTheDocument();
+      expect(screen.queryByTestId("agent-off-notice")).not.toBeInTheDocument();
+    });
+
+    it("shows the server's text when turning on is refused", async () => {
+      const detail = "The agent stays off: the gateway could not end its grants from before. Try again in a moment.";
+      api.get.mockResolvedValue(agentFixture(OFF));
+      api.turnOn.mockRejectedValue(new ApiError(detail, 503));
+      openAgent();
+
+      await userEvent.click(await screen.findByRole("button", { name: "Turn on" }));
+      expect(await screen.findByText(detail)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Turn on" })).toBeInTheDocument();
+    });
+
+    it("shows the Off chip and a warning with the time while it is off, for those who cannot manage it too", async () => {
+      api.get.mockResolvedValue(agentFixture({ ...OFF, can_manage: false }));
+      openAgent();
+
+      const notice = await screen.findByTestId("agent-off-notice");
+      expect(notice).toHaveTextContent(/Turned off .*2026.*\./);
+      expect(notice).toHaveTextContent("Its apps are refused until it is turned on again; their sign-ins stay.");
+      expect(notice).not.toHaveTextContent(" by ");
+      expect(screen.getByText("Off")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Turn on" })).not.toBeInTheDocument();
+    });
+
+    it("names who turned it off, when told", async () => {
+      api.namePrincipals.mockResolvedValue([{ type: "user", id: "u-boss", label: "boss@plant.example" }]);
+      api.get.mockResolvedValue(agentFixture({ ...OFF, turned_off_by: "u-boss" }));
+      openAgent();
+
+      expect(await screen.findByText(/by boss@plant\.example\./)).toBeInTheDocument();
+    });
+
+    it("has no Off chip or notice while it is on", async () => {
+      openAgent();
+      await screen.findByRole("button", { name: "Turn off" });
+      expect(screen.queryByText("Off")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("agent-off-notice")).not.toBeInTheDocument();
+    });
+
+    it("offers neither button on a retired agent or to someone who cannot manage it", async () => {
+      api.get.mockResolvedValue(agentFixture({ status: "retired" }));
+      const { unmount } = renderPage(<AgentDetail slug="excel-assistant" basePath="/admin/agents" />, {
+        path: "/admin/agents/:slug",
+        initialPath: "/admin/agents/excel-assistant",
+      });
+      await screen.findByRole("button", { name: "Restore" });
+      expect(screen.queryByRole("button", { name: "Turn off" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Turn on" })).not.toBeInTheDocument();
+      unmount();
+
+      api.get.mockResolvedValue(agentFixture({ can_manage: false }));
+      openAgent();
+      await screen.findByText(/You can see this agent but not change it/);
+      expect(screen.queryByRole("button", { name: "Turn off" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Turn on" })).not.toBeInTheDocument();
+    });
   });
 
   it("counts on the Apps tab what the gateway still holds back, and shows it there", async () => {

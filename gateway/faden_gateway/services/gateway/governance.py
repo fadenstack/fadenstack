@@ -47,7 +47,7 @@ import secrets
 import time
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, Literal, Protocol
 
@@ -330,10 +330,12 @@ async def record(
     text: str | None,
     outcome: str | None = None,
     answer_scope: str | None = None,
+    arguments_sha256: str | None = None,
 ) -> tuple[uuid.UUID, str | None]:
     """Write the decision record (not committed); its id and the text's HMAC.
 
-    *answer_scope*: what the user's answer to a waiting call said it covers.
+    *answer_scope*: what the user's answer to a waiting call said it covers. *arguments_sha256*: the call's
+    arguments' SHA-256 as the answering client hashed them (sdk/51 8.10), kept as sent.
     """
     digest = content_hmac(await keyring.key(session, ctx.tenant_id), text) if text else None
     row = PolicyDecisionRecord(
@@ -346,6 +348,7 @@ async def record(
         stage=ctx.stage.value,
         outcome=outcome or verdict.decision.outcome,
         answer_scope=answer_scope,
+        arguments_sha256=arguments_sha256,
         policy_id=verdict.decision.policy_id,
         policy_name=verdict.decision.policy_name,
         category=verdict.decision.category,
@@ -362,7 +365,7 @@ async def record(
 
 async def record_on_own_session(
     bind: Any, ctx: GovernanceContext, verdict: Verdict, *, text: str | None, outcome: str | None = None,
-    answer_scope: str | None = None,
+    answer_scope: str | None = None, arguments_sha256: str | None = None,
 ) -> tuple[uuid.UUID | None, str | None]:
     """:func:`record`, committed on a session of its own; ``(None, None)`` when the database fails.
 
@@ -371,7 +374,10 @@ async def record_on_own_session(
     """
     try:
         async with AsyncSession(bind, expire_on_commit=False) as own:
-            found = await record(own, ctx, verdict, text=text, outcome=outcome, answer_scope=answer_scope)
+            found = await record(
+                own, ctx, verdict, text=text, outcome=outcome, answer_scope=answer_scope,
+                arguments_sha256=arguments_sha256,
+            )
             await own.commit()
             return found
     except Exception:
@@ -648,6 +654,9 @@ class Answer:
     approved: bool
     #: What the approval covers; ``None`` from a client that does not say.
     scope: str | None = None
+    #: The call's arguments' SHA-256 as the answering client hashed them (sdk/51 8.10), for the decision
+    #: record. Not part of what the answer says: the same answer sent again with another is still the same.
+    arguments_sha256: str | None = field(default=None, compare=False)
 
 
 class Answered(StrEnum):
@@ -720,9 +729,13 @@ def _record(stored: Any) -> _Taken | None:
     if not isinstance(said, dict) or said.get("ended") or not isinstance(said.get("approved"), bool):
         return None
     scope = said.get("scope")
+    digest = said.get("arguments_sha256")
     return _Taken(
         tenant_id=str(said.get("tenant") or ""), user_id=str(said.get("user") or ""),
-        answer=Answer(approved=said["approved"], scope=scope if isinstance(scope, str) else None),
+        answer=Answer(
+            approved=said["approved"], scope=scope if isinstance(scope, str) else None,
+            arguments_sha256=digest if isinstance(digest, str) else None,
+        ),
     )
 
 
@@ -924,14 +937,15 @@ class Approvals:
 
     async def answer(
         self, *, tenant_id: str, user_id: str, approval_id: str, approved: bool, scope: str | None = None,
-        require_scope: bool = False,
+        require_scope: bool = False, arguments_sha256: str | None = None,
     ) -> Answered:
         """Answer a call of this user's. A refused answer leaves the call waiting for another.
 
         The first answer taken stands. The same answer sent again is taken as the first was, also once the
         call no longer waits (for :data:`ANSWER_KEPT_S`); another answer is :attr:`Answered.ALREADY_ANSWERED`.
+        *arguments_sha256* goes with the answer into the decision record; a repeat's is not taken.
         """
-        said = Answer(approved=approved, scope=scope)
+        said = Answer(approved=approved, scope=scope, arguments_sha256=arguments_sha256)
         if self._redis is None:
             return self._answer_here(tenant_id, user_id, approval_id, said, require_scope=require_scope)
         local = self._waiting.get(approval_id)
@@ -943,7 +957,10 @@ class Approvals:
         refused = refusal(once_only=owner[2], approved=approved, scope=scope, require_scope=require_scope)
         if refused is not None:
             return refused
-        record = json.dumps({"tenant": tenant_id, "user": user_id, "approved": approved, "scope": scope})
+        record = json.dumps({
+            "tenant": tenant_id, "user": user_id, "approved": approved, "scope": scope,
+            "arguments_sha256": arguments_sha256,
+        })
         if not await self._redis.set(_answer_key(approval_id), record, nx=True, ex=ANSWER_KEPT_S):
             # Answered already, or the wait ended first: the stored record says which.
             return _repeat(_record(await self._redis.get(_answer_key(approval_id))), tenant_id, user_id, said)

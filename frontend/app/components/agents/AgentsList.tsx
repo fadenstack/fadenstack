@@ -22,7 +22,7 @@ import { PageHeader } from "~/components/dashboard/kit";
 import { useAsyncData } from "~/lib/useAsyncData";
 import { useCan } from "~/lib/useCan";
 
-import { AgentStatusChip, AgentVersionChips } from "./AgentChips";
+import { AgentOffChip, AgentStatusChip, AgentVersionChips } from "./AgentChips";
 import { CreateAgentDialog } from "./CreateAgentDialog";
 import { agentPath } from "./agentPaths";
 
@@ -78,7 +78,12 @@ export function AgentsList({ basePath, back }: AgentsListProps) {
       label: t("common.status"),
       sortable: true,
       sortValue: (a) => STATUSES.indexOf(a.status),
-      render: (a) => <AgentStatusChip status={a.status} />,
+      render: (a) => (
+        <Stack direction="row" spacing={0.5} useFlexGap flexWrap="wrap">
+          <AgentStatusChip status={a.status} />
+          <AgentOffChip agent={a} />
+        </Stack>
+      ),
       minWidth: 110,
     },
     {

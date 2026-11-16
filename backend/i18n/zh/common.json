@@ -4745,10 +4745,21 @@
       "sign_out_confirm": "{{device}}（{{user}}）需要重新登录才能使用该智能体。",
       "suppressed": "此期间使用该智能体的人数少于 {{k}}，因此不显示其数据：这些数据会指向具体的个人。",
       "day_suppressed": "人数少于 {{k}} 的日期未显示。",
-      "user_hidden": "不显示"
+      "user_hidden": "不显示",
+      "report_show": "显示设备报告",
+      "report_hide": "隐藏设备报告",
+      "arguments_sha256": "参数的 SHA-256"
     },
     "back_to_chat": "返回聊天",
-    "no_access": "您没有负责任何智能体。请让管理员将您设为某个智能体的维护者。"
+    "no_access": "您没有负责任何智能体。请让管理员将您设为某个智能体的维护者。",
+    "off": "已关闭",
+    "turn_off": "关闭",
+    "turn_on": "开启",
+    "turn_off_title": "关闭 {{name}}？",
+    "turn_off_confirm": "它的应用会立即停止：每次聊天和工具调用都会被拒绝，并提示“您的组织已关闭此智能体”，正在进行的授权也会结束。登录会保留，因此您重新开启后应用即可恢复使用。",
+    "off_notice": "关闭于 {{when}}。",
+    "off_notice_by": "{{name}} 于 {{when}} 关闭。",
+    "off_notice_help": "在重新开启之前，它的应用会被拒绝；其登录会保留。"
   },
   "governance": {
     "title": "治理",
@@ -5862,5 +5873,20 @@
     "title": "图像生成已关闭",
     "note": "此版本已关闭图像生成。自 2026 年 12 月 2 日起，欧盟《人工智能法》（第 5 条）要求具备防止生成有害图像的保障措施，而此版本尚不具备。图像生成将在后续版本中随这些保障措施一起恢复。",
     "short": "此版本已关闭（欧盟《人工智能法》）"
+  },
+  "device_report": {
+    "title": "设备报告",
+    "system": "系统",
+    "app_version": "应用版本",
+    "plugins": "插件",
+    "mcp_programs": "MCP 程序",
+    "sha256": "SHA-256",
+    "file": "文件",
+    "unknown": "未知",
+    "none_plugins": "没有插件。",
+    "none_mcp": "没有 MCP 程序。",
+    "not_reported": "尚未报告",
+    "reported": "报告于 {{when}}",
+    "copy": "复制 {{name}} 的 SHA-256"
   }
 }

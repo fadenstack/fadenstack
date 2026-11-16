@@ -196,7 +196,26 @@ async def agent_request(
     request: Request,
     verified: Annotated[tuple[dict[str, Any], str], Depends(get_agent_route_claims)],
 ) -> tuple[AuthContext, AgentRequest]:
-    """Who is calling which agent, once the token and access are checked."""
+    """Who is calling which agent, once the token and access are checked; refused while the agent is off."""
+    return await _agent_request(agent, request, verified, while_off=False)
+
+
+async def agent_report_request(
+    agent: str,
+    request: Request,
+    verified: Annotated[tuple[dict[str, Any], str], Depends(get_agent_route_claims)],
+) -> tuple[AuthContext, AgentRequest]:
+    """The same, for what an agent that is off still takes (sdk/51 8.3).
+
+    Its profile, which says it is off, and its apps' events and manifests, so the record of what a device did
+    and its inventory keep coming.
+    """
+    return await _agent_request(agent, request, verified, while_off=True)
+
+
+async def _agent_request(
+    agent: str, request: Request, verified: tuple[dict[str, Any], str], *, while_off: bool,
+) -> tuple[AuthContext, AgentRequest]:
     claims, token = verified
     directory = getattr(request.app.state, "agent_directory", None)
     if directory is None:
@@ -249,7 +268,9 @@ async def agent_request(
         )
     groups_resolver = getattr(request.app.state, "group_membership_resolver", None)
     groups = (await groups_resolver.resolve(auth.user_id) or ()) if groups_resolver is not None else ()
-    decision = await decide(profile, user_id=auth.user_id, user=user, groups=groups, registry=registry)
+    decision = await decide(
+        profile, user_id=auth.user_id, user=user, groups=groups, registry=registry, while_off=while_off,
+    )
     if not decision.allowed:
         raise GatewayError(
             status_code=decision.status_code,
@@ -471,10 +492,13 @@ class UserSettings(BaseModel):
 @router.get("/v1/agents/{agent}/profile")
 async def agent_profile(
     request: Request,
-    caller: Annotated[tuple[AuthContext, AgentRequest], Depends(agent_request)],
+    caller: Annotated[tuple[AuthContext, AgentRequest], Depends(agent_report_request)],
     dao: Annotated[GatewayDAO, Depends()],
 ) -> dict[str, Any]:
-    """What the SDK caches about the agent: never its instructions, only their hash."""
+    """What the SDK caches about the agent: never its instructions, only their hash.
+
+    Also while the agent is turned off: ``enabled`` says so, and its other routes answer ``agent_disabled``.
+    """
     auth, agent = caller
     profile = agent.agent
     language = await _user_language(request, auth.user_id)
@@ -527,6 +551,9 @@ async def agent_profile(
         "name": profile.name,
         "version": profile.version,
         "draft": not profile.published,
+        # Whether the agent is on (sdk/51 8.3). Turned off, every route of it but this one, the events and the
+        # manifest answers 403 ``agent_disabled``; the SDK stops its turns and grants and says so.
+        "enabled": profile.enabled,
         "model": profile.model_alias,
         # Whether that model sees pictures, so the SDK sends a tool's picture (a rendered slide) or not.
         "vision": await dao.alias_vision(profile.model_alias) if profile.model_alias else None,
@@ -889,6 +916,12 @@ class _Event(BaseModel):
     conversation_id: str | None = Field(default=None, max_length=128, pattern=_ID.pattern)
 
 
+#: The SHA-256 of a call's arguments as the device's audit log hashes them (sdk/51 8.10): the arguments' JSON
+#: text exactly as the tool call carried it, UTF-8, in lowercase hex. Kept as sent, never recomputed: it ties
+#: the server's record to the device's log entry, and carries nothing of the arguments.
+_ARGUMENTS_SHA256 = r"^[0-9a-f]{64}$"
+
+
 class ToolExecuted(_Event):
     """A tool ran on the device: which, where, how long, and how it ended."""
 
@@ -900,6 +933,7 @@ class ToolExecuted(_Event):
     outcome: Literal["ok", "error", "denied", "cancelled"]
     #: What started the call: the model, the user, or a UI module (``module:<plugin>``).
     trigger: str | None = Field(default=None, pattern=_TRIGGER_PATTERN)
+    arguments_sha256: str | None = Field(default=None, pattern=_ARGUMENTS_SHA256)
 
 
 class ApprovalDecided(_Event):
@@ -916,6 +950,7 @@ class ApprovalDecided(_Event):
     grant_id: uuid.UUID | None = None
     #: What started the call: the model, the user, or a UI module (``module:<plugin>``).
     trigger: str | None = Field(default=None, pattern=_TRIGGER_PATTERN)
+    arguments_sha256: str | None = Field(default=None, pattern=_ARGUMENTS_SHA256)
 
 
 class LocalMcpAttached(_Event):
@@ -961,6 +996,17 @@ ClientEvent = Annotated[
 ]
 
 
+def _event_data(event: BaseModel) -> dict[str, Any]:
+    """What an event keeps beside its type and times.
+
+    ``arguments_sha256`` only when sent, so an older SDK's events keep their shape.
+    """
+    data = event.model_dump(mode="json", exclude={"type", "occurred_at", "conversation_id"})
+    if data.get("arguments_sha256") is None:
+        data.pop("arguments_sha256", None)
+    return data
+
+
 class ClientEvents(BaseModel):
     """A batch of what the SDK did -- names, counts, outcomes; never content."""
 
@@ -972,10 +1018,10 @@ class ClientEvents(BaseModel):
 @router.post("/v1/agents/{agent}/events", status_code=status.HTTP_202_ACCEPTED, response_model=None)
 async def agent_events(
     request: Request,
-    caller: Annotated[tuple[AuthContext, AgentRequest], Depends(agent_request)],
+    caller: Annotated[tuple[AuthContext, AgentRequest], Depends(agent_report_request)],
     dao: Annotated[GatewayDAO, Depends()],
 ) -> Response:
-    """Store the SDK's content-free events for usage and audit."""
+    """Store the SDK's content-free events for usage and audit; also while the agent is turned off."""
     auth, agent = caller
     try:
         batch = ClientEvents.model_validate_json(await request.body())
@@ -994,7 +1040,7 @@ async def agent_events(
             device_id=agent.device_id,
             conversation_id=event.conversation_id or agent.conversation_id,
             type=event.type,
-            data=event.model_dump(mode="json", exclude={"type", "occurred_at", "conversation_id"}),
+            data=_event_data(event),
             occurred_at=event.occurred_at,
         )
         for event in batch.events
@@ -1056,13 +1102,17 @@ async def agent_user(
 @router.put("/v1/agents/{agent}/manifest", response_model=None)
 async def agent_manifest(
     request: Request,
-    caller: Annotated[tuple[AuthContext, AgentRequest], Depends(agent_request)],
+    caller: Annotated[tuple[AuthContext, AgentRequest], Depends(agent_report_request)],
     dao: Annotated[GatewayDAO, Depends()],
 ) -> Response:
     """Keep what the app brings -- its tools with their classes, its context and defaults -- for review.
 
     Sent by the SDK when it starts; the same manifest again is only counted. Nothing in it changes what the
     agent may do: its maintainers compare it with the contract in the console and take in what they accept.
+
+    Its ``device`` block (sdk/51 8.3) is the device's, not the app's: kept per device, the latest report
+    replacing the one before, and left out of the manifest compared across devices (and of its ``sha256``).
+    Taken also while the agent is turned off.
     """
     auth, agent = caller
     body = await request.body()
@@ -1079,6 +1129,12 @@ async def agent_manifest(
         return error_response(
             status_code=400, message=validation_message(exc), error_type="invalid_request_error",
             code="invalid_manifest",
+        )
+    if manifest.device is not None and agent.device_id:
+        # A token with no device (a maintainer's own) has no device to keep it for.
+        await agent_manifests.keep_device(
+            dao.session, tenant_id=auth.tenant_id, agent_id=agent.id, user_id=auth.user_id,
+            device_id=agent.device_id, device=manifest.device,
         )
     try:
         digest, new = await agent_manifests.record(

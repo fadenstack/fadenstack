@@ -266,12 +266,18 @@ async def list_decisions(
     since: datetime | None = None,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
 ) -> dict[str, Any]:
-    """What the checks decided, newest first -- never the text, and not the policy's name (EE)."""
+    """What the checks decided, newest first -- never the text, and not the policy's name (EE).
+
+    With a person's answer to a call that waited: what it covered (``answer_scope``) and the call's
+    arguments' SHA-256 as their device hashed them (``arguments_sha256``, sdk/51 8.10), which matches the
+    device's own audit log.
+    """
     async with _gateway(request)() as db:
         rows = await db.execute(
             text(
                 "SELECT id, user_id, agent_id, session_id, request_id, stage, outcome, policy_id, category, "
-                'message, "check", content_hmac, tool_id, created_at FROM llm_gateway_policy_decision '
+                'message, "check", content_hmac, tool_id, answer_scope, arguments_sha256, created_at '
+                "FROM llm_gateway_policy_decision "
 
                 "WHERE tenant_id = :tenant_id "
                 "AND (CAST(:stage AS TEXT) IS NULL OR stage = :stage) "

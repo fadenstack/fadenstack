@@ -64,6 +64,9 @@ export function agentFixture(overrides: Partial<Agent> = {}): Agent {
     can_manage: true,
     created_at: "2026-09-30T10:00:00Z",
     updated_at: "2026-09-30T10:00:00Z",
+    enabled: true,
+    turned_off_at: null,
+    turned_off_by: null,
     ...overrides,
   };
 }

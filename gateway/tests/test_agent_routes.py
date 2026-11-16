@@ -1074,8 +1074,9 @@ def _row(**overrides: Any) -> dict[str, Any]:
     """A directory row as ``_AGENT_SQL`` returns it."""
     row: dict[str, Any] = {
         "id": AGENT_ID, "tenant_id": "tenant-a", "slug": "eplan-assistant", "name": "EPLAN assistant",
-        "status": "published", "published": True, "restricted_by": [], "version": 3, "instructions": INSTRUCTIONS,
-        "model_alias": ALIAS, "knowledge": "[]", "server_tools": None, "host_tool_contract": "[]",
+        "status": "published", "published": True, "restricted_by": [], "enabled": True, "version": 3,
+        "instructions": INSTRUCTIONS, "model_alias": ALIAS, "knowledge": "[]", "server_tools": None,
+        "host_tool_contract": "[]",
         "local_mcp_mode": "disable", "local_mcp_plain_http": "deny", "local_skills_mode": "disable", "ui": "{}",
         "pii": "{}", "approvals": "{}", "extensions": "{}", "maintainers": [], "grant_users": [], "grant_groups": [],
     }

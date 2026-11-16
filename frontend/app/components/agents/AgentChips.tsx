@@ -19,6 +19,13 @@ export function AgentStatusChip({ status }: { status: AgentStatus }) {
   return <Chip size="small" color={STATUS_COLOR[status]} label={t(`agents.status.${status}`)} />;
 }
 
+/** "Off", only while the agent is turned off (its apps are refused). */
+export function AgentOffChip({ agent }: { agent: Pick<Agent, "enabled"> }) {
+  const { t } = useTranslation();
+  if (agent.enabled !== false) return null;
+  return <Chip size="small" color="error" variant="outlined" label={t("agents.off")} />;
+}
+
 /** "v3 live" and, when a newer one waits, "v4 not published". */
 export function AgentVersionChips({ agent }: { agent: Agent }) {
   const { t } = useTranslation();

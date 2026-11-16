@@ -60,7 +60,7 @@ Die Seite des Agenten öffnet sich. Sein Status in der Liste ist **Entwurf**, **
 | **Versionen** | Jede Version. Mit **Veröffentlichen** eine Version veröffentlichen, mit **Zurücksetzen** zu einer früheren zurückkehren, unter **Änderungen** die Unterschiede sehen. |
 | **Zugriff** | **Wer ihn nutzen darf**, die Liste **Ausgeschlossene Personen** <span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span> und seine **Betreuer** (mit Enterprise: **Betreuer und Prüfer** <span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span>). **Zugriff prüfen** zeigt, ob eine Person den Agenten nutzen darf, und warum. |
 | **Skills** | Die Skills der Organisation, die in die Chats des Agenten kommen, ohne dass jemand sie auswählt: die allen zugewiesenen und die diesem Agenten zugewiesenen. Für alle, die den Agenten verwalten. |
-| **Aktivität** | Nutzung über einen Zeitraum (Anfragen, Fehler, Tokens, Benutzer, Unterhaltungen: nur Zahlen, nie Inhalte), nur, wenn mindestens fünf Personen den Agenten im Zeitraum genutzt haben; der Eigentümer eines persönlichen Agenten sieht dessen Zahlen trotzdem. Was die Anwendungen gemeldet haben (ausgeführte Tools, Zustimmungen, unverschlüsseltes HTTP für einen Server ein- oder ausgeschaltet) und **Angemeldete Geräte**. Der Reiter nennt niemanden außer Ihnen selbst. |
+| **Aktivität** | Nutzung über einen Zeitraum (Anfragen, Fehler, Tokens, Benutzer, Unterhaltungen: nur Zahlen, nie Inhalte), nur, wenn mindestens fünf Personen den Agenten im Zeitraum genutzt haben; der Eigentümer eines persönlichen Agenten sieht dessen Zahlen trotzdem. Was die Anwendungen gemeldet haben (ausgeführte Tools, Zustimmungen, unverschlüsseltes HTTP für einen Server ein- oder ausgeschaltet) und **Angemeldete Geräte**, jedes mit dem, was seine Anwendung zuletzt über es gemeldet hat (siehe [Was ein Gerät meldet](#what-a-device-reports)). Der Reiter nennt niemanden außer Ihnen selbst. |
 | **Apps** | Was die Anwendungen mitbringen, verglichen mit der Version des Agenten (siehe [Wenn eine Anwendung neue Tools mitbringt](#when-an-application-brings-new-tools)). |
 
 ??? info "Mehr zu Server-Tools"
@@ -155,6 +155,22 @@ damit niemand Ausgeschlossenes ihn zurückbekommt; der Reiter **Zugriff** sagt d
 Sobald die Lizenz wieder gültig ist, bleiben die noch aufgeführten ausgeschlossenen Personen wieder außen vor.
 
 ![Der Reiter „Aktivität“: Anfragen, Fehler, Tokens, Nutzer und Gespräche der letzten 30 Tage mit einem Diagramm, darunter, was die Anwendungen gemeldet haben, etwa ausgeführte Tools und Freigaben](../images/administer/agent-activity.png)
+
+### Was ein Gerät meldet {#what-a-device-reports}
+
+Jede Anwendung meldet beim Start das Gerät, auf dem sie läuft: das Betriebssystem, die Version der Anwendung und
+die Plugins und lokalen MCP-Serverprogramme, die sie lädt, jedes mit dem SHA-256 seiner Datei. Der Reiter
+**Aktivität** zeigt das unter jedem angemeldeten Gerät; jede Person sieht ihre eigenen Geräte unter
+**Mein Profil**. Um ein geändertes Programm zu finden, vergleichen Sie seinen SHA-256 mit dem, den Ihre IT
+freigegeben hat.
+
+Ein Programm wird mit seinem Dateinamen gespeichert, ohne seinen Ordner, damit kein Benutzername über einen Pfad
+hereinkommt. Die Meldung eines Geräts wird gelöscht, wenn das Konto der Person gelöscht wird, und 90 Tage nach der
+letzten Meldung des Geräts.
+
+Wenn die Anwendung ein Tool freigibt oder ausführt, kann sie außerdem den SHA-256 der Argumente des Aufrufs senden.
+Dieser Wert wird mit dem Ereignis und mit dem Entscheidungsdatensatz gespeichert, nie die Argumente selbst. Er
+stimmt mit dem Eintrag im Audit-Protokoll überein, das die Anwendung auf dem Gerät führt.
 
 ## Die Anwendungen installieren {#install-the-applications}
 
@@ -295,24 +311,54 @@ Adresse keinen Agenten, bietet sie **Create it from this extension** an. Der Age
 Erweiterung als Entwurf erstellt, den diese Person betreut. Veröffentlicht und anderen gewährt wird er dann in
 der Konsole oder auf ihrer Seite **Agenten**.
 
+## Einen Agenten ausschalten {#turn-an-agent-off}
+
+**Ausschalten**, oben auf der Seite des Agenten, stoppt seine Anwendungen sofort, für alle, auch für seine
+Betreuer und Administratoren. Jeder Chat und jeder Tool-Aufruf wird abgelehnt, und die Anwendungen melden, dass
+Ihre Organisation den Agenten ausgeschaltet hat. Nutzen Sie es, wenn etwas nicht stimmt: Eine Anwendung verhält
+sich falsch, ein Tool tut, was es nicht soll, oder das Modell darf eine Weile nicht gefragt werden. Wer den
+Agenten verwaltet, kann ihn ausschalten, so wie er ihn stilllegen kann.
+
+- **Freigaben enden.** Die Freigaben, die Personen dem Agenten für eine Arbeit gegeben haben, enden, und keine
+  davon gilt wieder, wenn der Agent zurück ist.
+- **Anmeldungen bleiben.** **Einschalten** holt den Agenten so zurück, wie er war, und niemand muss sich neu
+  anmelden.
+- **Der Verlauf bleibt vollständig.** Die Anwendungen melden weiter, was sie getan haben und auf welchen Geräten
+  sie laufen.
+- **Es wird angezeigt und festgehalten.** Die Seite und die Liste des Agenten zeigen **Aus**, mit wann und von
+  wem er ausgeschaltet wurde. **Zugriff prüfen** sagt, dass der Agent aus ist, und was sonst gälte. Jedes Schalten
+  wird im Audit-Protokoll festgehalten (`agent.turn_off`, `agent.turn_on`).
+
+**Stilllegen** sperrt den Agenten auch, aber seine Anmeldungen funktionieren dann nicht mehr, und es kommt vor
+dem Löschen des Agenten. Schalten Sie den Agenten aus, wenn er bald zurückkommen soll.
+
+??? info "Wenn Einschalten fehlschlägt"
+    Bevor der Agent zurück ist, werden die Freigaben von vor dem Ausschalten noch einmal beendet. Geht das gerade
+    nicht, bleibt der Agent aus, und die Seite sagt das: Wählen Sie **Einschalten** in einem Moment erneut.
+
 ## Stilllegen und löschen {#retire-and-delete}
 
 | Um | So geht's |
 |---|---|
+| seine Anwendungen eine Weile zu stoppen | **Ausschalten** (siehe [Einen Agenten ausschalten](#turn-an-agent-off)); **Einschalten** holt ihn zurück. |
 | den Agenten sofort für alle zu sperren | **Stilllegen**: Anmeldungen funktionieren nicht mehr; seine Versionen, Zugriffe und sein Verlauf bleiben erhalten. **Wiederherstellen** holt ihn so zurück, wie er war. |
 | einen stillgelegten Agenten endgültig zu löschen | **Löschen**, dann zur Bestätigung seine Adresse eingeben. Seine Versionen, Zugriffe und Anmeldungen werden entfernt; was er getan hat, bleibt in den Nutzungs- und Audit-Logs, und seine Adresse ist für einen neuen Agenten frei. Zum Löschen ist die Berechtigung `agents:delete` nötig, die die integrierte Rolle `admin` hat, Betreuer aber nicht. |
 | die Anmeldung eines Geräts zu beenden | **Abmelden** auf dem Reiter **Aktivität**: Die Person muss sich erneut anmelden. |
 
 ??? info "Wie lange Agent-Anmeldungen gelten"
     Eine Agent-Anmeldung auf einem Gerät gilt 30 Tage und endet nach 7 Tagen ohne Nutzung. Das Entziehen des
-    Zugriffs wirkt innerhalb von zehn Minuten. Diese Werte sind **Agent sign-in lifetime (s)**,
-    **Agent sign-in idle timeout (s)** und **Agent access token lifetime (s)** unter **Einstellungen → Allgemein**.
+    Zugriffs, das Deaktivieren der Person oder das Ausschalten des Agenten wirkt bei ihrer nächsten Anfrage. Das
+    Abmelden eines einzelnen Geräts wirkt innerhalb von fünf Minuten: Das Zugriffstoken einer Anwendung gilt
+    höchstens 300 Sekunden, und die Anwendung erneuert es mit ihrer Anmeldung. Diese Werte sind
+    **Agent sign-in lifetime (s)**, **Agent sign-in idle timeout (s)** und **Agent access token lifetime (s)**
+    (60 bis 300, in der Voreinstellung 300) unter **Einstellungen → Allgemein**.
 
     <span class="fs-enterprise" title="Erfordert Fadenstack Enterprise">Enterprise</span> Mit Enterprise kann ein Agent kürzere haben: **Gültigkeit der Anmeldung** auf seinem Reiter **Definition**,
     in Sekunden, mindestens 60; ein leeres Feld behält den Wert des Mandanten. Sie gelten mit der Version, die
     Sie speichern und veröffentlichen. Längere als die des Mandanten werden abgelehnt, und wird der Wert des
     Mandanten später gesenkt, verkürzt das auch die des Agenten. Bereits angemeldete Geräte erhalten die kürzere
-    Gültigkeit, wenn ihre Anmeldung das nächste Mal erneuert wird.
+    Gültigkeit, wenn ihre Anmeldung das nächste Mal erneuert wird. Ein Zugriffstoken gilt höchstens 300 Sekunden,
+    was auch immer eingestellt ist.
 
 ## Wenn es nicht funktioniert {#when-it-does-not-work}
 
@@ -322,5 +368,6 @@ Der Agent zeigt in der Anwendung an, warum eine Anmeldung fehlgeschlagen ist:
 |---|---|
 | **Unter dieser Adresse gibt es keinen Agenten.** | Die Adresse in der Anwendung weicht von der des Agenten ab. Vergleichen Sie sie mit der Liste **Agenten**; ein Agent, der ohne **Von einer App ausgehen** erstellt wurde, hat eine aus seinem Namen abgeleitete Adresse. |
 | **Die Person hat keinen Zugriff.** | Fügen Sie sie oder ihre Gruppe auf dem Reiter **Zugriff** hinzu, und prüfen Sie, ob der Agent veröffentlicht ist. **Zugriff prüfen** zeigt, was sie daran hindert, etwa ein Ausschluss. |
+| Die Anwendung meldet, dass Ihre Organisation den Agenten ausgeschaltet hat | Jemand hat den Agenten ausgeschaltet. **Einschalten** auf seiner Seite holt ihn zurück (siehe [Einen Agenten ausschalten](#turn-an-agent-off)). |
 | **Der Server antwortet nicht.** | Prüfen Sie die Serveradresse in der Anwendung und ob der Computer dem Zertifikat des Servers vertraut. |
 | Ein Tool, das die Anwendung anbietet, wird nicht genutzt | Es wird zurückgehalten: Übernehmen Sie es auf dem Reiter **Apps**. |

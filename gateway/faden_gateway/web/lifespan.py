@@ -368,7 +368,22 @@ async def _purge_loop(app: FastAPI) -> None:
                     break
         except Exception:
             log.warning("Erasing deleted chats failed; tried again in an hour", exc_info=True)
+        await _purge_devices(app)
         await asyncio.sleep(3600)
+
+
+async def _purge_devices(app: FastAPI) -> None:
+    """Delete the device blocks not reported for ``DEVICE_KEPT_DAYS`` (sdk/51 8.3); never fails the loop."""
+    from faden_gateway.services.gateway import agent_manifests  # noqa: PLC0415
+
+    try:
+        async with app.state.db_session_factory() as session:
+            gone = await agent_manifests.purge_devices(session)
+            await session.commit()
+        if gone:
+            log.info("Deleted %d device report(s) older than %d days", gone, agent_manifests.DEVICE_KEPT_DAYS)
+    except Exception:
+        log.warning("Deleting old device reports failed; tried again in an hour", exc_info=True)
 
 
 @asynccontextmanager

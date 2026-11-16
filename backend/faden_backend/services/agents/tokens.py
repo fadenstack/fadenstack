@@ -3,8 +3,8 @@
 The access token is a JWT the gateway verifies with the shared secret, like
 the API tokens of ``/me/api-token``, but bound to one agent (``aud`` is
 ``agent:<id>``) and marked ``typ: agent`` so the plain gateway routes refuse
-it. It lives minutes; removing someone's access takes effect at their next
-refresh at the latest.
+it. It lives five minutes at most (``ACCESS_TOKEN_MAX_S``); removing someone's
+access takes effect at their next refresh at the latest.
 
 The refresh token is 256 random bits, stored only as its SHA-256. Each
 refresh replaces it; presenting a replaced one again means it was copied, and
@@ -17,7 +17,7 @@ import hashlib
 import secrets
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 
 import jwt
@@ -92,10 +92,20 @@ def _access_token(*, secret: str, user: User, agent: Agent, device_id: uuid.UUID
     return jwt.encode(claims, secret, algorithm="HS256")
 
 
+#: The longest an access token lives, whatever the setting or an extension says (sdk/51 8.11): access a person
+#: or a device loses ends within this time at the latest (ASVS 5.0 V7.4.1).
+ACCESS_TOKEN_MAX_S = 300
+
+
 async def lifetimes(dao: AgentsDAO, agent: Agent) -> Lifetimes:
-    """How long *agent*'s tokens live, after its published version's settings."""
+    """How long *agent*'s tokens live, after its published version's settings; access never past the ceiling.
+
+    A larger value -- stored before the ceiling, or an extension's for the agent -- is cut to it here, where
+    every access token's lifetime comes from.
+    """
     version = await dao.version_by_id(agent.published_version_id)
-    return registry.token_lifetimes.lifetimes(version.extensions if version else {})
+    life = registry.token_lifetimes.lifetimes(version.extensions if version else {})
+    return replace(life, access_s=min(life.access_s, ACCESS_TOKEN_MAX_S))
 
 
 async def issue(

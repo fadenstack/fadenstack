@@ -2725,6 +2725,7 @@ class GatewayService:
             await gov.record_on_own_session(
                 self.dao.session.bind, ctx, verdict, text=None, outcome=outcome,
                 answer_scope=answer.scope if answer else None,
+                arguments_sha256=answer.arguments_sha256 if answer else None,
             )
 
     async def _recheck_after_wait(

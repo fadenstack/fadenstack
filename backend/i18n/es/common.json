@@ -4745,10 +4745,21 @@
       "sign_out_confirm": "{{device}} ({{user}}) tendrá que volver a iniciar sesión para usar el agente.",
       "suppressed": "Menos de {{k}} personas usaron este agente en este periodo, así que sus cifras no se muestran: señalarían a personas concretas.",
       "day_suppressed": "Se omiten los días con menos de {{k}} personas.",
-      "user_hidden": "No se muestra"
+      "user_hidden": "No se muestra",
+      "report_show": "Mostrar informe del dispositivo",
+      "report_hide": "Ocultar informe del dispositivo",
+      "arguments_sha256": "SHA-256 de los argumentos"
     },
     "back_to_chat": "Volver al chat",
-    "no_access": "No es responsable de ningún agente. Pida a un administrador que le haga responsable de uno."
+    "no_access": "No es responsable de ningún agente. Pida a un administrador que le haga responsable de uno.",
+    "off": "Apagado",
+    "turn_off": "Apagar",
+    "turn_on": "Encender",
+    "turn_off_title": "¿Apagar {{name}}?",
+    "turn_off_confirm": "Sus aplicaciones se detienen al instante: cada chat y cada llamada a una herramienta se rechaza con «Su organización apagó este agente», y las autorizaciones en curso terminan. Los inicios de sesión se mantienen, así que las aplicaciones vuelven a funcionar en cuanto usted lo encienda.",
+    "off_notice": "Apagado el {{when}}.",
+    "off_notice_by": "Apagado el {{when}} por {{name}}.",
+    "off_notice_help": "Sus aplicaciones son rechazadas hasta que se vuelva a encender; sus inicios de sesión se mantienen."
   },
   "governance": {
     "title": "Gobernanza",
@@ -5862,5 +5873,20 @@
     "title": "Generación de imágenes desactivada",
     "note": "La generación de imágenes está desactivada en esta versión. A partir del 2 de diciembre de 2026, el Reglamento de IA de la UE (artículo 5) exige salvaguardas contra la generación de imágenes dañinas, y esta versión aún no las tiene. La generación de imágenes volverá en una versión posterior, con esas salvaguardas.",
     "short": "Desactivada en esta versión (Reglamento de IA de la UE)"
+  },
+  "device_report": {
+    "title": "Informe del dispositivo",
+    "system": "Sistema",
+    "app_version": "Versión de la aplicación",
+    "plugins": "Complementos",
+    "mcp_programs": "Programas MCP",
+    "sha256": "SHA-256",
+    "file": "Archivo",
+    "unknown": "Desconocido",
+    "none_plugins": "Sin complementos.",
+    "none_mcp": "Sin programas MCP.",
+    "not_reported": "Aún no informado",
+    "reported": "Informado el {{when}}",
+    "copy": "Copiar el SHA-256 de {{name}}"
   }
 }

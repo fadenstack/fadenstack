@@ -76,7 +76,9 @@ A sign-in that already belongs to another account here is not linked to yours.
 
 **My Profile** shows, under **Signed-in apps**, every app and device you are signed in on: the desktop app, the Office
 add-ins and the browser extension each sign in once per device. For each you see the **App**, the **Device**, when
-you were **Signed in** and when it was **Last used**.
+you were **Signed in** and when it was **Last used**. **Show device report** shows what the app last reported about
+the device: the system, the app's version, and the plugins and MCP programs it loads, each with its SHA-256. Your
+organisation's administrators see the same for the devices signed in to their agents.
 
 To end one, select **Sign out** beside it and confirm. That device must be signed in again in the app (see
 [Sign in a desktop app](sign-in-an-app.md)). End the sign-in of a computer you lost or no longer use, and any you

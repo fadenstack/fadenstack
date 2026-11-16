@@ -16,15 +16,15 @@ import hashlib
 import json
 import re
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from faden_gateway.db.models.gateway import AgentClientManifest
+from faden_gateway.db.models.gateway import AgentClientManifest, AgentDeviceInventory
 
 TOOL_NAME = r"^[A-Za-z0-9_.:-]{1,128}$"
 #: A tool's parameter schema, and a whole manifest, at most.
@@ -105,6 +105,56 @@ class ManifestSdk(BaseModel):
     version: str = Field(default="", max_length=32)
 
 
+SHA256_HEX = r"^[0-9a-f]{64}$"
+
+
+def file_name(value: str) -> str:
+    r"""*value* without its folders: what follows the last ``/`` or ``\`` (a path can name the person)."""
+    return re.split(r"[\\/]", value)[-1]
+
+
+class DevicePlugin(BaseModel):
+    """A plugin the app on the device loads, with its file's SHA-256."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    name: str = Field(min_length=1, max_length=128)
+    version: str | None = Field(default=None, max_length=50)
+    sha256: str = Field(pattern=SHA256_HEX)
+
+
+class DeviceMcpProgram(BaseModel):
+    """A local MCP server's program on the device, with its file's SHA-256; kept by its file name only."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    name: str = Field(min_length=1, max_length=128)
+    program: str | None = Field(default=None, max_length=255)
+    sha256: str = Field(pattern=SHA256_HEX)
+
+    @field_validator("program")
+    @classmethod
+    def _file_name_only(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return file_name(value) or None
+
+
+class ManifestDevice(BaseModel):
+    """The device an app runs on, as its SDK reports it (sdk/51 8.3).
+
+    The system, the app's version, and the plugins and local MCP programs it loads, each with its SHA-256.
+    Kept per device, never in the manifest.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    os: str | None = Field(default=None, max_length=100)
+    app_version: str | None = Field(default=None, max_length=50)
+    plugins: list[DevicePlugin] = Field(default_factory=list, max_length=100)
+    mcp_programs: list[DeviceMcpProgram] = Field(default_factory=list, max_length=100)
+
+
 class AppManifest(BaseModel):
     """What an app brings to the agent it runs. Unknown fields are dropped (a newer SDK may send more)."""
 
@@ -115,6 +165,8 @@ class AppManifest(BaseModel):
     tools: list[ManifestTool] = Field(default_factory=list, max_length=200)
     context: list[ManifestContext] = Field(default_factory=list, max_length=100)
     ui: ManifestUi | None = None
+    #: The device's own block: kept per device (:func:`keep_device`), not part of what is stored here.
+    device: ManifestDevice | None = None
 
     @field_validator("tools")
     @classmethod
@@ -125,8 +177,8 @@ class AppManifest(BaseModel):
         return tools
 
     def stored(self) -> dict[str, Any]:
-        """The manifest as kept: tools and context in name order, each schema with its hash."""
-        data = self.model_dump(mode="json", by_alias=True, exclude_none=True)
+        """The manifest as kept: tools and context in name order, each schema with its hash; no device."""
+        data = self.model_dump(mode="json", by_alias=True, exclude_none=True, exclude={"device"})
         data["tools"] = [_with_schema_hash(t) for t in sorted(data.get("tools", []), key=lambda t: t["name"])]
         data["context"] = sorted(data.get("context", []), key=lambda c: c["id"])
         return data
@@ -242,3 +294,64 @@ async def record(
     row.last_device_id = device_id
     await session.commit()
     return digest, False
+
+
+# -- the device block -------------------------------------------------------------------------
+
+#: A device's block not reported again for this long goes (the hourly purge): a sign-in ends long before.
+DEVICE_KEPT_DAYS = 90
+
+
+async def keep_device(
+    session: AsyncSession,
+    *,
+    tenant_id: str,
+    agent_id: str,
+    user_id: str,
+    device_id: str,
+    device: ManifestDevice,
+) -> None:
+    """Keep what the device's SDK reported about it, replacing its last report; commits."""
+    values: dict[str, Any] = {
+        "tenant_id": tenant_id,
+        "user_id": user_id,
+        "os": device.os,
+        "app_version": device.app_version,
+        "plugins": [p.model_dump(mode="json", exclude_none=True) for p in device.plugins],
+        "mcp_programs": [p.model_dump(mode="json", exclude_none=True) for p in device.mcp_programs],
+        "reported_at": datetime.now(UTC),
+    }
+    row = await _device_row(session, agent_id, device_id)
+    if row is None:
+        session.add(AgentDeviceInventory(agent_id=agent_id, device_id=device_id, **values))
+        try:
+            await session.commit()
+            return
+        except IntegrityError:  # the same device reported twice at the same moment
+            await session.rollback()
+            row = await _device_row(session, agent_id, device_id)
+            if row is None:
+                raise
+    for name, value in values.items():
+        setattr(row, name, value)
+    await session.commit()
+
+
+async def _device_row(session: AsyncSession, agent_id: str, device_id: str) -> AgentDeviceInventory | None:
+    found = await session.execute(
+        select(AgentDeviceInventory).where(
+            AgentDeviceInventory.agent_id == agent_id, AgentDeviceInventory.device_id == device_id,
+        ),
+    )
+    return found.scalar_one_or_none()
+
+
+async def purge_devices(
+    session: AsyncSession, *, days: int = DEVICE_KEPT_DAYS, now: datetime | None = None,
+) -> int:
+    """Delete the device blocks not reported for *days*; how many. The caller commits."""
+    before = (now or datetime.now(UTC)) - timedelta(days=days)
+    gone = await session.execute(
+        delete(AgentDeviceInventory).where(AgentDeviceInventory.reported_at < before),
+    )
+    return int(getattr(gone, "rowcount", 0) or 0)

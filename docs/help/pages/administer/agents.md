@@ -57,7 +57,7 @@ The agent's page opens. Its list status is **Draft**, **Published** or **Retired
 | **Versions** | Every version. **Publish** one, **Roll back** to an earlier one, see the **Changes**. |
 | **Access** | **Who may use it**, the **Excluded people** <span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span> and its **Maintainers** (with Enterprise: **Maintainers and auditors** <span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span>). **Check someone's access** says whether a person may use the agent, and why. |
 | **Skills** | The organisation's skills that come into the agent's conversations without anyone picking them: those assigned to everyone, and those assigned to this agent. For those who manage the agent. |
-| **Activity** | Usage over a time range (requests, errors, tokens, users, conversations: counts only, never content), shown only when at least five people used the agent in the range; the owner of a personal agent sees its figures all the same. What the applications reported (tools that ran, approvals, plain http switched on or off for a server), and the **Signed-in devices**. It names nobody but you. |
+| **Activity** | Usage over a time range (requests, errors, tokens, users, conversations: counts only, never content), shown only when at least five people used the agent in the range; the owner of a personal agent sees its figures all the same. What the applications reported (tools that ran, approvals, plain http switched on or off for a server), and the **Signed-in devices**, each with what its application last reported about it (see [What a device reports](#what-a-device-reports)). It names nobody but you. |
 | **Apps** | What the applications bring, compared with the agent's version (see [When an application brings new tools](#when-an-application-brings-new-tools)). |
 
 ??? info "More about server tools"
@@ -145,6 +145,20 @@ everyone the agent is granted to can use it again. Once the licence is valid aga
 listed are kept out again.
 
 ![The Activity tab: requests, errors, tokens, users and conversations of the last 30 days with a chart, and below it what the applications reported, such as tools that ran and approvals](../images/administer/agent-activity.png)
+
+### What a device reports
+
+Each application reports, when it starts, the device it runs on: the operating system, the application's
+version, and the plugins and local MCP server programs it loads, each with the SHA-256 of its file. The
+**Activity** tab shows this under each signed-in device; each person sees their own devices under
+**My profile**. To find a changed program, compare its SHA-256 with the one your IT approved.
+
+A program is kept by its file name, without its folder, so no user name comes in with a path. A device's report
+goes when the person's account is deleted, and 90 days after the device last reported.
+
+When the application approves or runs a tool, it can also send the SHA-256 of the call's arguments. That value
+is kept with the event and with the decision record, never the arguments themselves. It matches the entry in the
+audit log the application keeps on the device.
 
 ## Install the applications
 
@@ -278,23 +292,49 @@ its address, it offers **Create it from this extension**. The agent is created f
 definition as a draft they maintain. Publishing it and granting it to others is then done in the console or
 on their **Agents** page.
 
+## Turn an agent off
+
+**Turn off**, at the top of the agent's page, stops its applications at once, for everyone, its maintainers and
+administrators too. Every chat and tool call is refused, and the applications say "Your organisation turned
+this agent off". Use it when something is wrong: an application misbehaves, a tool does what it should not, or
+the model must not be asked for a while. Those who manage the agent can turn it off, as they can retire it.
+
+- **Grants end.** The grants people gave the agent for a stretch of work end, and none of them counts again
+  when the agent is back.
+- **Sign-ins stay.** **Turn on** brings the agent back as it was, and nobody has to sign in again.
+- **The record stays complete.** The applications still report what they did and the devices they run on.
+- **It is said and recorded.** The agent's page and list show **Off**, with when and by whom it was turned
+  off. **Check someone's access** says the agent is off, and what would apply otherwise. Each switch is
+  recorded in the audit log (`agent.turn_off`, `agent.turn_on`).
+
+**Retire** also closes the agent, but its sign-ins stop working, and it comes before deleting the agent. Turn the
+agent off when it should come back soon.
+
+??? info "If Turn on fails"
+    Before the agent is back, the grants from before it was turned off are ended once more. When that cannot be
+    done right now, the agent stays off and the page says so: try **Turn on** again in a moment.
+
 ## Retire and delete
 
 | To | Do this |
 |---|---|
+| Stop its applications for a while | **Turn off** (see [Turn an agent off](#turn-an-agent-off)); **Turn on** brings it back. |
 | Close the agent to everyone at once | **Retire**: sign-ins stop working, and its versions, access and history are kept. **Restore** brings it back as it was. |
 | Delete a retired agent for good | **Delete**, then type its address to confirm. Its versions, access and sign-ins go; what it did stays in the usage and audit logs, and its address is free for a new agent. Deleting needs the permission `agents:delete`, which the built-in `admin` role has and maintainers do not. |
 | End one device's sign-in | **Sign out** on the **Activity** tab: that person must sign in again. |
 
 ??? info "How long agent sign-ins last"
-    An agent sign-in on a device lasts 30 days, and ends after 7 days without use. Removing someone's access
-    takes effect within ten minutes. These are **Agent sign-in lifetime (s)**, **Agent sign-in idle timeout (s)**
-    and **Agent access token lifetime (s)** under **Settings → General**.
+    An agent sign-in on a device lasts 30 days, and ends after 7 days without use. Removing someone's access,
+    deactivating them or turning the agent off takes effect at their next request. Signing out one device takes
+    effect within five minutes: an application's access token lasts at most 300 seconds, and the application
+    renews it with its sign-in. These are **Agent sign-in lifetime (s)**, **Agent sign-in idle timeout (s)** and
+    **Agent access token lifetime (s)** (60 to 300, 300 by default) under **Settings → General**.
 
     <span class="fs-enterprise" title="Needs Fadenstack Enterprise">Enterprise</span> With Enterprise, an agent can have shorter ones: **Sign-in lifetimes** on its **Definition** tab, in
     seconds, at least 60; an empty field keeps the tenant's. They come with the version you save and publish.
     Longer ones than the tenant's are refused, and lowering the tenant's setting later shortens the agent's too.
-    Devices already signed in get the shorter lifetime when their sign-in is next renewed.
+    Devices already signed in get the shorter lifetime when their sign-in is next renewed. An access token lasts
+    at most 300 seconds whatever is set.
 
 ## When it does not work
 
@@ -304,5 +344,6 @@ The panel says why a sign-in failed:
 |---|---|
 | **There is no agent under that address.** | The address in the application differs from the agent's. Compare it with the **Agents** list; an agent made without **Start from an app** has an address derived from its name. |
 | **The person has no access.** | Add them, or their group, on the **Access** tab, and check that the agent is published. **Check someone's access** says what stops them, such as an exclusion. |
+| **Your organisation turned this agent off.** | Someone turned the agent off. **Turn on** on its page brings it back (see [Turn an agent off](#turn-an-agent-off)). |
 | **The server does not answer.** | Check the server address in the application and that the computer trusts the server's certificate. |
 | A tool the application offers is not used | It is held back: accept it on the **Apps** tab. |

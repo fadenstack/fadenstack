@@ -98,6 +98,27 @@ def evidence_grant(what: dict[str, Any], *, reader: str, tenant_id: str, secret:
     return pyjwt.encode(claims, secret, algorithm="HS256")
 
 
+#: The grant for ending an agent's running grants in the gateway (the agent turned off, or on again): only the
+#: backend signs it, for one agent.
+AGENT_SWITCH_HEADER = "X-Faden-Agent-Switch"
+AGENT_SWITCH_TOKEN_TYPE = "agent_switch"  # noqa: S105 - a claim value, not a secret
+AGENT_SWITCH_TTL_SEC = 60
+
+
+def agent_switch_grant(agent_id: str, *, secret: str) -> str:
+    """The signed grant that the gateway may end the running grants of *agent_id*."""
+    now = int(time.time())
+    claims = {
+        "typ": AGENT_SWITCH_TOKEN_TYPE, "agent": agent_id, "jti": uuid.uuid4().hex,
+        "iat": now, "exp": now + AGENT_SWITCH_TTL_SEC,
+    }
+    return pyjwt.encode(claims, secret, algorithm="HS256")
+
+
+class GrantsEndFailed(RuntimeError):
+    """The gateway did not end an agent's grants (not reached, or refused)."""
+
+
 class EvidenceUnavailable(RuntimeError):
     """The gateway did not hand over a grant's evidence (not reached, refused, not found)."""
 
@@ -516,6 +537,20 @@ class GatewayChatClient:
         if response.status_code != 200:  # noqa: PLR2004
             raise EvidenceUnavailable(f"The gateway answered {response.status_code}.")
         return response.json()
+
+    async def end_agent_grants(self, agent_id: str, *, secret: str) -> int:
+        """End the running grants of *agent_id* in the gateway (``/internal/agent-grants-end``); how many."""
+        client = self._ensure_client()
+        token = agent_switch_grant(agent_id, secret=secret)
+        try:
+            response = await client.post(
+                "/internal/agent-grants-end", json={"agent": agent_id}, headers={AGENT_SWITCH_HEADER: token},
+            )
+        except httpx.HTTPError as exc:
+            raise GrantsEndFailed(f"The gateway could not be reached: {exc}") from exc
+        if response.status_code != httpx.codes.OK:
+            raise GrantsEndFailed(f"The gateway answered {response.status_code}.")
+        return int(response.json().get("ended") or 0)
 
     async def delete_session(self, session_id: str, jwt: str) -> None:
         client = self._ensure_client()

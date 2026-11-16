@@ -38,6 +38,7 @@ V = TypeVar("V")
 _AGENT_SQL = """
 SELECT a.id::text AS id, a.tenant_id, a.slug, a.name, a.status::text AS status,
        (a.published_version_id IS NOT NULL) AS published, a.restricted_by,
+       (a.turned_off_at IS NULL) AS enabled,
        v.version, v.instructions, v.model_alias, v.knowledge, v.server_tools,
        v.host_tool_contract, v.local_mcp_mode::text AS local_mcp_mode,
        v.local_mcp_plain_http::text AS local_mcp_plain_http,
@@ -185,6 +186,9 @@ class AgentProfile:
     #: sdk/51 F05). Only ``allow`` allows: a missing or unknown value reads as ``deny``, and the user's
     #: developer mode does not override it. The gateway only reports it; the SDK keeps to it.
     local_mcp_plain_http: str = "deny"
+    #: Whether the agent is on: turned off (``agents.turned_off_at``, sdk/51 8.3), its apps are refused with
+    #: ``agent_disabled`` (:func:`decide`), and its profile says ``enabled: false``.
+    enabled: bool = True
 
     def levels(self) -> tuple[tool_classes.ToolMode, tool_classes.ToolMode]:
         """The level conversations start in, and the highest.
@@ -248,6 +252,8 @@ class AgentProfile:
             local_skills_mode="allow" if row.get("local_skills_mode") == "allow" else "disable",
             # Fail closed too (ASVS 5.0 V8.2.1): plain http needs the explicit ``allow``.
             local_mcp_plain_http="allow" if row.get("local_mcp_plain_http") == "allow" else "deny",
+            # Fail closed: on only when the row says so.
+            enabled=row.get("enabled") is True,
         )
 
 
@@ -616,6 +622,11 @@ def _deny(status_code: int, code: str, message: str) -> AgentDecision:
     return AgentDecision(False, status_code, code, message)
 
 
+#: The answer to an app of an agent that is turned off (sdk/51 8.3); the SDKs show their own words for it.
+AGENT_DISABLED = "agent_disabled"
+AGENT_DISABLED_MESSAGE = "Your organisation turned this agent off."
+
+
 async def decide(
     agent: AgentProfile,
     *,
@@ -623,12 +634,33 @@ async def decide(
     user: UserFlags | None,
     groups: tuple[str, ...],
     registry: ExtensionRegistry = default_registry,
+    while_off: bool = False,
 ) -> AgentDecision:
-    """The backend's access rule (``services/agents/access.py``), on cached data."""
+    """The backend's access rule (``services/agents/access.py``), on cached data.
+
+    An agent turned off is refused to everyone, its maintainers and administrators too (``agent_disabled``),
+    after the checks that would refuse the caller anyway. *while_off*: the caller only reads the profile or
+    reports (events, the manifest), which an agent that is off still takes; the rest of the rule applies.
+    """
     if user is None or not user.is_active:
         return _deny(403, "user_inactive", "The user is deactivated or unknown.")
     if agent.status == "retired":
         return _deny(403, "agent_retired", "The agent is retired.")
+    decision = await _decide_access(agent, user_id=user_id, user=user, groups=groups, registry=registry)
+    if decision.allowed and not agent.enabled and not while_off:
+        return _deny(403, AGENT_DISABLED, AGENT_DISABLED_MESSAGE)
+    return decision
+
+
+async def _decide_access(
+    agent: AgentProfile,
+    *,
+    user_id: str,
+    user: UserFlags,
+    groups: tuple[str, ...],
+    registry: ExtensionRegistry,
+) -> AgentDecision:
+    """Whether the caller may use the agent, its switch aside."""
     if user.is_superuser or user_id in agent.maintainers:
         return AgentDecision(True, maintainer=True)
     closed = _closed(agent, registry)

@@ -13,8 +13,10 @@ import { AppSignInsCard } from "./AppSignInsCard";
 const sign = (over: Partial<agents.AgentSignIn> = {}): agents.AgentSignIn => ({
   device_id: "d1", agent_id: "a1", user_id: "u1", device_label: "Ada's laptop",
   created_at: "2026-10-01T09:00:00Z", last_used_at: new Date(Date.now() - 3 * 3600_000).toISOString(),
-  expires_at: "2027-01-01T00:00:00Z", idle_expires_at: "2026-12-01T00:00:00Z", ...over,
+  expires_at: "2027-01-01T00:00:00Z", idle_expires_at: "2026-12-01T00:00:00Z", device: null, ...over,
 });
+
+const SHA = "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9";
 
 function given(signIns: agents.AgentSignIn[]) {
   vi.spyOn(agents.agentsApi, "list").mockResolvedValue([{ id: "a1", name: "Desktop agent" } as agents.Agent]);
@@ -31,6 +33,30 @@ describe("signed-in apps on My Profile", () => {
     expect(screen.getByText("not used yet")).toBeInTheDocument();
     expect(screen.getByText(/3 hr\. ago|3 hours ago/)).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Sign out" })).toHaveLength(2);
+  });
+
+  it("shows what a device's app reported, and says so when it has not", async () => {
+    given([
+      sign({
+        device: {
+          os: "Windows 11",
+          app_version: "0.7.1",
+          plugins: [{ name: "excel-tools", version: "1.2", sha256: SHA }],
+          mcp_programs: [],
+          reported_at: "2026-10-02T09:00:00Z",
+        },
+      }),
+      sign({ device_id: "d2", device_label: "Office PC" }),
+    ]);
+    renderPage(<AppSignInsCard />);
+    await screen.findByText("Ada's laptop");
+    const [first, second] = screen.getAllByRole("button", { name: "Show device report" });
+    fireEvent.click(first);
+    expect(await screen.findByText("Windows 11", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText("excel-tools")).toBeInTheDocument();
+    expect(screen.getByText(`${SHA.slice(0, 12)}…`)).toBeInTheDocument();
+    fireEvent.click(second);
+    expect(await screen.findByText("Not reported yet")).toBeInTheDocument();
   });
 
   it("says when no app is signed in", async () => {

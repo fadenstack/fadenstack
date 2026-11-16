@@ -107,6 +107,43 @@ describe("an agent's activity", () => {
     expect(screen.getByText("Days with fewer than 5 people are left out.")).toBeInTheDocument();
   });
 
+  it("shows the SHA-256 of a call's arguments, shortened, with the whole value in its label", async () => {
+    const sha = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08";
+    api.events.mockResolvedValue([
+      event({ id: "e-1", data: { tool: "read_range", outcome: "ok", arguments_sha256: sha } }),
+      event({ id: "e-2", type: "approval.decided", data: { tool: "write_range", decision: "approved", arguments_sha256: sha } }),
+      event({ id: "e-3", data: { tool: "no_hash", outcome: "ok" } }),
+    ]);
+    show();
+
+    await screen.findByText("no_hash");
+    expect(screen.getAllByText(`${sha.slice(0, 12)}…`)).toHaveLength(2);
+    expect(screen.getAllByLabelText(`Arguments SHA-256: ${sha}`)).toHaveLength(2);
+  });
+
+  it("shows what a signed-in device reported, on request", async () => {
+    const sha = "ab".repeat(32);
+    const base = { agent_id: "a-1", user_id: "u-me", created_at: "2026-10-01T09:00:00Z", last_used_at: null, expires_at: "2027-01-01T00:00:00Z", idle_expires_at: "2026-12-01T00:00:00Z" };
+    api.signIns.mockResolvedValue([
+      {
+        ...base,
+        device_id: "d1",
+        device_label: "Ada's laptop",
+        device: { os: "Windows 11", app_version: "0.7.1", plugins: [{ name: "excel-tools", sha256: sha }], mcp_programs: [], reported_at: "2026-10-02T09:00:00Z" },
+      },
+      { ...base, device_id: "d2", device_label: "Office PC", device: null },
+    ]);
+    show();
+
+    await screen.findByText("Ada's laptop");
+    const [first, second] = screen.getAllByRole("button", { name: "Show device report" });
+    await userEvent.click(first);
+    expect(await screen.findByText("excel-tools")).toBeInTheDocument();
+    expect(screen.getByText(`${sha.slice(0, 12)}…`)).toBeInTheDocument();
+    await userEvent.click(second);
+    expect(await screen.findByText("Not reported yet")).toBeInTheDocument();
+  });
+
   it("names the viewer's own events and nobody else's, and searches either", async () => {
     api.events.mockResolvedValue([
       event({ id: "e-mine", user_id: "u-me" }),

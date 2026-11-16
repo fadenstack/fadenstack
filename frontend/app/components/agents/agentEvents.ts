@@ -29,6 +29,8 @@ export interface EventSummary {
   count?: { key: "tools" | "turns"; value: number };
   /** What let an approved call through: `once`, `chat`, `always` or `bypass` (the app's bypass mode). */
   scope?: string;
+  /** The SHA-256 of the call's arguments (64 hex characters), as the device's own audit log has it. */
+  argumentsSha256?: string;
 }
 
 const TONES: Record<string, EventTone> = {
@@ -45,6 +47,9 @@ const TONES: Record<string, EventTone> = {
 
 const text = (value: unknown): string | undefined =>
   typeof value === "string" && value.length > 0 ? value : undefined;
+/** A SHA-256 as 64 hex characters; anything else is not shown. */
+const sha = (value: unknown): string | undefined =>
+  typeof value === "string" && /^[0-9a-fA-F]{64}$/.test(value) ? value : undefined;
 const number = (value: unknown): number | undefined => (typeof value === "number" ? value : undefined);
 
 export function summarizeEvent(event: ClientEvent): EventSummary {
@@ -59,6 +64,7 @@ export function summarizeEvent(event: ClientEvent): EventSummary {
         ...outcome(text(d.outcome)),
         durationMs: number(d.duration_ms),
         facts: facts(d.source, d.server),
+        argumentsSha256: sha(d.arguments_sha256),
       };
     case "approval.decided":
       return {
@@ -67,6 +73,7 @@ export function summarizeEvent(event: ClientEvent): EventSummary {
         durationMs: number(d.wait_ms),
         facts: [],
         scope: text(d.scope),
+        argumentsSha256: sha(d.arguments_sha256),
       };
     case "local_mcp.attached":
       return {

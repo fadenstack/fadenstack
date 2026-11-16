@@ -16,6 +16,7 @@ may list the agents they can use, and sign in to one of them
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
@@ -50,6 +51,7 @@ from faden_backend.services.skills.client import forget_agent
 from faden_backend.services.usage import config as usage_config
 from faden_backend.services.usage.measures import Measures
 from faden_backend.services.usage.suppression import Cell, hide
+from faden_backend.settings import settings
 from faden_backend.web.api.agents.schema import (
     AcceptAppsRequest,
     AccessDTO,
@@ -63,6 +65,7 @@ from faden_backend.web.api.agents.schema import (
     AppsReviewDTO,
     ClientEventDTO,
     CreateAgentRequest,
+    DeviceDTO,
     GrantDTO,
     IssueTokenRequest,
     MemberDTO,
@@ -86,6 +89,8 @@ from faden_backend.web.api.agents.schema import (
     UsageDTO,
 )
 from faden_backend.web.origin import public_origin
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 tokens_router = APIRouter(prefix="/agent-tokens", tags=["agents"])
@@ -165,6 +170,10 @@ async def _dto(dao: AgentsDAO, agent: Agent, *, can_manage: bool) -> AgentDTO:
         can_manage=can_manage,
         unenforced=access.unenforced(agent, published) if can_manage else [],
         unenforced_restrictions=access.unenforced_restrictions(agent) if can_manage else [],
+        enabled=agent.enabled,
+        turned_off_at=agent.turned_off_at,
+        # Who turned it off is told to those who manage it, as their own record; not to the agent's users.
+        turned_off_by=agent.turned_off_by if can_manage else None,
         created_at=agent.created_at,
         updated_at=agent.updated_at,
     )
@@ -386,6 +395,75 @@ async def retire_agent(
     agent.status = AgentStatus.RETIRED
     await dao.session.flush()
     await _audit(audit, user, "agent.retire", str(agent.id))
+    await dao.session.refresh(agent)
+    return await _dto(dao, agent, can_manage=True)
+
+
+async def _end_grants(agent: Agent) -> int | None:
+    """End the agent's running grants in the gateway, which keeps them; ``None`` when that failed."""
+    from faden_backend.services.chat.gateway_client import GrantsEndFailed, shared_client  # noqa: PLC0415
+
+    try:
+        return await shared_client().end_agent_grants(str(agent.id), secret=settings.users_secret)
+    except GrantsEndFailed as exc:
+        logger.warning("The grants of agent %s could not be ended: %s", agent.id, exc)
+        return None
+
+
+@router.post("/{agent_ref}/turn-off", response_model=AgentDTO, name="turn_off_agent")
+async def turn_off_agent(
+    agent_ref: str,
+    user: Annotated[User, Depends(current_active_user)],
+    dao: AgentsDAO = Depends(),
+    rbac: RbacDAO = Depends(),
+    audit: AuditDAO = Depends(),
+) -> AgentDTO:
+    """Turn the agent off (sdk/51 8.3): from the next request its apps are refused with ``agent_disabled``.
+
+    For everyone, its maintainers and administrators too. Its profile still answers (``enabled: false``), and
+    so do its apps' events and manifests; sign-ins stay, so the apps work again once it is turned on. Its
+    running grants end in the gateway, after the switch is committed: a grant made in between ends when it is
+    turned on again. Turning an agent off that is off changes nothing.
+    """
+    agent = await _managed_agent(dao, rbac, agent_ref, user)
+    if agent.turned_off_at is None:
+        agent.turned_off_at = datetime.now(UTC)
+        agent.turned_off_by = user.id
+        await dao.session.commit()
+        ended = await _end_grants(agent)
+        await _audit(audit, user, "agent.turn_off", str(agent.id), {"grants_ended": ended})
+    await dao.session.refresh(agent)
+    return await _dto(dao, agent, can_manage=True)
+
+
+@router.post("/{agent_ref}/turn-on", response_model=AgentDTO, name="turn_on_agent")
+async def turn_on_agent(
+    agent_ref: str,
+    user: Annotated[User, Depends(current_active_user)],
+    dao: AgentsDAO = Depends(),
+    rbac: RbacDAO = Depends(),
+    audit: AuditDAO = Depends(),
+) -> AgentDTO:
+    """Turn the agent on again; no grant from before it was turned off counts again.
+
+    Its grants are ended in the gateway first: when that fails, the agent stays off (503), so a grant from
+    before never comes back. Turning an agent on that is on changes nothing.
+    """
+    agent = await _managed_agent(dao, rbac, agent_ref, user)
+    if agent.turned_off_at is not None:
+        ended = await _end_grants(agent)
+        if ended is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=(
+                    "The agent stays off: the gateway could not end its grants from before. "
+                    "Try again in a moment."
+                ),
+            )
+        agent.turned_off_at = None
+        agent.turned_off_by = None
+        await dao.session.flush()
+        await _audit(audit, user, "agent.turn_on", str(agent.id), {"grants_ended": ended})
     await dao.session.refresh(agent)
     return await _dto(dao, agent, can_manage=True)
 
@@ -660,6 +738,13 @@ async def explain_access(
     if target is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     decision = await access.decide(dao, agent, target)
+    if decision.allowed and not agent.enabled:
+        # Sign-ins stay while the agent is off, so access decides them as before; using it is refused for all.
+        decision = access.AccessDecision(
+            False, "agent_disabled",
+            "The agent is turned off: nobody can use it until it is turned on again. "
+            f"Otherwise: {decision.detail}",
+        )
     await _audit(
         audit, user, "agent.access.check", str(agent.id),
         {
@@ -939,7 +1024,41 @@ async def accept_agent_apps(
     return version
 
 
-def _sign_in(row: Any) -> SignInDTO:
+#: What the gateway keeps of each device's last report (the manifest's ``device`` block), for these devices.
+_DEVICES_SQL = """
+SELECT agent_id, device_id, os, app_version, plugins, mcp_programs, reported_at
+FROM agent_device_inventory
+WHERE device_id = ANY(CAST(:devices AS TEXT[]))
+"""
+
+
+def _json_list(value: Any) -> list[Any]:
+    """A JSON column's list, as the driver hands it over (decoded, or as text)."""
+    if isinstance(value, str):
+        value = json.loads(value)
+    return value if isinstance(value, list) else []
+
+
+async def _devices(request: Request, rows: list[Any]) -> dict[tuple[str, str], DeviceDTO]:
+    """What each signed-in device last reported about itself, by agent and device; none from old gateways."""
+    factory = getattr(request.app.state, "llm_graph_trace_session_factory", None)
+    if factory is None or not rows:
+        return {}
+    async with factory() as gw:
+        try:
+            found = await gw.execute(text(_DEVICES_SQL), {"devices": [str(r.family_id) for r in rows]})
+        except ProgrammingError:  # a gateway not upgraded yet
+            return {}
+        return {
+            (str(m["agent_id"]), str(m["device_id"])): DeviceDTO(
+                os=m["os"], app_version=m["app_version"], plugins=_json_list(m["plugins"]),
+                mcp_programs=_json_list(m["mcp_programs"]), reported_at=m["reported_at"],
+            )
+            for m in found.mappings().all()
+        }
+
+
+def _sign_in(row: Any, devices: dict[tuple[str, str], DeviceDTO] | None = None) -> SignInDTO:
     return SignInDTO(
         device_id=row.family_id,
         agent_id=row.agent_id,
@@ -949,19 +1068,23 @@ def _sign_in(row: Any) -> SignInDTO:
         last_used_at=row.last_used_at,
         expires_at=row.expires_at,
         idle_expires_at=row.idle_expires_at,
+        device=(devices or {}).get((str(row.agent_id), str(row.family_id))),
     )
 
 
 @router.get("/{agent_ref}/sign-ins", response_model=list[SignInDTO], name="list_agent_sign_ins")
 async def list_agent_sign_ins(
     agent_ref: str,
+    request: Request,
     user: Annotated[User, Depends(current_active_user)],
     dao: AgentsDAO = Depends(),
     rbac: RbacDAO = Depends(),
 ) -> list[SignInDTO]:
-    """The devices signed in to the agent, for its maintainers."""
+    """The devices signed in to the agent, for its maintainers; each with what it last reported."""
     agent = await _inspected_agent(dao, rbac, agent_ref, user)
-    return [_sign_in(r) for r in await dao.active_families(now=datetime.now(UTC), agent_id=agent.id)]
+    rows = await dao.active_families(now=datetime.now(UTC), agent_id=agent.id)
+    devices = await _devices(request, rows)
+    return [_sign_in(r, devices) for r in rows]
 
 
 # -- tokens --------------------------------------------------------------------------
@@ -1045,11 +1168,14 @@ async def refresh_agent_tokens(
 
 @tokens_router.get("/mine", response_model=list[SignInDTO], name="list_my_agent_sign_ins")
 async def list_my_sign_ins(
+    request: Request,
     user: Annotated[User, Depends(current_active_user)],
     dao: AgentsDAO = Depends(),
 ) -> list[SignInDTO]:
-    """The user's own sign-ins to agents."""
-    return [_sign_in(r) for r in await dao.active_families(now=datetime.now(UTC), user_id=user.id)]
+    """The user's own sign-ins to agents, each with what its device last reported about itself."""
+    rows = await dao.active_families(now=datetime.now(UTC), user_id=user.id)
+    devices = await _devices(request, rows)
+    return [_sign_in(r, devices) for r in rows]
 
 
 @tokens_router.delete("/{device_id}", status_code=status.HTTP_204_NO_CONTENT, name="revoke_agent_sign_in")

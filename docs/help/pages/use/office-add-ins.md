@@ -133,5 +133,6 @@ This signs you out of all four applications on this computer.
 | There is no **Fadenstack** group in Outlook | You are in the new Outlook for Windows. Switch back to classic Outlook. |
 | **The e-mail or password is not right.** | Only with a password: check them, and sign in again. Forgot your password? See [Your account](account.md#forgot-your-password). |
 | **You have no access to this agent.** | Your administrator has not given it to you yet, or the agent's address set for this application is wrong. |
+| **Your organisation turned this agent off.** | Your administrator stopped the agent for now. Your conversations stay on your computer; once it is on again, ask again. |
 | **Office is busy (a cell may be in edit mode, or a dialog is open). Finish that and try again.** | Leave the cell, or close the dialog, and ask again. |
 | **The agent could not start**, with a reason | Select **Try again**. If it keeps failing, tell your IT department what the reason says. |

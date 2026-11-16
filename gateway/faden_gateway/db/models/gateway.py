@@ -1077,6 +1077,29 @@ class AgentClientManifest(Base):
     last_device_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
+class AgentDeviceInventory(Base):
+    """What a device signed in to an agent last reported about itself (sdk/51 8.3).
+
+    The manifest's ``device`` block. One row per agent and device (the agent token's ``did``), replaced at
+    each report, and shown per device in the console. Erased with the person's account; a row not reported for
+    90 days goes (``agent_manifests.purge_devices``).
+    """
+
+    __tablename__ = "agent_device_inventory"
+
+    agent_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    device_id: Mapped[str] = mapped_column(String(64), primary_key=True, index=True)
+    tenant_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    user_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    os: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    app_version: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    #: ``[{name, version?, sha256}]``.
+    plugins: Mapped[list[Any]] = mapped_column(JSON, nullable=False, default=list)
+    #: ``[{name, program?, sha256}]``: a local MCP server's program, by its file name only.
+    mcp_programs: Mapped[list[Any]] = mapped_column(JSON, nullable=False, default=list)
+    reported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+
+
 # ---------------------------------------------------------------------------
 # Governance
 # ---------------------------------------------------------------------------
@@ -1105,6 +1128,10 @@ class PolicyDecisionRecord(Base):
     #: What the user's answer to a waiting call said it covers: ``once``, ``chat`` or ``always``; ``None``
     #: without an answer, or from a client that does not say.
     answer_scope: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    #: The SHA-256 of the call's arguments as the answering client hashed them (sdk/51 8.10), so the record
+    #: matches the device's audit log; kept as sent, never recomputed. ``None`` without an answer or from
+    #: older clients.
+    arguments_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     policy_id: Mapped[str] = mapped_column(String(128), nullable=False)
     #: The policy's name: for auditors, never shown to the user.
     policy_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
@@ -1167,8 +1194,9 @@ class ApprovalGrant(Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="active", server_default="active")
     paused_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    #: ``person``, ``admin``, ``agent`` (the device ended it), ``kill_switch`` (Bypass turned off) or ``limit`` (a
-    #: limit an administrator changed no longer allows it; an extension's, as ``approval_grant_change.changed_by``).
+    #: ``person``, ``admin``, ``agent`` (the device ended it), ``kill_switch`` (Bypass turned off),
+    #: ``agent_turned_off`` (the agent was turned off, or on again) or ``limit`` (a limit an administrator
+    #: changed no longer allows it; an extension's, as ``approval_grant_change.changed_by``).
     revoked_by: Mapped[str | None] = mapped_column(String(16), nullable=True)
     #: What allowed it (the agent's version and the limits applied), what is recorded, what the person saw.
     policy_version: Mapped[str | None] = mapped_column(String(64), nullable=True)

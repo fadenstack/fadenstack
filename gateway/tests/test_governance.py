@@ -628,6 +628,39 @@ async def test_a_waiting_call_takes_the_scopes_its_class_allows_and_the_scope_is
 
 
 @pytest.mark.anyio
+async def test_an_answer_carries_the_arguments_hash_into_the_decision_record(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """sdk/51 8.10: the record matches the device's audit log entry; a bad hash is refused, the call waits on."""
+    digest = "c0ffee" + "0" * 58
+    await _setup(fastapi_app, db_session)
+    await _make(db_session, "write")
+    _Knowledge(monkeypatch)
+    _Model(monkeypatch, _call("knowledge_search", {"query": "launch"}), _say("Done."))
+
+    ask = client.post("/v1/chat/completions", headers=_headers(**EVENTS), json={
+        "model": ALIAS, "stream": True, "messages": [{"role": "user", "content": "When?"}],
+    })
+    _, sent = await asyncio.wait_for(asyncio.gather(ask, _post_answers(
+        client, {"approved": True, "scope": "once", "arguments_sha256": "NOT-A-HASH"},
+        {"approved": True, "scope": "once", "arguments_sha256": digest},
+    )), 10)
+    assert [s.status_code for s in sent] == [422, 200]
+    [approved] = [d for d in await _decisions(db_session) if d.outcome == "approved"]
+    assert approved.arguments_sha256 == digest
+
+
+def test_a_repeated_answer_is_the_same_answer_whatever_hash_it_carries() -> None:
+    first = gov.Answer(approved=True, scope="once", arguments_sha256="a" * 64)
+    assert first == gov.Answer(approved=True, scope="once", arguments_sha256="b" * 64)
+    assert first == gov.Answer(approved=True, scope="once")
+    assert first != gov.Answer(approved=True, scope="chat", arguments_sha256="a" * 64)
+    stored = gov._record(json.dumps({"tenant": "t", "user": "u", "approved": True, "scope": "once",
+                                     "arguments_sha256": "a" * 64}))
+    assert stored is not None and stored.answer.arguments_sha256 == "a" * 64
+
+
+@pytest.mark.anyio
 @pytest.mark.parametrize("require_scope", [False, True], ids=["setting-off", "setting-on"])
 async def test_an_answer_without_a_scope_is_refused_only_with_the_setting_on(
     require_scope: bool, fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession,

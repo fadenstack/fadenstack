@@ -173,6 +173,12 @@ class AgentDTO(BaseModel):
     unenforced: list[str] = Field(default_factory=list)
     #: Those of them that are restrictions: lifted with ``DELETE .../restrictions/{name}``.
     unenforced_restrictions: list[str] = Field(default_factory=list)
+    #: Whether the agent is on. Turned off (``POST .../turn-off``), its apps are refused with
+    #: ``agent_disabled`` until it is turned on again (``POST .../turn-on``); its sign-ins stay.
+    enabled: bool = True
+    turned_off_at: datetime | None = None
+    #: Who turned it off; ``None`` when on, or when that account is gone.
+    turned_off_by: uuid.UUID | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -520,6 +526,32 @@ class AcceptAppsRequest(BaseModel):
     publish: bool = False
 
 
+class DevicePluginDTO(BaseModel):
+    """A plugin the device's app loads, with its file's SHA-256."""
+
+    name: str
+    version: str | None = None
+    sha256: str
+
+
+class DeviceMcpProgramDTO(BaseModel):
+    """A local MCP server's program on the device: its file name (never a folder) and SHA-256."""
+
+    name: str
+    program: str | None = None
+    sha256: str
+
+
+class DeviceDTO(BaseModel):
+    """What the device's SDK last reported about it (the manifest's ``device`` block, sdk/51 8.3)."""
+
+    os: str | None = None
+    app_version: str | None = None
+    plugins: list[DevicePluginDTO] = Field(default_factory=list)
+    mcp_programs: list[DeviceMcpProgramDTO] = Field(default_factory=list)
+    reported_at: datetime
+
+
 class SignInDTO(BaseModel):
     """One sign-in (device) to an agent."""
 
@@ -531,6 +563,8 @@ class SignInDTO(BaseModel):
     last_used_at: datetime | None
     expires_at: datetime
     idle_expires_at: datetime
+    #: What the device last reported about itself; ``None`` until its SDK sends the block.
+    device: DeviceDTO | None = None
 
 
 class DeveloperModeRequest(BaseModel):

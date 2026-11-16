@@ -27,7 +27,7 @@ import uuid
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -734,6 +734,25 @@ async def revoke(
     return (await session.execute(
         select(ApprovalGrant).where(ApprovalGrant.id == grant_id, mine),
     )).scalar_one_or_none()
+
+
+async def end_agent(session: AsyncSession, agent_id: str, *, by: str) -> int:
+    """End every running or paused grant of *agent_id*, on every device, recorded as ended *by*; how many.
+
+    The agent was turned off, or is turned on again (sdk/51 8.3): no grant from before counts from the next
+    call on. Idempotent; the caller commits.
+    """
+    now = datetime.now(UTC)
+    ended = await session.execute(
+        update(ApprovalGrant)
+        .where(
+            ApprovalGrant.agent_id == agent_id, ApprovalGrant.status.in_(("active", "paused")),
+            ApprovalGrant.expires_at > now,
+        )
+        .values(status="revoked", revoked_at=now, revoked_by=by)
+        .execution_options(synchronize_session=False),
+    )
+    return int(getattr(ended, "rowcount", 0) or 0)
 
 
 async def pause(session: AsyncSession, grant_id: uuid.UUID, owner: Owner) -> ApprovalGrant | None:

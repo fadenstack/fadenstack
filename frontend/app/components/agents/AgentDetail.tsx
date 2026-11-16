@@ -22,6 +22,7 @@ import Typography from "@mui/material/Typography";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import EditIcon from "@mui/icons-material/Edit";
+import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import RestoreFromTrashIcon from "@mui/icons-material/RestoreFromTrash";
 import RemoveCircleOutlineIcon from "@mui/icons-material/RemoveCircleOutline";
 
@@ -32,11 +33,13 @@ import { useAction } from "~/lib/useAction";
 import { useAsyncData } from "~/lib/useAsyncData";
 import { useCan } from "~/lib/useCan";
 import { useTabParam } from "~/lib/useTabParam";
+import { formatDateTime } from "~/lib/dates";
+import { usePrincipalNames } from "~/lib/usePrincipalNames";
 
 import { AgentAccessPanel } from "./AgentAccessPanel";
 import { AgentActivityPanel } from "./AgentActivityPanel";
 import { AgentAppsPanel } from "./AgentAppsPanel";
-import { AgentStatusChip, AgentVersionChips } from "./AgentChips";
+import { AgentOffChip, AgentStatusChip, AgentVersionChips } from "./AgentChips";
 import { AgentDefinitionPanel } from "./AgentDefinitionPanel";
 import { AgentSkillsPanel } from "./AgentSkillsPanel";
 import { AgentVersionsPanel } from "./AgentVersionsPanel";
@@ -196,9 +199,13 @@ function AgentHeader({
   const rights = agentRights(useCan());
   const [editing, setEditing] = useState(false);
   const [retiring, setRetiring] = useState(false);
+  const [turningOff, setTurningOff] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const change = useAction();
   const retired = agent.status === "retired";
+  const off = agent.enabled === false;
+  // Who turned it off: named like the people in the agent's activity (the id until the name comes).
+  const nameOf = usePrincipalNames(useMemo(() => [agent.turned_off_by], [agent.turned_off_by]), agentsApi.namePrincipals);
   const canDelete = retired && rights.delete;
 
   return (
@@ -212,6 +219,7 @@ function AgentHeader({
                 {agent.name}
               </Typography>
               <AgentStatusChip status={agent.status} />
+              <AgentOffChip agent={agent} />
               <AgentVersionChips agent={agent} />
             </Stack>
             <Typography variant="body2" color="text.secondary" fontFamily="monospace">
@@ -253,19 +261,50 @@ function AgentHeader({
                 {t("agents.restore")}
               </Button>
             ) : (
-              <Button
-                size="small"
-                color="error"
-                variant="outlined"
-                startIcon={<RemoveCircleOutlineIcon />}
-                onClick={() => setRetiring(true)}
-              >
-                {t("agents.retire")}
-              </Button>
+              <>
+                {agent.enabled === false ? (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<PowerSettingsNewIcon />}
+                    disabled={change.busy}
+                    onClick={() => void change.run(() => agentsApi.turnOn(agent.slug), onChanged)}
+                  >
+                    {t("agents.turn_on")}
+                  </Button>
+                ) : (
+                  <Button
+                    size="small"
+                    color="warning"
+                    variant="outlined"
+                    startIcon={<PowerSettingsNewIcon />}
+                    onClick={() => setTurningOff(true)}
+                  >
+                    {t("agents.turn_off")}
+                  </Button>
+                )}
+                <Button
+                  size="small"
+                  color="error"
+                  variant="outlined"
+                  startIcon={<RemoveCircleOutlineIcon />}
+                  onClick={() => setRetiring(true)}
+                >
+                  {t("agents.retire")}
+                </Button>
+              </>
             )}
           </Stack>
         )}
       </Stack>
+      {off && (
+        <Alert severity="warning" data-testid="agent-off-notice">
+          {agent.turned_off_by
+            ? t("agents.off_notice_by", { when: formatDateTime(agent.turned_off_at), name: nameOf(agent.turned_off_by) })
+            : t("agents.off_notice", { when: formatDateTime(agent.turned_off_at) })}{" "}
+          {t("agents.off_notice_help")}
+        </Alert>
+      )}
       {change.error && (
         <Alert severity="error" onClose={() => change.setError(null)}>
           {change.error}
@@ -297,6 +336,24 @@ function AgentHeader({
             () => {
               setDeleting(false);
               onDeleted();
+            },
+          )
+        }
+      />
+      <ConfirmDialog
+        open={turningOff}
+        title={t("agents.turn_off_title", { name: agent.name })}
+        message={t("agents.turn_off_confirm")}
+        confirmLabel={t("agents.turn_off")}
+        cancelLabel={t("common.cancel")}
+        loading={change.busy}
+        onClose={() => setTurningOff(false)}
+        onConfirm={() =>
+          void change.run(
+            () => agentsApi.turnOff(agent.slug),
+            () => {
+              setTurningOff(false);
+              onChanged();
             },
           )
         }

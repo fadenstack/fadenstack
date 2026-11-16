@@ -80,6 +80,7 @@ async def test_a_draft_serves_its_newest_version_a_published_agent_its_published
         assert (draft.default_level, draft.max_level) == ("ask", "auto"), "the migration's default: as before"
         assert draft.local_skills_mode == "disable", "the migration's default: the person's own skills stay off"
         assert draft.local_mcp_plain_http == "deny", "the migration's default: no plain http on the local network"
+        assert draft.enabled is True, "the migration's default: every agent on"
 
         conn = await asyncpg.connect(rows["dsn"])
         await conn.execute(
@@ -100,6 +101,13 @@ async def test_a_draft_serves_its_newest_version_a_published_agent_its_published
         assert [m.value for m in published.levels()] == ["read_only", "ask"]
         assert published.local_skills_mode == "allow"
         assert published.local_mcp_plain_http == "allow"
+        assert published.enabled is True
+
+        conn = await asyncpg.connect(rows["dsn"])
+        await conn.execute("UPDATE agents SET turned_off_at = now() WHERE id = $1::uuid", rows["agent"])
+        await conn.close()
+        turned_off = await backend.agent(("default", rows["slug"]))
+        assert turned_off is not None and turned_off.enabled is False, "turned off (sdk/51 8.3)"
 
         assert await backend.agent(("other-tenant", rows["slug"])) is None
         flags = await backend.user(rows["user"])

@@ -4745,10 +4745,21 @@
       "sign_out_confirm": "{{device}} ({{user}}) muss sich erneut anmelden, um den Agenten zu nutzen.",
       "suppressed": "Weniger als {{k}} Personen haben diesen Agenten in diesem Zeitraum genutzt. Seine Zahlen werden deshalb nicht angezeigt: Sie würden auf einzelne Personen hinweisen.",
       "day_suppressed": "Tage mit weniger als {{k}} Personen sind ausgelassen.",
-      "user_hidden": "Nicht angezeigt"
+      "user_hidden": "Nicht angezeigt",
+      "report_show": "Gerätebericht anzeigen",
+      "report_hide": "Gerätebericht ausblenden",
+      "arguments_sha256": "SHA-256 der Argumente"
     },
     "back_to_chat": "Zurück zum Chat",
-    "no_access": "Sie betreuen keine Agenten. Bitten Sie einen Administrator, Sie zum Betreuer eines Agenten zu machen."
+    "no_access": "Sie betreuen keine Agenten. Bitten Sie einen Administrator, Sie zum Betreuer eines Agenten zu machen.",
+    "off": "Aus",
+    "turn_off": "Ausschalten",
+    "turn_on": "Einschalten",
+    "turn_off_title": "{{name}} ausschalten?",
+    "turn_off_confirm": "Die Apps stoppen sofort: Jeder Chat und jeder Tool-Aufruf wird mit „Ihre Organisation hat diesen Agenten ausgeschaltet“ abgewiesen, und laufende Freigaben enden. Die Anmeldungen bleiben, die Apps funktionieren also wieder, sobald Sie ihn einschalten.",
+    "off_notice": "Ausgeschaltet am {{when}}.",
+    "off_notice_by": "Ausgeschaltet am {{when}} von {{name}}.",
+    "off_notice_help": "Seine Apps werden abgewiesen, bis er wieder eingeschaltet wird; ihre Anmeldungen bleiben."
   },
   "governance": {
     "title": "Governance",
@@ -5862,5 +5873,20 @@
     "title": "Bilderzeugung ausgeschaltet",
     "note": "Die Bilderzeugung ist in dieser Version ausgeschaltet. Ab dem 2. Dezember 2026 verlangt die EU-KI-Verordnung (Artikel 5) Schutzmaßnahmen gegen das Erzeugen schädlicher Bilder, und diese Version hat sie noch nicht. Die Bilderzeugung kommt in einer späteren Version mit diesen Schutzmaßnahmen zurück.",
     "short": "In dieser Version aus (EU-KI-Verordnung)"
+  },
+  "device_report": {
+    "title": "Gerätebericht",
+    "system": "System",
+    "app_version": "App-Version",
+    "plugins": "Plugins",
+    "mcp_programs": "MCP-Programme",
+    "sha256": "SHA-256",
+    "file": "Datei",
+    "unknown": "Unbekannt",
+    "none_plugins": "Keine Plugins.",
+    "none_mcp": "Keine MCP-Programme.",
+    "not_reported": "Noch nicht gemeldet",
+    "reported": "Gemeldet am {{when}}",
+    "copy": "SHA-256 von {{name}} kopieren"
   }
 }

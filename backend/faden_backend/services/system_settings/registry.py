@@ -832,13 +832,15 @@ SETTINGS_REGISTRY: list[SettingDefinition] = [
         group="agents",
         label="Agent access token lifetime (s)",
         description=(
-            "How long an agent access token is valid. The SDK refreshes it; removing a user's "
-            "access takes effect within this time."
+            "How long an agent access token is valid, 60 to 300 seconds. The SDK refreshes it; removing a "
+            "user's access or signing out a device takes effect within this time."
         ),
         is_secret=False,
-        default=600,
+        default=300,
         apply_scope=SystemApplyScope.LIVE_RELOAD,
         service_targets=(),
+        min_value=60,
+        max_value=300,
     ),
     SettingDefinition(
         key="agents.refresh_token_ttl_s",

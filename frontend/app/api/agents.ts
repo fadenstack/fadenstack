@@ -109,6 +109,11 @@ export interface Agent {
   unenforced_restrictions?: string[];
   created_at: string;
   updated_at: string;
+  /** False while the agent is turned off (its apps are refused; sign-ins stay). */
+  enabled: boolean;
+  turned_off_at: string | null;
+  /** A user id; told only to those who manage the agent. */
+  turned_off_by: string | null;
 }
 
 export interface AgentGrant {
@@ -178,6 +183,17 @@ export interface AgentSignIn {
   last_used_at: string | null;
   expires_at: string;
   idle_expires_at: string;
+  /** What the device's app last reported about itself; null until it reports. */
+  device: AgentDevice | null;
+}
+
+/** What a device's app reported about itself: its system, its plugins and the MCP programs it runs. */
+export interface AgentDevice {
+  os: string | null;
+  app_version: string | null;
+  plugins: { name: string; version?: string | null; sha256: string }[];
+  mcp_programs: { name: string; program?: string | null; sha256: string }[];
+  reported_at: string;
 }
 
 /** A class an app gives a tool; `unknown` when it gives none (the tool always asks). */
@@ -280,6 +296,9 @@ export const agentsApi = {
   /** Closed to everyone; versions, grants and history stay. */
   retire: (agent: string) => request<Agent>(`${at(agent)}/retire`, json("POST")),
   restore: (agent: string) => request<Agent>(`${at(agent)}/restore`, json("POST")),
+  /** Refuse the agent's apps at once (sign-ins stay, running grants end); for those who manage it. */
+  turnOff: (agent: string) => request<Agent>(`${at(agent)}/turn-off`, json("POST")),
+  turnOn: (agent: string) => request<Agent>(`${at(agent)}/turn-on`, json("POST")),
   /** Gone for good, with its versions, access and sign-ins (`agents:delete`; a retired agent only). */
   remove: (agent: string) => request<void>(at(agent), json("DELETE")),
 

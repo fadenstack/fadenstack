@@ -34,6 +34,7 @@ from sqlalchemy import CursorResult, delete, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_gateway.db.models.gateway import (
+    AgentDeviceInventory,
     ApprovalGrant,
     AttachmentScope,
     ChatAttachment,
@@ -282,6 +283,8 @@ async def erase_user(session: AsyncSession, file_store: Any, user_id: str) -> Er
     erased.memory_facts += facts.rowcount or 0
     # Their grants, and with them the calls each covered (their arguments), as their tool calls above.
     await session.execute(delete(ApprovalGrant).where(ApprovalGrant.user_id == user_id))
+    # What their devices reported about themselves (the manifest's device block): a device is the person's.
+    await session.execute(delete(AgentDeviceInventory).where(AgentDeviceInventory.user_id == user_id))
     return erased
 
 

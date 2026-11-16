@@ -12,6 +12,7 @@ import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import Stack from "@mui/material/Stack";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { useTheme } from "@mui/material/styles";
 import LogoutIcon from "@mui/icons-material/Logout";
@@ -26,6 +27,7 @@ import { useAction } from "~/lib/useAction";
 import { useAsyncData } from "~/lib/useAsyncData";
 import { usePrincipalNames } from "~/lib/usePrincipalNames";
 
+import { DeviceReportToggle, shortHash } from "./DeviceReport";
 import { EVENT_TYPES, summarizeEvent } from "./agentEvents";
 
 const RANGES = ["7", "30", "90"] as const;
@@ -211,6 +213,13 @@ function EventsTable({
                 {parts.join(" · ")}
               </Typography>
             )}
+            {s.argumentsSha256 && (
+              <Tooltip title={`${t("agents.activity.arguments_sha256")}: ${s.argumentsSha256}`}>
+                <Typography variant="caption" fontFamily="monospace" color="text.secondary" noWrap data-testid="arguments-sha256">
+                  {shortHash(s.argumentsSha256)}
+                </Typography>
+              </Tooltip>
+            )}
           </Stack>
         );
       },
@@ -252,6 +261,20 @@ function EventsTable({
   );
 }
 
+/** The device's name, and under it, on request, what its app reported about itself. */
+function DeviceCell({ signIn }: { signIn: AgentSignIn }) {
+  return (
+    <Stack spacing={0.5} alignItems="flex-start" sx={{ minWidth: 0 }}>
+      {signIn.device_label ?? (
+        <Typography variant="body2" fontFamily="monospace">
+          {signIn.device_id}
+        </Typography>
+      )}
+      <DeviceReportToggle device={signIn.device} />
+    </Stack>
+  );
+}
+
 function SignInsTable({
   agent,
   signIns,
@@ -273,8 +296,8 @@ function SignInsTable({
       key: "device",
       label: t("agents.activity.device"),
       searchValue: (s) => s.device_label ?? s.device_id,
-      render: (s) => s.device_label ?? <Typography variant="body2" fontFamily="monospace">{s.device_id}</Typography>,
-      minWidth: 180,
+      render: (s) => <DeviceCell signIn={s} />,
+      minWidth: 220,
     },
     { key: "user", label: t("agents.activity.user"), searchValue: (s) => nameOf(s.user_id), render: (s) => nameOf(s.user_id), minWidth: 180 },
     {

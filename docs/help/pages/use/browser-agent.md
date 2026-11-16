@@ -216,6 +216,7 @@ More on what is kept and who sees it: [Your data and privacy](privacy.md).
 | **There is no agent '…' on …** | The **Agent** name is wrong. Use **Change server or agent** and enter it as your administrator gave it. |
 | **You have no access to '…'. Ask your administrator to grant it to you or your team.** | You are not yet allowed to use this agent. |
 | **'…' has no published version yet.** or **'…' is retired.** | The agent is not available. Ask your administrator. |
+| **Your organisation turned this agent off.** | Your administrator stopped the agent for now. Your conversations stay in this browser; once it is on again, ask again. |
 | **Your account is deactivated.** | Ask your administrator. |
 | **Fadenstack needs to reach the server. Allow it when Chrome asks.** | You declined Chrome's question. Select **Connect** again and allow it. |
 | **This agent's model does not see pictures.** | Pictures cannot go to this agent. Ask your administrator if you need them. |

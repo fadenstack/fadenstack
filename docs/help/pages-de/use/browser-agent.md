@@ -212,6 +212,7 @@ Mehr dazu, was gespeichert wird und wer es sieht: [Ihre Daten und Datenschutz](p
 | **Auf … gibt es keinen Agenten „…“.** | Der Name unter **Agent** ist falsch. Wählen Sie **Server oder Agent ändern** und geben Sie ihn so ein, wie Ihr Administrator ihn Ihnen genannt hat. |
 | **Sie haben keinen Zugriff auf „…“.** | Sie dürfen diesen Agenten noch nicht nutzen. Bitten Sie Ihre Administration, ihn Ihnen oder Ihrem Team freizugeben. |
 | **„…“ hat noch keine veröffentlichte Version.** oder **„…“ ist außer Betrieb.** | Der Agent ist nicht verfügbar. Wenden Sie sich an Ihren Administrator. |
+| Eine Meldung, dass Ihre Organisation diesen Agenten ausgeschaltet hat | Ihr Administrator hat den Agenten vorerst gestoppt. Ihre Unterhaltungen bleiben in diesem Browser; sobald er wieder eingeschaltet ist, fragen Sie erneut. |
 | **Ihr Konto ist deaktiviert.** | Wenden Sie sich an Ihren Administrator. |
 | **Fadenstack muss den Server erreichen. Erlauben Sie es, wenn Chrome fragt.** | Sie haben die Frage von Chrome abgelehnt. Wählen Sie erneut **Verbinden** und erlauben Sie den Zugriff. |
 | **Das Modell dieses Agenten sieht keine Bilder.** | Bilder können nicht an diesen Agenten gehen. Fragen Sie Ihren Administrator, wenn Sie sie brauchen. |
