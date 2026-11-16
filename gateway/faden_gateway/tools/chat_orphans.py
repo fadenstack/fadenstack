@@ -24,12 +24,26 @@ import asyncpg
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
-from faden_gateway.db.models.gateway import ChatAttachment, ChatProject, ChatSession, MemoryFact
+from faden_gateway.db.models.gateway import (
+    AgentClientEvent,
+    AgentClientManifest,
+    AgentDeviceInventory,
+    ChatAttachment,
+    ChatProject,
+    ChatSession,
+    MemoryFact,
+)
 from faden_gateway.services.gateway import erasure
 from faden_gateway.services.gateway.file_store import LocalFileStore
 from faden_gateway.settings import settings
 
-_TABLES = {"chats": ChatSession, "projects": ChatProject, "files": ChatAttachment, "memory_facts": MemoryFact}
+#: Each kind of data an account leaves, and the column that names the account. What the apps reported is
+#: erased with an account from 0.7.1 on: accounts deleted before left it, so it is found here too.
+_TABLES: dict[str, Any] = {
+    "chats": ChatSession.user_id, "projects": ChatProject.user_id, "files": ChatAttachment.user_id,
+    "memory_facts": MemoryFact.user_id, "app_events": AgentClientEvent.user_id,
+    "app_manifests": AgentClientManifest.last_user_id, "devices": AgentDeviceInventory.user_id,
+}
 
 
 async def backend_user_ids() -> set[str]:
@@ -46,10 +60,10 @@ async def backend_user_ids() -> set[str]:
 
 
 async def find(session: AsyncSession, known: set[str]) -> dict[str, dict[str, int]]:
-    """Per account that no longer exists, how many of each kind of chat data it left."""
+    """Per account that no longer exists, how many of each kind of data it left."""
     found: dict[str, dict[str, int]] = {}
-    for label, model in _TABLES.items():
-        rows = (await session.execute(select(model.user_id, func.count()).group_by(model.user_id))).all()
+    for label, column in _TABLES.items():
+        rows = (await session.execute(select(column, func.count()).group_by(column))).all()
         for user_id, count in rows:
             if str(user_id) not in known:
                 found.setdefault(str(user_id), dict.fromkeys(_TABLES, 0))[label] = int(count)

@@ -103,7 +103,7 @@ When a limit stops a request, the message names the limit, for example the insta
 |---|---|
 | **A chat** | It disappears from your list at once and cannot be brought back. The server keeps it for the time your organisation set (30 days unless it chose another), then erases it for good, with its files and what the assistant remembered from it. |
 | **A project** | It is erased at once, with all its chats and their files. |
-| **Your account** (an administrator does it) | Your chats, projects, files and what the assistant remembered are erased with it. |
+| **Your account** (an administrator does it) | Your chats, projects, files and what the assistant remembered are erased with it, and so is what your apps reported to the server: which tools ran and when, and your devices' reports. |
 | A chat in **Chat history**, in the browser agent | It is removed from your browser. |
 | **Delete my data on this device**, in the browser agent's settings | All chats and **Allow always** choices kept for you in that browser are erased, with their key, and you are signed out. **Export my data** saves them first, as a file. |
 

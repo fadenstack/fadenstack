@@ -4754,10 +4754,11 @@
     "turn_off": "Turn off",
     "turn_on": "Turn on",
     "turn_off_title": "Turn off {{name}}?",
-    "turn_off_confirm": "Its apps stop at once: every chat and tool call is refused with “Your organisation turned this agent off”, and running grants end. Sign-ins stay, so the apps work again as soon as you turn it on.",
+    "turn_off_confirm": "Its apps stop at once: every chat and tool call is refused with “{{message}}”, and running grants end. Sign-ins stay, so the apps work again as soon as you turn it on.",
     "off_notice": "Turned off {{when}}.",
     "off_notice_by": "Turned off {{when}} by {{name}}.",
-    "off_notice_help": "Its apps are refused until it is turned on again; their sign-ins stay."
+    "off_notice_help": "Its apps are refused until it is turned on again; their sign-ins stay.",
+    "off_message": "Your organisation turned this agent off."
   },
   "governance": {
     "title": "Governance",

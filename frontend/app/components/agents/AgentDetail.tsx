@@ -343,7 +343,7 @@ function AgentHeader({
       <ConfirmDialog
         open={turningOff}
         title={t("agents.turn_off_title", { name: agent.name })}
-        message={t("agents.turn_off_confirm")}
+        message={t("agents.turn_off_confirm", { message: t("agents.off_message") })}
         confirmLabel={t("agents.turn_off")}
         cancelLabel={t("common.cancel")}
         loading={change.busy}

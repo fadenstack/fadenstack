@@ -103,7 +103,7 @@ Hält ein Limit eine Anfrage an, nennt die Meldung das Limit, etwa das Tageslimi
 |---|---|
 | **Einen Chat** | Er verschwindet sofort aus Ihrer Liste und lässt sich nicht zurückholen. Der Server behält ihn so lange, wie Ihre Organisation es eingestellt hat (30 Tage, wenn sie nichts anderes gewählt hat), und löscht ihn dann endgültig, mit seinen Dateien und dem, was sich der Assistent daraus gemerkt hat. |
 | **Ein Projekt** | Es wird sofort endgültig gelöscht, mit allen seinen Chats und deren Dateien. |
-| **Ihr Konto** (ein Administrator löscht es) | Ihre Chats, Projekte, Dateien und das, was sich der Assistent gemerkt hat, werden mit ihm gelöscht. |
+| **Ihr Konto** (ein Administrator löscht es) | Ihre Chats, Projekte, Dateien und das, was sich der Assistent gemerkt hat, werden mit ihm gelöscht, ebenso das, was Ihre Apps an den Server gemeldet haben: welche Tools wann liefen, und die Meldungen Ihrer Geräte. |
 | Einen Chat in **Chat history**, im Browser-Agenten | Er wird aus Ihrem Browser entfernt. |
 | **Meine Daten auf diesem Gerät löschen**, in den Einstellungen des Browser-Agenten | Alle Chats und Entscheidungen **Immer zulassen**, die für Sie in diesem Browser gespeichert sind, werden samt Schlüssel gelöscht, und Sie werden abgemeldet. **Meine Daten exportieren** speichert sie vorher als Datei. |
 

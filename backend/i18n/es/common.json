@@ -4756,10 +4756,11 @@
     "turn_off": "Apagar",
     "turn_on": "Encender",
     "turn_off_title": "¿Apagar {{name}}?",
-    "turn_off_confirm": "Sus aplicaciones se detienen al instante: cada chat y cada llamada a una herramienta se rechaza con «Su organización apagó este agente», y las autorizaciones en curso terminan. Los inicios de sesión se mantienen, así que las aplicaciones vuelven a funcionar en cuanto usted lo encienda.",
+    "turn_off_confirm": "Sus aplicaciones se detienen al instante: cada chat y cada llamada a una herramienta se rechaza con «{{message}}», y las autorizaciones en curso terminan. Los inicios de sesión se mantienen, así que las aplicaciones vuelven a funcionar en cuanto usted lo encienda.",
     "off_notice": "Apagado el {{when}}.",
     "off_notice_by": "Apagado el {{when}} por {{name}}.",
-    "off_notice_help": "Sus aplicaciones son rechazadas hasta que se vuelva a encender; sus inicios de sesión se mantienen."
+    "off_notice_help": "Sus aplicaciones son rechazadas hasta que se vuelva a encender; sus inicios de sesión se mantienen.",
+    "off_message": "Su organización apagó este agente."
   },
   "governance": {
     "title": "Gobernanza",

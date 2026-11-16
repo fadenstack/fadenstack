@@ -4756,10 +4756,11 @@
     "turn_off": "Éteindre",
     "turn_on": "Allumer",
     "turn_off_title": "Éteindre {{name}} ?",
-    "turn_off_confirm": "Ses applications s’arrêtent aussitôt : chaque discussion et chaque appel d’outil est refusé avec « Votre organisation a éteint cet agent », et les autorisations en cours prennent fin. Les connexions restent, donc les applications refonctionnent dès que vous l’allumez.",
+    "turn_off_confirm": "Ses applications s’arrêtent aussitôt : chaque discussion et chaque appel d’outil est refusé avec « {{message}} », et les autorisations en cours prennent fin. Les connexions restent, donc les applications refonctionnent dès que vous l’allumez.",
     "off_notice": "Éteint le {{when}}.",
     "off_notice_by": "Éteint le {{when}} par {{name}}.",
-    "off_notice_help": "Ses applications sont refusées tant qu’il n’est pas rallumé ; leurs connexions restent."
+    "off_notice_help": "Ses applications sont refusées tant qu’il n’est pas rallumé ; leurs connexions restent.",
+    "off_message": "Votre organisation a éteint cet agent."
   },
   "governance": {
     "title": "Gouvernance",

@@ -86,5 +86,7 @@ async def erase(
         "memory_facts": erased.memory_facts,
         # An account's usage: its request-log rows and person-level usage days.
         "request_logs": erased.request_logs, "usage_days": erased.usage_days,
+        # What its apps reported: events, the app manifests it reported last, its devices' reports.
+        "app_events": erased.app_events, "app_manifests": erased.app_manifests, "devices": erased.devices,
         "failed_files": erased.failed_files, "partial": erased.partial,
     }

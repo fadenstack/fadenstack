@@ -362,6 +362,29 @@ async def test_without_the_gateways_table_the_sign_ins_come_without_devices() ->
     assert await views._devices(none, rows) == {}  # type: ignore[arg-type]
 
 
+def test_the_apps_message_is_the_consoles_words() -> None:
+    """The gateway's refusal says, in English, what the console's ``agents.off_message`` says; the SDKs take the
+    console's words in its five languages (owner, 16 Nov), so the five texts live in one place."""
+    import ast
+
+    root = Path(__file__).resolve().parents[2]
+    source = (root / "gateway" / "faden_gateway" / "services" / "gateway" / "agents.py").read_text(encoding="utf-8")
+    found = {
+        node.targets[0].id: ast.literal_eval(node.value)
+        for node in ast.parse(source).body
+        if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name)
+        and node.targets[0].id in {"AGENT_DISABLED", "AGENT_DISABLED_MESSAGE"}
+    }
+    assert found["AGENT_DISABLED"] == "agent_disabled"
+    texts = {
+        lang: json.loads((root / "backend" / "i18n" / lang / "common.json").read_text(encoding="utf-8"))["agents"]
+        for lang in ("en", "de", "es", "fr", "zh")
+    }
+    assert texts["en"]["off_message"] == found["AGENT_DISABLED_MESSAGE"] == "Your organisation turned this agent off."
+    for lang, agents in texts.items():
+        assert agents["off_message"] and "{{message}}" in agents["turn_off_confirm"], lang
+
+
 def test_the_backend_signs_the_call_that_ends_an_agents_grants(secret: str) -> None:  # noqa: F811
     token = gateway_client.agent_switch_grant("agent-1", secret=secret)
     claims = jwt.decode(token, secret, algorithms=["HS256"])

@@ -34,6 +34,8 @@ from sqlalchemy import CursorResult, delete, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_gateway.db.models.gateway import (
+    AgentClientEvent,
+    AgentClientManifest,
     AgentDeviceInventory,
     ApprovalGrant,
     AttachmentScope,
@@ -71,6 +73,11 @@ class Erased:
     #: A person's request-log rows and their person-level usage days (an account erased: M12).
     request_logs: int = 0
     usage_days: int = 0
+    #: What a person's apps reported (an account erased): their events, the app manifests they reported last,
+    #: and their devices' reports. Each names the person and their device.
+    app_events: int = 0
+    app_manifests: int = 0
+    devices: int = 0
     #: Files that could not be deleted: their rows wait, emptied, for the next purge.
     failed_files: int = 0
 
@@ -87,6 +94,9 @@ class Erased:
         self.memory_facts += other.memory_facts
         self.request_logs += other.request_logs
         self.usage_days += other.usage_days
+        self.app_events += other.app_events
+        self.app_manifests += other.app_manifests
+        self.devices += other.devices
         self.failed_files += other.failed_files
         return self
 
@@ -241,7 +251,7 @@ async def erase_attachment(session: AsyncSession, file_store: Any, attachment_id
 
 
 async def erase_user(session: AsyncSession, file_store: Any, user_id: str) -> Erased:
-    """Everything of one person: projects, chats, files, memory, grants, and their usage (an account deleted).
+    """Everything of one person, an account deleted: chats, files, memory, grants, usage, their apps' reports.
 
     Their usage is their request-log rows (with their tool calls) and their person-level usage days
     (M12). The hourly and daily sums, which name no person, keep their totals: the rollup job recomputes
@@ -283,8 +293,19 @@ async def erase_user(session: AsyncSession, file_store: Any, user_id: str) -> Er
     erased.memory_facts += facts.rowcount or 0
     # Their grants, and with them the calls each covered (their arguments), as their tool calls above.
     await session.execute(delete(ApprovalGrant).where(ApprovalGrant.user_id == user_id))
-    # What their devices reported about themselves (the manifest's device block): a device is the person's.
-    await session.execute(delete(AgentDeviceInventory).where(AgentDeviceInventory.user_id == user_id))
+    # What their apps reported: the events (no content, but whose device did what and when), the app
+    # manifests they reported last (a manifest names only its last reporter; the app reports it again at its
+    # next start on anyone's device), and their devices' own reports.
+    events = await session.execute(delete(AgentClientEvent).where(AgentClientEvent.user_id == user_id))
+    erased.app_events = cast("CursorResult[Any]", events).rowcount or 0
+    manifests = await session.execute(
+        delete(AgentClientManifest).where(AgentClientManifest.last_user_id == user_id),
+    )
+    erased.app_manifests = cast("CursorResult[Any]", manifests).rowcount or 0
+    devices = await session.execute(
+        delete(AgentDeviceInventory).where(AgentDeviceInventory.user_id == user_id),
+    )
+    erased.devices = cast("CursorResult[Any]", devices).rowcount or 0
     return erased
 
 

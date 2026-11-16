@@ -153,6 +153,58 @@ async def test_erasing_a_person_takes_their_usage_and_leaves_the_sums(db_session
     assert await _count(db_session, UsageErased) == 1, "erased twice: noted once, with the later time"
 
 
+async def test_erasing_a_person_takes_what_their_apps_reported(db_session: AsyncSession) -> None:
+    """Owner, 16 Nov: the apps' events and the manifests a person reported go with the account (GDPR Art. 17)."""
+    from datetime import UTC, datetime  # noqa: PLC0415
+
+    from faden_gateway.db.models.gateway import (  # noqa: PLC0415
+        AgentClientEvent,
+        AgentClientManifest,
+        AgentDeviceInventory,
+    )
+
+    def event(user: str) -> AgentClientEvent:
+        return AgentClientEvent(tenant_id="t1", agent_id="a1", user_id=user, device_id=f"d-{user}",
+                                type="tool.executed", data={"tool": "x"})
+
+    def manifest(user: str, sha: str) -> AgentClientManifest:
+        return AgentClientManifest(tenant_id="t1", agent_id="a1", sha256=sha, source="app", manifest={},
+                                   last_user_id=user, last_device_id=f"d-{user}")
+
+    def device(user: str) -> AgentDeviceInventory:
+        return AgentDeviceInventory(agent_id="a1", device_id=f"d-{user}", tenant_id="t1", user_id=user,
+                                    plugins=[], mcp_programs=[], reported_at=datetime.now(UTC))
+
+    db_session.add_all([
+        event("u1"), event("u1"), event("u2"), manifest("u1", "a" * 64), manifest("u2", "b" * 64),
+        device("u1"), device("u2"),
+    ])
+    await db_session.flush()
+
+    erased = await erasure.erase_user(db_session, _Store(), "u1")
+
+    assert (erased.app_events, erased.app_manifests, erased.devices) == (2, 1, 1)
+    assert set((await db_session.execute(select(AgentClientEvent.user_id))).scalars()) == {"u2"}
+    assert set((await db_session.execute(select(AgentClientManifest.last_user_id))).scalars()) == {"u2"}
+    assert set((await db_session.execute(select(AgentDeviceInventory.user_id))).scalars()) == {"u2"}
+
+
+async def test_an_account_erase_answers_what_went_of_its_apps_reports(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession,
+) -> None:
+    from faden_gateway.db.models.gateway import AgentClientEvent  # noqa: PLC0415
+
+    db_session.add(AgentClientEvent(tenant_id="t1", agent_id="a1", user_id="u1", type="tool.executed", data={}))
+    await db_session.flush()
+    fastapi_app.state.chat_file_store = _Store()
+    r = await client.post(
+        "/internal/chat-erase", json={"scope": "user", "target": "u1"},
+        headers={ERASE_GRANT_HEADER: _grant("user", "u1")},
+    )
+    assert r.status_code == 200, r.text
+    assert (r.json()["app_events"], r.json()["app_manifests"], r.json()["devices"]) == (1, 0, 0)
+
+
 def _grant(scope: str, target: str, *, typ: str = "chat_erase") -> str:
     now = int(time.time())
     return jwt.encode(
@@ -221,6 +273,21 @@ async def test_chat_data_of_accounts_that_no_longer_exist_is_listed_then_erased_
 
         erased = await erasure.erase_user(session, _Store(), "gone")
         assert erased.chats == 1
+        assert await chat_orphans.find(session, await known()) == {}
+
+        # An account deleted before 0.7.1 left what its apps reported, even with no chat: found and erased too.
+        from faden_gateway.db.models.gateway import AgentClientEvent, AgentClientManifest  # noqa: PLC0415
+
+        session.add_all([
+            AgentClientEvent(tenant_id="t1", agent_id="a1", user_id="left-apps", type="tool.executed", data={}),
+            AgentClientManifest(tenant_id="t1", agent_id="a1", sha256="c" * 64, source="app", manifest={},
+                                last_user_id="left-apps"),
+        ])
+        await session.flush()
+        listed = await chat_orphans.find(session, await known())
+        assert list(listed) == ["left-apps"]
+        assert (listed["left-apps"]["app_events"], listed["left-apps"]["app_manifests"]) == (1, 1)
+        await erasure.erase_user(session, _Store(), "left-apps")
         assert await chat_orphans.find(session, await known()) == {}
         await session.close()
         await tx.rollback()
