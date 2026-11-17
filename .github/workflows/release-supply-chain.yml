@@ -575,7 +575,7 @@ jobs:
           set -euo pipefail
           archive="scorecard_${SCORECARD_VERSION#v}_linux_amd64.tar.gz"
           curl -fsSL -o "$RUNNER_TEMP/$archive" \
-            "https://gh.ali360.cloudns.ch/ossf/scorecard/releases/download/${SCORECARD_VERSION}/${archive}"
+            "https://github.com/ossf/scorecard/releases/download/${SCORECARD_VERSION}/${archive}"
           echo "${SCORECARD_SHA256}  $RUNNER_TEMP/$archive" | sha256sum --check --strict -
           tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" scorecard
 
