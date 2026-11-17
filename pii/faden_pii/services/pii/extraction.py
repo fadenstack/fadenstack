@@ -19,6 +19,9 @@ class TextUnit:
     key: Any
     person_hint: bool = False
     entity_hint: str | None = None
+    #: The text of a tool result: its element refs are structure, never redacted
+    #: (spans.STRUCTURAL_REF).
+    tool_result: bool = False
 
     @property
     def text(self) -> str:
@@ -194,8 +197,17 @@ class ExtractedPayload:
                 and index > 0
                 and name_question(messages[index - 1])
             )
+            tool_result = message.get("role") in ("tool", "function")
             if isinstance(content, str):
-                self.units.append(TextUnit(path + "/content", message, "content", hint))
+                self.units.append(
+                    TextUnit(
+                        path + "/content",
+                        message,
+                        "content",
+                        hint,
+                        tool_result=tool_result,
+                    )
+                )
             elif isinstance(content, list):
                 for number, part in enumerate(content):
                     if (
@@ -205,7 +217,13 @@ class ExtractedPayload:
                     ):
                         raise PIIError("pii_unsupported_surface")
                     self.units.append(
-                        TextUnit(f"{path}/content/{number}/text", part, "text", hint)
+                        TextUnit(
+                            f"{path}/content/{number}/text",
+                            part,
+                            "text",
+                            hint,
+                            tool_result=tool_result,
+                        )
                     )
             elif content is not None:
                 raise PIIError("pii_unsupported_surface")

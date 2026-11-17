@@ -171,6 +171,18 @@ ausdrücklich. Der Dienst lehnt nicht unterstützte Kategorien ab, statt sie sti
 - Was ein MCP-Tool erhält, legen Sie pro Server fest: siehe
   [MCP-Server](mcp-servers.md#personal-data-pii-mode).
 
+!!! tip "Agenten, die auf Seiten und in Dokumenten handeln, laufen mit `tokenize_reversible`"
+    Der Browser-Agent, die Office-Add-ins und jeder Agent, der Formulare ausfüllt oder Dokumente schreibt,
+    funktionieren nur mit echten Werten in ihren Tool-Aufrufen. Mit `redact` erreicht ein Name, den die Person
+    eingegeben hat, das Modell als `<PERSON>`, und das Modell kann diesen Platzhalter in ein Formular schreiben.
+    Mit `tokenize_reversible` setzt das Gateway den echten Wert wieder in den Tool-Aufruf ein, bevor die App ihn
+    ausführt. Stellen Sie in der Richtlinie, die für sie gilt, **Modus** auf `tokenize_reversible`, oder setzen
+    Sie **PII-Modus ändern** des Agenten auf **Erlaubt**, damit seine App ihn wählen kann.
+
+    In einem Tool-Ergebnis werden die Element-Verweise, die ein Seiten-Agent auflistet, etwa `[e50]` oder
+    `[f1.e3]`, in keinem der beiden Modi maskiert: Sie bezeichnen Teile der Seite, keine Personen, und der Agent
+    braucht sie, um dort zu handeln.
+
 ### Was der Filter gefunden hat {#what-the-filter-found}
 
 **Datenschutz (PII) → Dashboard** zeigt nur Zahlen: die Prüfungen, wie viele davon personenbezogene Daten

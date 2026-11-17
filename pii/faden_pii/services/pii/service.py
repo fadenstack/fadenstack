@@ -24,7 +24,12 @@ from presidio_analyzer import AnalyzerEngine, BatchAnalyzerEngine, RecognizerRes
 from presidio_anonymizer import AnonymizerEngine
 
 from faden_pii.services.pii.extraction import ExtractedPayload, name_value
-from faden_pii.services.pii.spans import resolve_spans, validate_spans
+from faden_pii.services.pii.spans import (
+    STRUCTURAL_REF,
+    resolve_spans,
+    subtract,
+    validate_spans,
+)
 from faden_pii.services.pii.errors import PIIError
 from faden_pii.services.pii.limits import validate_units
 from faden_pii.services.pii.runtime import (
@@ -423,6 +428,11 @@ class PIIService:
                             RecognizerResult(match[1], found.start(), found.end(), 1.0)
                         )
                 results[:] = resolve_spans(unit.text, results)
+        # Last, after every pass above: a tool result's element refs are never masked,
+        # whatever found them.
+        for unit, results in zip(extracted.units, analysis_rows, strict=True):
+            if unit.tool_result:
+                results[:] = subtract(unit.text, results, STRUCTURAL_REF, trim=True)
         analyses = iter(analysis_rows)
 
         if mode == "tokenize":

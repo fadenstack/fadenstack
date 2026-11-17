@@ -156,6 +156,16 @@ the service refuses unsupported coverage instead of silently ignoring that categ
 - What an MCP tool receives is set per server: see
   [MCP servers](mcp-servers.md#personal-data-pii-mode).
 
+!!! tip "Agents that act on pages and documents run under `tokenize_reversible`"
+    The browser agent, the Office add-ins and any agent that fills in forms or writes documents work only with
+    real values in their tool calls. Under `redact`, a name the person typed reaches the model as `<PERSON>`, and
+    the model can write that placeholder into a form. Under `tokenize_reversible`, the gateway puts the real
+    value back into the tool call before the app runs it. Set **Mode** to `tokenize_reversible` in the policy
+    that covers them, or set the agent's **Changing the PII mode** to **Allowed** so that its app can choose it.
+
+    In a tool result, the element refs a page agent lists, such as `[e50]` or `[f1.e3]`, are never masked, in
+    either mode: they name parts of the page, not people, and the agent needs them to act on it.
+
 ### What the filter found
 
 **Privacy (PII) → Dashboard** shows counts only: scans, how many found personal data, the kinds found, and
