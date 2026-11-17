@@ -1,0 +1,782 @@
+# Reusable workflow: the release supply chain for one product release.
+# For every release file and every image it makes an SBOM, scans it for known
+# vulnerabilities, writes VEX and CSAF documents, scores the repository with
+# OpenSSF Scorecard and, when it is not a dry run, signs, attests and uploads.
+# Called by the release workflows of the Fadenstack repositories.
+#
+# What it makes, per release file and per image (images by digest):
+#   SBOM       CycloneDX 1.6 JSON (syft), enriched for BSI TR-03183-2 by
+#              tools/release/sbom_tr03183.py: SBOM author and timestamp, the
+#              deliverable as the main component with SHA-512 and SHA-256 taken
+#              from its bytes, package URL, supplier, licences, dependencies and
+#              the bsi:component:* properties. A document that misses a required
+#              field fails the run.
+#   OSV        osv-scanner (pinned, checksum-verified) over each SBOM.
+#   VEX, CSAF  tools/release/vex_csaf.py matches the findings against the
+#              repository's OpenVEX file and writes an OpenVEX document for the
+#              release (findings without a statement are under_investigation)
+#              and a CSAF 2.0 csaf_vex document for each `affected` statement.
+#              Unless dry_run, a finding with CVSS >= 7.0 (or OSV severity HIGH
+#              or CRITICAL) without a statement other than under_investigation
+#              fails the run.
+#   Scorecard  OpenSSF Scorecard of the calling repository (never published).
+#   Signatures, provenance, upload (only when dry_run is false): see "Signing".
+#
+# Inputs:
+#   product         file name part and package URL namespace, e.g. fadenstack-cli.
+#   version         the release version.
+#   release_tag     the GitHub release that receives the results; required unless
+#                   dry_run. When files_artifact is empty, the release's assets
+#                   are also where the files come from.
+#   supplier_name, supplier_url
+#                   manufacturer and supplier of the deliverable and the SBOM
+#                   author (TR-03183-2 "SBOM creator" and "component creator").
+#   licence         SPDX expression of the deliverables (optional).
+#   files_artifact  name of an Actions artifact the caller uploaded with the
+#                   release files in the same run. Empty: use the release assets.
+#   files           newline-separated glob patterns (on the file name) that pick
+#                   the covered files. Checksums, signatures, bundles, earlier
+#                   SBOMs, VEX/CSAF documents and third-party notices are never
+#                   covered.
+#   images          newline-separated image references; each is resolved to its
+#                   digest and everything is done by digest.
+#   signing         keyless | key | none, see "Signing".
+#   attest          GitHub artifact attestations (build provenance and SBOM),
+#                   taken only when the calling repository is public. Otherwise
+#                   a notice, and the SLSA provenance is an in-toto statement
+#                   signed by the `signing` mode.
+#   vex_file        the repository's OpenVEX file (default .vex/openvex.json); a
+#                   missing file means no statements.
+#   scorecard       run OpenSSF Scorecard (default true).
+#   dry_run         default TRUE. See "Dry run".
+#   tools_ref       the full commit SHA of fadenstack/fadenstack that holds
+#                   tools/release/*.py: the same SHA as in the `uses:` line. A
+#                   called workflow cannot see its own ref, so the caller
+#                   passes it. (Callers in this repository pass github.sha.)
+#
+# Secrets (all optional): cosign_private_key and cosign_password (signing: key),
+# scorecard_token (a token that can read a private repository's settings; a
+# public repository needs none).
+#
+# Calling it:
+#   jobs:
+#     supply-chain:
+#       permissions:      # the caller grants the ceiling; each job below asks
+#         contents: write # for less. A dry run does not use the write grants.
+#         id-token: write
+#         attestations: write
+#         packages: write
+#         actions: read
+#       uses: fadenstack/fadenstack/.github/workflows/release-supply-chain.yml@<full commit sha>
+#       with:
+#         product: fadenstack-cli
+#         version: 0.7.0
+#         release_tag: v0.7.0
+#         supplier_name: Example GmbH
+#         supplier_url: https://example.com
+#         files_artifact: release-files
+#         tools_ref: <the same full commit sha>
+#         dry_run: false
+#       secrets: inherit
+#
+# Signing:
+#   keyless  cosign keyless signing with the run's OIDC identity. Sigstore's
+#            public Rekor log records the repository URL, workflow path, ref,
+#            commit SHA, trigger and run URL, and the public Fulcio certificate
+#            carries them. Public repositories only; the workflow refuses it in
+#            a private one.
+#   key      a cosign key pair from the secrets cosign_private_key and
+#            cosign_password. Signed with an empty signing config (no Rekor, no
+#            timestamp authority): nothing is written to a public log. The
+#            bundles verify with the public key.
+#   none     nothing is signed.
+#   Files get `cosign sign-blob --bundle` (<file>.sigstore.json); images get
+#   `cosign sign` and `cosign attest --type cyclonedx`. With attest on a public
+#   repository, actions/attest-build-provenance and actions/attest-sbom add
+#   GitHub attestations. Without them, tools/release/slsa_provenance.py writes
+#   the SLSA v1 provenance predicate (builder: the calling workflow's ref;
+#   source: repository and commit; invocation: the run; subjects by sha256) and
+#   cosign attests it (`attest-blob` for files, `attest` for images) in the
+#   `signing` mode. Then the SBOMs, VEX, CSAF documents, signatures, bundles and
+#   provenance go to the release with `gh release upload`.
+#
+# Dry run (dry_run: true, the default): SBOMs, OSV scan, VEX/CSAF and Scorecard
+# run as usual, but nothing leaves the runner: no signing (keyless would write
+# to Rekor), no attestation, no registry push, no `gh release` write and no
+# artifact upload. The sign-and-publish job is skipped. Everything produced is
+# summarised in the job logs and in $GITHUB_STEP_SUMMARY. The high-severity
+# fail rule is reported only.
+
+name: Release supply chain
+
+on:
+  workflow_call:
+    inputs:
+      product:
+        required: true
+        type: string
+      version:
+        required: true
+        type: string
+      release_tag:
+        required: false
+        type: string
+        default: ""
+      supplier_name:
+        required: true
+        type: string
+      supplier_url:
+        required: true
+        type: string
+      licence:
+        required: false
+        type: string
+        default: ""
+      files_artifact:
+        required: false
+        type: string
+        default: ""
+      files:
+        required: false
+        type: string
+        default: "*"
+      images:
+        required: false
+        type: string
+        default: ""
+      signing:
+        required: false
+        type: string
+        default: keyless
+      attest:
+        required: false
+        type: boolean
+        default: true
+      vex_file:
+        required: false
+        type: string
+        default: .vex/openvex.json
+      scorecard:
+        required: false
+        type: boolean
+        default: true
+      dry_run:
+        required: false
+        type: boolean
+        default: true
+      tools_ref:
+        required: true
+        type: string
+    secrets:
+      cosign_private_key:
+        required: false
+      cosign_password:
+        required: false
+      scorecard_token:
+        required: false
+
+permissions:
+  contents: read
+
+env:
+  OSV_SCANNER_VERSION: v2.7.1
+  OSV_SCANNER_SHA256: fb7dab19a8bd9bbe5c3189f09d4b7ee1820c9553a23bac202648a56efd2f6ee8
+  COSIGN_VERSION: v3.1.4
+  SYFT_VERSION: v1.57.2
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read  # resolves the digests of GHCR images
+    outputs:
+      matrix: ${{ steps.subjects.outputs.matrix }}
+      count: ${{ steps.subjects.outputs.count }}
+      visibility: ${{ steps.visibility.outputs.visibility }}
+      attest_github: ${{ steps.visibility.outputs.attest_github }}
+    steps:
+      - name: Validate the inputs
+        shell: bash
+        env:
+          PRODUCT: ${{ inputs.product }}
+          VERSION: ${{ inputs.version }}
+          TAG: ${{ inputs.release_tag }}
+          SIGNING: ${{ inputs.signing }}
+          TOOLS_REF: ${{ inputs.tools_ref }}
+          SUPPLIER_URL: ${{ inputs.supplier_url }}
+          VEX_FILE: ${{ inputs.vex_file }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          HAS_KEY: ${{ secrets.cosign_private_key != '' && secrets.cosign_password != '' }}
+        run: |
+          set -euo pipefail
+          [[ "$PRODUCT" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { echo "::error::product must be letters, digits, dot, dash or underscore"; exit 1; }
+          [[ "$VERSION" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]*$ ]] || { echo "::error::version has characters that are not allowed"; exit 1; }
+          [[ -z "$TAG" || "$TAG" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]] || { echo "::error::release_tag has characters that are not allowed"; exit 1; }
+          [[ "$SIGNING" =~ ^(keyless|key|none)$ ]] || { echo "::error::signing must be keyless, key or none"; exit 1; }
+          [[ "$TOOLS_REF" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::tools_ref must be a full 40-character commit SHA"; exit 1; }
+          [[ "$SUPPLIER_URL" =~ ^https://[^[:space:]]+$ ]] || { echo "::error::supplier_url must be an https URL"; exit 1; }
+          [[ "$VEX_FILE" != /* && "$VEX_FILE" != *..* ]] || { echo "::error::vex_file must be a path inside the repository"; exit 1; }
+          if [ "$DRY_RUN" != true ]; then
+            [ -n "$TAG" ] || { echo "::error::release_tag is required unless dry_run is true"; exit 1; }
+            if [ "$SIGNING" = key ] && [ "$HAS_KEY" != true ]; then
+              echo "::error::signing: key needs the secrets cosign_private_key and cosign_password"; exit 1
+            fi
+          fi
+
+      - name: Detect the repository's visibility
+        id: visibility
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ATTEST: ${{ inputs.attest }}
+          SIGNING: ${{ inputs.signing }}
+        run: |
+          set -euo pipefail
+          visibility=$(gh api "repos/$GITHUB_REPOSITORY" --jq .visibility)
+          echo "visibility=$visibility" >> "$GITHUB_OUTPUT"
+          attest_github=false
+          if [ "$ATTEST" = true ]; then
+            if [ "$visibility" = public ]; then
+              attest_github=true
+            else
+              echo "::notice::GitHub artifact attestations need a public repository on this plan; this one is $visibility. The SLSA provenance is signed with the signing mode instead."
+            fi
+          fi
+          echo "attest_github=$attest_github" >> "$GITHUB_OUTPUT"
+          if [ "$SIGNING" = keyless ] && [ "$visibility" != public ]; then
+            # Keyless signing writes the repository URL, workflow, ref and commit to the public Rekor log.
+            echo "::error::signing: keyless is for public repositories; this one is $visibility. Use signing: key."
+            exit 1
+          fi
+
+      - name: Download the release files (artifact)
+        if: ${{ inputs.files_artifact != '' }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ inputs.files_artifact }}
+          path: files
+
+      - name: Download the release files (release assets)
+        if: ${{ inputs.files_artifact == '' && inputs.release_tag != '' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p files
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir files
+
+      - name: Log in to GHCR
+        if: ${{ inputs.images != '' }}
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Select the files and resolve the images
+        id: subjects
+        shell: bash
+        env:
+          PATTERNS: ${{ inputs.files }}
+          IMAGES: ${{ inputs.images }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          subjects='[]'
+          index=0
+          if [ -d files ]; then
+            while IFS= read -r path; do
+              name=$(basename "$path")
+              # Not deliverables: checksums, signatures and bundles, earlier SBOMs, VEX and
+              # CSAF documents, PyPI's publish attestations, the signed release list and
+              # the binaries' third-party notices.
+              case "$name" in
+                *.sha256|*.sig|*.sigstore.json|*.bundle|*.attestation|*.spdx.json|*.cdx.json|*.openvex.json|*.csaf.json|*.intoto.json|*.intoto.jsonl|SHA256SUMS|index.json|*THIRD-PARTY-NOTICES.txt) continue ;;
+              esac
+              selected=false
+              while IFS= read -r pattern; do
+                pattern="${pattern//$'\r'/}"
+                [ -n "$pattern" ] || continue
+                # shellcheck disable=SC2053
+                if [[ "$name" == $pattern ]]; then selected=true; break; fi
+              done <<< "$PATTERNS"
+              [ "$selected" = true ] || continue
+              if echo "$subjects" | jq -e --arg n "$name" 'any(.[]; .name == $n)' > /dev/null; then
+                echo "::error::Two files are called $name"; exit 1
+              fi
+              subjects=$(echo "$subjects" | jq -c --arg id "f$index" --arg n "$name" --arg p "$path" \
+                '. + [{id: $id, kind: "file", name: $n, path: $p, repo: "", digest: ""}]')
+              index=$((index + 1))
+            done < <(find files -type f | sort)
+          fi
+          index=0
+          while IFS= read -r ref; do
+            ref="${ref//$'\r'/}"
+            [ -n "$ref" ] || continue
+            digest=$(docker buildx imagetools inspect "$ref" --format '{{json .Manifest}}' | jq -r .digest)
+            [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::Could not resolve the digest of $ref"; exit 1; }
+            repo="${ref%%@*}"
+            last="${repo##*/}"
+            if [[ "$last" == *:* ]]; then repo="${repo%:*}"; fi
+            echo "$ref -> $repo@$digest"
+            subjects=$(echo "$subjects" | jq -c --arg id "i$index" --arg n "$ref" --arg r "$repo" --arg d "$digest" \
+              '. + [{id: $id, kind: "image", name: $n, path: "", repo: $r, digest: $d}]')
+            index=$((index + 1))
+          done <<< "$IMAGES"
+          count=$(echo "$subjects" | jq length)
+          [ "$count" -gt 0 ] || { echo "::error::No release files or images selected"; exit 1; }
+          echo "matrix=$(echo "$subjects" | jq -c '{include: .}')" >> "$GITHUB_OUTPUT"
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Release supply chain: $count deliverable(s)"
+            echo
+            echo "$subjects" | jq -r '.[] | "- \(.kind): `\(.name)` \(.digest)"'
+            echo
+            echo "Dry run: $DRY_RUN"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  analyze:
+    name: SBOM, OSV and VEX (${{ matrix.name }})
+    needs: plan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read  # syft and imagetools read GHCR images
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - name: Check out the calling repository (the VEX file)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          sparse-checkout: ${{ inputs.vex_file }}
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Check out the release tools
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: fadenstack/fadenstack
+          ref: ${{ inputs.tools_ref }}
+          path: .release-tools
+          sparse-checkout: tools/release
+          persist-credentials: false
+
+      - name: Check the Python version
+        shell: bash
+        run: python3 -c 'import sys; assert sys.version_info >= (3, 12), sys.version'
+
+      - uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        id: syft
+        with:
+          syft-version: ${{ env.SYFT_VERSION }}
+
+      - name: Install osv-scanner
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL -o "$RUNNER_TEMP/osv-scanner" \
+            "https://github.com/google/osv-scanner/releases/download/${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64"
+          echo "${OSV_SCANNER_SHA256}  $RUNNER_TEMP/osv-scanner" | sha256sum --check --strict -
+          chmod +x "$RUNNER_TEMP/osv-scanner"
+
+      - name: Log in to GHCR
+        if: ${{ matrix.kind == 'image' }}
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Fetch the file (artifact)
+        if: ${{ matrix.kind == 'file' && inputs.files_artifact != '' }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ inputs.files_artifact }}
+          path: files
+
+      - name: Fetch the file (release asset)
+        if: ${{ matrix.kind == 'file' && inputs.files_artifact == '' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release_tag }}
+          ASSET: ${{ matrix.name }}
+        run: |
+          set -euo pipefail
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir files --pattern "$ASSET"
+
+      - name: Make and check the SBOM
+        id: sbom
+        shell: bash
+        env:
+          SYFT: ${{ steps.syft.outputs.cmd }}
+          KIND: ${{ matrix.kind }}
+          NAME: ${{ matrix.name }}
+          SUBJECT_PATH: ${{ matrix.path }}
+          REPO: ${{ matrix.repo }}
+          DIGEST: ${{ matrix.digest }}
+          ID: ${{ matrix.id }}
+          PRODUCT: ${{ inputs.product }}
+          VERSION: ${{ inputs.version }}
+          SUPPLIER_NAME: ${{ inputs.supplier_name }}
+          SUPPLIER_URL: ${{ inputs.supplier_url }}
+          LICENCE: ${{ inputs.licence }}
+        run: |
+          set -euo pipefail
+          out="results/$ID"
+          mkdir -p "$out" raw
+          tools=.release-tools/tools/release
+          if [ "$KIND" = file ]; then
+            file="$SUBJECT_PATH"
+            [ -f "$file" ] || file="files/$NAME"
+            [ -f "$file" ] || { echo "::error::$NAME is missing"; exit 1; }
+            stem="$NAME"
+            case "$NAME" in
+              *.whl|*.zip)
+                # Unpack, as sbom-release.yml does: the archive's own file listing is no inventory.
+                mkdir -p "unpacked/$ID"
+                unzip -q "$file" -d "unpacked/$ID"
+                "$SYFT" "dir:unpacked/$ID" --source-name "$PRODUCT" --source-version "$VERSION" \
+                  -o "cyclonedx-json@1.6=raw/$ID.cdx.json" ;;
+              *)
+                "$SYFT" "file:$file" -o "cyclonedx-json@1.6=raw/$ID.cdx.json" ;;
+            esac
+            python3 "$tools/sbom_tr03183.py" enrich --input "raw/$ID.cdx.json" --output "$out/$stem.cdx.json" \
+              --kind file --product "$PRODUCT" --version "$VERSION" --supplier-name "$SUPPLIER_NAME" \
+              --supplier-url "$SUPPLIER_URL" --subject-file "$file" --licence "$LICENCE"
+          else
+            short="${DIGEST#sha256:}"
+            stem="${REPO##*/}-${short:0:12}"
+            "$SYFT" "registry:$REPO@$DIGEST" -o "cyclonedx-json@1.6=raw/$ID.cdx.json"
+            docker buildx imagetools inspect --raw "$REPO@$DIGEST" > "raw/$ID.manifest.json"
+            python3 "$tools/sbom_tr03183.py" enrich --input "raw/$ID.cdx.json" --output "$out/$stem.cdx.json" \
+              --kind image --product "$PRODUCT" --version "$VERSION" --supplier-name "$SUPPLIER_NAME" \
+              --supplier-url "$SUPPLIER_URL" --repository "$REPO" --digest "$DIGEST" \
+              --manifest-file "raw/$ID.manifest.json" --name "$REPO" --licence "$LICENCE"
+          fi
+          echo "stem=$stem" >> "$GITHUB_OUTPUT"
+          python3 "$tools/sbom_tr03183.py" validate --input "$out/$stem.cdx.json" --label "$NAME"
+
+      - name: Scan the SBOM with osv-scanner
+        shell: bash
+        env:
+          ID: ${{ matrix.id }}
+          STEM: ${{ steps.sbom.outputs.stem }}
+        run: |
+          set -euo pipefail
+          sbom="results/$ID/$STEM.cdx.json"
+          json="raw/$ID.osv.json"
+          rc=0
+          # Exit 0: no findings. 1: findings. 128: no packages in the SBOM.
+          "$RUNNER_TEMP/osv-scanner" scan source -L "$sbom" --format json --output-file "$json" || rc=$?
+          case "$rc" in
+            0|1) ;;
+            128) echo "::notice::osv-scanner found no packages in the SBOM"; echo '{"results": []}' > "$json" ;;
+            *) echo "::error::osv-scanner failed with status $rc"; exit 1 ;;
+          esac
+          [ -s "$json" ] || echo '{"results": []}' > "$json"
+
+      - name: Write VEX and CSAF
+        shell: bash
+        env:
+          ID: ${{ matrix.id }}
+          NAME: ${{ matrix.name }}
+          STEM: ${{ steps.sbom.outputs.stem }}
+          PRODUCT: ${{ inputs.product }}
+          VERSION: ${{ inputs.version }}
+          SUPPLIER_NAME: ${{ inputs.supplier_name }}
+          SUPPLIER_URL: ${{ inputs.supplier_url }}
+          VEX_FILE: ${{ inputs.vex_file }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          out="results/$ID"
+          purl=$(jq -r '.metadata.component.purl' "$out/$STEM.cdx.json")
+          args=()
+          if [ "$DRY_RUN" = true ]; then args+=(--dry-run); fi
+          python3 .release-tools/tools/release/vex_csaf.py --osv "raw/$ID.osv.json" --vex "$VEX_FILE" \
+            --out-dir "$out" --stem "$STEM" --product "$PRODUCT" --version "$VERSION" --subject-purl "$purl" \
+            --author "$SUPPLIER_NAME" --author-url "$SUPPLIER_URL" --label "$NAME" "${args[@]}"
+
+      - name: Summarise what was produced
+        shell: bash
+        env:
+          ID: ${{ matrix.id }}
+          NAME: ${{ matrix.name }}
+          STEM: ${{ steps.sbom.outputs.stem }}
+        run: |
+          set -euo pipefail
+          {
+            echo "#### Produced for $NAME (not uploaded in a dry run)"
+            echo
+            echo '```'
+            (cd "results/$ID" && sha256sum -- *)
+            echo '```'
+            echo
+            jq -r '.metadata.component | "- component: \(.name) \(.version)\n- purl: `\(.purl)`\n- SHA-512: `\(.hashes[0].content)`"' "results/$ID/$STEM.cdx.json"
+            echo
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the results for the publish job
+        if: ${{ !inputs.dry_run }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: supply-chain-${{ matrix.id }}
+          path: results/${{ matrix.id }}/*
+          retention-days: 1
+
+  scorecard:
+    name: OpenSSF Scorecard
+    if: ${{ inputs.scorecard }}
+    needs: plan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Choose the token
+        id: token
+        shell: bash
+        env:
+          VISIBILITY: ${{ needs.plan.outputs.visibility }}
+          SCORECARD_TOKEN: ${{ secrets.scorecard_token }}
+        run: |
+          set -euo pipefail
+          if [ -n "$SCORECARD_TOKEN" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "custom=true" >> "$GITHUB_OUTPUT"
+          elif [ "$VISIBILITY" = public ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "custom=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Scorecard skipped: a $VISIBILITY repository needs the scorecard_token secret."
+          fi
+
+      - name: Run Scorecard (JSON, for the score)
+        if: ${{ steps.token.outputs.run == 'true' }}
+        uses: ossf/scorecard-action@fa7117db83c52d787ae5a89f350999701505d78e # v2.5.0
+        with:
+          results_file: scorecard.json
+          results_format: json
+          repo_token: ${{ steps.token.outputs.custom == 'true' && secrets.scorecard_token || github.token }}
+          publish_results: false
+
+      - name: Run Scorecard (SARIF)
+        if: ${{ steps.token.outputs.run == 'true' }}
+        uses: ossf/scorecard-action@fa7117db83c52d787ae5a89f350999701505d78e # v2.5.0
+        with:
+          results_file: scorecard.sarif
+          results_format: sarif
+          repo_token: ${{ steps.token.outputs.custom == 'true' && secrets.scorecard_token || github.token }}
+          publish_results: false
+
+      - name: Summarise the score
+        if: ${{ steps.token.outputs.run == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "### OpenSSF Scorecard"
+            echo
+            jq -r '"Aggregate score: **\(.score)** of 10 (scorecard \(.scorecard.version // "unknown"))"' scorecard.json
+            echo
+            echo "| Check | Score | Reason |"
+            echo "| --- | ---: | --- |"
+            jq -r '.checks[] | "| \(.name) | \(.score) | \((.reason // "") | gsub("\\|"; "/")) |"' scorecard.json
+            echo
+            echo "SARIF: $(jq '[.runs[].results[]?] | length' scorecard.sarif) alerts (kept on the runner, not uploaded)."
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    name: Sign and publish (${{ matrix.name }})
+    # A dry run publishes nothing: this job does not start.
+    if: ${{ !inputs.dry_run }}
+    needs: [plan, analyze]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write       # gh release upload
+      id-token: write       # keyless signing and GitHub attestations
+      attestations: write   # GitHub attestations
+      packages: write       # signatures and attestations pushed next to the images
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - name: Check out the release tools
+        if: ${{ !inputs.dry_run }}
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: fadenstack/fadenstack
+          ref: ${{ inputs.tools_ref }}
+          path: .release-tools
+          sparse-checkout: tools/release
+          persist-credentials: false
+
+      - name: Fetch the results of the analysis
+        if: ${{ !inputs.dry_run }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: supply-chain-${{ matrix.id }}
+          path: results
+
+      - name: Fetch the file (artifact)
+        if: ${{ !inputs.dry_run && matrix.kind == 'file' && inputs.files_artifact != '' }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ inputs.files_artifact }}
+          path: files
+
+      - name: Fetch the file (release asset)
+        if: ${{ !inputs.dry_run && matrix.kind == 'file' && inputs.files_artifact == '' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release_tag }}
+          ASSET: ${{ matrix.name }}
+        run: |
+          set -euo pipefail
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir files --pattern "$ASSET"
+
+      - name: Log in to GHCR
+        if: ${{ !inputs.dry_run && matrix.kind == 'image' }}
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Install cosign
+        if: ${{ !inputs.dry_run && inputs.signing != 'none' }}
+        uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+        with:
+          cosign-release: ${{ env.COSIGN_VERSION }}
+
+      - name: Prepare the signing key (no transparency log)
+        if: ${{ !inputs.dry_run && inputs.signing == 'key' }}
+        shell: bash
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.cosign_private_key }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s\n' "$COSIGN_PRIVATE_KEY" > "$RUNNER_TEMP/cosign.key"
+          # An empty signing config lists no Rekor and no timestamp authority,
+          # so nothing is sent to a public log.
+          cosign signing-config create --out "$RUNNER_TEMP/signing-config-no-tlog.json"
+
+      - name: Locate the SBOM
+        id: sbom
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          path=$(ls results/*.cdx.json)
+          [ "$(echo "$path" | wc -l)" -eq 1 ] || { echo "::error::Expected one SBOM"; exit 1; }
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+
+      - name: GitHub attestations (build provenance)
+        if: ${{ !inputs.dry_run && needs.plan.outputs.attest_github == 'true' }}
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: ${{ matrix.kind == 'file' && format('files/{0}', matrix.name) || '' }}
+          subject-name: ${{ matrix.kind == 'image' && matrix.repo || '' }}
+          subject-digest: ${{ matrix.kind == 'image' && matrix.digest || '' }}
+          push-to-registry: ${{ matrix.kind == 'image' }}
+          create-storage-record: false
+
+      - name: GitHub attestations (SBOM)
+        if: ${{ !inputs.dry_run && needs.plan.outputs.attest_github == 'true' }}
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-path: ${{ matrix.kind == 'file' && format('files/{0}', matrix.name) || '' }}
+          subject-name: ${{ matrix.kind == 'image' && matrix.repo || '' }}
+          subject-digest: ${{ matrix.kind == 'image' && matrix.digest || '' }}
+          sbom-path: ${{ steps.sbom.outputs.path }}
+          push-to-registry: ${{ matrix.kind == 'image' }}
+          create-storage-record: false
+
+      - name: Sign, attest and write the SLSA provenance
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        env:
+          KIND: ${{ matrix.kind }}
+          NAME: ${{ matrix.name }}
+          REPO: ${{ matrix.repo }}
+          DIGEST: ${{ matrix.digest }}
+          SIGNING: ${{ inputs.signing }}
+          ATTEST_GITHUB: ${{ needs.plan.outputs.attest_github }}
+          SBOM_PATH: ${{ steps.sbom.outputs.path }}
+          COSIGN_PASSWORD: ${{ secrets.cosign_password }}
+          COSIGN_YES: "true"
+        run: |
+          set -euo pipefail
+          mkdir -p publish
+          cp results/* publish/
+          sbom="publish/$(basename "$SBOM_PATH")"
+          args=()
+          if [ "$SIGNING" = key ]; then
+            args+=(--key "$RUNNER_TEMP/cosign.key" --signing-config "$RUNNER_TEMP/signing-config-no-tlog.json")
+          fi
+          provenance=false
+          if [ "$SIGNING" != none ] && [ "$ATTEST_GITHUB" != true ]; then
+            provenance=true
+            if [ "$KIND" = file ]; then
+              python3 .release-tools/tools/release/slsa_provenance.py --subject-file "files/$NAME" \
+                --statement-out "$RUNNER_TEMP/provenance.statement.json" --predicate-out "$RUNNER_TEMP/provenance.predicate.json"
+            else
+              python3 .release-tools/tools/release/slsa_provenance.py --subject-digest "$REPO=$DIGEST" \
+                --statement-out "$RUNNER_TEMP/provenance.statement.json" --predicate-out "$RUNNER_TEMP/provenance.predicate.json"
+            fi
+          fi
+          if [ "$SIGNING" = none ]; then
+            echo "::notice::signing: none, nothing is signed"
+          elif [ "$KIND" = file ]; then
+            f="files/$NAME"
+            cosign sign-blob "${args[@]}" --bundle "publish/$NAME.sigstore.json" "$f"
+            cosign sign-blob "${args[@]}" --bundle "$sbom.sigstore.json" "$sbom"
+            cosign attest-blob "${args[@]}" --type cyclonedx --predicate "$sbom" \
+              --bundle "publish/$NAME.sbom.sigstore.json" "$f"
+            if [ "$provenance" = true ]; then
+              cosign attest-blob "${args[@]}" --type slsaprovenance1 --predicate "$RUNNER_TEMP/provenance.predicate.json" \
+                --bundle "publish/$NAME.provenance.sigstore.json" "$f"
+            fi
+          else
+            ref="$REPO@$DIGEST"
+            cosign sign "${args[@]}" "$ref"
+            cosign attest "${args[@]}" --type cyclonedx --predicate "$sbom" "$ref"
+            if [ "$provenance" = true ]; then
+              cosign attest "${args[@]}" --type slsaprovenance1 --predicate "$RUNNER_TEMP/provenance.predicate.json" "$ref"
+            fi
+          fi
+          rm -f "$RUNNER_TEMP/cosign.key"
+          if [ "$provenance" = true ]; then
+            # The readable statement next to the signed attestation.
+            cp "$RUNNER_TEMP/provenance.statement.json" "publish/${NAME//[^A-Za-z0-9._-]/_}.provenance.intoto.json"
+          fi
+
+      - name: Remove the signing key
+        # Also when a step above failed: on a self-hosted runner the file would outlive the job.
+        if: ${{ always() && !inputs.dry_run && inputs.signing == 'key' }}
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/cosign.key"
+
+      - name: Upload the results to the release
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          ls -l publish
+          gh release upload "$TAG" publish/* --repo "$GITHUB_REPOSITORY" --clobber

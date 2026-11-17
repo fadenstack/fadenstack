@@ -1,0 +1,70 @@
+# The core repository's own trial of release-supply-chain.yml. It builds the CLI
+# wheel, then runs the reusable workflow with dry_run: true: SBOM, OSV scan,
+# VEX/CSAF and Scorecard run, and everything is summarised in the job log and
+# the step summary. Nothing is signed, attested, pushed or uploaded, apart from
+# the wheel itself as a one-day artifact so that the reusable workflow can read it.
+name: Release supply chain (dry run)
+
+on:
+  push:
+    branches: [feat/release-supply-chain]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  wheel:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+
+      - name: Read the version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(python3 -c 'import tomllib; print(tomllib.load(open("cli/pyproject.toml", "rb"))["project"]["version"])')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build the wheel
+        working-directory: cli
+        run: uv build --wheel --out-dir ../dist
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cli-wheel
+          path: dist/*.whl
+          retention-days: 1
+
+  supply-chain:
+    needs: wheel
+    # The called workflow asks for more than read on its publish job. A caller
+    # must grant that ceiling or the run does not start. A dry run never uses
+    # the write grants: that job is skipped.
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      packages: write
+      actions: read
+    uses: ./.github/workflows/release-supply-chain.yml
+    with:
+      product: fadenstack-cli
+      version: ${{ needs.wheel.outputs.version }}
+      supplier_name: Emagin8 UG (haftungsbeschränkt)
+      supplier_url: https://fadenstack.com
+      files_artifact: cli-wheel
+      files: "*.whl"
+      images: ghcr.io/fadenstack/backend:0.7.0
+      signing: keyless
+      attest: true
+      scorecard: true
+      dry_run: true
+      tools_ref: ${{ github.sha }}

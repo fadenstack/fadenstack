@@ -1,0 +1,31 @@
+{
+  "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:11111111-2222-4333-8444-555555555555",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-01-01T00:00:00Z",
+    "tools": {"components": [{"type": "application", "author": "anchore", "name": "syft", "version": "1.0.0"}]},
+    "component": {"bom-ref": "dir", "type": "file", "name": "unpacked"}
+  },
+  "components": [
+    {
+      "bom-ref": "pkg:pypi/click@8.1.7",
+      "type": "library",
+      "name": "click",
+      "version": "8.1.7",
+      "purl": "pkg:pypi/click@8.1.7",
+      "licenses": [{"license": {"id": "BSD-3-Clause"}}]
+    },
+    {
+      "bom-ref": "pkg:pypi/rich@13.7.0",
+      "type": "library",
+      "name": "rich",
+      "version": "13.7.0",
+      "purl": "pkg:pypi/rich@13.7.0",
+      "hashes": [{"alg": "SHA-256", "content": "0000000000000000000000000000000000000000000000000000000000000000"}]
+    },
+    {"bom-ref": "file1", "type": "file", "name": "/METADATA"}
+  ]
+}

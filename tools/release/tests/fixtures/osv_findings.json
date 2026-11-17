@@ -1,0 +1,30 @@
+{
+  "results": [
+    {
+      "source": {"path": "release.cdx.json", "type": "sbom"},
+      "packages": [
+        {
+          "package": {"name": "jinja2", "version": "2.4.1", "ecosystem": "PyPI", "purl": "pkg:pypi/jinja2@2.4.1"},
+          "vulnerabilities": [
+            {"id": "PYSEC-2014-8", "aliases": ["CVE-2014-1402", "GHSA-8r7q-cvjq-x353"], "summary": "Insecure temporary files", "database_specific": {"severity": "HIGH"}},
+            {"id": "GHSA-8r7q-cvjq-x353", "aliases": ["CVE-2014-1402", "PYSEC-2014-8"]},
+            {"id": "PYSEC-2014-82", "aliases": ["CVE-2014-0012", "GHSA-fqh9-2qgg-h84h"], "summary": "Cache poisoning"}
+          ],
+          "groups": [
+            {"ids": ["PYSEC-2014-8", "GHSA-8r7q-cvjq-x353"], "aliases": ["CVE-2014-1402", "GHSA-8r7q-cvjq-x353", "PYSEC-2014-8"], "max_severity": "8.6"},
+            {"ids": ["PYSEC-2014-82"], "aliases": ["CVE-2014-0012", "GHSA-fqh9-2qgg-h84h", "PYSEC-2014-82"], "max_severity": "6.9"}
+          ]
+        },
+        {
+          "package": {"name": "werkzeug", "version": "0.1", "ecosystem": "PyPI", "purl": "pkg:pypi/werkzeug@0.1"},
+          "vulnerabilities": [
+            {"id": "GHSA-hrfv-mqp8-q5rw", "aliases": ["CVE-2023-25577"], "summary": "Resource exhaustion", "database_specific": {"severity": "HIGH"}}
+          ],
+          "groups": [
+            {"ids": ["GHSA-hrfv-mqp8-q5rw"], "aliases": ["CVE-2023-25577", "GHSA-hrfv-mqp8-q5rw"], "max_severity": "7.5"}
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://example.invalid/vex/test",
+  "author": "Test Author",
+  "timestamp": "2026-01-01T00:00:00Z",
+  "version": 1,
+  "statements": [
+    {
+      "vulnerability": {"name": "CVE-2014-1402"},
+      "timestamp": "2026-02-01T00:00:00Z",
+      "products": [{"@id": "pkg:pypi/jinja2"}],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The affected temp-file cache is never enabled."
+    },
+    {
+      "vulnerability": {"name": "GHSA-hrfv-mqp8-q5rw"},
+      "timestamp": "2026-02-01T00:00:00Z",
+      "status": "affected",
+      "action_statement": "Upgrade werkzeug to 2.2.3 or later.",
+      "impact_statement": "Reachable through the bundled dev server."
+    }
+  ]
+}
