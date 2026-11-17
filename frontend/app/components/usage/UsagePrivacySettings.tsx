@@ -442,7 +442,7 @@ function StatementSection() {
   );
   return (
     <Paper sx={{ p: 2 }}>
-      <SectionTitle title={t("usage.settings.statement_title")} doc={USAGE_HELP.documents} />
+      <SectionTitle title={t("usage.settings.statement_title")} doc={USAGE_HELP.statement} />
       <Typography variant="body2" color="text.secondary">
         {t("usage.settings.statement_intro")}
       </Typography>

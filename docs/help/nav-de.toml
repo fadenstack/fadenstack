@@ -37,7 +37,6 @@ nav = [
     { "Nutzung und Limits" = "administer/usage.md" },
     { "Nutzung und Datenschutz" = "administer/usage-privacy.md" },
     { "Budgets" = "administer/budgets.md" },
-    { "Unterlagen für Datenschutz und Betriebsrat" = "administer/usage-documents.md" },
     { "LLM-Aufrufe" = "administer/llm-calls.md" },
     { "Das Dashboard" = "administer/dashboard.md" },
   ] },

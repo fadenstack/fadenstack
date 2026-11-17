@@ -4,7 +4,7 @@ Usage figures say who used which model, how much and when. At work, that makes t
 the box, Fadenstack shows nobody's usage figures to anyone else: each person sees their own, and administrators
 see figures for groups of at least five people. This page says what is stored, who sees it, how long it is kept,
 and what each setting changes, so that you can decide with your data protection officer (DPO) and, where there
-is one, your works council. Templates for them are on [Documents for your DPO and works council](usage-documents.md).
+is one, your works council.
 
 !!! note "Not legal advice"
     These pages describe what Fadenstack does and offer templates; they are not legal advice. Your organisation
@@ -44,7 +44,7 @@ when. A change applies within minutes; nothing restarts.
 
 | Setting | Default | Range | What changing it means |
 |---|---|---|---|
-| **Person-level reporting** (`usage.person_reporting`) | Off | Off, on | On: people with the role `usage_auditor` can look at one person's or one team's figures per person, giving a reason each time (see [Looking at one person's figures](#looking-at-one-persons-figures)). Everyone's **My usage** then says so. This is an evaluation of employee data per person: in Germany it is co-determined by the works council (§ 87(1) no. 6 BetrVG), so agree it before switching it on; assume a data protection impact assessment is needed; and tell employees (the person-level notice on [Documents](usage-documents.md#employee-notice)). |
+| **Person-level reporting** (`usage.person_reporting`) | Off | Off, on | On: people with the role `usage_auditor` can look at one person's or one team's figures per person, giving a reason each time (see [Looking at one person's figures](#looking-at-one-persons-figures)). Everyone's **My usage** then says so. This is an evaluation of employee data per person: in Germany it is co-determined by the works council (§ 87(1) no. 6 BetrVG), so agree it before switching it on; assume a data protection impact assessment is needed; and tell employees. |
 | **Minimum group size** (`usage.min_group_size`) | 5 | 5 to 50 | Every figure on **Usage** covers at least this many people. Raise it if your works agreement asks for more; it cannot go below 5. The higher it is, the more teams, agents and days are shown only in the **Fewer than … people** row. |
 | **Person-level granularity** (`usage.person_granularity`) | **Per day** | **Per day**, **Per month** | How finely the person-level view shows a person's figures. Month shows less of how someone works. There is no finer setting: no person's figures exist by the hour. |
 | **Request log** (`usage.request_log_retention_days`) | 90 days | 7 to 365 days | How long each request's record is kept: the person, the time to the second, the model, the tokens and, for agents, the device. Keep it longer only for a reason you can name, such as investigating security incidents, and write that reason down. |
@@ -52,7 +52,7 @@ when. A change applies within minutes; nothing restarts.
 | **Hourly figures** (`usage.hourly_retention_days`) | 90 days | 31 to 180 days | Figures per hour by team, agent, model and provider, for capacity planning. They hold no person. |
 | **Daily figures** (`usage.daily_retention_months`) | 25 months | 13 to 60 months | Figures per day by team, agent, model and provider, for year-on-year planning and costs. They hold no person. |
 | **Time zone** (`usage.time_zone`) | The server's time zone, or UTC | A time zone name such as `Europe/Berlin` | Where days and months begin, and when the daily limit starts again. No effect on privacy. |
-| **Privacy notice** (`usage.privacy_notice_url`) | Empty | Empty, or an `https://` address | **My usage** links to it, so people find your notice to employees (see [Documents](usage-documents.md#employee-notice)) where they see their own figures. Empty: no link. |
+| **Privacy notice** (`usage.privacy_notice_url`) | Empty | Empty, or an `https://` address | **My usage** links to it, so people find your notice to employees where they see their own figures. Empty: no link. |
 
 ??? info "The configuration statement"
     Under **Configuration statement** on the same tab, pick the **Language** (English, German, Spanish, French or

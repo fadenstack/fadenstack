@@ -204,8 +204,7 @@ Budgets arbeiten mit Nutzungszahlen, und die sind im Betrieb Daten über Beschä
 
 - **Budgets für einzelne Personen sind standardmäßig ausgeschaltet.** Ein Budget für eine Person begrenzt, wie
   diese Person arbeitet. In Deutschland ist das Einschalten mitbestimmungspflichtig (§ 87 Abs. 1 Nr. 6 BetrVG):
-  Stimmen Sie es vorher mit dem Betriebsrat ab und informieren Sie die Beschäftigten in Ihren Hinweisen (siehe
-  [Unterlagen für Datenschutz und Betriebsrat](usage-documents.md)).
+  Stimmen Sie es vorher mit dem Betriebsrat ab und informieren Sie die Beschäftigten in Ihren Hinweisen.
 - **Die Nutzung einer Person gehört ihr allein.** Sie sieht sie unter **Meine Nutzung**. Die Administration sieht
   das Budget einer Person, sein Limit und seinen Modus, aber weder ihre Nutzung noch, in der Liste, wessen Budget
   es ist: außer die personenbezogene Auswertung ist eingeschaltet und sie hat die Rolle `usage_auditor`.

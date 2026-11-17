@@ -4,8 +4,7 @@ Nutzungszahlen sagen, wer welches Modell wie viel und wann genutzt hat. Im Betri
 Beschäftigte. Von Haus aus zeigt Fadenstack niemandem die Nutzungszahlen einer anderen Person: Jede Person sieht
 ihre eigenen, Administratoren sehen Zahlen für Gruppen von mindestens fünf Personen. Diese Seite beschreibt, was
 gespeichert wird, wer es sieht, wie lange es aufbewahrt wird und was jede Einstellung ändert, damit Sie mit Ihrem
-Datenschutzbeauftragten und, wo es einen gibt, Ihrem Betriebsrat entscheiden können. Vorlagen dafür stehen unter
-[Unterlagen für Datenschutz und Betriebsrat](usage-documents.md).
+Datenschutzbeauftragten und, wo es einen gibt, Ihrem Betriebsrat entscheiden können.
 
 !!! note "Keine Rechtsberatung"
     Diese Seiten beschreiben, was Fadenstack tut, und bieten Vorlagen an; sie sind keine Rechtsberatung. Ihre
@@ -52,7 +51,7 @@ Minuten; nichts wird neu gestartet.
 
 | Einstellung | Voreinstellung | Bereich | Was eine Änderung bedeutet |
 |---|---|---|---|
-| **Personenbezogene Auswertung** (`usage.person_reporting`) | Aus | Aus, ein | Ein: Personen mit der Rolle `usage_auditor` können die Zahlen einer Person oder eines Teams pro Person ansehen, jedes Mal mit Begründung (siehe [Die Zahlen einer Person ansehen](#looking-at-one-persons-figures)). **Meine Nutzung** sagt das dann allen. Das ist eine Auswertung von Beschäftigtendaten pro Person: Sie unterliegt der Mitbestimmung des Betriebsrats (§ 87 Abs. 1 Nr. 6 BetrVG); vereinbaren Sie sie also, bevor Sie sie einschalten. Gehen Sie davon aus, dass eine Datenschutz-Folgenabschätzung nötig ist, und informieren Sie die Beschäftigten (die Fassung für die personenbezogene Auswertung unter [Unterlagen](usage-documents.md#employee-notice)). |
+| **Personenbezogene Auswertung** (`usage.person_reporting`) | Aus | Aus, ein | Ein: Personen mit der Rolle `usage_auditor` können die Zahlen einer Person oder eines Teams pro Person ansehen, jedes Mal mit Begründung (siehe [Die Zahlen einer Person ansehen](#looking-at-one-persons-figures)). **Meine Nutzung** sagt das dann allen. Das ist eine Auswertung von Beschäftigtendaten pro Person: Sie unterliegt der Mitbestimmung des Betriebsrats (§ 87 Abs. 1 Nr. 6 BetrVG); vereinbaren Sie sie also, bevor Sie sie einschalten. Gehen Sie davon aus, dass eine Datenschutz-Folgenabschätzung nötig ist, und informieren Sie die Beschäftigten. |
 | **Mindestgruppengröße** (`usage.min_group_size`) | 5 | 5 bis 50 | Jede Zahl unter **Nutzung** umfasst mindestens so viele Personen. Erhöhen Sie sie, wenn Ihre Betriebsvereinbarung mehr verlangt; unter 5 geht es nicht. Je höher sie ist, desto mehr Teams, Agenten und Tage erscheinen nur in der Zeile **Weniger als … Personen**. |
 | **Granularität personenbezogener Zahlen** (`usage.person_granularity`) | **Pro Tag** | **Pro Tag**, **Pro Monat** | Wie fein die personenbezogene Auswertung die Zahlen einer Person zeigt. Monat lässt weniger darauf schließen, wie jemand arbeitet. Feiner geht es nicht: Stündliche Zahlen einer Person gibt es nicht. |
 | **Anfrageprotokoll** (`usage.request_log_retention_days`) | 90 Tage | 7 bis 365 Tage | Wie lange der Eintrag jeder Anfrage aufbewahrt wird: die Person, die Zeit auf die Sekunde, das Modell, die Tokens und bei Agenten das Gerät. Bewahren Sie ihn nur aus einem Grund länger auf, den Sie benennen können, etwa der Aufklärung von Sicherheitsvorfällen, und halten Sie den Grund schriftlich fest. |
@@ -60,7 +59,7 @@ Minuten; nichts wird neu gestartet.
 | **Stündliche Zahlen** (`usage.hourly_retention_days`) | 90 Tage | 31 bis 180 Tage | Zahlen pro Stunde nach Team, Agent, Modell und Provider, für die Kapazitätsplanung. Sie enthalten keine Person. |
 | **Tägliche Zahlen** (`usage.daily_retention_months`) | 25 Monate | 13 bis 60 Monate | Zahlen pro Tag nach Team, Agent, Modell und Provider, für den Vergleich mit dem Vorjahr und die Kosten. Sie enthalten keine Person. |
 | **Zeitzone** (`usage.time_zone`) | Die Zeitzone des Servers oder UTC | Ein Zeitzonenname wie `Europe/Berlin` | Wo Tage und Monate beginnen und wann das Tageslimit neu beginnt. Ohne Einfluss auf den Datenschutz. |
-| **Datenschutzhinweise** (`usage.privacy_notice_url`) | Leer | Leer oder eine `https://`-Adresse | **Meine Nutzung** verlinkt darauf, sodass die Beschäftigten Ihre Datenschutzhinweise (siehe [Unterlagen](usage-documents.md#employee-notice)) dort finden, wo sie ihre eigenen Zahlen sehen. Leer: kein Link. |
+| **Datenschutzhinweise** (`usage.privacy_notice_url`) | Leer | Leer oder eine `https://`-Adresse | **Meine Nutzung** verlinkt darauf, sodass die Beschäftigten Ihre Datenschutzhinweise dort finden, wo sie ihre eigenen Zahlen sehen. Leer: kein Link. |
 
 ??? info "Die Konfigurationsbeschreibung"
     Wählen Sie auf demselben Reiter unter **Konfigurationsbeschreibung** die **Sprache** (Deutsch, Englisch,

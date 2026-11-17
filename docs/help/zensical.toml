@@ -42,7 +42,6 @@ nav = [
     { "Usage and limits" = "administer/usage.md" },
     { "Usage and privacy" = "administer/usage-privacy.md" },
     { "Budgets" = "administer/budgets.md" },
-    { "Documents for your DPO and works council" = "administer/usage-documents.md" },
     { "LLM calls" = "administer/llm-calls.md" },
     { "The dashboard" = "administer/dashboard.md" },
   ] },

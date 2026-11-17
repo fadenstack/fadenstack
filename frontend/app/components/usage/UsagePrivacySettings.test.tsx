@@ -204,7 +204,7 @@ describe("links to Help", () => {
     expect(hrefs).toEqual([
       "/help/administer/usage-privacy/#the-settings",
       "/help/administer/usage/#limits-for-the-whole-instance",
-      "/help/administer/usage-documents/",
+      "/help/administer/usage-privacy/#the-settings",
     ]);
   });
 });

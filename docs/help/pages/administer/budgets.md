@@ -193,7 +193,7 @@ Budgets work with usage figures, which at work are data about employees (see
 
 - **Budgets for single people are off by default.** A budget for one person limits how that person works. In
   Germany, switching them on is co-determined by the works council (§ 87(1) no. 6 BetrVG): agree it first, and
-  tell employees in your notice (see [Documents for your DPO and works council](usage-documents.md)).
+  tell employees in your notice.
 - **A person's use is theirs alone.** They see it on **My usage**. Administrators see a person's budget, its
   limit and its mode, but neither their use nor, on the list, whose budget it is: unless person-level reporting
   is on and they hold the role `usage_auditor`.

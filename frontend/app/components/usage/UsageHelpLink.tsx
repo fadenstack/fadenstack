@@ -34,5 +34,6 @@ export const USAGE_HELP = {
   limits: "administer/usage#limits-for-the-whole-instance",
   settings: "administer/usage-privacy#the-settings",
   onePerson: "administer/usage-privacy#looking-at-one-persons-figures",
-  documents: "administer/usage-documents",
+  // Help explains the configuration statement with the settings.
+  statement: "administer/usage-privacy#the-settings",
 } as const;
