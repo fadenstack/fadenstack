@@ -3,7 +3,38 @@
   "@id": "https://fadenstack.com/vex/fadenstack/core",
   "author": "Fadenstack",
   "role": "Document Creator",
-  "timestamp": "2026-11-17T00:00:00Z",
-  "version": 1,
-  "statements": []
+  "timestamp": "2026-11-17T21:30:00Z",
+  "version": 2,
+  "statements": [
+    {
+      "vulnerability": {
+        "name": "GHSA-fc5q-39xc-vjpf",
+        "aliases": [
+          "CVE-2026-112366"
+        ]
+      },
+      "timestamp": "2026-11-17T21:30:00Z",
+      "products": [
+        {
+          "@id": "pkg:oci/frontend?repository_url=ghcr.io/fadenstack/frontend",
+          "subcomponents": [
+            {
+              "@id": "pkg:npm/picomatch@4.0.4"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/mcp?repository_url=ghcr.io/fadenstack/mcp",
+          "subcomponents": [
+            {
+              "@id": "pkg:npm/picomatch@4.0.4"
+            }
+          ]
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_cannot_be_controlled_by_adversary",
+      "impact_statement": "picomatch 4.0.4 is in the console and MCP images only inside the npm command line tool (npm 11.21.2, through tinyglobby). The console runs npm only to start its own server, with a fixed script; the MCP image runs npm and npx to install and start the MCP servers an administrator configures. No glob pattern from a user, a request or a model reaches picomatch, so its ReDoS through repeated extglobs cannot be triggered by an adversary. No fixed picomatch release exists yet (affected up to 4.0.7)."
+    }
+  ]
 }
