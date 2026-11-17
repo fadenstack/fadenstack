@@ -10,10 +10,16 @@ Modellen, die sie ausführt.
 |---|---|---|
 | Betriebssystem | Linux, x86_64 | |
 | CPU-Kerne | 4 | 8 |
-| Arbeitsspeicher, Kerndienste | 6 GB | 8 GB |
+| Arbeitsspeicher, Kerndienste | 8 GB | 12 GB |
 | Arbeitsspeicher, mit mehrsprachigem PII, MCP und Skills | 12 GB | 16 GB |
-| Speicherplatz | 60 GB | 100 GB, zuzüglich der Größe der Modelle, die Sie bereitstellen wollen |
+| Speicherplatz, mit den Runtime-Images für beide Maschinenarten (Standard) | 150 GB | 250 GB, zuzüglich der Größe der Modelle, die Sie bereitstellen wollen |
+| Speicherplatz, nur mit den Runtime-Images für x86_64-Maschinen | 70 GB | 120 GB, zuzüglich der Größe der Modelle, die Sie bereitstellen wollen |
 | GPU | keine | keine |
+
+`faden doctor` lehnt einen Server mit weniger als 7 GB Arbeitsspeicher ab – so viel meldet ein Server mit 8 GB,
+sobald der Kernel seinen Anteil hat – und einen mit weniger als 20 GB freiem Speicherplatz. Das ist seine
+Untergrenze für die Dienste allein; die Werte für den Speicherplatz oben enthalten zusätzlich die Runtime-Images,
+die `faden deploy` herunterlädt (siehe [Speicherplatz](#disk)).
 
 | Der Server braucht außerdem | |
 |---|---|
@@ -37,7 +43,7 @@ ob die Ports frei sind, die die Installation nach außen öffnet.
 | Das PII-Modul | Zusätzlicher Arbeitsspeicher für das gewählte Modell und mehr CPU pro Chat-Runde; mindestens 4 GB für den mehrsprachigen PII-Container zusätzlich zu den anderen Diensten einplanen |
 | MCP-Tools, Skills | Einige hundert MB Arbeitsspeicher |
 | Modelle | Speicherplatz: Jedes Modell wird auf den Server heruntergeladen und von dort auf die Maschinen kopiert |
-| GPU-Maschinen | Ein Runtime-Image pro Maschinenart auf der Festplatte; bei CPU und Arbeitsspeicher nichts Messbares |
+| GPU-Maschinen | Die Runtime-Images jeder Maschinenart auf der Festplatte; bei CPU und Arbeitsspeicher nichts Messbares |
 | Tracing | Speicherplatz für den Trace-Speicher |
 
 Um die Dienste nach einer Änderung der Hardware neu zu bemessen, führen Sie `faden tune` und danach `faden up` aus.
@@ -54,16 +60,26 @@ Siehe [Lokale PII-Verarbeitung auf CPU oder GPU](installing.md#local-pii-on-cpu-
 
 | Was | Größe | Nötig |
 |---|---|---|
-| Images der Dienste | etwa 11 GB | immer |
-| Runtime-Image, x86_64-Maschinen | etwa 15 GB | wenn Sie x86_64-GPU-Maschinen hinzufügen |
-| Runtime-Image, Maschinen vom Typ NVIDIA DGX Spark | etwa 12 GB | wenn Sie DGX-Spark-Maschinen hinzufügen |
+| Images der Dienste | etwa 17 GB | immer |
+| Runtime-Images, x86_64-Maschinen | etwa 29 GB (zwei Images mit je etwa 14,5 GB) | wenn Sie x86_64-GPU-Maschinen hinzufügen |
+| Runtime-Images, Maschinen vom Typ NVIDIA DGX Spark | etwa 68 GB (zwei Images mit 35 und 33 GB) | wenn Sie DGX-Spark-Maschinen hinzufügen |
 | Modellspeicher | die Modelle, die Sie bereitstellen | immer |
 | Datenbank | wächst mit dem Chatverlauf | immer |
 | Trace-Speicher | wächst mit den Traces | wenn Tracing eingeschaltet ist |
 
-Der Server hält für jede Maschinenart, die Sie haben, ein Runtime-Image vor, weil die Maschinen es vom Server
-herunterladen, nicht aus dem Internet. Wenn Sie nur x86_64-Maschinen haben, installieren Sie mit
-`faden deploy --runtime-images x86_64`, um das andere auszulassen.
+Der Server hält die Runtime-Images jeder Maschinenart vor, weil die Maschinen sie vom Server herunterladen, nicht
+aus dem Internet. Ein Release legt zwei pro Maschinenart fest: das aktuelle und das vorige, für Cluster, die noch
+nicht gewechselt haben. `faden deploy` lädt sie für beide Maschinenarten herunter, wenn Sie nichts anderes
+angeben, zusammen etwa 97 GB zusätzlich zu den Images der Dienste. Wenn Sie nur x86_64-Maschinen haben,
+installieren Sie mit `faden deploy --runtime-images x86_64`, um die für DGX Spark auszulassen;
+`faden runtime-images --check` zeigt, was der Server vorhält.
+
+!!! warning "Die Standard-Aufteilung der Festplatte bei Ubuntu Server"
+    Auf einer großen Festplatte gibt das Installationsprogramm von Ubuntu Server dem Root-Dateisystem ein
+    logisches Volume von etwa 100 GB und lässt den Rest der Festplatte ungenutzt. Das läuft voll, während die
+    Runtime-Images heruntergeladen werden. Vergrößern Sie es vor der Installation, z. B. mit
+    `sudo lvextend -r -l +100%FREE /dev/ubuntu-vg/ubuntu-lv`, oder installieren Sie mit `--runtime-images` für die
+    Maschinen, die Sie haben.
 
 Sicherungen landen standardmäßig auf derselben Festplatte; lassen Sie Platz dafür, oder legen Sie sie woanders
 ab (siehe [Sicherungen](backups.md)).

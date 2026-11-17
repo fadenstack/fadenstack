@@ -9,10 +9,15 @@ runs and the people using them; a GPU machine is sized by the models it runs.
 |---|---|---|
 | Operating system | Linux, x86_64 | |
 | CPU cores | 4 | 8 |
-| Memory, core services | 6 GB | 8 GB |
+| Memory, core services | 8 GB | 12 GB |
 | Memory, with the multilingual PII, MCP and skills modules | 12 GB | 16 GB |
-| Disk | 60 GB | 100 GB, plus the size of the models you intend to host |
+| Disk, with the runtime images for both kinds of machine (the default) | 150 GB | 250 GB, plus the size of the models you intend to host |
+| Disk, with the runtime images for x86_64 machines only | 70 GB | 120 GB, plus the size of the models you intend to host |
 | GPU | none | none |
+
+`faden doctor` fails a server with less than 7 GB of memory, which is what a server with 8 GB reports once the
+kernel has its share, and one with less than 20 GB of free disk. Those are its floor for the services alone; the
+disk figures above add the runtime images that `faden deploy` pulls (see [Disk](#disk)).
 
 | The server also needs | |
 |---|---|
@@ -35,7 +40,7 @@ install publishes are free.
 | The PII module | Additional memory for its selected model and more CPU per chat turn; allow at least 4 GB for the multilingual PII container, plus the other services |
 | MCP tools, skills | A few hundred MB of memory |
 | Models | Disk: every model is downloaded to the server and copied to the machines from there |
-| GPU machines | One runtime image per kind of machine on disk; nothing measurable in CPU or memory |
+| GPU machines | The runtime images for each kind of machine on disk; nothing measurable in CPU or memory |
 | Tracing | Disk for the trace store |
 
 To size the services again after changing the hardware, run `faden tune` and then `faden up`.
@@ -52,16 +57,24 @@ requests and long documents. `faden doctor` reports compatibility and CPU availa
 
 | What | Size | Needed when |
 |---|---|---|
-| Service images | about 11 GB | always |
-| Runtime image, x86_64 machines | about 15 GB | you add x86_64 GPU machines |
-| Runtime image, NVIDIA DGX Spark machines | about 12 GB | you add DGX Spark machines |
+| Service images | about 17 GB | always |
+| Runtime images, x86_64 machines | about 29 GB (two images of about 14.5 GB) | you add x86_64 GPU machines |
+| Runtime images, NVIDIA DGX Spark machines | about 68 GB (two images of 35 and 33 GB) | you add DGX Spark machines |
 | Model store | the models you host | always |
 | Database | grows with chat history | always |
 | Trace store | grows with traces | tracing is on |
 
-The server keeps a runtime image for each kind of machine you have, because the machines download it from the
-server, not from the internet. If you only have x86_64 machines, install with
-`faden deploy --runtime-images x86_64` to skip the other one.
+The server keeps the runtime images for each kind of machine, because the machines download them from the
+server, not from the internet. A release pins two per kind of machine: the current one and the one before it, for
+clusters not switched yet. `faden deploy` pulls them for both kinds unless you say otherwise, about 97 GB on top
+of the service images. If you only have x86_64 machines, install with `faden deploy --runtime-images x86_64` to
+skip the DGX Spark ones; `faden runtime-images --check` shows what the server holds.
+
+!!! warning "Ubuntu Server's default disk layout"
+    On a large disk, Ubuntu Server's installer gives the root file system a logical volume of about 100 GB and
+    leaves the rest of the disk unused. That fills up while the runtime images are pulled. Grow it before you
+    install, for example with `sudo lvextend -r -l +100%FREE /dev/ubuntu-vg/ubuntu-lv`, or install with
+    `--runtime-images` for the machines you have.
 
 Backups land on the same disk by default; leave room for them, or send them elsewhere (see [Backups](backups.md)).
 

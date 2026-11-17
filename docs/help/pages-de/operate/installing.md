@@ -48,23 +48,27 @@ Führen Sie nach der Installation des Werkzeugs `faden doctor` aus, um zuerst de
 
 | Frage | Was Sie antworten |
 |---|---|
+| Continue with the Preview release? | Kommt zuerst, nach einem Hinweis, solange das Release ein Preview ist. Ja setzt fort und hält fest, wer es wann angenommen hat. Nein (Standard) beendet die Installation, und nichts wird geändert. Siehe [Preview-Releases](preview.md). |
 | **HTTPS** | `generate` (Standard): ein auf diesem Server erstelltes Zertifikat für seine Namen und Adressen. `own`: Ihr Zertifikat und Ihr Schlüssel als PEM-Dateien. `off`: einfaches HTTP. |
 | Other names or addresses | Bei `generate`: Namen, unter denen die Konsole erreicht wird und die der Server selbst nicht kennt, z. B. `ai.example.internal`. Durch Kommas getrennt, leer für keine. |
 | A port to use instead | Nur wenn Port 80 oder 443 von etwas anderem belegt ist. |
 | Check for new releases? | Ja (Standard): Einmal am Tag lesen der Server und `faden` die öffentliche Liste der Releases und melden den Administratoren, wenn eines erschienen ist. Über den Server wird nichts gesendet. Siehe [Upgrade](upgrading.md#how-you-hear-about-a-new-release). |
+| Days to keep deleted chats | 30 (Standard): Ein Chat, den jemand löscht, verschwindet für ihn sofort und wird nach so vielen Tagen mit seinen Dateien endgültig gelöscht. 0 löscht ihn innerhalb einer Stunde. Administratoren ändern das später unter **Einstellungen → Chat**. |
 | Admin email | Die E-Mail-Adresse, mit der sich der erste Administrator anmeldet. |
 | Admin password | Mindestens 8 Zeichen, und nicht die E-Mail-Adresse. Leer lassen, um ein Passwort erzeugen zu lassen. |
 | Save to file? | Speichert die Zugangsdaten in `~/fadenstack/.bootstrap-credentials` (nur für Sie lesbar). |
 | Back up every night? | Ja (Standard) führt `faden backup` um 03:00 Uhr aus und behält die letzten 7. Siehe [Sicherungen](backups.md). |
-| Make the backup key now? | Ja (Standard) zeigt den Wiederherstellungsschlüssel der Sicherungen einmal an und fragt nach zwei Gruppen aus Ihrer Kopie; jede Sicherung wird für ihn verschlüsselt. Siehe [Verschlüsselte Sicherungen](backups.md#encrypted-backups). |
+| Make the backup key now? | Ja (Standard) zeigt den Wiederherstellungsschlüssel der Sicherungen einmal an; von da an wird jede Sicherung für ihn verschlüsselt. Siehe [Verschlüsselte Sicherungen](backups.md#encrypted-backups). |
+| I have kept a copy of this key off this server | Kommt unter dem Schlüssel. Kopieren Sie ihn zuerst vom Server (in einen Passwort-Manager, auf ein Blatt im Tresor) und antworten Sie dann mit Ja: Der Bildschirm wird geleert, und Sie tippen zwei Gruppen des Schlüssels aus Ihrer Kopie ein. Nein (Standard) erstellt keinen Schlüssel: Die Sicherungen bleiben unverschlüsselt, bis Sie `faden backup key create` ausführen. |
 
 Die Zugangsdaten werden nur einmal angezeigt. Bewahren Sie sie in einem Passwort-Manager auf.
 
 ### Ohne Rückfragen {#without-questions}
 
-`faden deploy -y` fragt nichts: HTTPS mit einem hier erstellten Zertifikat, der Administrator `admin@localhost`
-mit einem erzeugten Passwort, gespeichert in `~/fadenstack/.bootstrap-credentials`, die nächtliche Sicherung und
-die Update-Prüfung eingeschaltet. Bewahren Sie die Zugangsdaten an einem sicheren Ort auf und löschen Sie dann diese Datei.
+`faden deploy -y` fragt nichts: Es nimmt das Preview-Release an und wählt HTTPS mit einem hier erstellten
+Zertifikat, den Administrator `admin@localhost` mit einem erzeugten Passwort, gespeichert in
+`~/fadenstack/.bootstrap-credentials`, 30 Tage für gelöschte Chats, die nächtliche Sicherung und die
+Update-Prüfung eingeschaltet. Bewahren Sie die Zugangsdaten an einem sicheren Ort auf und löschen Sie dann diese Datei.
 Der Wiederherstellungsschlüssel der Sicherungen bleibt in `~/fadenstack/backup-recovery-key.txt`: Kopieren Sie
 ihn vom Server und führen Sie dann `faden backup key confirm` aus.
 
@@ -85,8 +89,9 @@ gespeichert.
 ### Die Runtime-Images {#the-runtime-images}
 
 Zum Schluss lädt `faden deploy` die Runtime-Images herunter: die Container, in denen die GPU-Maschinen Modelle
-ausführen. Die Maschinen laden sie von diesem Server, nicht aus dem Internet, deshalb hält der Server eines pro
-Maschinenart vor. Das ist der größte Download der Installation. Schlägt er fehl, laufen die Dienste bereits;
+ausführen. Die Maschinen laden sie von diesem Server, nicht aus dem Internet, deshalb hält der Server sie für
+jede Maschinenart vor: etwa 29 GB für x86_64-Maschinen und 68 GB für DGX Spark (siehe
+[Speicherplatz](requirements.md#disk)). Das ist der größte Download der Installation. Schlägt er fehl, laufen die Dienste bereits;
 wiederholen Sie ihn mit:
 
 ```bash

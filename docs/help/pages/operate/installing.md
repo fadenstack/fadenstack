@@ -45,22 +45,26 @@ Run `faden doctor` after installing the tool to check the host first.
 
 | Question | What to answer |
 |---|---|
+| Continue with the Preview release? | Asked first, after a notice, while the release is a Preview. Yes goes on and records who accepted it, and when. No, the default, stops the install, and nothing is changed. See [Preview releases](preview.md). |
 | **HTTPS** | `generate` (the default): a certificate made on this server for its names and addresses. `own`: your certificate and key as PEM files. `off`: plain HTTP. |
 | Other names or addresses | With `generate`: names the console is reached by that the server does not know itself, such as `ai.example.internal`. Comma-separated, blank for none. |
 | A port to use instead | Only when port 80 or 443 is taken by something else. |
 | Check for new releases? | Yes (the default): once a day the server and `faden` read the public list of releases and tell the administrators when one is out. Nothing about the server is sent. See [Upgrading](upgrading.md#how-you-hear-about-a-new-release). |
+| Days to keep deleted chats | 30 (the default): a chat someone deletes disappears for them at once and is erased for good, with its files, after this many days. 0 erases it within the hour. Administrators change it later under **Settings → Chat**. |
 | Admin email | The first administrator's sign-in. |
 | Admin password | At least 8 characters, and not the e-mail address. Leave blank to have one generated. |
 | Save to file? | Saves the credentials to `~/fadenstack/.bootstrap-credentials` (readable by you only). |
 | Back up every night? | Yes (the default) runs `faden backup` at 03:00 and keeps the last 7. See [Backups](backups.md). |
-| Make the backup key now? | Yes (the default) shows the backup recovery key once and asks for two groups of it from your copy; every backup is encrypted to it. See [Encrypted backups](backups.md#encrypted-backups). |
+| Make the backup key now? | Yes (the default) shows the backup recovery key once; every backup is encrypted to it from then on. See [Encrypted backups](backups.md#encrypted-backups). |
+| I have kept a copy of this key off this server | Asked under the key. Copy it off the server first (a password manager, a sheet in a safe), then answer yes: the screen is cleared and you type two groups of the key from your copy. No, the default, makes no key: backups stay unencrypted until you run `faden backup key create`. |
 
 The credentials are shown once. Store them in a password manager.
 
 ### Without questions
 
-`faden deploy -y` asks nothing: HTTPS with a certificate made here, the administrator `admin@localhost` with a
-generated password, saved to `~/fadenstack/.bootstrap-credentials`, the nightly backup and the update check on. Store the
+`faden deploy -y` asks nothing: it accepts the Preview release, and takes HTTPS with a certificate made here, the
+administrator `admin@localhost` with a generated password, saved to `~/fadenstack/.bootstrap-credentials`, deleted
+chats kept 30 days, the nightly backup and the update check on. Store the
 credentials somewhere safe, then delete that file. The backup recovery key is left in
 `~/fadenstack/backup-recovery-key.txt`: copy it off the server, then run `faden backup key confirm`.
 
@@ -80,8 +84,9 @@ faden deploy --runtime-images x86_64
 ### The runtime images
 
 At the end, `faden deploy` pulls the runtime images: the containers the GPU machines run models in. The machines
-download them from this server, not from the internet, so the server keeps one per kind of machine. This is the
-largest download of the install. If it fails, the services are already running; retry it with:
+download them from this server, not from the internet, so the server keeps them for each kind of machine: about
+29 GB for x86_64 machines and 68 GB for DGX Spark (see [Disk](requirements.md#disk)). This is the largest download
+of the install. If it fails, the services are already running; retry it with:
 
 ```bash
 faden runtime-images            # fetch what this release needs
