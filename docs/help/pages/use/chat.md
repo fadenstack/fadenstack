@@ -89,3 +89,4 @@ The sidebar opens from the round menu button in a bottom corner, or from the log
 | **The model did not start its reply within … s; it may be busy.** | Many people are using that model. Select **Retry**, try again later, or pick another model. |
 | **The server restarted while this reply was being written.** | Select **Retry**. |
 | **Image generation is turned off in this version. …** | The model answered with a picture, or the request asked for one. This version makes no pictures: ask for the answer in words, or pick another model. |
+| **… only PNG, JPEG, WebP and GIF pictures are taken; this one is …** | The picture is in another format, whatever its name ends in. Save it as PNG or JPEG and add it again. |

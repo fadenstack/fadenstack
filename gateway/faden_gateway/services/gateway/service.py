@@ -36,6 +36,7 @@ from faden_gateway.services.gateway import (
     image_generation,
     knowledge,
     media_fetch,
+    picture_check,
     picture_marking,
     provider_address,
     skill_files,
@@ -3028,6 +3029,11 @@ class GatewayService:
         # Read before anything runs: the session step rewrites the messages.
         question = _last_user_text(payload)
         if chat:
+            # Each picture the client sent, by its first bytes, as the gateway fetched it: refused (400)
+            # before anything is stored or a model asked, at the place the client put it. Checked again on
+            # what leaves, which holds the chat's own pictures too (picture_check.py).
+            client_media = await media_fetch.inline({"messages": payload.get("messages")}, req.media)
+            picture_check.checked(client_media)
             # Before anything is stored or sent: a refused prompt leaves no text.
             req.checks = await self._governance_checks(auth)
             if req.checks:
@@ -3188,6 +3194,9 @@ class GatewayService:
             # Last, on what leaves: every media URL as the data: URL the gateway fetched for it. The
             # tool rounds, the retries and the background turn all send this payload on.
             egress = await media_fetch.inline(egress, req.media)
+            # Then every picture by its first bytes (PNG, JPEG, WebP, GIF only), and no field that names a
+            # multimodal item held elsewhere (picture_check.py; vLLM 0.31.0's advisories, release plan §12.3).
+            egress = picture_check.checked(egress)
             # A watermarked model would give the same request the same answer: the request ends in an
             # invisible variation, and n answers are asked for one by one (answer_variety).
             req.unvaried_payload = egress
