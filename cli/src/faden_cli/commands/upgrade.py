@@ -487,6 +487,11 @@ def _restart_and_check(ctx: ComposeContext, shared_dir: Path, env_path: Path, st
     _sync_postgres_password(ctx, env_path)
     # Earlier releases made two logins with fixed passwords on every install.
     retire_fixed_logins(env_path)
+    # Langfuse ran on the server's own database, which backups leave out: moved into its own once, while
+    # Postgres runs and before the services start on the new .env.
+    from faden_cli.core.langfuse_db import move_step as move_langfuse  # noqa: PLC0415
+
+    move_langfuse(ctx, env_path)
 
     # The front door first, on its own: recreated with this release's config
     # it serves the maintenance page while the rest restarts -- even on the

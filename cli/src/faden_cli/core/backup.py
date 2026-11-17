@@ -1228,6 +1228,7 @@ def create_backup(
         result.ok = False
         result.errors.append("No databases were dumped successfully.")
         return result
+    _warn_if_langfuse_left_out(ctx)
 
     # 3. Snapshot .env
     if not db_only and ctx.env_file:
@@ -1284,6 +1285,20 @@ def create_backup(
         info(f"Rotated {removed} old backup(s).")
 
     return result
+
+
+def _warn_if_langfuse_left_out(ctx: ComposeContext) -> None:
+    """Say so when the install's Langfuse runs on ``postgres``, which a backup leaves out (langfuse_db)."""
+    if not ctx.env_file or not Path(str(ctx.env_file)).exists():
+        return
+    from faden_cli.core.env_gen import read_env_file  # noqa: PLC0415
+    from faden_cli.core.langfuse_db import runs_on_server_database  # noqa: PLC0415
+
+    if runs_on_server_database(read_env_file(Path(str(ctx.env_file)))):
+        warning(
+            "  Langfuse runs on the database postgres, which a backup leaves out: its users, projects, "
+            "API keys and prompts are not in this backup. `faden upgrade` moves it into its own database."
+        )
 
 
 def _recipient(ctx: ComposeContext, result: BackupResult) -> X25519PublicKey | None:

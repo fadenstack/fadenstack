@@ -151,7 +151,11 @@ Or switch the check off: **Updates** still shows what each part of the install r
        (see [Where the company data is kept](installing.md#where-the-company-data-is-kept));
     6. restarts the services; the database migrations run here, and the two Postgres
        logins with fixed passwords that earlier releases made (`llm_user`, `faden_backend`, used by nothing) are
-       switched off;
+       switched off. Before release 0.7.1, Langfuse kept its users, projects, API keys and prompts in the server's
+       own database `postgres`, which a backup leaves out: the upgrade moves them into their own database
+       `langfuse`, once, with Langfuse stopped and every table's rows compared, so backups hold them from then on.
+       Their old copy stays in `postgres` for going back. If the move cannot be made, Langfuse stays where it was
+       and the upgrade says so;
     7. waits for the console API to answer, then lifts the maintenance page;
     8. fetches the runtime images the new release names. Only what changed is downloaded. A failed pull stops
        nothing: retry it with `faden runtime-images`.

@@ -9,6 +9,7 @@ when you install.
 | Part | In the backup | Why it matters |
 |---|---|---|
 | Every database on the server's Postgres | Yes | Users, settings, providers, machines, clusters, deployments, chats, the request log |
+| Langfuse's users, projects, API keys and prompts | Yes, from release 0.7.1 on | Before, Langfuse kept them in the server's own database `postgres`, which a backup leaves out. `faden upgrade` to 0.7.1 moves them into their own database; until then, `faden backup` says that it leaves them out. Langfuse's traces are in ClickHouse (see **Logs, metrics, traces** below) |
 | `.env` | Yes, unless `--db-only` | It holds the key the chats are encrypted with and the keys that seal stored secrets (the Hugging Face token, secret settings, the MCP servers' credentials). A database restored without its `.env` has chats and secrets nobody can read |
 | Certificate material (`tls/`, `tls-ca/`) | Yes, unless `--db-only` | The served certificate and the server's own certificate authority with its private key. With them, a rebuilt server is one the machines still trust |
 | The release, migration versions and checksums | Yes | The release the install ran and the `faden` version that took the backup, which `faden restore` shows. It checks the database dumps, the volume archives and the certificate files before it changes anything |

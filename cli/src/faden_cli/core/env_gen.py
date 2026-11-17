@@ -424,11 +424,16 @@ def write_env_file(
         for key in SECRET_KEYS:
             if key in existing and key in variables:
                 variables[key] = existing[key]
-        # Also fix derived values that embed a secret
+        # Also fix derived values that embed a secret. Langfuse's URL keeps the database it names: built from
+        # POSTGRES_DB (`postgres`), it put every install's Langfuse on the server's own database, which
+        # backups leave out (core/langfuse_db.py moves it).
         if "POSTGRES_PASSWORD" in existing and "LANGFUSE_DATABASE_URL" in variables:
+            from faden_cli.core.langfuse_db import database_of  # noqa: PLC0415
+
             pw = existing["POSTGRES_PASSWORD"]
             user = variables.get("POSTGRES_USER", "postgres")
-            db = variables.get("POSTGRES_DB", "langfuse")
+            url = existing.get("LANGFUSE_DATABASE_URL") or variables["LANGFUSE_DATABASE_URL"]
+            db = database_of(url)
             variables["LANGFUSE_DATABASE_URL"] = (
                 f"postgresql://{user}:{pw}@postgres:5432/{db}"
             )
@@ -541,8 +546,11 @@ def fill_required_env(env_path: Path, *, profiles: list[str] | tuple[str, ...] =
     # set, even to nothing, stays as it is.
     added.update({key: value for key, value in DEPLOY_SETTINGS.items() if key not in current})
     if "POSTGRES_PASSWORD" in added and current.get("LANGFUSE_DATABASE_URL"):
+        from faden_cli.core.langfuse_db import database_of  # noqa: PLC0415
+
         user = current.get("POSTGRES_USER") or "postgres"
-        added["LANGFUSE_DATABASE_URL"] = f"postgresql://{user}:{added['POSTGRES_PASSWORD']}@postgres:5432/langfuse"
+        db = database_of(current["LANGFUSE_DATABASE_URL"])
+        added["LANGFUSE_DATABASE_URL"] = f"postgresql://{user}:{added['POSTGRES_PASSWORD']}@postgres:5432/{db}"
     if any(key in kept for key in _REFUSED_DATA_KEYS) and not current.get(ALLOW_PUBLISHED_KEYS):
         added[ALLOW_PUBLISHED_KEYS] = "true"
     if added:

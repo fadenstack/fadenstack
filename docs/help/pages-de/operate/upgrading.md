@@ -163,7 +163,12 @@ Oder schalten Sie die Prüfung aus: **Updates** zeigt weiterhin, was jeder Teil 
        prüft sie (siehe [Wo die Firmendaten liegen](installing.md#where-the-company-data-is-kept));
     6. startet die Dienste neu; hier laufen die Datenbankmigrationen, und die beiden
        Postgres-Anmeldungen mit festen Passwörtern, die frühere Releases angelegt haben (`llm_user`,
-       `faden_backend`, von nichts genutzt), werden abgeschaltet;
+       `faden_backend`, von nichts genutzt), werden abgeschaltet. Vor Release 0.7.1 hat Langfuse seine Benutzer,
+       Projekte, API-Schlüssel und Prompts in der eigenen Datenbank des Servers, `postgres`, abgelegt, die eine
+       Sicherung auslässt: Das Upgrade verschiebt sie einmalig in eine eigene Datenbank `langfuse`, während
+       Langfuse angehalten ist, und vergleicht die Zeilen jeder Tabelle, sodass Sicherungen sie von da an
+       enthalten. Ihre alte Kopie bleibt für den Weg zurück in `postgres`. Lässt sich die Verschiebung nicht
+       ausführen, bleibt Langfuse, wo es war, und das Upgrade meldet das;
     7. wartet, bis die Konsolen-API antwortet, und hebt dann die Wartungsseite auf;
     8. holt die Runtime-Images, die das neue Release nennt. Nur was sich geändert hat, wird heruntergeladen. Ein
        fehlgeschlagener Download hält nichts auf: Wiederholen Sie ihn mit `faden runtime-images`.
