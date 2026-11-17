@@ -6,6 +6,7 @@ Please tell us privately first. Do not report a security problem in a public iss
 
 Report it in one of these ways:
 
+- **By e-mail:** <security@fadenstack.com>.
 - **On GitHub:** this repository's **Security** tab, **Report a vulnerability**. Only the maintainers see the
   report.
 - **Through our contact form:** <https://emagin8.de/contact?subject=Fadenstack%20security>, with the subject
@@ -26,6 +27,13 @@ We confirm that we received your report and keep you informed while we fix it. A
 publish a security advisory on GitHub that describes the problem and names you, if you want to be named. Please
 keep the details to yourself until that release is out.
 
+We keep your name and contact details only while the case is open. When it closes (the fix is out and the
+advisory published), we delete them; the technical record of the problem and its fix stays, without them.
+
+When a vulnerability in a Fadenstack product is actively exploited, or an incident affects its security, we tell
+its users without undue delay, in a security advisory on GitHub and on <https://fadenstack.com/security/>, with
+what to do.
+
 ## Please don't
 
 - test against installations you do not own or are not allowed to test;
@@ -42,7 +50,7 @@ Security fixes go into the latest release. Keep your installation current with `
 | Fadenstack 0.7.0 and older | No: upgrade to 0.7.1 first |
 | The Fadenstack SDKs for .NET and TypeScript, 0.3.0 | Yes |
 | The SDKs before 0.3.0 | No: upgrade first |
-| The Fadenstack agents: the Chrome extension, the Office add-ins, the desktop agent and the Nextcloud app | The latest release of each; report a problem in them as above |
+| The Fadenstack agents: the Chrome extension, the Office add-ins, the desktop agent and the Nextcloud app | The latest release of each, for five years from that agent's release (the releases of 8 December 2026: until 8 December 2031); report a problem in them as above |
 
 ## Scope
 
