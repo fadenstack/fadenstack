@@ -34,6 +34,7 @@
 #   licence         SPDX expression of the deliverables (optional).
 #   files_artifact  name of an Actions artifact the caller uploaded with the
 #                   release files in the same run. Empty: use the release assets.
+#                   It may hold subfolders; each file's name must be unique in it.
 #   files           newline-separated glob patterns (on the file name) that pick
 #                   the covered files. Checksums, signatures, bundles, earlier
 #                   SBOMs, VEX/CSAF documents and third-party notices are never
@@ -696,7 +697,7 @@ jobs:
         if: ${{ !inputs.dry_run && needs.plan.outputs.attest_github == 'true' }}
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: ${{ matrix.kind == 'file' && format('files/{0}', matrix.name) || '' }}
+          subject-path: ${{ matrix.kind == 'file' && matrix.path || '' }}
           subject-name: ${{ matrix.kind == 'image' && matrix.repo || '' }}
           subject-digest: ${{ matrix.kind == 'image' && matrix.digest || '' }}
           push-to-registry: ${{ matrix.kind == 'image' }}
@@ -706,7 +707,7 @@ jobs:
         if: ${{ !inputs.dry_run && needs.plan.outputs.attest_github == 'true' }}
         uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
         with:
-          subject-path: ${{ matrix.kind == 'file' && format('files/{0}', matrix.name) || '' }}
+          subject-path: ${{ matrix.kind == 'file' && matrix.path || '' }}
           subject-name: ${{ matrix.kind == 'image' && matrix.repo || '' }}
           subject-digest: ${{ matrix.kind == 'image' && matrix.digest || '' }}
           sbom-path: ${{ steps.sbom.outputs.path }}
@@ -718,6 +719,8 @@ jobs:
         env:
           KIND: ${{ matrix.kind }}
           NAME: ${{ matrix.name }}
+          # Where the plan found the file in the artifact (it may be in a subfolder), as analyze reads it.
+          SUBJECT_PATH: ${{ matrix.path }}
           REPO: ${{ matrix.repo }}
           DIGEST: ${{ matrix.digest }}
           SIGNING: ${{ inputs.signing }}
@@ -738,7 +741,7 @@ jobs:
           if [ "$SIGNING" != none ] && [ "$ATTEST_GITHUB" != true ]; then
             provenance=true
             if [ "$KIND" = file ]; then
-              python3 .release-tools/tools/release/slsa_provenance.py --subject-file "files/$NAME" \
+              python3 .release-tools/tools/release/slsa_provenance.py --subject-file "$SUBJECT_PATH" \
                 --statement-out "$RUNNER_TEMP/provenance.statement.json" --predicate-out "$RUNNER_TEMP/provenance.predicate.json"
             else
               python3 .release-tools/tools/release/slsa_provenance.py --subject-digest "$REPO=$DIGEST" \
@@ -748,7 +751,7 @@ jobs:
           if [ "$SIGNING" = none ]; then
             echo "::notice::signing: none, nothing is signed"
           elif [ "$KIND" = file ]; then
-            f="files/$NAME"
+            f="$SUBJECT_PATH"
             cosign sign-blob "${args[@]}" --bundle "publish/$NAME.sigstore.json" "$f"
             cosign sign-blob "${args[@]}" --bundle "$sbom.sigstore.json" "$sbom"
             cosign attest-blob "${args[@]}" --type cyclonedx --predicate "$sbom" \
