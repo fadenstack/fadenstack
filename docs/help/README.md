@@ -49,6 +49,65 @@ translated yet is the English one with a note, so the German build never fails f
 it in the same change: STYLE.md says how, and `scripts/ui_label.py` finds what the German console calls a button.
 The German pages show the German screenshots (`pages/images/de/`) where they exist, otherwise the English ones.
 
+## Help from other repositories (agents)
+
+The public site also carries Help that lives with an agent: an agent's repository keeps its Help in its own
+`docs/help/`, and the docs hub mounts it at `agents/<agent>/` (`help.fadenstack.com/agents/<agent>/`, German
+under `de/agents/<agent>/`), the way the Developers site mounts the SDKs' docs. The build gives mounted pages
+what it gives these: the theme, the search, the question box, the language switch, the German fallback note,
+and `check.py`'s checks. The console's `/help` is this folder alone and stays so: it carries no mounted Help, so
+no page here links into `agents/`.
+
+**The source.** One entry per repository in the docs hub's `sources.toml`:
+
+```toml
+[[source]]
+key = "chrome"                            # unique; names the source in messages
+site = "help"
+repo = "fadenstack/faden-agent-chrome"
+docs = "docs/help"
+mount = "agents/chrome"                   # agents/<agent>: lower case, letters, digits and -
+```
+
+**The repository's `docs/help/`.** This folder's layout, for one agent:
+
+| Path | What |
+|---|---|
+| `pages/` | The English pages. `index.md` is the agent's start page. Pictures in `pages/images/`, their German versions (where taken) at the same path under `pages/images/de/` |
+| `pages-de/` | The German pages: the same files at the same paths. A page missing here is published as the English one with the "Noch nicht übersetzt" note |
+| `zensical.toml` | `[project]` with `nav`: one titled section holding every page, paths relative to `pages/`, e.g. `nav = [{ "Browser agent" = [{ "Overview" = "index.md" }, { "Installing" = "install.md" }] }]` |
+| `nav-de.toml` | `nav`: the same pages in the same order, with German titles |
+| `questions.toml` | The question box: one table per page (`["install.md"]`), one line per question, `"How do I install it?" = "anchor"` (`""` for the top of the page). The page must be in the nav, the anchor a heading of its English page |
+| `questions-de.toml` | The same pages and anchors, the questions in German |
+
+Nothing else is read: no theme, no `site.toml`, no overrides, no scripts.
+
+**Rules.**
+
+- [STYLE.md](STYLE.md) applies: public pages, the contract and not the mechanism, the neutral names and examples,
+  German with `Sie` and `{#english-slug}` on every German heading, so the anchors match the English ones.
+- Links are relative. Inside the source as usual; to this Help's pages through the mount: from
+  `pages/index.md`, mounted at `agents/chrome/`, `../../use/chat.md` is this Help's chat page. `check.py`
+  resolves links in the site as it is put together, so a link to a page that is neither here nor in the source
+  fails.
+- A page that is not in the nav is not published; a German nav that lists other pages than the English one
+  stops the build.
+
+**Where it shows.** After this Help's own sections, one section **Agents** (**Agenten**), holding each source's
+section in the order of `sources.toml`. Its questions join this Help's in the question box.
+
+**Build with the sources.** The hub's `sources.toml`, the repositories checked out next to the hub (as
+`<the hub's folder>/../<repo name>`; `--checkouts DIR` looks elsewhere):
+
+```sh
+python docs/help/scripts/check.py --sources ../docs/sources.toml       # these pages and every source's
+python docs/help/scripts/build.py --target public --out build/help --build --sources ../docs/sources.toml
+```
+
+`--allow-missing` leaves out a source that is not checked out, and says so. Only `--target public` takes
+`--sources`. The public Help is released by hand (built locally, published with the website's
+`deploy/publish.sh`).
+
 ## Screenshots
 
 Recorded CLI output can also be rendered as terminal captures:
