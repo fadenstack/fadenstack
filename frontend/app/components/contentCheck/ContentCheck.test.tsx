@@ -151,6 +151,19 @@ describe("ContentCheck, signed in", () => {
     expect(submit.mock.calls[0][0]).toMatchObject({ media_type: "text/markdown" });
   });
 
+  it("takes a saved mail and names its type when the browser gives none", async () => {
+    const user = userEvent.setup();
+    renderCheck();
+    await user.click(screen.getByRole("tab", { name: "Picture or file" }));
+    expect(screen.getByTestId("content-check-file")).toHaveAttribute("accept", expect.stringContaining(".eml"));
+    expect(screen.getByText(/text files and mails \(\.eml\), up to 20 MB/)).toBeInTheDocument();
+    await user.upload(screen.getByTestId("content-check-file"), new File(["Subject: Re"], "reply.eml", { type: "" }));
+    await user.click(screen.getByTestId("content-check-submit"));
+
+    await screen.findByTestId("content-check-result");
+    expect(submit.mock.calls[0][0]).toMatchObject({ media_type: "message/rfc822" });
+  });
+
   it("asks for the signed result and saves it as JSON", async () => {
     const created: Blob[] = [];
     const createObjectURL = vi.fn((blob: Blob) => {
@@ -243,10 +256,15 @@ describe("ContentCheck, public page", () => {
     expect(within(screen.getByTestId("content-check-explanation")).queryByText(/text watermarks/)).toBeNull();
   });
 
-  it("refuses a text file before sending it", async () => {
+  it.each([
+    ["notes.txt", "text/plain"],
+    ["reply.eml", "message/rfc822"],
+    ["reply.eml", ""],
+  ])("refuses a text file before sending it (%s, %s)", async (name, type) => {
     const user = userEvent.setup({ applyAccept: false });
     renderCheck("public");
-    await user.upload(screen.getByTestId("content-check-file"), new File(["notes"], "notes.txt", { type: "text/plain" }));
+    expect(screen.getByTestId("content-check-file")).toHaveAttribute("accept", expect.not.stringContaining(".eml"));
+    await user.upload(screen.getByTestId("content-check-file"), new File(["notes"], name, { type }));
     await user.click(screen.getByTestId("content-check-submit"));
 
     expect(await screen.findByTestId("content-check-error")).toHaveTextContent(

@@ -35,6 +35,8 @@ PUBLIC_CHECK_ENABLED_KEY = "provenance.public_check_enabled"
 PUBLIC_CHECK_CONTACT_KEY = "provenance.public_check_contact"
 #: The longest contact the public page shows.
 MAX_CONTACT_CHARS = 500
+#: Mails: the engine reads their text parts as texts, so they are texts here too (not for the public page).
+MAIL_TYPES = frozenset({"message/rfc822"})
 
 #: The longest base64 the engine reads for a file of :data:`MAX_CONTENT_BYTES` (its own rule).
 MAX_FILE_BASE64 = MAX_CONTENT_BYTES * 4 // 3 + 4
@@ -150,8 +152,9 @@ class CheckBody(BaseModel):
 
     @property
     def is_text(self) -> bool:
-        """Whether a text is to be checked: pasted, or a file the engine reads as text."""
-        return self.text is not None or (self.media_type or "").strip().lower().startswith("text/")
+        """Whether a text is to be checked: pasted, or a file the engine reads as text (a mail's too)."""
+        media_type = (self.media_type or "").strip().lower()
+        return self.text is not None or media_type.startswith("text/") or media_type in MAIL_TYPES
 
     def engine_body(self) -> dict[str, Any]:
         """The engine's ``VerifyRequest``."""

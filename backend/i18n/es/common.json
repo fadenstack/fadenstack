@@ -2030,7 +2030,7 @@
     "text_limit": "Hasta {{size}}. Los saltos de línea y los espacios no importan.",
     "choose_file": "Elegir un archivo",
     "drop_hint": "o arrástrelo aquí",
-    "file_types": "Imágenes (PNG, JPEG, WebP), documentos de Word, PowerPoint y Excel, PDF y archivos de texto, hasta {{size}}.",
+    "file_types": "Imágenes (PNG, JPEG, WebP), documentos de Word, PowerPoint y Excel, PDF, archivos de texto y correos (.eml), hasta {{size}}.",
     "public_file_types": "Imágenes (PNG, JPEG, WebP), documentos de Word, PowerPoint y Excel y PDF, hasta {{size}}.",
     "selected_file": "{{name}} ({{size}})",
     "remove_file": "Quitar el archivo",

@@ -517,6 +517,8 @@ async def test_anyone_checks_a_picture_when_the_page_is_offered(
         {"text": SUBMITTED_TEXT},
         {"file": base64.b64encode(SUBMITTED_TEXT.encode()).decode(), "media_type": "text/plain"},
         {"file": base64.b64encode(b"# notes").decode(), "media_type": "Text/Markdown"},
+        {"file": base64.b64encode(b"Subject: Re\r\n\r\n" + SUBMITTED_TEXT.encode()).decode(),
+         "media_type": "message/RFC822"},
     ],
 )
 async def test_texts_are_refused_on_the_public_page_naming_whom_to_ask(

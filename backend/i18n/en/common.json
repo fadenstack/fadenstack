@@ -2171,7 +2171,7 @@
     "text_limit": "Up to {{size}}. Line breaks and spacing do not matter.",
     "choose_file": "Choose a file",
     "drop_hint": "or drop it here",
-    "file_types": "Pictures (PNG, JPEG, WebP), Word, PowerPoint and Excel documents, PDF and text files, up to {{size}}.",
+    "file_types": "Pictures (PNG, JPEG, WebP), Word, PowerPoint and Excel documents, PDF, text files and mails (.eml), up to {{size}}.",
     "public_file_types": "Pictures (PNG, JPEG, WebP), Word, PowerPoint and Excel documents and PDF, up to {{size}}.",
     "selected_file": "{{name}} ({{size}})",
     "remove_file": "Remove the file",

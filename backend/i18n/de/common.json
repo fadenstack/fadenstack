@@ -2030,7 +2030,7 @@
     "text_limit": "Bis {{size}}. Zeilenumbrüche und Abstände spielen keine Rolle.",
     "choose_file": "Datei auswählen",
     "drop_hint": "oder hierher ziehen",
-    "file_types": "Bilder (PNG, JPEG, WebP), Word-, PowerPoint- und Excel-Dokumente, PDF und Textdateien, bis {{size}}.",
+    "file_types": "Bilder (PNG, JPEG, WebP), Word-, PowerPoint- und Excel-Dokumente, PDF, Textdateien und E-Mails (.eml), bis {{size}}.",
     "public_file_types": "Bilder (PNG, JPEG, WebP), Word-, PowerPoint- und Excel-Dokumente und PDF, bis {{size}}.",
     "selected_file": "{{name}} ({{size}})",
     "remove_file": "Datei entfernen",

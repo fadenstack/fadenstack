@@ -22,6 +22,8 @@ an Ihren Administrator.
     - Texte, die Sie einfügen. Zeilenumbrüche und Abstände spielen keine Rolle.
     - Bilder: PNG, JPEG und WebP.
     - Word-, PowerPoint- und Excel-Dokumente, PDF und Textdateien (`.txt`, `.md`, `.html`).
+    - E-Mails, als `.eml`-Datei gespeichert. Eine E-Mail, die ein Assistent entworfen hat, nennt ihren Datensatz
+      in der Kopfzeile `X-AI-Generated`; die Prüfung liest sie und prüft auch den Text der E-Mail.
 
     Bis 20 MB auf einmal. Administratoren finden dieselbe Prüfung auch in der Konsole unter
     **Dienstprogramme → Inhalte prüfen**.
@@ -81,8 +83,8 @@ verworfen.
 ## Ohne Konto {#without-an-account}
 
 Ihre Organisation kann eine öffentliche Prüfseite anbieten, z. B. unter `https://ai.example.internal/check`. Dort
-kann jeder ohne Anmeldung Bilder und Dateien prüfen. Texte werden nur für Personen mit einem Konto geprüft; die
-Seite nennt, an wen man sich wenden kann. Eingeschaltet wird sie von Administratoren: siehe
+kann jeder ohne Anmeldung Bilder und Dateien prüfen. Texte und E-Mails werden nur für Personen mit einem Konto
+geprüft; die Seite nennt, an wen man sich wenden kann. Eingeschaltet wird sie von Administratoren: siehe
 [Kennzeichnung KI-generierter Inhalte](../administer/content-marking.md#the-public-check-page).
 
 ![Die öffentliche Prüfseite: Ein Bild oder eine Datei prüfen, mit Datei auswählen, dem Hinweis, dass Texte für Personen mit einem Konto geprüft werden, und was geprüft wird](../images/use/public-check.png)

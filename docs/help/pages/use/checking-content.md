@@ -22,6 +22,8 @@ administrator.
     - Texts you paste. Line breaks and spacing do not matter.
     - Pictures: PNG, JPEG and WebP.
     - Word, PowerPoint and Excel documents, PDF, and text files (`.txt`, `.md`, `.html`).
+    - Mails saved as `.eml` files. A mail that an assistant drafted names its record in the mail's
+      `X-AI-Generated` header, which the check reads; the mail's text is checked as well.
 
     Up to 20 MB at a time. Administrators also find the same check in the console under
     **Utilities → Check content**.
@@ -77,8 +79,9 @@ Nothing you submit is kept or logged: the text or file is checked and then dropp
 ## Without an account
 
 Your organisation can offer a public check page, for example at `https://ai.example.internal/check`. There,
-anyone can check pictures and files without signing in. Texts are checked only for people with an account; the
-page names whom to ask. Administrators switch it on: see [Content marking](../administer/content-marking.md#the-public-check-page).
+anyone can check pictures and files without signing in. Texts and mails are checked only for people with an
+account; the page names whom to ask. Administrators switch it on: see
+[Content marking](../administer/content-marking.md#the-public-check-page).
 
 ![The public check page: Check a picture or a file, with Choose a file, the note that texts are checked for people with an account, and what is checked](../images/use/public-check.png)
 

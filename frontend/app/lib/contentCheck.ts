@@ -8,7 +8,7 @@
  */
 import type { ContentCheckResult } from "~/api/provenance";
 
-/** Signed in: pictures, Office documents, PDF and text files. */
+/** Signed in: pictures, Office documents, PDF, text files and mails. */
 export const ACCOUNT_FILE_TYPES = [
   "image/png",
   "image/jpeg",
@@ -20,6 +20,7 @@ export const ACCOUNT_FILE_TYPES = [
   ".txt",
   ".md",
   ".html",
+  ".eml",
 ].join(",");
 
 /** The public page: pictures, Office documents and PDF (texts are for people with an account). */
@@ -39,6 +40,7 @@ const BY_EXTENSION: Record<string, string> = {
   markdown: "text/markdown",
   html: "text/html",
   htm: "text/html",
+  eml: "message/rfc822",
 };
 
 /** The file's media type: the browser's, or -- when it gives none (Markdown, often) -- its extension's. */
@@ -48,9 +50,10 @@ export function mediaTypeOf(file: { name: string; type: string }): string {
   return BY_EXTENSION[extension] ?? "application/octet-stream";
 }
 
-/** Whether the engine reads the file as a text (which the public page does not check). */
+/** Whether the engine reads the file as a text, a mail's too (which the public page does not check). */
 export function isTextType(mediaType: string): boolean {
-  return mediaType.toLowerCase().startsWith("text/");
+  const type = mediaType.toLowerCase();
+  return type.startsWith("text/") || type === "message/rfc822";
 }
 
 /** The file's bytes, base64 (without the `data:` prefix). */

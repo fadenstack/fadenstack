@@ -2173,7 +2173,7 @@
     "text_limit": "Jusqu'à {{size}}. Les retours à la ligne et les espaces n'ont pas d'importance.",
     "choose_file": "Choisir un fichier",
     "drop_hint": "ou déposez-le ici",
-    "file_types": "Images (PNG, JPEG, WebP), documents Word, PowerPoint et Excel, PDF et fichiers texte, jusqu'à {{size}}.",
+    "file_types": "Images (PNG, JPEG, WebP), documents Word, PowerPoint et Excel, PDF, fichiers texte et e-mails (.eml), jusqu'à {{size}}.",
     "public_file_types": "Images (PNG, JPEG, WebP), documents Word, PowerPoint et Excel et PDF, jusqu'à {{size}}.",
     "selected_file": "{{name}} ({{size}})",
     "remove_file": "Retirer le fichier",

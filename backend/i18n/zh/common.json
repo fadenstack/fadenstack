@@ -2030,7 +2030,7 @@
     "text_limit": "最大 {{size}}。换行和空格不影响结果。",
     "choose_file": "选择文件",
     "drop_hint": "或将文件拖到此处",
-    "file_types": "图片（PNG、JPEG、WebP）、Word、PowerPoint 和 Excel 文档、PDF 及文本文件，最大 {{size}}。",
+    "file_types": "图片（PNG、JPEG、WebP）、Word、PowerPoint 和 Excel 文档、PDF、文本文件及邮件（.eml），最大 {{size}}。",
     "public_file_types": "图片（PNG、JPEG、WebP）、Word、PowerPoint 和 Excel 文档及 PDF，最大 {{size}}。",
     "selected_file": "{{name}}（{{size}}）",
     "remove_file": "移除文件",
