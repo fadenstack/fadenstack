@@ -23,6 +23,12 @@ WORKDIR /app
 RUN npm run build
 
 FROM node:24-alpine
+# The Alpine packages' fixes (zlib 1.3.2-r1 had a critical advisory, ALPINE-CVE-2026-4738), and an npm whose own
+# undici and brace-expansion are fixed (npm 11.19.1 in node:24 bundles undici 6.28.0 and brace-expansion 5.0.9:
+# GHSA-2m5v-pch6-74hx and others, fixed in 6.29.1 and 5.0.11). npm starts the server (CMD below).
+RUN apk upgrade --no-cache \
+    && npm install -g --no-fund --no-audit npm@11.21.2 \
+    && npm cache clean --force
 COPY ./package.json package-lock.json /app/
 COPY ./LICENSE ./NOTICE /app/
 COPY --from=production-dependencies-env /app/node_modules /app/node_modules
