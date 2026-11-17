@@ -543,6 +543,7 @@ jobs:
         ghcr.io/fadenstack/frontend:${{ needs.build.outputs.version }}
         ghcr.io/fadenstack/pii:${{ needs.build.outputs.version }}
         ghcr.io/fadenstack/pii:${{ needs.build.outputs.version }}-cpu
+        ghcr.io/fadenstack/pii:${{ needs.build.outputs.version }}-gpu
         ghcr.io/fadenstack/mcp:${{ needs.build.outputs.version }}
         ghcr.io/fadenstack/skills:${{ needs.build.outputs.version }}
       signing: keyless
