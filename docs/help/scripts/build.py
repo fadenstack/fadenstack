@@ -26,7 +26,12 @@ import subprocess
 import sys
 import tomllib
 import unicodedata
+from collections.abc import Sequence
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from sources import FILES, Source  # noqa: E402  (scripts/sources.py: Help from other repositories)
+from sources import load as load_sources  # noqa: E402
 
 HELP = Path(__file__).resolve().parent.parent          # docs/help
 THEME = HELP.parent / "theme"                           # docs/theme
@@ -48,6 +53,7 @@ LANGS: dict[str, dict[str, str]] = {
         "help": "Help",
         "developers": "Developers",
         "console": "Console",
+        "agents": "Agents",
         "untranslated": "",
     },
     "de": {
@@ -64,6 +70,7 @@ LANGS: dict[str, dict[str, str]] = {
         "help": "Hilfe",
         "developers": "Developers",
         "console": "Konsole",
+        "agents": "Agenten",
         "untranslated": '!!! note "Noch nicht übersetzt"\n    Diese Seite gibt es noch nicht auf Deutsch; hier steht die englische Fassung.\n\n',
     },
 }
@@ -174,8 +181,11 @@ def _anchors(text: str) -> tuple[str, set[str]]:
 _IMAGE = re.compile(r"(\]\()((?:\.\./)*)images/([^)\s]+?\.png)")
 
 
-def _local_images(docs: Path, lang: str) -> None:
-    """Point a translation's pictures at pages/images/<lang>/ where there is one, and keep only its language's."""
+def _local_images(docs: Path, lang: str, english: Path = HELP / "pages") -> None:
+    """Point a translation's pictures at images/<lang>/ where there is one, and keep only its language's.
+
+    *docs* holds the pages of one tree (this Help's, or a mounted source's), *english* that tree's English pages.
+    """
     for other in LANGS:
         if other not in ("en", lang):
             shutil.rmtree(docs / "images" / other, ignore_errors=True)
@@ -183,7 +193,7 @@ def _local_images(docs: Path, lang: str) -> None:
         return
 
     def swap(m: re.Match) -> str:
-        local = HELP / "pages" / "images" / lang / m[3]
+        local = english / "images" / lang / m[3]
         return f"{m[1]}{m[2]}images/{lang}/{m[3]}" if local.is_file() else m[0]
 
     for page in docs.rglob("*.md"):
@@ -201,25 +211,28 @@ def _page_url(page: str) -> str:
     return (stem[: -len("index")] if stem.endswith("/index") else stem + "/")
 
 
-def _questions(lang: str, docs: Path) -> None:
-    """Write assets/questions.json for the front page's question search, from the language's questions file."""
+def _questions(lang: str, docs: Path, sources: Sequence[Source] = ()) -> None:
+    """Write assets/questions.json for the front page's question search: this Help's questions, then each source's."""
     words = LANGS[lang]
-    data = tomllib.loads((HELP / words["questions"]).read_text(encoding="utf-8"))
-    pages = set(_files(_nav("en")))
+    trees = [("", words["questions"], tomllib.loads((HELP / words["questions"]).read_text(encoding="utf-8")),
+              set(_files(_nav("en"))), HELP / "pages")]
+    trees += [(source.mount + "/", f"{source.key}: {FILES[lang]['questions']}", source.questions(lang),
+               set(source.files()), source.pages("en")) for source in sources]
     out = []
-    for page, questions in data.items():
-        if page not in pages:
-            raise SystemExit(f"{words['questions']}: {page} is not a page in the navigation")
-        _, anchors = _anchors((HELP / "pages" / page).read_text(encoding="utf-8"))
-        title, _ = _anchors((docs / page).read_text(encoding="utf-8"))
-        for question, anchor in questions.items():
-            if anchor and anchor not in anchors:
-                raise SystemExit(f"{words['questions']}: {page} has no section #{anchor} ({question})")
-        out.append({
-            "url": _page_url(page),
-            "title": title,
-            "questions": [{"q": q, "at": a} for q, a in questions.items()],
-        })
+    for mount, name, data, pages, english in trees:
+        for page, questions in data.items():
+            if page not in pages:
+                raise SystemExit(f"{name}: {page} is not a page in the navigation")
+            _, anchors = _anchors((english / page).read_text(encoding="utf-8"))
+            title, _ = _anchors((docs / mount / page).read_text(encoding="utf-8"))
+            for question, anchor in questions.items():
+                if anchor and anchor not in anchors:
+                    raise SystemExit(f"{name}: {page} has no section #{anchor} ({question})")
+            out.append({
+                "url": mount + _page_url(page),
+                "title": title,
+                "questions": [{"q": q, "at": a} for q, a in questions.items()],
+            })
     target = docs / "assets" / "questions.json"
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps({"pages": out}, ensure_ascii=False), encoding="utf-8")
@@ -237,34 +250,54 @@ def _with_note(text: str, note: str) -> str:
     return head + "\n".join([*lines[:at], "", note.rstrip("\n"), "", *lines[at:]])
 
 
-def assemble(out: Path, target: str, lang: str = "en", theme: Path = THEME) -> list[str]:
-    """Put one language's site together in *out*; returns the pages that fell back to English."""
+def _tree(docs: Path, lang: str, translated: Path, english: Path, pages: list[str], mount: str = "") -> list[str]:
+    """Copy one tree of pages into *docs* (this Help's at the root, a source's at its mount) in *lang*.
+
+    The pictures: the language's own under images/<lang>/ where taken (_local_images), the English ones otherwise;
+    a page not translated yet is the English one with a note. Returns those pages, with the mount.
+    """
+    shutil.copytree(translated, docs, dirs_exist_ok=True) if translated.is_dir() else docs.mkdir(parents=True)
+    if lang != "en" and (english / "images").is_dir():
+        shutil.copytree(english / "images", docs / "images", dirs_exist_ok=True)
+    fell_back = []
+    for page in pages:
+        if not (docs / page).is_file():
+            target_file = docs / page
+            target_file.parent.mkdir(parents=True, exist_ok=True)
+            text = (english / page).read_text(encoding="utf-8")
+            target_file.write_text(_with_note(text, LANGS[lang]["untranslated"]), encoding="utf-8")
+            fell_back.append(mount + page)
+    _local_images(docs, lang, english)
+    return fell_back
+
+
+def assemble(
+    out: Path, target: str, lang: str = "en", theme: Path = THEME, sources: Sequence[Source] = (),
+) -> list[str]:
+    """Put one language's site together in *out*, with *sources* mounted; returns the pages that fell back to English."""
     words, t = LANGS[lang], TARGETS[target]
-    pages = HELP / words["pages"]
     english = _files(_nav("en"))
     if sorted(_files(_nav(lang))) != sorted(english):
         raise SystemExit(f"{words['nav']} must list the same pages as zensical.toml")
+    if sources and target != "public":
+        raise SystemExit("only the public Help mounts other sources: the console's /help is this folder alone")
 
     out.mkdir(parents=True, exist_ok=True)
     for child in out.iterdir():  # empty it, but keep the folder: a preview server may be running in it
         shutil.rmtree(child) if child.is_dir() else child.unlink()
-    shutil.copytree(pages, out / "docs", dirs_exist_ok=True) if pages.is_dir() else (out / "docs").mkdir()
-    if lang != "en":
-        # The pictures: the language's own under images/<lang>/ where taken (_local_images), the English ones
-        # otherwise; a page not translated yet is the English one.
-        shutil.copytree(HELP / "pages" / "images", out / "docs" / "images", dirs_exist_ok=True)
-    fell_back = []
-    for page in english:
-        if not (out / "docs" / page).is_file():
-            target_file = out / "docs" / page
-            target_file.parent.mkdir(parents=True, exist_ok=True)
-            text = (HELP / "pages" / page).read_text(encoding="utf-8")
-            target_file.write_text(_with_note(text, words["untranslated"]), encoding="utf-8")
-            fell_back.append(page)
-    _title_admonitions(out / "docs", lang)
-    _local_images(out / "docs", lang)
-    shutil.copytree(theme / "assets", out / "docs" / "assets", dirs_exist_ok=True)
-    _questions(lang, out / "docs")
+    docs = out / "docs"
+    fell_back = _tree(docs, lang, HELP / words["pages"], HELP / "pages", english)
+    nav = _nav(lang)
+    for source in sources:
+        if (docs / source.mount).exists():
+            raise SystemExit(f"{source.key}: {source.mount}/ is a folder of this Help already")
+        fell_back += _tree(docs / source.mount, lang, source.pages(lang), source.pages("en"), source.files(),
+                           source.mount + "/")
+    if sources:
+        nav = [*nav, {words["agents"]: [source.mounted(lang) for source in sources]}]
+    _title_admonitions(docs, lang)
+    shutil.copytree(theme / "assets", docs / "assets", dirs_exist_ok=True)
+    _questions(lang, docs, sources)
     shutil.copytree(theme / "overrides", out / "overrides")
 
     base = str(t["base"])
@@ -287,7 +320,7 @@ def assemble(out: Path, target: str, lang: str = "en", theme: Path = THEME) -> l
         ("#SITE_DESCRIPTION#", f"site_description = {toml_value(words['description'])}"),
         ("#COPYRIGHT#", copyright_line),
         ("#SITE_URL#", f'site_url = "{base}{words["prefix"]}"' if t["site_url"] else ""),
-        ("#NAV#", "nav = " + toml_value(_nav(lang))),
+        ("#NAV#", "nav = " + toml_value(nav)),
         ("#SITES#", "sites = " + toml_value(_sites(target, lang))),
         ("#ALTERNATE#", "alternate = " + toml_value(alternate)),
         ("#LANGUAGE#", f'language = "{lang}"'),
@@ -331,10 +364,18 @@ def main() -> int:
     ap.add_argument("--lang", choices=["all", *LANGS], default="all")
     ap.add_argument("--theme", type=Path, default=THEME, help="default: docs/theme next to docs/help")
     ap.add_argument("--build", action="store_true", help="also run `zensical build --strict` and put the sites together")
+    ap.add_argument("--sources", type=Path, help="the docs hub's sources.toml: mount its Help sources (public only)")
+    ap.add_argument("--checkouts", type=Path, help="where the sources' repositories are (default: next to the hub)")
+    ap.add_argument("--allow-missing", action="store_true", help="leave out a source that is not checked out")
     args = ap.parse_args()
+    if args.sources and args.target != "public":
+        ap.error("--sources is for --target public: the console's /help is this folder alone")
+    sources = load_sources(args.sources, args.checkouts, args.allow_missing) if args.sources else []
+    for source in sources:
+        print(f"mounting {source.key}: {source.root} -> {source.mount}/")
     langs = list(LANGS) if args.lang == "all" else [args.lang]
     for lang in langs:
-        fell_back = assemble(args.out / lang, args.target, lang, args.theme)
+        fell_back = assemble(args.out / lang, args.target, lang, args.theme, sources)
         print(f"assembled {args.out / lang} ({args.target}, {lang})")
         if fell_back:
             print(f"  not translated yet, English for now: {', '.join(fell_back)}")

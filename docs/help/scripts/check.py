@@ -1,24 +1,33 @@
 """Check Help pages before they go anywhere.
 
     python docs/help/scripts/check.py [PATH ...]      # default: docs/help/pages/ and docs/help/pages-de/
+    python docs/help/scripts/check.py --sources ../docs/sources.toml    # and the Help mounted from other repos
 
 Two checks:
   - the docs hub's scrub patterns (private addresses, lab names, internal wording, timings, e-mail addresses,
     secrets): the same rules the hub applies when it builds help.fadenstack.com. Read from the hub, so they are
     kept in one place: FADEN_DOCS_HUB, or the hub checked out next to this repo (../docs);
-  - every relative link to a Markdown page, and every picture, points at a file that exists. A translated page
-    (pages-de/) uses the English pictures: its picture links are looked up in pages/ as well.
+  - every relative link to a Markdown page, and every picture, points at a file that exists in the site as it is
+    put together: this Help at the root, each source at its mount (README.md, "Help from other repositories").
+    A translation also finds the English files, as the build falls back to them (pictures, pages not translated).
+    Without --sources nothing is mounted, so a page here that links into agents/ fails: the console has none.
 
 A reviewed line passes the scrub when it ends with `<!-- scrub: ok -->`, as in the hub.
 """
 
 from __future__ import annotations
 
+import argparse
 import importlib.util
 import os
+import posixpath
 import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from sources import FILES, Source  # noqa: E402  (scripts/sources.py: Help from other repositories)
+from sources import load as load_sources  # noqa: E402
 
 HELP = Path(__file__).resolve().parent.parent          # docs/help
 REPO = HELP.parent.parent                               # the core repo
@@ -39,19 +48,57 @@ def scrub_rules() -> dict[str, re.Pattern[str]]:
     return rules
 
 
-def _shared_picture(page: Path, target: str) -> bool:
-    """A translated page's picture: the English one, at the same place under pages/."""
-    if target.endswith(".md"):
-        return False
-    resolved = (page.parent / target).resolve()
-    for translated in HELP.glob("pages-*"):
-        if resolved.is_relative_to(translated.resolve()):
-            return (HELP / "pages" / resolved.relative_to(translated.resolve())).is_file()
-    return False
+def site_trees(sources: list[Source]) -> list[tuple[str, Path, str]]:
+    """Every tree of pages and where it lands in the site: (language, folder, mount)."""
+    trees = [(lang, HELP / files["pages"], "") for lang, files in FILES.items()]
+    trees += [(lang, s.pages(lang), s.mount + "/") for s in sources for lang in FILES]
+    return [(lang, folder, mount) for lang, folder, mount in trees if folder.is_dir()]
+
+
+def site_files(trees: list[tuple[str, Path, str]]) -> dict[str, set[str]]:
+    """Each language's files by their path in the site (a translation also has the English ones: its fallback)."""
+    files: dict[str, set[str]] = {lang: set() for lang in FILES}
+    for lang, folder, mount in trees:
+        files[lang] |= {mount + p.relative_to(folder).as_posix() for p in folder.rglob("*") if p.is_file()}
+    for lang in files:
+        files[lang] |= files["en"]
+    return files
+
+
+def in_site(page: Path, trees: list[tuple[str, Path, str]]) -> tuple[str, str] | None:
+    """The language and the site path of *page*, if it belongs to one of the trees."""
+    for lang, folder, mount in trees:
+        if page.resolve().is_relative_to(folder.resolve()):
+            return lang, mount + page.resolve().relative_to(folder.resolve()).as_posix()
+    return None
+
+
+def broken(page: Path, target: str, trees: list[tuple[str, Path, str]], files: dict[str, set[str]]) -> str:
+    """What is wrong with a relative link of *page* in the site as it is put together (the mounts included), or "".
+    A page outside the trees is looked up beside it."""
+    placed = in_site(page, trees)
+    if placed is None:
+        return "" if (page.parent / target).resolve().is_file() else "link to a file that does not exist"
+    lang, at = placed
+    resolved = posixpath.normpath(posixpath.join(posixpath.dirname(at), target))
+    if not at.startswith("agents/") and resolved.startswith("agents/"):
+        return "link into agents/, which the console's /help does not have"
+    if resolved.startswith("../") or resolved not in files[lang]:
+        return "link to a file that does not exist"
+    return ""
 
 
 def main() -> int:
-    targets = [Path(a) for a in sys.argv[1:]] or [d for d in (HELP / "pages", HELP / "pages-de") if d.is_dir()]
+    ap = argparse.ArgumentParser(description="Check Help pages: the hub's scrub, and every relative link.")
+    ap.add_argument("paths", nargs="*", type=Path, help="pages or folders (default: every tree)")
+    ap.add_argument("--sources", type=Path, help="the docs hub's sources.toml: check its Help sources too")
+    ap.add_argument("--checkouts", type=Path, help="where the sources' repositories are (default: next to the hub)")
+    ap.add_argument("--allow-missing", action="store_true", help="leave out a source that is not checked out")
+    args = ap.parse_args()
+    sources = load_sources(args.sources, args.checkouts, args.allow_missing) if args.sources else []
+    trees = site_trees(sources)
+    files = site_files(trees)
+    targets = args.paths or [folder for _, folder, _ in trees]
     pages = sorted(p for t in targets for p in ([t] if t.is_file() else t.rglob("*.md")))
     rules = scrub_rules()
     hits = []
@@ -71,8 +118,9 @@ def main() -> int:
             for target in LINK.findall(line):
                 if "://" in target:
                     continue
-                if not (page.parent / target).resolve().is_file() and not _shared_picture(page, target):
-                    hits.append(f"{where}: link to a file that does not exist: {target}")
+                problem = broken(page, target, trees, files)
+                if problem:
+                    hits.append(f"{where}: {problem}: {target}")
     if hits:
         print("\n".join(hits))
         print(f"\n{len(hits)} line(s) need a look.")
