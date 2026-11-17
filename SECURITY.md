@@ -52,6 +52,35 @@ Security fixes go into the latest release. Keep your installation current with `
 | The SDKs before 0.3.0 | No: upgrade first |
 | The Fadenstack agents: the Chrome extension, the Office add-ins, the desktop agent and the Nextcloud app | The latest release of each, for five years from that agent's release (the releases of 8 December 2026: until 8 December 2031); report a problem in them as above |
 
+## Checking a release
+
+From 0.7.1, every file of a release and every service image comes with:
+
+- an SBOM in CycloneDX 1.6, made for BSI TR-03183-2 (`<file>.cdx.json` on the GitHub release; for an image,
+  `<image>-<digest>.cdx.json`);
+- the vulnerability scan's result as OpenVEX (`.openvex.json`), and a CSAF document for each finding that affects us;
+- a signature and SLSA provenance, made by our release workflow with Sigstore (the bundle `<file>.sigstore.json`) and
+  as a GitHub attestation.
+
+To check a file you downloaded, with [cosign](https://docs.sigstore.dev/cosign/) or the GitHub CLI:
+
+```bash
+cosign verify-blob --bundle <file>.sigstore.json \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp '^https://github\.com/fadenstack/fadenstack/\.github/workflows/release-supply-chain\.yml@' \
+  <file>
+gh attestation verify <file> --repo fadenstack/fadenstack
+```
+
+And an image:
+
+```bash
+gh attestation verify oci://ghcr.io/fadenstack/gateway:<version> --repo fadenstack/fadenstack
+```
+
+Our other repositories (the SDKs, the agents) are signed by the same workflow: check them with
+`--repo fadenstack/<repository> --signer-repo fadenstack/fadenstack`.
+
 ## Scope
 
 This policy covers this repository and what is released from it: the server's services, the `faden` command,
