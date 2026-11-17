@@ -513,3 +513,40 @@ jobs:
       kind: cli
       version: ${{ needs.build.outputs.version }}
       release_tag: ${{ github.ref_name }}
+
+  # The shared release supply chain (fadenstack/fadenstack's release-supply-chain.yml, by commit): an SBOM per
+  # release file and per image in CycloneDX 1.6 for BSI TR-03183-2, the OSV scan with OpenVEX and CSAF
+  # (.vex/openvex.json), the OpenSSF Scorecard, cosign signatures and SLSA provenance, uploaded to this release.
+  # After the release files and the checksums: it reads them from the release. The engine's image is its own
+  # repository's to sign.
+  supply-chain:
+    needs: [build, executables, checksums]
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      packages: write
+      actions: read
+    uses: fadenstack/fadenstack/.github/workflows/release-supply-chain.yml@f7c915a32ad64f725be51b3154484bfc81fbbec1
+    with:
+      product: fadenstack
+      version: ${{ needs.build.outputs.version }}
+      release_tag: ${{ github.ref_name }}
+      supplier_name: Emagin8 UG (haftungsbeschränkt)
+      supplier_url: https://fadenstack.com
+      licence: Apache-2.0
+      images: |
+        ghcr.io/fadenstack/base:${{ needs.build.outputs.version }}
+        ghcr.io/fadenstack/gateway:${{ needs.build.outputs.version }}
+        ghcr.io/fadenstack/backend:${{ needs.build.outputs.version }}
+        ghcr.io/fadenstack/frontend:${{ needs.build.outputs.version }}
+        ghcr.io/fadenstack/pii:${{ needs.build.outputs.version }}
+        ghcr.io/fadenstack/pii:${{ needs.build.outputs.version }}-cpu
+        ghcr.io/fadenstack/mcp:${{ needs.build.outputs.version }}
+        ghcr.io/fadenstack/skills:${{ needs.build.outputs.version }}
+      signing: keyless
+      attest: true
+      dry_run: false
+      tools_ref: f7c915a32ad64f725be51b3154484bfc81fbbec1
+    secrets: inherit
