@@ -39,6 +39,7 @@ from faden_gateway.services.gateway import (
     approval_settings,
     grants,
     image_generation,
+    picture_check,
     step_up,
     tool_classes,
 )
@@ -399,6 +400,9 @@ def apply_agent(
             code="agent_has_no_model",
             param="model",
         )
+    # Each picture the app sent, by its first bytes, refused (400) at the place the app put it: the instructions go
+    # first below, and the gateway's own checks after this see the messages one place further on.
+    picture_check.checked({"messages": shaped.get("messages")})
     if profile.instructions:
         messages = shaped.get("messages")
         if isinstance(messages, list):

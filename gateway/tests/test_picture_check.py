@@ -19,6 +19,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from faden_gateway.db.models.gateway import ProviderType
 from faden_gateway.services.gateway import picture_check
 from faden_gateway.services.gateway.errors import GatewayError
+from tests.test_agent_routes import URL as AGENT_URL
+from tests.test_agent_routes import _chat as _agent_chat
+from tests.test_agent_routes import _headers as _agent_headers
+from tests.test_agent_routes import _model as _agent_model
+from tests.test_agent_routes import backend  # noqa: F401 - the fixture the agent route needs
 from tests.test_gateway_pipeline_combined import ALIAS, _model_answers, _Observability, _seed, _token
 
 PNG = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
@@ -158,6 +163,26 @@ async def test_an_eps_labelled_png_is_refused_before_the_model_is_asked(
     assert error["code"] == "picture_type_not_allowed"
     assert error["param"] == "messages[0].content[1]"
     assert sent == [], "the model was not asked"
+
+
+@pytest.mark.anyio
+async def test_the_agent_route_names_the_apps_own_position(
+    client: AsyncClient, db_session: AsyncSession, backend: Any, monkeypatch: pytest.MonkeyPatch,  # noqa: F811
+) -> None:
+    """The agent's instructions go first: a refusal still names the place in the app's own messages (found on .172)."""
+    await _seed(db_session, provider=ProviderType.REMOTE_OPENAI, pii=None)
+    sent: list[dict[str, Any]] = []
+    _agent_model(monkeypatch, sent)
+
+    r = await client.post(AGENT_URL, headers=_agent_headers(), json=_agent_chat(messages=[
+        {"role": "user", "content": [{"type": "text", "text": "What is this?"},
+                                     {"type": "image_url", "image_url": {"url": _data(EPS)}}]},
+    ]))
+
+    assert r.status_code == 400, r.text
+    assert r.json()["error"]["code"] == "picture_type_not_allowed"
+    assert r.json()["error"]["param"] == "messages[0].content[1]"
+    assert sent == []
 
 
 @pytest.mark.anyio
