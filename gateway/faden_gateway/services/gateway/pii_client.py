@@ -55,16 +55,44 @@ class PIIPolicyMismatchError(RuntimeError):
         self.code = code
 
 
-def _policy_refusal(resp: httpx.Response) -> str | None:
-    """The PII service's refusal code when *resp* refuses the policy; ``None`` otherwise."""
-    if resp.status_code != 422:
+#: The PII service's refusals of a request it will not check because of its size (413): more
+#: text, parts, windows or nesting than its limits allow. The same request cannot pass on a retry.
+SIZE_REFUSALS = frozenset({"pii_input_too_large", "pii_input_too_deep"})
+
+
+class PIIInputTooLargeError(RuntimeError):
+    """The PII service refused the request as too large (or too deeply nested) to check."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
+
+
+def _refusal(resp: httpx.Response, status: int, codes: frozenset[str]) -> str | None:
+    """The PII service's refusal code when *resp* has *status* and one of *codes*; ``None`` otherwise."""
+    if resp.status_code != status:
         return None
     try:
         detail = resp.json().get("detail")
     except ValueError:
         return None
     code = detail.get("code") if isinstance(detail, dict) else None
-    return code if code in POLICY_REFUSALS else None
+    return code if code in codes else None
+
+
+def _policy_refusal(resp: httpx.Response) -> str | None:
+    """The PII service's refusal code when *resp* refuses the policy; ``None`` otherwise."""
+    return _refusal(resp, 422, POLICY_REFUSALS)
+
+
+def _raise_refusal(resp: httpx.Response) -> None:
+    """Raise what the PII service refused, when it refused the policy or the request's size."""
+    refused = _policy_refusal(resp)
+    if refused:
+        raise PIIPolicyMismatchError(refused)
+    too_large = _refusal(resp, 413, SIZE_REFUSALS)
+    if too_large:
+        raise PIIInputTooLargeError(too_large)
 
 
 class PIIClient:
@@ -138,9 +166,7 @@ class PIIClient:
                     timeout=10.0,
                     headers=headers,
                 )
-            refused = _policy_refusal(resp)
-            if refused:
-                raise PIIPolicyMismatchError(refused)
+            _raise_refusal(resp)
             resp.raise_for_status()
             data = resp.json()
             _validate_response(data, effective_mode)
@@ -160,6 +186,9 @@ class PIIClient:
             )
         except PIIPolicyMismatchError as exc:
             logger.warning("The PII service refused the policy (%s): it does not fit the detector", exc.code)
+            raise
+        except PIIInputTooLargeError as exc:
+            logger.warning("The PII service refused the request as too large to check (%s)", exc.code)
             raise
         except Exception:
             # HTTP/validation exceptions can contain response bodies. Never log PII.

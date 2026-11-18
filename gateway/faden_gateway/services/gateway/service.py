@@ -56,7 +56,7 @@ from faden_gateway.services.gateway.observability import (
 )
 from faden_gateway.services.gateway.mcp_client import MCPClient
 from faden_gateway.services.gateway.mcp_tool_cache import MCP_TOOL_PREFIX, MCPToolCache
-from faden_gateway.services.gateway.pii_client import PIIClient, PIIPolicyMismatchError
+from faden_gateway.services.gateway.pii_client import PIIClient, PIIInputTooLargeError, PIIPolicyMismatchError
 from faden_gateway.services.gateway.provenance_client import ProvenanceClient, SignedReceipt
 from faden_gateway.services.gateway.session_titles import title_from_message
 from faden_gateway.services.gateway.pii_policy import (
@@ -379,14 +379,30 @@ _PII_POLICY_MISMATCH_MESSAGE = (
 )
 
 
+_PII_TOO_LARGE_MESSAGE = (
+    "The request is too large for the PII check ({code}), and the PII policy blocks what it cannot check, so "
+    "nothing was sent. A shorter conversation, fewer tools or smaller tool results fit."
+)
+
+
 def _pii_blocked(exc: BaseException, unavailable: str) -> GatewayError:
-    """A failed PII scan's refusal under fail_action=block: the policy's own fault, else *unavailable*."""
+    """A failed PII scan's refusal under fail_action=block.
+
+    The policy's fault, the request's size, else *unavailable*.
+    """
     if isinstance(exc, PIIPolicyMismatchError):
         return GatewayError(
             status_code=502,
             message=_PII_POLICY_MISMATCH_MESSAGE.format(code=exc.code),
             error_type="server_error",
             code="pii_policy_mismatch",
+        )
+    if isinstance(exc, PIIInputTooLargeError):
+        return GatewayError(
+            status_code=413,
+            message=_PII_TOO_LARGE_MESSAGE.format(code=exc.code),
+            error_type="invalid_request_error",
+            code="pii_input_too_large",
         )
     return GatewayError(
         status_code=502, message=unavailable, error_type="server_error", code="pii_service_unavailable",
