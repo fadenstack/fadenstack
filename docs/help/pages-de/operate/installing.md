@@ -306,12 +306,14 @@ oder langen Dokumenten.
 
 !!! note "Ein langer Text auf einem Server ohne GPU"
     Die Prüfung hat für jede Anfrage höchstens 8 Sekunden. Auf einem Server ohne GPU kann eine Anfrage mit einem
-    langen Text (einige tausend Zeichen, etwa ein Dokument, das ein Agent mitschickt) länger brauchen. Blockiert die
-    Richtlinie, was sie nicht prüfen kann, wird die Anfrage dann abgelehnt, und die Meldung lautet „PII service
-    unavailable“. Abhilfe: die Prüfung auf einer GPU ausführen (`gliner2-multi-v1` mit `gpu-shared` oder
-    `gpu-dedicated`, siehe unten), nur Anfragen an Cloud-Anbieter prüfen (**Anfragen an lokale Modelle schützen** in
-    der [Richtlinie für personenbezogene Daten](../administer/policies.md#personal-data) ausgeschaltet lassen, wie es
-    voreingestellt ist) oder kürzere Texte senden.
+    langen Text (einige tausend Zeichen, etwa ein Dokument, das ein Agent mitschickt) länger brauchen. Wo die
+    PII-Richtlinie blockiert, was sie nicht prüfen kann (voreingestellt für Anfragen an Cloud-Anbieter, und für
+    Anfragen an lokale Modelle, wenn **Anfragen an lokale Modelle schützen** eingeschaltet ist), wird eine solche
+    Anfrage dann abgelehnt, und die Meldung lautet „PII service unavailable“. Was Administratoren tun können: die
+    Prüfung auf einer GPU ausführen (`gliner2-multi-v1` mit `gpu-shared` oder `gpu-dedicated`, siehe unten); für
+    Anfragen an lokale Modelle **Anfragen an lokale Modelle schützen** in der
+    [Richtlinie für personenbezogene Daten](../administer/policies.md#personal-data) ausgeschaltet lassen, wie es
+    voreingestellt ist; kürzere Texte senden.
 
 ![Die Auswahl von PII-Sprachpaket, Erkennung und Ausführungsmodus](../images/operate/pii-mode-choice.png)
 
