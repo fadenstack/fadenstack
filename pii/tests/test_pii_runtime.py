@@ -136,9 +136,45 @@ def test_complete_windows_and_cross_boundary_source_coverage():
     assert pieces[-1].text.endswith("Jörg Müller")
 
 
-def test_one_oversized_word_is_rejected_not_truncated():
+def _covered(text, pieces, max_tokens):
+    coverage = set()
+    for piece in pieces:
+        assert piece.tokens <= max_tokens
+        assert text[piece.offset : piece.offset + len(piece.text)] == piece.text
+        coverage.update(range(piece.offset, piece.offset + len(piece.text)))
+    return coverage == set(range(len(text)))
+
+
+def test_one_oversized_word_is_cut_into_windows_not_truncated():
+    """A run without whitespace longer than a window is cut, not refused.
+
+    Found 17 Nov 2026: compact JSON and long addresses were refused with 413.
+    """
+    text = "x" * 700 + " end"
+    pieces = windows(text, len, max_tokens=256)
+    assert _covered(text, pieces, 256)
+    assert len(pieces) >= 3 and pieces[-1].text.endswith("end")
+
+
+def test_a_long_address_in_a_sentence_is_covered_with_the_labels_counted():
+    text = (
+        "Please read https://cloud.example.org/"
+        + "a1b2c3d4/" * 120
+        + " and tell Jörg Müller."
+    )
+    pieces = windows(text, lambda value: len(value) + 40, max_tokens=256)
+    assert _covered(text, pieces, 256)
+    assert any("Jörg Müller" in piece.text for piece in pieces)
+
+
+def test_a_character_that_fits_no_window_is_refused():
     with pytest.raises(PIIError, match="pii_input_too_large"):
-        windows("x" * 257, len, max_tokens=256)
+        windows("ab", lambda value: len(value) + 300, max_tokens=256)
+
+
+def test_a_text_needing_too_many_windows_is_still_refused():
+    with pytest.raises(PIIError, match="pii_input_too_large"):
+        windows("x" * 20_000, len, max_tokens=256, max_windows=64)
 
 
 @pytest.mark.parametrize(
