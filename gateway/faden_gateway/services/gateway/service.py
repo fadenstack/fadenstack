@@ -56,7 +56,12 @@ from faden_gateway.services.gateway.observability import (
 )
 from faden_gateway.services.gateway.mcp_client import MCPClient
 from faden_gateway.services.gateway.mcp_tool_cache import MCP_TOOL_PREFIX, MCPToolCache
-from faden_gateway.services.gateway.pii_client import PIIClient, PIIInputTooLargeError, PIIPolicyMismatchError
+from faden_gateway.services.gateway.pii_client import (
+    PIIClient,
+    PIIDeadlineExceededError,
+    PIIInputTooLargeError,
+    PIIPolicyMismatchError,
+)
 from faden_gateway.services.gateway.provenance_client import ProvenanceClient, SignedReceipt
 from faden_gateway.services.gateway.session_titles import title_from_message
 from faden_gateway.services.gateway.pii_policy import (
@@ -384,11 +389,16 @@ _PII_TOO_LARGE_MESSAGE = (
     "nothing was sent. A shorter conversation, fewer tools or smaller tool results fit."
 )
 
+_PII_OUT_OF_TIME_MESSAGE = (
+    "The PII check took longer than its limit for this request ({code}), and the PII policy blocks what it "
+    "cannot check, so nothing was sent. A shorter text fits; an administrator can run the check on a GPU."
+)
+
 
 def _pii_blocked(exc: BaseException, unavailable: str) -> GatewayError:
     """A failed PII scan's refusal under fail_action=block.
 
-    The policy's fault, the request's size, else *unavailable*.
+    The policy's fault, the request's size, its time limit, else *unavailable*.
     """
     if isinstance(exc, PIIPolicyMismatchError):
         return GatewayError(
@@ -403,6 +413,13 @@ def _pii_blocked(exc: BaseException, unavailable: str) -> GatewayError:
             message=_PII_TOO_LARGE_MESSAGE.format(code=exc.code),
             error_type="invalid_request_error",
             code="pii_input_too_large",
+        )
+    if isinstance(exc, PIIDeadlineExceededError):
+        return GatewayError(
+            status_code=504,
+            message=_PII_OUT_OF_TIME_MESSAGE.format(code=exc.code),
+            error_type="server_error",
+            code="pii_deadline_exceeded",
         )
     return GatewayError(
         status_code=502, message=unavailable, error_type="server_error", code="pii_service_unavailable",

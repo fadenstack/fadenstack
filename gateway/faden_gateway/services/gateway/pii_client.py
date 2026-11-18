@@ -68,6 +68,18 @@ class PIIInputTooLargeError(RuntimeError):
         self.code = code
 
 
+#: The PII service's answer when it could not finish the check within the request's time limit (504).
+DEADLINE_REFUSALS = frozenset({"pii_deadline_exceeded"})
+
+
+class PIIDeadlineExceededError(RuntimeError):
+    """The PII service ran out of time for the request: it checked nothing."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
+
+
 def _refusal(resp: httpx.Response, status: int, codes: frozenset[str]) -> str | None:
     """The PII service's refusal code when *resp* has *status* and one of *codes*; ``None`` otherwise."""
     if resp.status_code != status:
@@ -86,13 +98,16 @@ def _policy_refusal(resp: httpx.Response) -> str | None:
 
 
 def _raise_refusal(resp: httpx.Response) -> None:
-    """Raise what the PII service refused, when it refused the policy or the request's size."""
+    """Raise what the PII service refused: the policy, the request's size, or its time limit."""
     refused = _policy_refusal(resp)
     if refused:
         raise PIIPolicyMismatchError(refused)
     too_large = _refusal(resp, 413, SIZE_REFUSALS)
     if too_large:
         raise PIIInputTooLargeError(too_large)
+    out_of_time = _refusal(resp, 504, DEADLINE_REFUSALS)
+    if out_of_time:
+        raise PIIDeadlineExceededError(out_of_time)
 
 
 class PIIClient:
@@ -189,6 +204,9 @@ class PIIClient:
             raise
         except PIIInputTooLargeError as exc:
             logger.warning("The PII service refused the request as too large to check (%s)", exc.code)
+            raise
+        except PIIDeadlineExceededError as exc:
+            logger.warning("The PII service ran out of time for the request (%s)", exc.code)
             raise
         except Exception:
             # HTTP/validation exceptions can contain response bodies. Never log PII.
