@@ -1,28 +1,28 @@
-FROM node:24-alpine AS development-dependencies-env
+FROM node:26-alpine AS development-dependencies-env
 COPY . /app
 WORKDIR /app
 RUN npm ci
 
-FROM node:24-alpine AS production-dependencies-env
+FROM node:26-alpine AS production-dependencies-env
 COPY ./package.json package-lock.json /app/
 WORKDIR /app
 RUN npm ci --omit=dev
 
 # Help, built from the core's docs (docs/help and docs/theme, the named build context "docs"): the console
 # serves it at /help, so every install has the help of its own release, offline too.
-FROM python:3.12-slim AS help-env
+FROM python:3.15-slim AS help-env
 RUN pip install --no-cache-dir zensical==0.0.67
 COPY --from=docs help /docs/help
 COPY --from=docs theme /docs/theme
 RUN python /docs/help/scripts/build.py --target console --out /help-build --build
 
-FROM node:24-alpine AS build-env
+FROM node:26-alpine AS build-env
 COPY . /app/
 COPY --from=development-dependencies-env /app/node_modules /app/node_modules
 WORKDIR /app
 RUN npm run build
 
-FROM node:24-alpine
+FROM node:26-alpine
 # The Alpine packages' fixes (zlib 1.3.2-r1 had a critical advisory, ALPINE-CVE-2026-4738), and an npm whose own
 # undici and brace-expansion are fixed (npm 11.19.1 in node:24 bundles undici 6.28.0 and brace-expansion 5.0.9:
 # GHSA-2m5v-pch6-74hx and others, fixed in 6.29.1 and 5.0.11). npm starts the server (CMD below).
