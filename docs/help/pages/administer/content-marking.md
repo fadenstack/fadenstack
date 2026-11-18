@@ -81,8 +81,9 @@ names the answer and the result is **Inconclusive**. The fingerprint works for e
 the watermark where the watermark is weak. Neither survives rewording or translation.
 
 **The text watermark.** Answers of your own models also carry an invisible watermark: a pattern in the model's
-choice of words, keyed with your installation's secret watermark key. It can be found in texts of roughly 200
-words or more, and it weakens when the text is heavily edited, translated or paraphrased. A text that mostly
+choice of words, keyed with your installation's secret watermark key. It is a probability, not a kept mark: on
+0.7.1 it was found in about a third of the texts of 200 to 399 tokens, three quarters of 400 to 999 and all from
+1,000. A paste or light rewording can remove it; so can heavy editing, translation or paraphrase. A text that mostly
 restates what the model was given (a summary of a mail, a rewrite of a paragraph, names and figures taken from a
 document) carries little of it, as the model has few words of its own to choose: such a text is found by its
 receipt, and what the agents write also by the record they keep with it.
@@ -105,8 +106,9 @@ These answers carry no text watermark, and their receipt records which of these 
 ## The runtime decides
 
 Whether a chat model watermarks its answers depends on its cluster's runtime. On a cluster's **Runtime** card, a
-runtime with vLLM 0.30 or later has the watermark: for GB10 machines and for x86_64 machines that is the runtime
-with vLLM 0.31, while the GB10 one with vLLM 0.29 and the x86_64 one with vLLM 0.26 have none.
+runtime with vLLM 0.30 or later has the watermark: for GB10 machines that is the runtime with vLLM 0.31, and the
+x86_64 runtime with vLLM 0.31 is meant to have it too, but this has not been measured there. The GB10 runtime with
+vLLM 0.29 and the x86_64 one with vLLM 0.26 have none.
 
 - A model picks up the watermark the next time it starts. Switching a cluster's runtime restarts the cluster and
   its models (see [Clusters](../operate/clusters.md#runtime)).
@@ -160,7 +162,7 @@ forms and files, each in the way its host allows: in document properties or cust
 HTML attributes, in file metadata, or in the front matter of a Markdown file. The installation keeps the signed
 record of each placement.
 
-These marks are a second signal beside the text's own watermark, never the mark itself: a mail program or a web
+These marks are a second signal beside the text's own watermark: a mail program or a web
 form can drop an HTML attribute on paste or save, and a reader copying the plain text leaves it behind.
 
 ## Who can check content

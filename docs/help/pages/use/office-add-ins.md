@@ -1,6 +1,6 @@
 # Office add-ins
 
-The Office add-ins put a Fadenstack agent in a pane beside your document in Word, Excel, PowerPoint and Outlook. The agent sees what you select, reads the document when it needs to, and changes it only when you allow it. Every answer comes from your organisation's model, through your Fadenstack server.
+The Office add-ins put a Fadenstack agent in a pane beside your document in Word, Excel, PowerPoint and Outlook. The agent sees what you select, reads the document when it needs to, and changes it only when you allow it. With your organisation's server, every answer comes from your organisation's model, through your Fadenstack server. The add-ins also offer **Use my own AI**; this page is about the connection to your organisation.
 
 ![A Word document with two review comments by the Fadenstack agent, and the agent's pane beside it saying what it added](../images/use/office-word-comments.png)
 
@@ -14,7 +14,7 @@ The Office add-ins put a Fadenstack agent in a pane beside your document in Word
 ## Open the agent and sign in
 
 1. On the **Home** tab (in a message opened in its own window: the **Message** tab), select **Agent** in the **Fadenstack** group. The pane opens beside the document. With no document open, a blank one opens with it (in PowerPoint, a presentation with one slide).
-2. The first time, in **Sign in to your agent**, enter the **Server** if IT has not set it, then select **Sign in with a code**.
+2. The first time, choose **Connect to my organisation** (your IT department may have chosen for you). In **Sign in to your agent**, enter the **Server** if IT has not set it, then select **Sign in with a code**.
 3. The pane shows **Your sign-in code**. Select **Open the sign-in page**; your browser opens Fadenstack's page for it. If no browser opens, select **Copy the link** and open it yourself. **Copy the code** copies the code.
 4. On that page, sign in to Fadenstack as usual if the browser asks, check that the code is the one in the pane, and approve. The pane says **Waiting for your approval...** meanwhile and signs in by itself afterwards. Your password stays in the browser. More: [Sign in a desktop app](sign-in-an-app.md).
 
@@ -36,7 +36,7 @@ One approval signs in all the Office agents: Word, Excel, PowerPoint and Outlook
 
 ## Language and settings
 
-The pane shows itself in Office's language. To pick another, select the gear (**Settings**) at the top of the pane, then a language under **Language**: the whole pane changes at once, the conversation too. **Automatic** goes back to Office's language. The choice holds for Word, Excel, PowerPoint and Outlook on this computer, and is kept for your account, so the console and the browser agent follow it. If your organisation set a language, the settings show it with **Set by your organisation**, and you cannot change it. The pane's own words, such as the sign-in, are in English for now.
+The pane shows itself in Office's language. To pick another, select the gear (**Settings**) at the top of the pane, then a language under **Language**: the whole pane changes at once, the conversation too. **Automatic** goes back to Office's language. The choice holds for Word, Excel, PowerPoint and Outlook on this computer, and is kept for your account, so the console and the browser agent follow it. If your organisation set a language, the settings show it with **Set by your organisation**, and you cannot change it.
 
 **About**, the last entry under the gear, names the agent and its version, the model, the add-in, the Fadenstack SDK it is built with and the server; **Copy details** copies them for a question to your IT department. It links to your organisation's Help and to fadenstack.com. A small **Fadenstack** link also sits under the message box (what such a link sends: [Your data and privacy](privacy.md#links-to-fadenstackcom)).
 
@@ -81,18 +81,20 @@ marks are hidden and stay in the saved file:
 | **Word** | A hidden bookmark around the text, and a note in the document's custom XML and its properties |
 | **Excel** | A hidden name over the cells it wrote, and the same note in the workbook |
 | **PowerPoint** | Tags on the slides and shapes it wrote, and the same note in the presentation |
-| **Outlook** | A hidden property of the draft and an `X-AI-Generated` header |
+| **Outlook** | A hidden property of the draft, which stays on your sent copy, and an `X-AI-Generated` header, which goes to the recipients |
 
 ![Word with the paragraph the agent added at the end of a memo, as a tracked change, and the agent's pane beside it saying what it added](../images/use/office-word-marked-paragraph.png)
 
 A mail the agent drafts to someone outside your organisation also starts with the visible line **This message
 was drafted with AI.** (with your name, **… on behalf of …**, when Outlook knows it). A reply inside your
-organisation gets no line, only the hidden marks.
+organisation gets no line. A mail takes only the `X-AI-Generated` header to its recipients; the property stays on your
+sent copy.
 
 ![An Outlook draft to an outside address that starts with This message was drafted with AI., and the agent's pane beside it](../images/use/office-outlook-draft-outside.png)
 
 Your organisation keeps a signed record of each piece, so [Check content](checking-content.md) finds a saved
-document, or text copied out of it, later. Leave the marks in place when you go on editing.
+Word or PowerPoint document later. Nothing is promised for text copied out of it. Leave the marks in place when you
+go on editing.
 
 ??? info "Where to see the mark in Word"
     **Insert → Bookmark**, then tick **Hidden bookmarks**: a mark is a bookmark whose name starts with
@@ -112,7 +114,7 @@ Change the mode in the pane: **Off**, **Read only**, **Ask** or **Auto**. Even i
 
 ## Where your data goes
 
-- What you ask, and the parts of the document the agent reads to answer, go to your organisation's server and to the model your administrator chose for the agent.
+- With your organisation's server, what you ask, and the parts of the document the agent reads to answer, go to that server and to the model your administrator chose for the agent.
 - Your conversations stay on your computer, encrypted. The events the add-ins send to the server say which tools ran, not what they read. What the tools read still reaches the server, in the requests to the AI model, as the first point says.
 - Your sign-in is kept on your computer, protected by Windows.
 

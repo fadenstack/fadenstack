@@ -19,7 +19,7 @@ Für jede App:
 
 1. Wählen Sie auf **Apps** den Download-Link der App.
 2. Installieren Sie sie von der Seite aus, die sich öffnet.
-3. Geben Sie in der App die Adresse des Servers ein, die auf **Apps** steht, falls sie danach fragt, und melden Sie sich mit Ihrem eigenen Konto an.
+3. Wählen Sie in der App **Mit meiner Organisation verbinden**, geben Sie die Adresse des Servers ein, die auf **Apps** steht, falls sie danach fragt, und melden Sie sich mit Ihrem eigenen Konto an.
 
 Möglicherweise hat Ihre IT-Abteilung die Adresse des Servers schon für Sie eingetragen, z. B. bei den Office-Add-ins und der Chrome-Erweiterung.
 

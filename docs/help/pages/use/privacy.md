@@ -105,7 +105,7 @@ When a limit stops a request, the message names the limit, for example the insta
 | **A project** | It is erased at once, with all its chats and their files. |
 | **Your account** (an administrator does it) | Your chats, projects, files and what the assistant remembered are erased with it, and so is what your apps reported to the server: which tools ran and when, and your devices' reports. |
 | A chat in **Chat history**, in the browser agent | It is removed from your browser. |
-| **Delete my data on this device**, in the browser agent's settings | All chats and **Allow always** choices kept for you in that browser are erased, with their key, and you are signed out. **Export my data** saves them first, as a file. |
+| **Remove my data…**, under **Your data in this browser** in the browser agent's settings | The chats, saved prompts, **Allow always** choices and record of tool calls kept for you in that browser are erased, with their key, and your connection ends. **Remove all my Fadenstack data in this browser…** does the same for every Fadenstack app there. **Export my data** saves them first, as a file. |
 
 If something must be erased sooner, for example personal data you pasted by mistake, ask your administrator: a chat they delete in the console is erased at once. Backups taken before keep it until they are replaced (the nightly ones after a week).
 

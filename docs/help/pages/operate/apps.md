@@ -17,7 +17,7 @@ your mirror. This protects against a list being held back, for example by a mirr
 
 ## Apps in use
 
-Each app reports its name and version to the server when it starts. The server counts the versions it has seen in the last 30 days. No names of people are shown.
+Each app reports its name and version to the server when it starts, with a short description of the operating system (at most 100 characters). The desktop agent also reports its plugins and its local MCP programs (by file name), each with its SHA-256; the Office add-ins report their local MCP programs the same way. The server counts the versions it has seen in the last 30 days. No names of people are shown.
 
 ## The Apps section on Updates
 
@@ -65,8 +65,8 @@ Under **Apps** on **Updates** you can download files that point an app at this s
 |---|---|---|
 | Office add-ins | `policy.json` | Put it on each computer at `%PROGRAMDATA%\Fadenstack\Office\policy.json`, for example by Group Policy or Intune. It holds this server's address and the four agents (Excel, Word, PowerPoint, Outlook). |
 | Nextcloud app | `connect-nextcloud.sh` | Run its `occ` commands on the Nextcloud server as the web server's user. They enable the app `fadenstack_agent` and set `server_url`, `agent` and `integration_enabled`. |
-| Chrome extension | `fadenstack-chrome-policy.json` | A Chrome policy: it installs the extension from the Chrome Web Store and sets the extension's managed settings `serverUrl` and `agent`. On Linux, put the file in `/etc/opt/chrome/policies/managed/`. On Windows and macOS, set the same values by Group Policy, Intune or a configuration profile. |
-| Desktop agent | none | The person enters the server's address at the first start and signs in. |
+| Chrome extension | `fadenstack-chrome-policy.json` | A Chrome policy: it installs the extension from the Chrome Web Store and sets the extension's managed settings `serverUrl` (the older name of `server`, which the extension still reads) and `agent`. On Linux, put the file in `/etc/opt/chrome/policies/managed/`. On Windows and macOS, set the same values by Group Policy, Intune or a configuration profile. |
+| Desktop agent | none | The person enters the server's address at the first start and signs in. Or IT sets the server for the computer with the key `server` in `%PROGRAMDATA%\Fadenstack\Desktop\policy.json` (you write this file yourself): the app then uses that server, and the person only signs in. |
 
 ??? info "When this server uses its own certificate authority"
     For the Office add-ins, also download `/install/ca.crt` from the server and put it at `%PROGRAMDATA%\Fadenstack\Office\fadenstack-ca.crt` on each computer.

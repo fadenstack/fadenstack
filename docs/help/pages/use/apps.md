@@ -19,7 +19,7 @@ For each app:
 
 1. On **Apps**, select the app's download link.
 2. Install it from the page that opens.
-3. In the app, enter the server's address shown on **Apps** if it asks, and sign in with your own account.
+3. In the app, choose **Connect to my organisation**, enter the server's address shown on **Apps** if it asks, and sign in with your own account.
 
 Your IT department may already have set the server's address for you, for example for the Office add-ins and the Chrome extension.
 

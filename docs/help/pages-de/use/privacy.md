@@ -72,7 +72,7 @@ Wenn es aktiv ist, werden personenbezogene Daten auf eine von zwei Arten maskier
 Sie können den Schutz nur strenger machen als die Richtlinie Ihrer Organisation, nie lockerer. Einstellungen, die die Richtlinie erzwingt, zeigen ein Schloss.
 
 ??? info "Im Browser-Agenten und in den Office-Add-ins"
-    Im Browser-Agenten und in den Office-Add-ins zeigt ein Hinweis **Personal data protected**, wie viele Werte dem Modell vorenthalten wurden und welcher Art sie waren.
+    Im Browser-Agenten und in den Office-Add-ins zeigt ein Hinweis **Personenbezogene Daten geschützt**, wie viele Werte dem Modell vorenthalten wurden und welcher Art sie waren.
 
 ## Modelle bei externen Providern {#models-at-outside-providers}
 
@@ -104,8 +104,8 @@ Hält ein Limit eine Anfrage an, nennt die Meldung das Limit, etwa das Tageslimi
 | **Einen Chat** | Er verschwindet sofort aus Ihrer Liste und lässt sich nicht zurückholen. Der Server behält ihn so lange, wie Ihre Organisation es eingestellt hat (30 Tage, wenn sie nichts anderes gewählt hat), und löscht ihn dann endgültig, mit seinen Dateien und dem, was sich der Assistent daraus gemerkt hat. |
 | **Ein Projekt** | Es wird sofort endgültig gelöscht, mit allen seinen Chats und deren Dateien. |
 | **Ihr Konto** (ein Administrator löscht es) | Ihre Chats, Projekte, Dateien und das, was sich der Assistent gemerkt hat, werden mit ihm gelöscht, ebenso das, was Ihre Apps an den Server gemeldet haben: welche Tools wann liefen, und die Meldungen Ihrer Geräte. |
-| Einen Chat in **Chat history**, im Browser-Agenten | Er wird aus Ihrem Browser entfernt. |
-| **Meine Daten auf diesem Gerät löschen**, in den Einstellungen des Browser-Agenten | Alle Chats und Entscheidungen **Immer zulassen**, die für Sie in diesem Browser gespeichert sind, werden samt Schlüssel gelöscht, und Sie werden abgemeldet. **Meine Daten exportieren** speichert sie vorher als Datei. |
+| Einen Chat im **Chatverlauf**, im Browser-Agenten | Er wird aus Ihrem Browser entfernt. |
+| **Meine Daten entfernen…**, unter **Ihre Daten in diesem Browser** in den Einstellungen des Browser-Agenten | Die Chats, gespeicherten Prompts, Entscheidungen **Immer zulassen** und das Protokoll der Tool-Aufrufe, die für Sie in diesem Browser gespeichert sind, werden samt Schlüssel gelöscht, und Ihre Verbindung endet. **Alle meine Fadenstack-Daten in diesem Browser entfernen…** tut dasselbe für jede Fadenstack-App dort. **Meine Daten exportieren** speichert sie vorher als Datei. |
 
 Muss etwas früher endgültig gelöscht werden, z. B. personenbezogene Daten, die Sie versehentlich eingefügt haben, wenden Sie sich an Ihren Administrator: Ein Chat, den er in der Konsole löscht, wird sofort gelöscht. Vorher erstellte Sicherungen enthalten ihn, bis sie ersetzt werden (die nächtlichen nach einer Woche).
 

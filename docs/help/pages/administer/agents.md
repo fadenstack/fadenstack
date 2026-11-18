@@ -167,8 +167,10 @@ the server and the agent in the extension's managed storage (Chrome's `3rdparty`
 sign in and cannot change them:
 
 ```json
-{ "serverUrl": "https://ai.example.internal", "agent": "browser-assistant" }
+{ "server": "https://ai.example.internal", "agent": "browser-assistant" }
 ```
+
+`server` is the current name of the key; the older `serverUrl` is still read.
 
 Add `"language": "de"` to fix the panel's language for everyone; without it, each person picks one in the panel's
 settings, and **Automatic** is the browser's language.

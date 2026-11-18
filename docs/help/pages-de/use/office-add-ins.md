@@ -1,6 +1,6 @@
 # Office-Add-ins {#office-add-ins}
 
-Die Office-Add-ins bringen einen Fadenstack-Agenten in einen Aufgabenbereich neben Ihrem Dokument in Word, Excel, PowerPoint und Outlook. Der Agent sieht, was Sie markieren, liest das Dokument, wenn er es braucht, und ändert es nur, wenn Sie es erlauben. Jede Antwort kommt vom Modell Ihrer Organisation, über Ihren Fadenstack-Server.
+Die Office-Add-ins bringen einen Fadenstack-Agenten in einen Aufgabenbereich neben Ihrem Dokument in Word, Excel, PowerPoint und Outlook. Der Agent sieht, was Sie markieren, liest das Dokument, wenn er es braucht, und ändert es nur, wenn Sie es erlauben. Mit dem Server Ihrer Organisation kommt jede Antwort vom Modell Ihrer Organisation, über Ihren Fadenstack-Server. Die Add-ins bieten auch **Meine eigene KI nutzen**; diese Seite beschreibt die Verbindung zu Ihrer Organisation.
 
 ![Ein Word-Dokument mit zwei Kommentaren des Fadenstack-Agenten und daneben der Aufgabenbereich des Agenten, der sagt, was er hinzugefügt hat](../images/use/office-word-comments.png)
 
@@ -14,14 +14,14 @@ Die Office-Add-ins bringen einen Fadenstack-Agenten in einen Aufgabenbereich neb
 ## Agent öffnen und anmelden {#open-the-agent-and-sign-in}
 
 1. Wählen Sie auf der Registerkarte **Start** (in einer Nachricht, die in einem eigenen Fenster geöffnet ist: auf der Registerkarte **Nachricht**) in der Gruppe **Fadenstack** die Schaltfläche **Agent**. Der Aufgabenbereich öffnet sich neben dem Dokument. Ist kein Dokument geöffnet, öffnet sich mit ihm ein leeres (in PowerPoint eine Präsentation mit einer Folie).
-2. Geben Sie beim ersten Mal in **Bei Ihrem Agenten anmelden** den **Server** ein, falls die IT ihn nicht eingestellt hat, und wählen Sie dann **Mit einem Code anmelden**.
+2. Wählen Sie beim ersten Mal **Mit meiner Organisation verbinden** (Ihre IT-Abteilung hat vielleicht für Sie gewählt). Geben Sie in **Bei Ihrem Agenten anmelden** den **Server** ein, falls die IT ihn nicht eingestellt hat, und wählen Sie dann **Mit einem Code anmelden**.
 3. Der Aufgabenbereich zeigt **Ihr Anmeldecode**. Wählen Sie **Anmeldeseite öffnen**; Ihr Browser öffnet die Fadenstack-Seite dafür. Öffnet sich kein Browser, wählen Sie **Link kopieren** und öffnen den Link selbst. **Code kopieren** kopiert den Code.
-4. Melden Sie sich auf dieser Seite wie gewohnt bei Fadenstack an, falls der Browser danach fragt, prüfen Sie, ob der Code der im Aufgabenbereich ist, und genehmigen Sie. Der Aufgabenbereich zeigt währenddessen **Waiting for your approval...** und meldet sich danach selbst an. Ihr Passwort bleibt im Browser. Mehr dazu: [Eine Desktop-App anmelden](sign-in-an-app.md).
+4. Melden Sie sich auf dieser Seite wie gewohnt bei Fadenstack an, falls der Browser danach fragt, prüfen Sie, ob der Code der im Aufgabenbereich ist, und genehmigen Sie. Der Aufgabenbereich zeigt währenddessen **Warten auf Ihre Bestätigung…** und meldet sich danach selbst an. Ihr Passwort bleibt im Browser. Mehr dazu: [Eine Desktop-App anmelden](sign-in-an-app.md).
 
 Eine Genehmigung meldet alle Office-Agenten an: Word, Excel, PowerPoint und Outlook auf diesem Computer.
 
 ??? info "Stattdessen mit Passwort anmelden"
-    Wählen Sie **Mit einem Passwort anmelden**, geben Sie Ihre **E-Mail** und Ihr **Passwort** (Ihr Fadenstack-Konto) ein und wählen Sie **Anmelden**. Eine Anmeldung gilt für Word, Excel, PowerPoint und Outlook auf diesem Computer. Das ist auch der Weg, wenn Ihr Server älter ist und sich nicht mit einem Code anmelden kann: Der Aufgabenbereich sagt dann **This server does not support signing in with a code yet.** und zeigt das Passwortformular. **Mit einem Code anmelden** bringt den Code zurück.
+    Wählen Sie **Mit einem Passwort anmelden**, geben Sie Ihre **E-Mail** und Ihr **Passwort** (Ihr Fadenstack-Konto) ein und wählen Sie **Anmelden**. Eine Anmeldung gilt für Word, Excel, PowerPoint und Outlook auf diesem Computer. Das ist auch der Weg, wenn Ihr Server älter ist und sich nicht mit einem Code anmelden kann: Der Aufgabenbereich sagt dann **Dieser Server unterstützt die Anmeldung mit Code noch nicht.** und zeigt das Passwortformular. **Mit einem Code anmelden** bringt den Code zurück.
 
 ??? info "Ein Agent, den Sie nicht nutzen dürfen"
     Hat Ihr Administrator Ihnen einen der Office-Agenten nicht freigegeben, werden die anderen trotzdem angemeldet, und der Aufgabenbereich sagt **Für Sie nicht verfügbar:** mit dem Namen des Agenten. Ist es der Agent der Anwendung, die Sie geöffnet haben, sehen Sie **Sie haben keinen Zugriff auf diesen Agenten.** Wenden Sie sich an Ihren Administrator (siehe [Agenten und Add-ins](../administer/agents.md)). Agenten, die der Server nicht gleich mit anmelden konnte, werden angemeldet, wenn Sie ihre Anwendung öffnen: **Noch nicht angemeldet:** nennt sie.
@@ -36,7 +36,7 @@ Eine Genehmigung meldet alle Office-Agenten an: Word, Excel, PowerPoint und Outl
 
 ## Sprache und Einstellungen {#language-and-settings}
 
-Der Bereich zeigt sich in der Sprache von Office. Um eine andere zu wählen, wählen Sie oben im Bereich das Zahnrad (**Einstellungen**) und dann unter **Sprache** eine Sprache: Der ganze Bereich wechselt sofort, auch die Unterhaltung. **Automatisch** kehrt zur Sprache von Office zurück. Die Auswahl gilt für Word, Excel, PowerPoint und Outlook auf diesem Computer und wird für Ihr Konto gespeichert, sodass die Konsole und der Browser-Agent ihr folgen. Hat Ihre Organisation eine Sprache festgelegt, zeigen die Einstellungen sie mit **Von Ihrer Organisation festgelegt** an, und Sie können sie nicht ändern. Die eigenen Texte des Bereichs, etwa die Anmeldung, sind vorerst auf Englisch.
+Der Bereich zeigt sich in der Sprache von Office. Um eine andere zu wählen, wählen Sie oben im Bereich das Zahnrad (**Einstellungen**) und dann unter **Sprache** eine Sprache: Der ganze Bereich wechselt sofort, auch die Unterhaltung. **Automatisch** kehrt zur Sprache von Office zurück. Die Auswahl gilt für Word, Excel, PowerPoint und Outlook auf diesem Computer und wird für Ihr Konto gespeichert, sodass die Konsole und der Browser-Agent ihr folgen. Hat Ihre Organisation eine Sprache festgelegt, zeigen die Einstellungen sie mit **Von Ihrer Organisation festgelegt** an, und Sie können sie nicht ändern.
 
 **Info**, der letzte Eintrag unter dem Zahnrad, nennt den Agenten und seine Version, das Modell, das Add-in, das Fadenstack-SDK, mit dem er gebaut ist, und den Server; **Details kopieren** kopiert sie für eine Frage an Ihre IT-Abteilung. Er verlinkt auf die Hilfe Ihrer Organisation und auf fadenstack.com. Unter dem Nachrichtenfeld steht außerdem ein kleiner Link **Fadenstack** (was ein solcher Link sendet: [Ihre Daten und Datenschutz](privacy.md#links-to-fadenstackcom)).
 
@@ -51,7 +51,7 @@ Der Bereich zeigt sich in der Sprache von Office. Um eine andere zu wählen, wä
 
 ## Was er in jeder Anwendung kann {#what-it-can-do-in-each-application}
 
-| Anwendung | Er liest | Er kann ändern (fragt vorher in **Ask**) | Er fragt jedes Mal, bevor er |
+| Anwendung | Er liest | Er kann ändern (fragt vorher in **Nachfragen**) | Er fragt jedes Mal, bevor er |
 |---|---|---|---|
 | **Word** | Das Dokument, seine Abschnitte, Tabellen und Kommentare, Ihre Markierung | Text einfügen oder ersetzen, Kommentare hinzufügen, Formatvorlagen anwenden, Tabellen einfügen | Text löscht |
 | **Excel** | Die Arbeitsmappe, Blätter, Tabellen, Diagramme, benannte Bereiche, jeden Bereich, mit Formeln | Zellen beschreiben, Blätter hinzufügen, Zellen formatieren, Tabellen und Diagramme erstellen | Zellen leert, ein Blatt löscht |
@@ -80,15 +80,15 @@ Was der Agent in ein Dokument oder eine Mail schreibt, ist als mit KI erstellt g
 | **Word** | Eine verborgene Textmarke um den Text und ein Vermerk im benutzerdefinierten XML und in den Eigenschaften des Dokuments |
 | **Excel** | Ein verborgener Name über den Zellen, die er geschrieben hat, und derselbe Vermerk in der Arbeitsmappe |
 | **PowerPoint** | Tags an den Folien und Formen, die er geschrieben hat, und derselbe Vermerk in der Präsentation |
-| **Outlook** | Eine verborgene Eigenschaft des Entwurfs und ein Header `X-AI-Generated` |
+| **Outlook** | Eine verborgene Eigenschaft des Entwurfs, die auf Ihrer gesendeten Kopie bleibt, und ein Header `X-AI-Generated`, der zu den Empfängern geht |
 
 ![Word mit dem Absatz, den der Agent am Ende eines Memos eingefügt hat, als nachverfolgte Änderung, und daneben der Aufgabenbereich des Agenten, der sagt, was er eingefügt hat](../images/use/office-word-marked-paragraph.png)
 
-Eine Mail, die der Agent an jemanden außerhalb Ihrer Organisation entwirft, beginnt außerdem mit der sichtbaren Zeile **Diese Nachricht wurde mit KI verfasst.** (mit Ihrem Namen, **… im Auftrag von …**, wenn Outlook ihn kennt). Eine Antwort innerhalb Ihrer Organisation bekommt keine Zeile, nur die verborgenen Kennzeichnungen.
+Eine Mail, die der Agent an jemanden außerhalb Ihrer Organisation entwirft, beginnt außerdem mit der sichtbaren Zeile **Diese Nachricht wurde mit KI verfasst.** (mit Ihrem Namen, **… im Auftrag von …**, wenn Outlook ihn kennt). Eine Antwort innerhalb Ihrer Organisation bekommt keine Zeile. Eine E-Mail nimmt nur den Header `X-AI-Generated` zu ihren Empfängern mit; die Eigenschaft bleibt auf Ihrer gesendeten Kopie.
 
 ![Ein Outlook-Entwurf an eine Adresse außerhalb, der mit der Zeile This message was drafted with AI. beginnt, und daneben der Aufgabenbereich des Agenten](../images/use/office-outlook-draft-outside.png)
 
-Ihre Organisation bewahrt zu jedem Stück einen signierten Nachweis auf, sodass [Inhalte prüfen](checking-content.md) ein gespeichertes Dokument oder daraus kopierten Text später findet. Lassen Sie die Kennzeichnungen stehen, wenn Sie weiterschreiben.
+Ihre Organisation bewahrt zu jedem Stück einen signierten Nachweis auf, sodass [Inhalte prüfen](checking-content.md) ein gespeichertes Word- oder PowerPoint-Dokument später findet. Für daraus kopierten Text wird nichts zugesagt. Lassen Sie die Kennzeichnungen stehen, wenn Sie weiterschreiben.
 
 ??? info "Wo Sie die Kennzeichnung in Word sehen"
     **Einfügen → Textmarke**, dann **Ausgeblendete Textmarken** ankreuzen: Eine Kennzeichnung ist eine Textmarke, deren Name mit `_faden_ai_` beginnt.
@@ -97,17 +97,17 @@ Ihre Organisation bewahrt zu jedem Stück einen signierten Nachweis auf, sodass 
 
 ## Wann er nachfragt {#what-it-asks-first}
 
-Jeder Chat beginnt im Tool-Modus **Ask**: Der Agent liest, ohne zu fragen, und fragt, bevor er etwas ändert.
+Jeder Chat beginnt im Tool-Modus **Nachfragen**: Der Agent liest, ohne zu fragen, und fragt, bevor er etwas ändert.
 
 ![Eine Karte Run add_comment? in Word mit dem Kommentar, den der Agent hinzufügen will, und Allow, Allow for this chat und Deny](../images/use/office-word-approval.png)
 
-Wenn er fragt, zeigt eine Karte **Run …?** mit dem, was er tun will. Wählen Sie **Allow** (dieses eine Mal), **Allow for this chat** (bis Sie den Chat schließen oder wieder öffnen), **Allow always** (für diesen Agenten auf diesem Computer) oder **Deny**. Was sich nicht rückgängig machen lässt, und alles, was Ihr Administrator zuerst erfragt haben will, bietet nur **Allow** und **Deny**: Er fragt jedes Mal.
+Wenn er fragt, zeigt eine Karte **… ausführen?** mit dem, was er tun will. Wählen Sie **Zulassen** (dieses eine Mal), **Für diesen Chat zulassen** (bis Sie den Chat schließen oder wieder öffnen), **Immer zulassen** (für diesen Agenten auf diesem Computer) oder **Ablehnen**. Was sich nicht rückgängig machen lässt, und alles, was Ihr Administrator zuerst erfragt haben will, bietet nur **Zulassen** und **Ablehnen**: Er fragt jedes Mal.
 
-Den Modus ändern Sie im Aufgabenbereich: **Off**, **Read only**, **Ask** oder **Auto**. Auch in **Auto** fragt der Agent, bevor er etwas löscht oder leert. Mehr zu den Tool-Modi: [Tools im Chat](tools.md#choose-the-tool-mode).
+Den Modus ändern Sie im Aufgabenbereich: **Aus**, **Nur lesen**, **Nachfragen** oder **Automatisch**. Auch in **Automatisch** fragt der Agent, bevor er etwas löscht oder leert. Mehr zu den Tool-Modi: [Tools im Chat](tools.md#choose-the-tool-mode).
 
 ## Wohin Ihre Daten gehen {#where-your-data-goes}
 
-- Was Sie fragen und die Teile des Dokuments, die der Agent liest, um zu antworten, gehen an den Server Ihrer Organisation und an das Modell, das Ihr Administrator für den Agenten ausgewählt hat.
+- Mit dem Server Ihrer Organisation gehen Ihre Fragen und die Teile des Dokuments, die der Agent liest, um zu antworten, an diesen Server und an das Modell, das Ihr Administrator für den Agenten ausgewählt hat.
 - Ihre Unterhaltungen bleiben verschlüsselt auf Ihrem Computer. Die Ereignisse, die die Add-ins an den Server senden, nennen, welche Tools liefen, nicht, was sie gelesen haben. Was die Tools lesen, erreicht den Server trotzdem, mit den Anfragen an das KI-Modell, wie im ersten Punkt beschrieben.
 - Ihre Anmeldung wird auf Ihrem Computer gespeichert, geschützt durch Windows.
 
@@ -127,7 +127,7 @@ Damit melden Sie sich auf diesem Computer in allen vier Anwendungen ab.
 | Die Schaltfläche **Agent** ist ausgegraut | Das Dokument ist in der geschützten Ansicht geöffnet. Wählen Sie **Bearbeitung aktivieren**, dann **Agent**. |
 | In Outlook gibt es keine Gruppe **Fadenstack** | Sie verwenden das neue Outlook für Windows. Wechseln Sie zum klassischen Outlook zurück. |
 | **E-Mail oder Passwort stimmen nicht.** | Nur bei der Anmeldung mit Passwort: Prüfen Sie beides und melden Sie sich erneut an. Passwort vergessen? Siehe [Ihr Konto](account.md#forgot-your-password). |
-| Eine Meldung, dass Ihre Organisation diesen Agenten ausgeschaltet hat | Ihr Administrator hat den Agenten vorerst gestoppt. Ihre Unterhaltungen bleiben auf Ihrem Computer; sobald er wieder eingeschaltet ist, fragen Sie erneut. |
+| **Ihre Organisation hat diesen Agenten ausgeschaltet.** | Ihr Administrator hat den Agenten vorerst gestoppt. Ihre Unterhaltungen bleiben auf Ihrem Computer; sobald er wieder eingeschaltet ist, fragen Sie erneut. |
 | **Sie haben keinen Zugriff auf diesen Agenten.** | Ihr Administrator hat ihn Ihnen noch nicht freigegeben, oder die für diese Anwendung eingestellte Adresse des Agenten ist falsch. |
 | **Office is busy (a cell may be in edit mode, or a dialog is open). Finish that and try again.** | Verlassen Sie die Zelle oder schließen Sie das Dialogfeld, und fragen Sie erneut. |
 | **Der Agent konnte nicht starten**, mit einer Begründung | Wählen Sie **Erneut versuchen**. Wenn es weiterhin fehlschlägt, teilen Sie Ihrer IT-Abteilung mit, was in der Begründung steht. |

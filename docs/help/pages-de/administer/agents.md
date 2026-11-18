@@ -179,8 +179,10 @@ stimmt mit dem Eintrag im Audit-Protokoll überein, das die Anwendung auf dem Ge
 (Chrome-Richtlinie `3rdparty`), sodass Benutzer sich nur anmelden und beides nicht ändern können:
 
 ```json
-{ "serverUrl": "https://ai.example.internal", "agent": "browser-assistant" }
+{ "server": "https://ai.example.internal", "agent": "browser-assistant" }
 ```
+
+`server` ist der aktuelle Name des Schlüssels; der ältere Name `serverUrl` wird weiterhin gelesen.
 
 Mit `"language": "de"` legen Sie die Sprache der Seitenleiste für alle fest; ohne wählt jede Person sie in den
 Einstellungen der Seitenleiste, und **Automatisch** ist die Sprache des Browsers.

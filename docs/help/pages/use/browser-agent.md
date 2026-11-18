@@ -13,7 +13,7 @@ The browser agent is Fadenstack in Chrome's side panel. It works with the page y
 ## Open the panel and sign in
 
 1. Select the Fadenstack button in Chrome's toolbar, or press Alt+Shift+F.
-2. The first time, enter the **Server** and the **Agent** in **Connect to Fadenstack**.
+2. The first time, choose **Connect to my organisation** (your IT department may have chosen for you), then enter the **Server** and the **Agent** in **Connect to Fadenstack**.
 3. Select **Connect**, and allow the access when Chrome asks.
 4. The panel shows **Your sign-in code**. Select **Open the sign-in page**; your browser opens Fadenstack's page for it. If you cannot open it from the panel, **Copy the code** copies the code.
 5. On that page, sign in to Fadenstack as usual if the browser asks, check that the code is the one in the panel, and approve. The panel says **Waiting for your approval...** meanwhile and signs in by itself afterwards. Your password stays on that page; the extension never sees it. More: [Sign in a desktop app](sign-in-an-app.md).
@@ -35,10 +35,8 @@ Below the languages, **Settings** holds the switches **Search the web with Chrom
 
 | Select | What happens |
 |---|---|
-| **Export my data** | Saves a JSON file with your chats, your saved prompts and the **Allow always** choices kept for you in this browser. Your sign-in is not in it, and neither is what the server keeps; ask your IT department for that. |
-| **Delete my data on this device** | After you confirm, deletes the chats, saved prompts and **Allow always** choices kept for you in this browser, and the key that protects them, and signs you out. This cannot be undone. Your chats cannot be read again, not even from a copy. What the server keeps stays; ask your IT department. |
-| **Sign out on this device** | Signs you out here. Your chats stay in this browser for your next sign-in. |
-| **Change server or agent** | Back to the first form. |
+| **Your data in this browser** | Opens the page for your data. **Export my data** saves a JSON file with the chats, saved prompts, **Allow always** choices and record of tool calls kept for you in this browser. Your sign-in is not in it, and neither is what the server keeps; ask your IT department for that. **Remove my data…** asks you to confirm, then removes the chats, saved prompts, **Allow always** choices and record of tool calls kept for you in this browser, and ends your connection, so you connect again from the start. This cannot be undone. Your chats cannot be read again in this browser. **Export all my Fadenstack data** and **Remove all my Fadenstack data in this browser…** do the same for every Fadenstack app in this browser. What the server keeps stays; ask your IT department. |
+| **Connection** | Shows the server you are connected to. **Sign out** ends your sign-in at the server and on this computer; tick **Also delete the chats kept on this computer** to delete your chats too, otherwise they stay in this browser for your next sign-in. Here you can also change to another server or to your own AI. |
 
 The chats and choices are kept for each signed-in person on their own: someone else who signs in to the same browser does not see yours.
 
@@ -89,7 +87,7 @@ Quick actions ask the agent at once, in your language. They are in the panel's *
 
 Skills are ways of working your organisation set up, such as "Reply in our style" or "Check a contract against our checklist". To use one for a message, type `$` in the message box (or `/` at its start), and pick the skill from the list: type a few letters to narrow it, then press Enter. The skill shows above the message box and goes with that message only. See [Skills](skills.md).
 
-The same list starts with **My prompts**: questions you saved yourself. To save one, select **Save as prompt** (the bookmark) under a message you sent. Picking a prompt puts its text into the message box, where you can change it before you send it. The trash icon beside a prompt deletes it. Your prompts are kept in this browser only, up to 100; **Export my data** includes them, and **Delete my data on this device** deletes them.
+The same list starts with **My prompts**: questions you saved yourself. To save one, select **Save as prompt** (the bookmark) under a message you sent. Picking a prompt puts its text into the message box, where you can change it before you send it. The trash icon beside a prompt deletes it. Your prompts are kept in this browser only, up to 100; **Export my data** includes them, and **Remove my data…** deletes them.
 
 ## Videos
 
@@ -102,7 +100,7 @@ On a page with a video, the agent can read its transcript: ask "Summarise this v
 
 The agent can go through a task that spans several pages of a site, such as a form in steps or a search on the site: it goes to another page of the same site, goes back, scrolls, waits for the next page, and presses Enter, Tab, Esc or the arrow keys in a field. While it acts on a page, the page shows a coloured edge and, at its foot, **Fadenstack is working on this page** with a **Stop** button: **Stop** there stops the answer as the panel's Stop does.
 
-It stays on the site the tab is on. Another site it opens in a new tab with **Open page**, which needs your permission for that site, or reaches by clicking a link, which asks you. One request takes at most 25 actions on pages; then the agent tells you what is done and asks whether to go on. It never buys, pays, creates accounts or accepts terms for you: it stops before such a step and hands it to you.
+It stays on the site the tab is on. Another site it opens in a new tab with **Open page**, which needs your permission for that site, or reaches by clicking a link, which asks you. One request takes at most 25 actions on pages; then the agent tells you what is done and asks whether to go on. It is told never to buy, pay, create accounts or accept terms for you, and to stop before such a step and hand it to you.
 
 ## Tables and chats as files
 
@@ -128,7 +126,7 @@ The agent can search the web with Chrome's own search engine, the one set in Chr
 In the **Ask** tool mode, every search asks first, and the card shows the query. The search runs in a tab in the background, and the agent reads the results like a page, so the first time Fadenstack needs your permission for the search engine's site: select **Allow …** above the message box, then ask again. It then opens a result or two and gives you their links.
 
 ??? info "Where a search goes"
-    The query goes to the search engine set in Chrome, not through your organisation's server, as a search you typed into the address bar would. The agent is told never to put personal data or text from the page into a query unless you asked for exactly that; read the query on the card before you allow it.
+    The query goes to the search engine set in Chrome, not through your organisation's server, as a search you typed into the address bar would. Your organisation's server may still see the query: where it supports this, it checks each step, with what the step is given, before the step runs. The agent is told never to put personal data or text from the page into a query unless you asked for exactly that; read the query on the card before you allow it.
 
 ## What else it can do
 
@@ -154,7 +152,9 @@ The **Tool mode** at the top of the panel decides what runs without asking:
 
 ![A card asking Run copy_to_clipboard?, showing the table it will copy, with the Allow, Allow for this chat and Deny buttons](../images/use/browser-agent-approval.png)
 
-When it asks, a card shows **Run …?** with the action and what it is given, and says what it acts on, such as *Button "Send" on mail.example.com*, *Press Enter in Text box "Search" on shop.example* or *Go to https://shop.example/order/2*. Select **Allow** (this once), **Allow for this chat** (until you close or reopen the chat), **Allow always** (for this agent in this browser), or **Deny**. Pressing a button or a key, using a site's tool, and anything your administrator wants asked first, offers only **Allow** and **Deny**: it asks every time. **Reset approvals**, at the bottom of the tool-mode menu, takes back what you allowed for the chat and always.
+When it asks, a card shows **Run …?** with the action and what it is given, and says what it acts on, such as *Button "Send" on mail.example.com*, *Press Enter in Text box "Search" on shop.example* or *Go to https://shop.example/order/2*. Select **Allow** (this once), **Allow for this chat** (until you close or reopen the chat), **Allow always** (for this agent in this browser), or **Deny**. Pressing a button or a key, using a site's tool, and anything your administrator wants asked first, offers only **Allow** and **Deny**: it asks every time, except in Bypass. **Reset approvals**, at the bottom of the tool-mode menu, takes back what you allowed for the chat and always.
+
+Where your organisation allows it, **Bypass** is a fifth tool mode. You switch it on yourself, for one chat and a limited time. Then what your organisation's Bypass grant covers runs without asking, a button or a key press included; rules your administrator set, and tools marked "always ask", still ask. See [Bypass](tools.md#bypass).
 
 ??? info "What the card shows for a field or a button"
     For a field or a button, what the action is given is the page's internal reference, not its label.
@@ -163,20 +163,20 @@ If you close the panel while the agent answers, the answer stops: the agent work
 
 ## What it writes is marked
 
-Text the agent writes into a page, such as a reply in a mail or ticket editor, is marked as made with AI where
-the page keeps it: the text carries a hidden mark, and where the page shows a title for it, hovering over the text
-shows **AI-generated**. Your organisation keeps a signed record of each text, so
-[Check content](checking-content.md) finds it later, also when the words are copied out of the page. Leave the
-marks in place when you go on editing.
+Text the agent writes into a rich-text editor, such as a reply in a mail or ticket editor, carries a hidden AI mark
+where the editor keeps it, and where the page shows a title for it, hovering over the text shows
+**AI-generated**. In a plain text box no mark stays in the text; it is only recorded. Your organisation keeps a
+signed record of each text, so [Check content](checking-content.md) finds it later. Leave the marks in place when
+you go on editing.
 
 ![The browser agent's panel after it wrote a reply into a ticket's editor: the Run fill_field? card answered Allowed, Ran fill_field, and the two paragraphs it added](../images/use/browser-agent-write-done.png)
 
 ## What it never does
 
-- It never reads the content of a site you have not allowed; only the titles and addresses of this window's tabs reach the model. On such a site the bar says **The agent cannot read …**; select **Allow on this site** (or **All sites**) to let it. A quick action on text you selected sends that text, even from a site you have not allowed.
+- It never reads the content of a site you have not allowed. A tab on such a site reaches the model only as a tab whose site is not allowed, without its title and address; the site's host name reaches the model once the agent opened it or went to it. On such a site the bar says **The agent cannot read …**; select **Allow on this site** (or **All sites**) to let it. A quick action on text you selected sends that text, even from a site you have not allowed.
 - It never reads out or fills in password fields, nor card fields the site marks as such. A payment field the site does not mark is read and filled like any other field.
-- It never presses a button, such as **Send**, or Enter in a field without asking you, every time: no earlier answer covers it.
-- It never goes to another site in your tab by itself, and never buys, pays, creates accounts or accepts terms for you.
+- It never presses a button, such as **Send**, or Enter in a field without asking you, every time: no earlier answer covers it. Only in Bypass, where your organisation allows it and you switched it on, does what the grant covers run without asking.
+- It never goes to another site in your tab by itself. It is told never to buy, pay, create accounts or accept terms for you; that is an instruction to the model, not a technical block.
 - It is told never to take instructions from the page or a picture: what they say is something to read, not an order to follow. What a page, a PDF, a transcript or a site's tool contains reaches the model marked as the page's text, in a way the page cannot fake, and text that tries to instruct assistants is pointed out to the model; the agent then tells you that the page tries to instruct it. A page can still mislead a model, so read what a card asks before you allow it.
 - It never reaches files on your computer that you did not add.
 
@@ -191,7 +191,7 @@ At installation, Chrome lets the extension open its side panel, keep its setting
 - A video's captions are fetched from the video's own site, as its player does. With tools that sites offer switched on, what a site's tool is given goes to that site.
 - PDFs are read inside your browser. Pictures are made smaller in your browser before they go. CSV and Markdown files you save stay on your computer.
 - Your conversations stay in this browser, encrypted, each signed-in person's on their own. The key stays in the browser and cannot be read out of it. Your saved prompts stay in this browser too. The events the extension sends to the server say which tools ran and how long they took, not what they read. What the tools read still reaches the server, in the requests to the AI model, as the first point says.
-- Your sign-in is kept in this browser and, unlike the conversations, is not encrypted there. On a computer others use, sign out when you are done: select the gear (**Settings**) at the top of the panel, then **Sign out on this device**. To remove your conversations and saved prompts as well, select **Delete my data on this device**.
+- Your sign-in is kept in this browser and, unlike the conversations, is not encrypted there. On a computer others use, sign out when you are done: select the gear (**Settings**) at the top of the panel, then **Connection**, then **Sign out**. To remove your conversations and saved prompts as well, select **Your data in this browser**, then **Remove my data…**.
 
 More on what is kept and who sees it: [Your data and privacy](privacy.md).
 
@@ -213,7 +213,7 @@ More on what is kept and who sees it: [Your data and privacy](privacy.md).
 | You see | What to do |
 |---|---|
 | **… does not answer. Check the server's address, and that this computer trusts its certificate.** | The address is wrong, or your computer does not trust the server's certificate. Check the address, or tell your IT department. |
-| **There is no agent '…' on …** | The **Agent** name is wrong. Use **Change server or agent** and enter it as your administrator gave it. |
+| **There is no agent '…' on …** | The **Agent** name is wrong. Select the gear (**Settings**), then **Connection**, and connect again with the name your administrator gave you. |
 | **You have no access to '…'. Ask your administrator to grant it to you or your team.** | You are not yet allowed to use this agent. |
 | **'…' has no published version yet.** or **'…' is retired.** | The agent is not available. Ask your administrator. |
 | **Your organisation turned this agent off.** | Your administrator stopped the agent for now. Your conversations stay in this browser; once it is on again, ask again. |

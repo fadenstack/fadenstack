@@ -18,7 +18,7 @@ etwa von einem Spiegel, der nicht mehr aktualisiert wird.
 
 ## Apps im Einsatz {#apps-in-use}
 
-Jede App meldet dem Server beim Start ihren Namen und ihre Version. Der Server zählt die Versionen, die er in den letzten 30 Tagen gesehen hat. Namen von Personen werden nicht angezeigt.
+Jede App meldet dem Server beim Start ihren Namen und ihre Version, dazu eine kurze Beschreibung des Betriebssystems (höchstens 100 Zeichen). Der Desktop-Agent meldet außerdem seine Plugins und seine lokalen MCP-Programme (nach Dateiname), jeweils mit ihrer SHA-256; die Office-Add-ins melden ihre lokalen MCP-Programme ebenso. Der Server zählt die Versionen, die er in den letzten 30 Tagen gesehen hat. Namen von Personen werden nicht angezeigt.
 
 ## Der Bereich Apps auf Updates {#the-apps-section-on-updates}
 
@@ -66,8 +66,8 @@ Unter **Apps** auf **Updates** laden Sie Dateien herunter, die eine App auf dies
 |---|---|---|
 | Office-Add-ins | `policy.json` | Legen Sie sie auf jedem Computer unter `%PROGRAMDATA%\Fadenstack\Office\policy.json` ab, z. B. per Gruppenrichtlinie oder Intune. Sie enthält die Adresse dieses Servers und die vier Agenten (Excel, Word, PowerPoint, Outlook). |
 | Nextcloud-App | `connect-nextcloud.sh` | Führen Sie ihre `occ`-Befehle auf dem Nextcloud-Server als Benutzer des Webservers aus. Sie aktivieren die App `fadenstack_agent` und setzen `server_url`, `agent` und `integration_enabled`. |
-| Chrome-Erweiterung | `fadenstack-chrome-policy.json` | Eine Chrome-Richtlinie: Sie installiert die Erweiterung aus dem Chrome Web Store und setzt die verwalteten Einstellungen `serverUrl` und `agent` der Erweiterung. Unter Linux gehört die Datei nach `/etc/opt/chrome/policies/managed/`. Unter Windows und macOS setzen Sie dieselben Werte per Gruppenrichtlinie, Intune oder Konfigurationsprofil. |
-| Desktop-Agent | keine | Die Person gibt beim ersten Start die Adresse des Servers ein und meldet sich an. |
+| Chrome-Erweiterung | `fadenstack-chrome-policy.json` | Eine Chrome-Richtlinie: Sie installiert die Erweiterung aus dem Chrome Web Store und setzt die verwalteten Einstellungen `serverUrl` (der ältere Name von `server`, den die Erweiterung weiter liest) und `agent` der Erweiterung. Unter Linux gehört die Datei nach `/etc/opt/chrome/policies/managed/`. Unter Windows und macOS setzen Sie dieselben Werte per Gruppenrichtlinie, Intune oder Konfigurationsprofil. |
+| Desktop-Agent | keine | Die Person gibt beim ersten Start die Adresse des Servers ein und meldet sich an. Oder die IT stellt den Server für den Computer ein, mit dem Schlüssel `server` in `%PROGRAMDATA%\Fadenstack\Desktop\policy.json` (diese Datei schreiben Sie selbst): Die App nutzt dann diesen Server, und die Person meldet sich nur noch an. |
 
 ??? info "Wenn dieser Server eine eigene Zertifizierungsstelle nutzt"
     Laden Sie für die Office-Add-ins zusätzlich `/install/ca.crt` vom Server herunter und legen Sie es auf jedem Computer unter `%PROGRAMDATA%\Fadenstack\Office\fadenstack-ca.crt` ab.

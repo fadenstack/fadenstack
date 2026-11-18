@@ -2,7 +2,7 @@
 
 Die KI-Verordnung der EU (Art. 50 Abs. 2) verlangt von Anbietern von KI-Systemen, die Text, Bilder, Audio oder
 Video erzeugen, ihre Ausgaben maschinenlesbar zu kennzeichnen, damit sie als KI-generiert erkennbar sind. Das
-Modul **Herkunftsnachweis** tut das für alles, was die Modelle Ihrer Installation erzeugen, und lässt Benutzer
+Modul **Herkunftsnachweis** tut das für das, was die Modelle Ihrer Installation erzeugen, und lässt Benutzer
 Inhalte auf diese Kennzeichnung prüfen. Es ist von Anfang an eingeschaltet und muss nicht eingerichtet werden.
 
 Wie Benutzer einen Text, ein Bild oder eine Datei prüfen, steht unter [Inhalte prüfen](../use/checking-content.md).
@@ -91,9 +91,10 @@ Fingerabdruck wirkt für jedes Modell, auch für externe, und sichert das Wasser
 Keines von beiden übersteht ein Umformulieren oder Übersetzen.
 
 **Das Text-Wasserzeichen.** Antworten Ihrer eigenen Modelle tragen außerdem ein unsichtbares Wasserzeichen: ein
-Muster in der Wortwahl des Modells, gebildet mit dem geheimen Wasserzeichen-Schlüssel Ihrer Installation. Es lässt
-sich in Texten ab etwa 200 Wörtern finden und wird schwächer, wenn der Text stark bearbeitet, übersetzt oder
-umschrieben wird. Ein Text, der vor allem wiedergibt, was das Modell bekommen hat (die Zusammenfassung einer Mail,
+Muster in der Wortwahl des Modells, gebildet mit dem geheimen Wasserzeichen-Schlüssel Ihrer Installation. Es ist eine
+Wahrscheinlichkeit, keine bleibende Kennzeichnung: In 0.7.1 fand es sich in etwa einem Drittel der Texte von 200 bis
+399 Tokens, in drei Vierteln der Texte von 400 bis 999 Tokens und in allen ab 1.000 Tokens. Ein Einfügen oder
+leichtes Umformulieren kann es entfernen, ebenso starkes Bearbeiten, Übersetzen oder Umschreiben. Ein Text, der vor allem wiedergibt, was das Modell bekommen hat (die Zusammenfassung einer Mail,
 ein umformulierter Absatz, Namen und Zahlen aus einem Dokument), trägt wenig davon, weil das Modell kaum eigene
 Wörter wählt: Ein solcher Text wird über seinen Beleg gefunden, und was die Agenten schreiben, auch über den
 Nachweis, den sie dazu ablegen.
@@ -121,8 +122,8 @@ Diese Antworten tragen kein Text-Wasserzeichen, und ihr Beleg hält fest, was da
 
 Ob ein Chat-Modell seine Antworten mit dem Wasserzeichen versieht, hängt von der Runtime seines Clusters ab. Auf
 der Karte **Laufzeit** eines Clusters gilt: Eine Runtime mit vLLM 0.30 oder neuer hat das Wasserzeichen; für
-GB10- und für x86_64-Maschinen ist das die Runtime mit vLLM 0.31, die GB10-Runtime mit vLLM 0.29 und die
-x86_64-Runtime mit vLLM 0.26 haben keines.
+GB10-Maschinen ist das die Runtime mit vLLM 0.31, und die x86_64-Runtime mit vLLM 0.31 soll es ebenfalls haben,
+doch dort ist es nicht gemessen. Die GB10-Runtime mit vLLM 0.29 und die x86_64-Runtime mit vLLM 0.26 haben keines.
 
 - Ein Modell bekommt das Wasserzeichen beim nächsten Start. Ein Wechsel der Runtime startet den Cluster und seine
   Modelle neu (siehe [Cluster](../operate/clusters.md#runtime)).
@@ -181,7 +182,7 @@ Webformulare und Dateien schreiben, jeweils so, wie die Anwendung es zulässt: i
 eigenen XML-Teilen, in Kopfzeilen von E-Mails, in HTML-Attributen, in Datei-Metadaten oder im Front Matter einer
 Markdown-Datei. Die Installation bewahrt den signierten Nachweis jeder Einfügung auf.
 
-Diese Kennzeichen sind ein zweites Signal neben dem Wasserzeichen im Text, nie die Kennzeichnung selbst: Ein
+Diese Kennzeichen sind ein zweites Signal neben dem Wasserzeichen im Text: Ein
 E-Mail-Programm oder ein Webformular kann ein HTML-Attribut beim Einfügen oder Speichern verwerfen, und wer den
 reinen Text kopiert, lässt es zurück.
 
