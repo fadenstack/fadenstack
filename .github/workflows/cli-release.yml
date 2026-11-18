@@ -25,11 +25,21 @@
 #
 # Needed: UPDATE_FEED_SIGNING_KEY signs the release feed (job feed). Optional:
 # FEED_DEPLOY_SSH_KEY, FEED_DEPLOY_HOST, FEED_DEPLOY_KNOWN_HOSTS put it on fadenstack.com.
+#
+# A released version's feed again (job feed-again), when its entry's text is corrected after the release: run this
+# workflow by hand on the branch that holds the corrected release/releases.yaml, with feed_version (e.g. 0.7.1).
+# Nothing else runs: the feed is built from that branch, signed, checked, it replaces the release's index.json and
+# index.json.sig, and goes to fadenstack.com/updates/v1/ as the feed job puts it.
 
 name: Release CLI
 
 on:
   workflow_dispatch:
+    inputs:
+      feed_version:
+        description: "Only build and sign the feed again for this released version (e.g. 0.7.1), from this branch's release/releases.yaml"
+        required: false
+        default: ""
   push:
     tags:
       - "v*"
@@ -44,6 +54,8 @@ env:
 
 jobs:
   build:
+    # Not for a feed-only run (feed-again); every other job needs this one, so they are skipped with it.
+    if: ${{ !inputs.feed_version }}
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -501,6 +513,72 @@ jobs:
           # "Failure writing output" (exit 23) on a feed that was published (0.5.0).
           curl -fsS https://fadenstack.com/updates/v1/index.json -o feed-live.json
           grep -q "\"${{ needs.build.outputs.version }}\"" feed-live.json
+
+  feed-again:
+    # A released version's feed built and signed again from this branch's release/releases.yaml (a corrected entry),
+    # by hand with feed_version; see the top of this file. The version comes in through env, never into the script.
+    if: ${{ inputs.feed_version }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # replaces the release's feed files
+    env:
+      VERSION: ${{ inputs.feed_version }}
+      UPDATE_FEED_SIGNING_KEY: ${{ secrets.UPDATE_FEED_SIGNING_KEY }}
+      FEED_DEPLOY_SSH_KEY: ${{ secrets.FEED_DEPLOY_SSH_KEY }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          sparse-checkout: |
+            release
+            cli/src/faden_cli/core
+            backend/faden_backend/web/api/install
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.13"
+
+      - name: Build, sign and check the feed
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::feed_version must be a released version such as 0.7.1"
+            exit 1
+          fi
+          if [ -z "$UPDATE_FEED_SIGNING_KEY" ]; then
+            echo "::error::UPDATE_FEED_SIGNING_KEY is not set"
+            exit 1
+          fi
+          gh release view "v$VERSION" -R "$GITHUB_REPOSITORY" --json tagName > /dev/null
+          pip install pyyaml cryptography packaging
+          python release/update_feed.py build --version "$VERSION" --out feed
+          python release/update_feed.py sign feed
+          python release/update_feed.py verify feed
+
+      - name: Replace the release's feed files
+        shell: bash
+        run: gh release upload "v$VERSION" feed/index.json feed/index.json.sig --clobber -R "$GITHUB_REPOSITORY"
+
+      - name: Put it on fadenstack.com
+        if: env.FEED_DEPLOY_SSH_KEY != ''
+        shell: bash
+        env:
+          FEED_DEPLOY_HOST: ${{ secrets.FEED_DEPLOY_HOST }}
+          FEED_DEPLOY_KNOWN_HOSTS: ${{ secrets.FEED_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$FEED_DEPLOY_SSH_KEY" > ~/.ssh/feed && chmod 600 ~/.ssh/feed
+          printf '%s\n' "$FEED_DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          rsync -e "ssh -i $HOME/.ssh/feed -o BatchMode=yes" --delay-updates --chmod=F644 \
+            feed/index.json feed/index.json.sig "$FEED_DEPLOY_HOST:v1/"
+          # The live files are the ones signed here.
+          curl -fsS https://fadenstack.com/updates/v1/index.json -o feed-live.json
+          curl -fsS https://fadenstack.com/updates/v1/index.json.sig -o feed-live.json.sig
+          cmp feed/index.json feed-live.json
+          cmp feed/index.json.sig feed-live.json.sig
 
   sbom:
     needs: [build, executables]
