@@ -111,7 +111,9 @@ override that should use it:
 3. Choose **Language**. Remove categories shown as unavailable for that language, then add the categories you need
    under **Entities**. Adopting a profile does not automatically select every available category.
 4. Choose whether to protect cloud requests, local-model requests or both. Keep **If detection fails** at `block`
-   when a protected request must not be sent without a successful check. Save the policy.
+   when a protected request must not be sent without a successful check. Save the policy. On a server without a
+   GPU, a request with a long text can take longer than the check allows: see
+   [Local PII on CPU or GPU](../operate/installing.md#local-pii-on-cpu-or-gpu).
 
 Changing the language can make a previously selected category unavailable. Remove or replace it explicitly;
 the service refuses unsupported coverage instead of silently ignoring that category.
