@@ -128,6 +128,8 @@ release notes on **Updates**): **Settings → Branding → Show links to fadenst
 |---|---|
 | **A PII policy is set for this workspace, but the PII module is not running.** | Your organisation's policy needs the personal-data check, and the module that does it is switched off. Nothing was sent. Tell your administrator. |
 | **PII service unavailable and fail_action=block.** | The personal-data check could not run, and your organisation's policy says not to send messages without it. Try again later; if it keeps happening, tell your administrator. |
+| **The PII check took longer than its limit for this request …** | The text was too long to check in time, so nothing was sent. Send a shorter text, or tell your administrator, who can make the check faster. |
+| **The request is too large for the PII check …** | The conversation or what a tool returned is more than the check takes at once, so nothing was sent. Start a new chat or send less. |
 | An answer shows `<PERSON>` or `[PERSON_1]` where a name should be | The name was masked before it reached the model. With `redact` this is expected. With `tokenize_reversible` the name should come back; if it does not, tell your administrator. |
 | **Your admin hasn't allowed changing the PII mode for this chat.** | Your organisation fixes the mode. The other settings in **Privacy** may still be open to you. |
 | **… is not applied. Choose it again to apply it.** | The mode you chose earlier did not take effect. Choose it again in **Mode**. |

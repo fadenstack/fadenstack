@@ -309,7 +309,8 @@ oder langen Dokumenten.
     langen Text (einige tausend Zeichen, etwa ein Dokument, das ein Agent mitschickt) länger brauchen. Wo die
     PII-Richtlinie blockiert, was sie nicht prüfen kann (voreingestellt für Anfragen an Cloud-Anbieter, und für
     Anfragen an lokale Modelle, wenn **Anfragen an lokale Modelle schützen** eingeschaltet ist), wird eine solche
-    Anfrage dann abgelehnt, und die Meldung lautet „PII service unavailable“. Was Administratoren tun können: die
+    Anfrage dann mit `pii_deadline_exceeded` abgelehnt („The PII check took longer than its limit for this request
+    …“). Was Administratoren tun können: die
     Prüfung auf einer GPU ausführen (`gliner2-multi-v1` mit `gpu-shared` oder `gpu-dedicated`, siehe unten); für
     Anfragen an lokale Modelle **Anfragen an lokale Modelle schützen** in der
     [Richtlinie für personenbezogene Daten](../administer/policies.md#personal-data) ausgeschaltet lassen, wie es
