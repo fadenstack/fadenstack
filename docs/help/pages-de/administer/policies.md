@@ -135,6 +135,8 @@ Mandanten-Overrides, die das Profil verwenden sollen:
    **Entitäten** die benötigten Kategorien. Das Übernehmen des Profils wählt nicht automatisch alle Kategorien aus.
 4. Wählen Sie den Schutz für Cloud-Anfragen, lokale Modelle oder beides. Lassen Sie **Wenn die Erkennung fehlschlägt**
    auf `block`, wenn eine geschützte Anfrage nur nach erfolgreicher Prüfung gesendet werden darf. Speichern Sie.
+   Auf einem Server ohne GPU kann eine Anfrage mit einem langen Text länger brauchen, als die Prüfung erlaubt: siehe
+   [Lokale PII-Verarbeitung auf CPU oder GPU](../operate/installing.md#local-pii-on-cpu-or-gpu).
 
 Ein Sprachwechsel kann eine zuvor gewählte Kategorie ungültig machen. Entfernen oder ersetzen Sie diese
 ausdrücklich. Der Dienst lehnt nicht unterstützte Kategorien ab, statt sie stillschweigend zu ignorieren.

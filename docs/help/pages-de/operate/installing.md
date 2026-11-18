@@ -304,6 +304,15 @@ Die PII-Erkennung läuft auf Ihrem Server. Bei der Einrichtung werden die gewäh
 Chat-Texte werden lokal verarbeitet. Die CPU-Verarbeitung ist langsamer, besonders bei gleichzeitigen Anfragen
 oder langen Dokumenten.
 
+!!! note "Ein langer Text auf einem Server ohne GPU"
+    Die Prüfung hat für jede Anfrage höchstens 8 Sekunden. Auf einem Server ohne GPU kann eine Anfrage mit einem
+    langen Text (einige tausend Zeichen, etwa ein Dokument, das ein Agent mitschickt) länger brauchen. Blockiert die
+    Richtlinie, was sie nicht prüfen kann, wird die Anfrage dann abgelehnt, und die Meldung lautet „PII service
+    unavailable“. Abhilfe: die Prüfung auf einer GPU ausführen (`gliner2-multi-v1` mit `gpu-shared` oder
+    `gpu-dedicated`, siehe unten), nur Anfragen an Cloud-Anbieter prüfen (**Anfragen an lokale Modelle schützen** in
+    der [Richtlinie für personenbezogene Daten](../administer/policies.md#personal-data) ausgeschaltet lassen, wie es
+    voreingestellt ist) oder kürzere Texte senden.
+
 ![Die Auswahl von PII-Sprachpaket, Erkennung und Ausführungsmodus](../images/operate/pii-mode-choice.png)
 
 1. Führen Sie `faden doctor` aus. **Local PII** zeigt GPU-Kompatibilität, installierte Erkennung, Inhaltssprachen,

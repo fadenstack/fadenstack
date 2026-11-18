@@ -283,6 +283,14 @@ needed and go into every backup. What it marks is on [Content marking](../admini
 PII detection runs on your server. Setup downloads the selected model files; chat text is processed locally.
 CPU processing is slower, especially with concurrent requests or long documents.
 
+!!! note "A long text on a server without a GPU"
+    The check gives each request at most 8 seconds. On a server without a GPU, a request with a long text (a few
+    thousand characters, such as a document an agent includes) can take longer. When the policy blocks what it
+    cannot check, the request is then refused, and the message says "PII service unavailable". To avoid it, run the
+    check on a GPU (`gliner2-multi-v1` with `gpu-shared` or `gpu-dedicated`, below), check only requests to cloud
+    providers (leave **Protect requests to local models** off in the
+    [personal data policy](../administer/policies.md#personal-data), as it is by default), or keep texts shorter.
+
 ![The PII language, detector and execution choices](../images/operate/pii-mode-choice.png)
 
 1. Run `faden doctor`. **Local PII** reports GPU compatibility, the installed detector, its content languages,
