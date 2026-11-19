@@ -305,16 +305,17 @@ Chat-Texte werden lokal verarbeitet. Die CPU-Verarbeitung ist langsamer, besonde
 oder langen Dokumenten.
 
 !!! note "Ein langer Text auf einem Server ohne GPU"
-    Die Prüfung hat für jede Anfrage höchstens 8 Sekunden. Auf einem Server ohne GPU kann eine Anfrage mit einem
-    langen Text (einige tausend Zeichen, etwa ein Dokument, das ein Agent mitschickt) länger brauchen. Wo die
-    PII-Richtlinie blockiert, was sie nicht prüfen kann (voreingestellt für Anfragen an Cloud-Anbieter, und für
+    Die Prüfung hat für jede Anfrage 8 Sekunden und für jeden Abschnitt eines langen Textes, den sie liest (je einige
+    hundert Zeichen), eine halbe Sekunde mehr, höchstens 30 Sekunden. Auf einem Server ohne GPU kann eine Anfrage mit
+    einem langen Text (mehrere tausend Zeichen, etwa ein Dokument, das ein Agent mitschickt) trotzdem länger brauchen.
+    Wo die PII-Richtlinie blockiert, was sie nicht prüfen kann (voreingestellt für Anfragen an Cloud-Anbieter, und für
     Anfragen an lokale Modelle, wenn **Anfragen an lokale Modelle schützen** eingeschaltet ist), wird eine solche
     Anfrage dann mit `pii_deadline_exceeded` abgelehnt („The PII check took longer than its limit for this request
-    …“). Was Administratoren tun können: die
-    Prüfung auf einer GPU ausführen (`gliner2-multi-v1` mit `gpu-shared` oder `gpu-dedicated`, siehe unten); für
-    Anfragen an lokale Modelle **Anfragen an lokale Modelle schützen** in der
-    [Richtlinie für personenbezogene Daten](../administer/policies.md#personal-data) ausgeschaltet lassen, wie es
-    voreingestellt ist; kürzere Texte senden.
+    …“). Was Administratoren tun können: die Prüfung auf einer GPU ausführen (`gliner2-multi-v1` mit `gpu-shared` oder
+    `gpu-dedicated`, siehe unten); einer virtuellen Maschine den CPU-Typ des Hosts geben (Host-Passthrough), denn ohne
+    die AVX2-Befehle des Hosts läuft die Prüfung etwa dreimal langsamer; für Anfragen an lokale Modelle **Anfragen an
+    lokale Modelle schützen** in der [Richtlinie für personenbezogene Daten](../administer/policies.md#personal-data)
+    ausgeschaltet lassen, wie es voreingestellt ist; kürzere Texte senden.
 
 ![Die Auswahl von PII-Sprachpaket, Erkennung und Ausführungsmodus](../images/operate/pii-mode-choice.png)
 
@@ -369,11 +370,12 @@ oder langen Dokumenten.
     `gpu-shared` ist für eine GPU vorgesehen, die auch andere Software nutzt. `gpu-dedicated` ist für eine GPU,
     die Sie für PII freihalten. Die Auswahl sperrt andere Software nicht aus.
 
-    Automatisch wird ein Viertel der verfügbaren CPU-Threads verwendet, höchstens acht bei CPU- und zwei bei
-    GPU-Ausführung. `--pii-cpu-threads 2` setzt eine ausdrückliche Anzahl. Beim Start gelten auch CPU-Limits
-    des Containers. `--pii-gpu-memory-mib 4096` begrenzt die Speicherzuteilung; andere Software erhält keine Reservierungssperre.
-    Für den PII-Container gilt zusätzlich ein Host-RAM-Limit von 4 GiB. `FADEN_PII_MEMORY_LIMIT` in `.env`
-    ändert dieses Limit; führen Sie danach `faden up` aus. Host-RAM und GPU-Speicher sind getrennte Budgets.
+    Automatisch wird bei CPU-Ausführung die Hälfte der verfügbaren CPU-Threads verwendet, höchstens acht, bei
+    GPU-Ausführung ein Viertel, höchstens zwei. `--pii-cpu-threads 2` setzt eine ausdrückliche Anzahl. Beim Start gelten
+    auch CPU-Limits des Containers. `--pii-gpu-memory-mib 4096` begrenzt die Speicherzuteilung; andere Software erhält
+    keine Reservierungssperre. Für den PII-Container gilt zusätzlich ein Host-RAM-Limit von 4 GiB.
+    `FADEN_PII_MEMORY_LIMIT` in `.env` ändert dieses Limit; führen Sie danach `faden up` aus. Host-RAM und GPU-Speicher
+    sind getrennte Budgets.
 
 ### Erweiterte PII-Felder {#extended-pii-fields}
 

@@ -18,7 +18,13 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_gateway.services.gateway.errors import GatewayError
-from faden_gateway.services.gateway.pii_client import DEADLINE_REFUSALS, PIIClient, PIIDeadlineExceededError
+from faden_gateway.services.gateway.pii_client import (
+    DEADLINE_REFUSALS,
+    PII_BUDGET_MS,
+    PIIClient,
+    PIIDeadlineExceededError,
+)
+from faden_gateway.services.gateway.pii_policy import parse_pii_policy
 from faden_gateway.services.registry import service_registry
 from tests.test_pii_module_off import (
     _chat,
@@ -38,6 +44,28 @@ async def test_running_out_of_time_is_told_apart(code: str) -> None:
     with pytest.raises(PIIDeadlineExceededError) as refused:
         await _sanitize(_answering(504, {"detail": {"code": code}}))
     assert refused.value.code == code
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(("asked", "sent"), [(None, "30000"), (5_000, "5000"), (90_000, "30000"), (0, "1")])
+async def test_the_budget_sent_is_at_most_the_pii_services_cap(asked: int | None, sent: str) -> None:
+    # 0.7.2: the PII service starts with 8 s and adds 0.5 s per window, up to 30 s; the gateway allows it that much.
+    seen: list[str | None] = []
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        seen.append(request.headers.get("x-pii-budget-ms"))
+        return httpx.Response(504, json={"detail": {"code": "pii_deadline_exceeded"}})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(answer)) as http:
+        policy = parse_pii_policy(_policy())
+        assert policy is not None
+        with pytest.raises(PIIDeadlineExceededError):
+            await PIIClient(base_url="http://pii.local", http_client=http).sanitize(
+                payload={"messages": [{"role": "user", "content": "I am Alice Meyer"}]}, policy=policy,
+                **({} if asked is None else {"budget_ms": asked}),
+            )
+    assert seen == [sent]
+    assert PII_BUDGET_MS == 30_000
 
 
 @pytest.mark.anyio

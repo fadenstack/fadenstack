@@ -298,10 +298,27 @@ class Settings(BaseSettings):
             "FADEN_PII_CACHE_BYTES", "FADEN_PII_PII_CACHE_BYTES"
         ),
     )
+    # A request's time: this much, and pii_work_seconds_per_window more for each
+    # window of its text once it is known, at most pii_work_timeout_cap_seconds
+    # (and never longer than the caller's x-pii-budget-ms).
     pii_work_timeout_seconds: float = Field(
         default=8.0,
         validation_alias=AliasChoices(
             "FADEN_PII_WORK_TIMEOUT_SECONDS", "FADEN_PII_PII_WORK_TIMEOUT_SECONDS"
+        ),
+    )
+    pii_work_seconds_per_window: float = Field(
+        default=0.5,
+        validation_alias=AliasChoices(
+            "FADEN_PII_WORK_SECONDS_PER_WINDOW",
+            "FADEN_PII_PII_WORK_SECONDS_PER_WINDOW",
+        ),
+    )
+    pii_work_timeout_cap_seconds: float = Field(
+        default=30.0,
+        validation_alias=AliasChoices(
+            "FADEN_PII_WORK_TIMEOUT_CAP_SECONDS",
+            "FADEN_PII_PII_WORK_TIMEOUT_CAP_SECONDS",
         ),
     )
     pii_event_entries: int = Field(
@@ -406,6 +423,10 @@ class Settings(BaseSettings):
         if (
             not 0 <= self.pii_score_threshold <= 1
             or not 0 < self.pii_work_timeout_seconds <= 8
+            or not 0 <= self.pii_work_seconds_per_window <= 5
+            or not self.pii_work_timeout_seconds
+            <= self.pii_work_timeout_cap_seconds
+            <= 60
         ):
             raise ValueError("Invalid PII confidence/deadline")
         if (

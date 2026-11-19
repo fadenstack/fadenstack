@@ -138,8 +138,10 @@ def effective_threads() -> int:
 
 
 def pii_threads(available: int, *, gpu: bool = False) -> int:
-    """Use a quarter of available threads, capped by the measured profile."""
-    return min(2 if gpu else 8, max(1, available // 4))
+    """The PII model's threads: on a GPU a quarter of the CPU threads (at most 2: the GPU does the work); on a CPU
+    half of them (at most 8), as the CPU check's time is the model's inference (measured 19 Nov 2026 on an 8-thread
+    server: 10,000 characters in 6.5 s with 2 threads, 4.4 s with 4, 4.3 s with 8; a second session gained nothing)."""
+    return min(2, max(1, available // 4)) if gpu else min(8, max(1, available // 2))
 
 
 # ── Tune profile ─────────────────────────────────────────────────

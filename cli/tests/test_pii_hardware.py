@@ -122,7 +122,7 @@ def test_new_cpu_install_and_published_variant(selection):
     values = read_env_file(env)
     assert downloaded == ["gliner-onnx"]
     assert values["FADEN_PII_IMAGE"] == "registry.example.internal/faden/pii:1.2.3-cpu"
-    assert values["FADEN_PII_CPU_THREADS"] == "1"
+    assert values["FADEN_PII_CPU_THREADS"] == "2"  # half of the fixture's 4 threads
     assert values["FADEN_PII_CPU_THREADS_MODE"] == "auto"
 
 
@@ -146,7 +146,7 @@ def test_interactive_gpu_choice_and_noninteractive_preservation(selection, monke
 
 
 @pytest.mark.parametrize(
-    ("available", "cpu", "gpu"), [(1, 1, 1), (2, 1, 1), (8, 2, 2), (16, 4, 2), (64, 8, 2)]
+    ("available", "cpu", "gpu"), [(1, 1, 1), (2, 1, 1), (8, 4, 2), (16, 8, 2), (64, 8, 2)]
 )
 def test_thread_defaults_are_bounded(available, cpu, gpu):
     assert sysinfo.pii_threads(available) == cpu <= available

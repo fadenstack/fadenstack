@@ -68,6 +68,11 @@ class PIIInputTooLargeError(RuntimeError):
         self.code = code
 
 
+#: How long the gateway waits for the PII check at most: the PII service starts a request with its base
+#: time and adds time for each window of the text, up to this (its own cap, pii_work_timeout_cap_seconds,
+#: is the same 30 s).
+PII_BUDGET_MS = 30_000
+
 #: The PII service's answer when it could not finish the check within the request's time limit (504).
 DEADLINE_REFUSALS = frozenset({"pii_deadline_exceeded"})
 
@@ -131,7 +136,7 @@ class PIIClient:
         token_mapping: dict[str, str] | None = None,
         request_id: str | None = None,
         cache_scope: str = "",
-        budget_ms: int = 8_000,
+        budget_ms: int = PII_BUDGET_MS,
     ) -> SanitizeResult:
         """Call ``POST /api/v1/pii/sanitize`` on the PII service.
 
@@ -169,16 +174,16 @@ class PIIClient:
             body["token_mapping"] = token_mapping
 
         try:
-            headers = {**self._headers, "x-pii-budget-ms": str(min(max(budget_ms, 1), 8_000))}
+            headers = {**self._headers, "x-pii-budget-ms": str(min(max(budget_ms, 1), PII_BUDGET_MS))}
             if request_id:
                 headers["x-request-id"] = request_id
             if cache_scope:
                 headers["x-pii-scope"] = cache_scope[:128]
-            async with asyncio.timeout(10):
+            async with asyncio.timeout(PII_BUDGET_MS / 1000 + 2):
                 resp = await self._http.post(
                     f"{self._base}/api/v1/pii/sanitize",
                     json=body,
-                    timeout=10.0,
+                    timeout=PII_BUDGET_MS / 1000 + 2,
                     headers=headers,
                 )
             _raise_refusal(resp)
