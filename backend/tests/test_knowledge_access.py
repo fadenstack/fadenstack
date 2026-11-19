@@ -41,6 +41,12 @@ from faden_backend.settings import settings
 from faden_backend.web.api.admin.rag_lite import views as rag_lite_views
 
 API = "/api/admin/rag"
+
+
+@pytest.fixture(autouse=True)
+def _rag_lite_on(monkeypatch: pytest.MonkeyPatch) -> None:
+    """RAG Lite switched on: off, it answers 409 rag_lite_off and has nothing to search (test_rag_lite_off.py)."""
+    monkeypatch.setattr(settings, "rag_lite_enabled", True)
 #: Every chunk's and the query's: each chunk is as near as the next, so a search returns all it may see.
 _VECTOR = [1.0] * MAX_EMBEDDING_DIM
 
