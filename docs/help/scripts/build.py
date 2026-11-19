@@ -48,6 +48,8 @@ LANGS: dict[str, dict[str, str]] = {
         "help": "Help",
         "developers": "Developers",
         "console": "Console",
+        "ai_note": "Parts of this site were created with the help of AI. Emagin8 UG (haftungsbeschränkt) is "
+        "responsible for its content.",
         "untranslated": "",
     },
     "de": {
@@ -64,6 +66,8 @@ LANGS: dict[str, dict[str, str]] = {
         "help": "Hilfe",
         "developers": "Developers",
         "console": "Konsole",
+        "ai_note": "Teile dieser Website wurden mit Hilfe von KI erstellt. Für den Inhalt ist die Emagin8 UG "
+        "(haftungsbeschränkt) verantwortlich.",
         "untranslated": '!!! note "Noch nicht übersetzt"\n    Diese Seite gibt es noch nicht auf Deutsch; hier steht die englische Fassung.\n\n',
     },
 }
@@ -279,7 +283,9 @@ def assemble(out: Path, target: str, lang: str = "en", theme: Path = THEME) -> l
         f"copyright = '<a href=\"https://fadenstack.com/{ref}\" rel=\"noopener noreferrer\">Fadenstack</a> · "
         "© 2026 Emagin8 UG (haftungsbeschränkt) · "
         f'<a href="https://fadenstack.com/impressum/{ref}" rel="noopener noreferrer">Impressum</a> · '
-        f'<a href="https://fadenstack.com/privacy/{ref}" rel="noopener noreferrer">{words["privacy"]}</a>\''
+        f'<a href="https://fadenstack.com/privacy/{ref}" rel="noopener noreferrer">{words["privacy"]}</a> · '
+        # Written with the help of AI, as the Developers site says too (owner, 19 November 2026).
+        f'{words["ai_note"]}\''
     )
     config = (HELP / "site.toml").read_text(encoding="utf-8")
     for marker, value in (
