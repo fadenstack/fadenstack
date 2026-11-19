@@ -192,7 +192,9 @@ services:
   # Langfuse v3 (web + worker)
   # -----------------------------
   langfuse-worker:
-    image: docker.io/langfuse/langfuse-worker:3
+    # Pinned to the version tested with this release (3.227.1), as Grafana and Alloy are: the floating tag
+    # brought a Langfuse that refuses a first user such as admin@localhost (core langfuse_login.py).
+    image: docker.io/langfuse/langfuse-worker:3.227.1@sha256:02c87eda9a9c6be5b3bf9a78041db86f06bad568d9dd434be3b3c1159f8d0579
     container_name: faden-worker
     logging: *faden-logging
     restart: unless-stopped
@@ -243,7 +245,8 @@ services:
       LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
 
   langfuse-web:
-    image: docker.io/langfuse/langfuse:3
+    # The same version as langfuse-worker, pinned the same way.
+    image: docker.io/langfuse/langfuse:3.227.1@sha256:314f4d79d6761299e4299dc646943f01bfabbc1daff286ab818245549aa5e9d6
     container_name: faden-web
     logging: *faden-logging
     restart: unless-stopped

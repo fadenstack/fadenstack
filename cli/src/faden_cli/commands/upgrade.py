@@ -492,6 +492,11 @@ def _restart_and_check(ctx: ComposeContext, shared_dir: Path, env_path: Path, st
     from faden_cli.core.langfuse_db import move_step as move_langfuse  # noqa: PLC0415
 
     move_langfuse(ctx, env_path)
+    # Langfuse refuses a first user without a domain such as example.com (admin@localhost, made by deploy -y)
+    # and then has no user and no API key: the address is corrected before it starts on the new .env.
+    from faden_cli.core.langfuse_login import correct_step, report_first_user  # noqa: PLC0415
+
+    corrected = correct_step(env_path)
 
     # The front door first, on its own: recreated with this release's config
     # it serves the maintenance page while the rest restarts -- even on the
@@ -520,6 +525,7 @@ def _restart_and_check(ctx: ComposeContext, shared_dir: Path, env_path: Path, st
     from faden_cli.core.compose import report_inactive_modules  # noqa: PLC0415
 
     report_inactive_modules(ctx)
+    report_first_user(env_path, wanted=corrected)
 
     # ClickHouse's diagnostic logs are off from this release; what they hold
     # stays until dropped (41 GB of trace_log filled one install's disk).

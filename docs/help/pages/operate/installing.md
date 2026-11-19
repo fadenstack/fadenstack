@@ -37,9 +37,10 @@ Run `faden doctor` after installing the tool to check the host first.
     `faden deploy /opt/faden`), generates `.env` with random passwords and keys, sizes the services for the host,
     pulls the images for the tool's own release, starts everything, and creates the first administrator. Grafana,
     RabbitMQ and Langfuse each keep a random password of their own in `.env`: none of them is the administrator's
-    console password. Langfuse's first user is the administrator's e-mail with `LANGFUSE_INIT_USER_PASSWORD`; an
-    install made before this release has the console password it was deployed with in those three places, and `.env`
-    holds what each runs on.
+    console password. Langfuse's first user is the administrator's e-mail with `LANGFUSE_INIT_USER_PASSWORD`
+    (`LANGFUSE_INIT_USER_EMAIL` in `.env`: Langfuse takes no address without a domain such as example.com, so an
+    address such as `admin@localhost` gets `.local` added, also on `faden upgrade`); an install made before this
+    release has the console password it was deployed with in those three places, and `.env` holds what each runs on.
 
 ### What it asks
 
@@ -218,7 +219,7 @@ Started by hand with `docker compose` instead, set them yourself, each to a long
 | `FADEN_GATEWAY_PII_SERVICE_TOKEN`, `FADEN_BACKEND_PII_SERVICE_TOKEN`, `FADEN_MCP_PII_SERVICE_TOKEN`, `FADEN_PII_SERVICE_TOKEN` | Calls to the PII service, which refuses every call without it (only its health check is open). One value for all four |
 | `LANGFUSE_SALT`, `LANGFUSE_ENCRYPTION_KEY` (64 hex characters: `openssl rand -hex 32`), `LANGFUSE_NEXTAUTH_SECRET` | Langfuse's API keys, stored keys and sign-ins |
 | `REDIS_AUTH`, `MINIO_ROOT_PASSWORD`, `CLICKHOUSE_PASSWORD`, `GRAFANA_ADMIN_PASSWORD` | The stores and Grafana. Grafana reads its password when it first starts, so changing it later in `.env` does not change it in Grafana |
-| `LANGFUSE_INIT_USER_PASSWORD` | The password of Langfuse's first user (the administrator's e-mail). Langfuse reads it once, when it creates the user: change it in Langfuse after that, and note the new one in `.env` |
+| `LANGFUSE_INIT_USER_PASSWORD` | The password of Langfuse's first user (`LANGFUSE_INIT_USER_EMAIL`, normally the administrator's e-mail). Langfuse reads it once, when it creates the user: change it in Langfuse after that, and note the new one in `.env` |
 | `RABBITMQ_ADMIN_PASS`, `RABBITMQ_BACKEND_PASS`, `RABBITMQ_API_PASS`, `RABBITMQ_PII_PASS` | The message broker. Its users come from `rabbitmq/definitions.json`, which `faden deploy` writes from these |
 
 Outside development, the backend, the gateway and the MCP and skills services do not start on the development

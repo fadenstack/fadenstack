@@ -41,7 +41,9 @@ Führen Sie nach der Installation des Werkzeugs `faden doctor` aus, um zuerst de
     legt den ersten Administrator an. Grafana, RabbitMQ
     und Langfuse behalten je ein eigenes, zufälliges Passwort in der `.env`: Keines davon ist das Konsolen-Passwort
     des Administrators. Der erste Benutzer von Langfuse ist die E-Mail-Adresse des Administrators mit
-    `LANGFUSE_INIT_USER_PASSWORD`; eine vor diesem Release angelegte Installation hat an diesen drei Stellen das
+    `LANGFUSE_INIT_USER_PASSWORD` (`LANGFUSE_INIT_USER_EMAIL` in der `.env`: Langfuse nimmt keine Adresse ohne eine
+    Domain wie example.com, daher bekommt eine Adresse wie `admin@localhost` ein `.local` angehängt, auch bei
+    `faden upgrade`); eine vor diesem Release angelegte Installation hat an diesen drei Stellen das
     Konsolen-Passwort, mit dem sie eingerichtet wurde, und die `.env` enthält, womit jeder Dienst läuft.
 
 ### Was der Befehl fragt {#what-it-asks}
@@ -233,7 +235,7 @@ Zufallswert (`openssl rand -base64 48`):
 | `FADEN_GATEWAY_PII_SERVICE_TOKEN`, `FADEN_BACKEND_PII_SERVICE_TOKEN`, `FADEN_MCP_PII_SERVICE_TOKEN`, `FADEN_PII_SERVICE_TOKEN` | Aufrufe des PII-Dienstes, der jeden Aufruf ohne ihn ablehnt (nur sein Health-Check ist offen). Ein Wert für alle vier |
 | `LANGFUSE_SALT`, `LANGFUSE_ENCRYPTION_KEY` (64 Hex-Zeichen: `openssl rand -hex 32`), `LANGFUSE_NEXTAUTH_SECRET` | Die API-Schlüssel, gespeicherten Schlüssel und Anmeldungen von Langfuse |
 | `REDIS_AUTH`, `MINIO_ROOT_PASSWORD`, `CLICKHOUSE_PASSWORD`, `GRAFANA_ADMIN_PASSWORD` | Die Speicher und Grafana. Grafana liest sein Passwort beim ersten Start; eine spätere Änderung in der `.env` ändert es in Grafana nicht |
-| `LANGFUSE_INIT_USER_PASSWORD` | Das Passwort des ersten Benutzers von Langfuse (die E-Mail-Adresse des Administrators). Langfuse liest es nur einmal, wenn es den Benutzer anlegt: Ändern Sie es danach in Langfuse und tragen Sie das neue in die `.env` ein |
+| `LANGFUSE_INIT_USER_PASSWORD` | Das Passwort des ersten Benutzers von Langfuse (`LANGFUSE_INIT_USER_EMAIL`, meist die E-Mail-Adresse des Administrators). Langfuse liest es nur einmal, wenn es den Benutzer anlegt: Ändern Sie es danach in Langfuse und tragen Sie das neue in die `.env` ein |
 | `RABBITMQ_ADMIN_PASS`, `RABBITMQ_BACKEND_PASS`, `RABBITMQ_API_PASS`, `RABBITMQ_PII_PASS` | Den Message-Broker. Seine Benutzer stammen aus `rabbitmq/definitions.json`, die `faden deploy` daraus schreibt |
 
 Außerhalb der Entwicklung starten das Backend, das Gateway sowie der MCP- und der Skills-Dienst nicht mit den

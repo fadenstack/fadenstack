@@ -82,9 +82,12 @@ def langfuse_login_env(env_vars: dict[str, str], admin_email: str) -> dict[str, 
     password in four places is four places to lose it from, and ``faden admin reset-password`` could not keep
     them in step. Each service has a random password in ``.env`` instead, which is what the service runs on:
     Langfuse reads ``LANGFUSE_INIT_USER_PASSWORD`` only when it creates the user, so one already set is kept.
+    The address is one Langfuse takes: ``admin@localhost`` becomes ``admin@localhost.local`` (langfuse_login).
     """
+    from faden_cli.core.langfuse_login import address_for_langfuse  # noqa: PLC0415
+
     values = {
-        "LANGFUSE_INIT_USER_EMAIL": admin_email,
+        "LANGFUSE_INIT_USER_EMAIL": address_for_langfuse(admin_email),
         "LANGFUSE_INIT_USER_NAME": "Admin",
         "LANGFUSE_INIT_PROJECT_NAME": "fadenstack",
     }
@@ -973,7 +976,9 @@ def deploy_cmd(
             env_vars = read_env_file(env_path)
             env_vars.update(langfuse_login_env(env_vars, creds["email"]))
             write_env_file(env_path, env_vars)
-            info("Langfuse's first user is the administrator's e-mail, with a password of its own in .env.")
+            from faden_cli.core.langfuse_login import announce, report_first_user  # noqa: PLC0415
+
+            announce(creds["email"], env_vars["LANGFUSE_INIT_USER_EMAIL"])
 
             # Force-recreate so Langfuse picks up the user (it creates it when it starts). Grafana and
             # RabbitMQ keep the random passwords the .env was generated with: they are not the console's.
@@ -985,7 +990,7 @@ def deploy_cmd(
                 wait=True,
                 timeout=60,
             )
-            success("Langfuse recreated with its first user.")
+            report_first_user(env_path, then=", fix what it shows, then run `faden deploy` again")
     else:
         warning("Backend did not become healthy in time — skipping admin setup.")
         console.print(
