@@ -292,7 +292,8 @@ CPU processing is slower, especially with concurrent requests or long documents.
     requests to local models** is on), such a request is then refused with `pii_deadline_exceeded` ("The PII check
     took longer than its limit for this request …"). What an administrator can do: run the check on a GPU
     (`gliner2-multi-v1` with `gpu-shared` or `gpu-dedicated`, below); give a virtual machine the host's CPU type
-    (host passthrough), since without the host's AVX2 instructions the check runs about three times slower; for
+    (host passthrough), since without the host's AVX2 instructions the check runs about three times slower (see
+    [The CPU and the PII check](requirements.md#the-cpu-and-the-pii-check)); for
     requests to local models, leave **Protect requests to local models** off in the
     [personal data policy](../administer/policies.md#personal-data), as it is by default; keep texts shorter.
 

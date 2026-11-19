@@ -315,7 +315,8 @@ oder langen Dokumenten.
     Anfrage dann mit `pii_deadline_exceeded` abgelehnt („The PII check took longer than its limit for this request
     …“). Was Administratoren tun können: die Prüfung auf einer GPU ausführen (`gliner2-multi-v1` mit `gpu-shared` oder
     `gpu-dedicated`, siehe unten); einer virtuellen Maschine den CPU-Typ des Hosts geben (Host-Passthrough), denn ohne
-    die AVX2-Befehle des Hosts läuft die Prüfung etwa dreimal langsamer; für Anfragen an lokale Modelle **Anfragen an
+    die AVX2-Befehle des Hosts läuft die Prüfung etwa dreimal langsamer (siehe
+    [Die CPU und die PII-Prüfung](requirements.md#the-cpu-and-the-pii-check)); für Anfragen an lokale Modelle **Anfragen an
     lokale Modelle schützen** in der [Richtlinie für personenbezogene Daten](../administer/policies.md#personal-data)
     ausgeschaltet lassen, wie es voreingestellt ist; kürzere Texte senden.
 
