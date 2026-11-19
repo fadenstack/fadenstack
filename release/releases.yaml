@@ -25,6 +25,28 @@
 series: []
 
 releases:
+  - version: 0.7.2
+    channel: stable
+    date: ""
+    severity: normal
+    summary: >-
+      The local PII check gives a long text more time and, on a server without a GPU, more of the CPU; a request it
+      still cannot check in time is refused as pii_deadline_exceeded, no longer as "PII service unavailable". Check
+      content finds pasted Word paragraphs and PowerPoint slides, RAG Lite answers clearly while it is off and works
+      without a restart once switched on, and Langfuse gets its first user on every install.
+    highlights:
+      - "With the PII check on, a request the check cannot finish within its time limit is refused as 504 pii_deadline_exceeded (\"The PII check took longer than its limit for this request, and the PII policy blocks what it cannot check, so nothing was sent. A shorter text fits; an administrator can run the check on a GPU.\"), no longer as \"PII service unavailable\", in chats and in the scan of tool results; the request log names it. Where the PII policy does not block what it cannot check, nothing changes."
+      - "The local PII check's time grows with the text: 8 seconds for each request, and half a second more for each part of a long text it reads (a few hundred characters each), at most 30 seconds. On a server without a GPU it uses half of the CPU threads (at most 8) instead of a quarter: 10,000 characters took 6.5 seconds with 2 threads and 4.4 with 4. faden upgrade sets the new number where it was chosen automatically; a number set with --pii-cpu-threads stays."
+      - "Known limit: on a server without a GPU, a request with a long text (several thousand characters, such as a document an agent includes) can still take longer than its limit. Where the PII policy blocks what it cannot check (by default for requests to cloud providers, and for requests to local models when Protect requests to local models is on), such a request is then refused with pii_deadline_exceeded. What an administrator can do: run the check on a GPU (gliner2-multi-v1 with gpu-shared or gpu-dedicated); give a virtual machine the host's CPU type (host passthrough), since without the host's AVX2 instructions the check runs about three times slower; for requests to local models, leave Protect requests to local models off, as it is by default; keep texts shorter."
+      - "faden doctor, and the PII step of faden deploy, faden upgrade and faden module enable, warn when the PII check runs on a CPU without AVX2. A virtual machine with a generic CPU type (QEMU Virtual CPU, Proxmox's kvm64 or x86-64-v2-AES) hides the host's AVX2: give it the host's CPU type (Help: System requirements, The CPU and the PII check). With the check on a GPU, nothing is said."
+      - "The built-in Help carries the note on long texts and names the PII check's two refusals, pii_deadline_exceeded (504) and pii_input_too_large (413), as help.fadenstack.com has since 0.7.1."
+      - "Check content finds the mark of a pasted Word paragraph or PowerPoint slide: a paragraph an agent wrote, pasted into another document, keeps its bookmark, and a slide copied into another deck keeps its tags, but neither keeps the record the add-in placed, so both read as no mark found. Now the bookmark or the tags name the record, with a note that the content may have changed since."
+      - "RAG Lite switched on under Settings → Modules works at once: before, its knowledge base waited for a restart. While it is off, uploading, retrying and searching documents are refused with 409 rag_lite_off (\"RAG Lite is off. Switch the RAG Lite module on first.\"), where they failed with 500 before, and agents are not offered the knowledge search (/searchable answers false). Its documents stay and can be deleted while it is off."
+      - "Langfuse: both images are pinned to 3.227.1 by digest; they followed the tag langfuse:3 before. Langfuse refuses an address without a domain such as example.com, so on an install made with faden deploy -y (administrator admin@localhost) it had no first user and no API keys, and recorded no traces. Its first user now gets \".local\" added to such an address, faden upgrade corrects the address in .env, says so and checks that Langfuse then has its first user, and faden deploy says Langfuse has its first user only once it does."
+      - "Updated dependencies: FastAPI 0.163.1, sentry-sdk 2.75.0 and loguru 0.8.0 in the gateway and the backend; the console's image is built on Node 26, the active LTS."
+    upgrade_from: 0.4.0
+    components:
+      agent: 0.2.12
   - version: 0.7.1
     channel: stable
     date: "2026-11-18"
