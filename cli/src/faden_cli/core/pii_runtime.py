@@ -130,7 +130,7 @@ def deploy_step(
     locale: str | None = None,
 ) -> bool:
     """One selection/migration path for deploy, upgrade and module enable."""
-    from faden_cli.core.pii_hardware import CPU_NOTICE, detect_support
+    from faden_cli.core.pii_hardware import AVX2_NOTICE, CPU_NOTICE, detect_support, lacks_avx2
     from faden_cli.core.pii_artifacts import MODELS, provision
     from faden_cli.core.sysinfo import effective_threads
 
@@ -238,6 +238,8 @@ def deploy_step(
             device = support.devices[0]
     if not selected.startswith("gpu-"):
         warning(CPU_NOTICE)
+        if lacks_avx2():
+            warning(AVX2_NOTICE)
     available = effective_threads()
     if threads is not None and threads > available:
         warning(f"PII CPU threads reduced from {threads} to {available}, the available CPU limit.")

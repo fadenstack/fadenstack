@@ -207,7 +207,16 @@ def _pii_check(gpu) -> None:
             f"({env.get('FADEN_PII_CPU_THREADS_MODE', 'manual')}); container CPU limits apply at startup."
         )
     console.print(f"  [yellow]{CPU_NOTICE}[/yellow]")
+    _avx2_check(on_cpu=not (profile.startswith("gpu-") and support.available))
     console.print("  Compatibility is a preflight check; startup validates the actual CUDA runtime and model artifacts.")
+
+
+def _avx2_check(*, on_cpu: bool) -> None:
+    """Where PII runs on the CPU: a warning when the CPU hides AVX2 (a VM's generic CPU type)."""
+    from faden_cli.core.pii_hardware import AVX2_NOTICE, lacks_avx2  # noqa: PLC0415
+
+    if on_cpu and lacks_avx2():
+        console.print(f"  [yellow]{AVX2_NOTICE}[/yellow]")
 
 
 def _install_compose() -> tuple[Path | None, Path | None]:

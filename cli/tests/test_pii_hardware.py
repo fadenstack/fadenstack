@@ -1,12 +1,15 @@
 """Detect actual compatibility and preserve deliberate upgrade choices."""
 
 import hashlib
+import io
 import json
 from types import SimpleNamespace
 
 from click.testing import CliRunner
 import pytest
+from rich.console import Console
 
+from faden_cli.commands import doctor
 from faden_cli.core import compose, detect, pii_artifacts, pii_hardware, pii_runtime, sysinfo
 from faden_cli.core.env_gen import read_env_file, set_env_values
 
@@ -151,3 +154,58 @@ def test_interactive_gpu_choice_and_noninteractive_preservation(selection, monke
 def test_thread_defaults_are_bounded(available, cpu, gpu):
     assert sysinfo.pii_threads(available) == cpu <= available
     assert sysinfo.pii_threads(available, gpu=True) == gpu <= available
+
+
+@pytest.mark.parametrize(
+    ("cpuinfo", "lacks"),
+    [
+        ("processor : 0|model name : Intel(R) Core(TM) i5-8260U|flags : fpu sse4_2 avx avx2 fma f16c", False),
+        ("processor : 0|model name : QEMU Virtual CPU version 2.5+|flags : fpu sse sse2 sse4_2", True),
+        ("processor : 0|flags : fpu avx2_like", True),
+        ("processor : 0|model name : no flags line", False),
+        (None, False),
+    ],
+    ids=["avx2", "qemu-virtual-cpu", "no-exact-avx2", "no-flags", "no-file"],
+)
+def test_avx2_is_read_from_the_cpus_flags(tmp_path, cpuinfo, lacks):
+    path = tmp_path / "cpuinfo"
+    if cpuinfo is not None:
+        path.write_text(cpuinfo.replace("|", chr(10)), encoding="utf-8")
+    assert pii_hardware.lacks_avx2(path) is lacks
+
+
+@pytest.mark.parametrize("lacks", [True, False])
+def test_the_pii_step_warns_on_a_cpu_without_avx2(selection, monkeypatch, lacks):
+    env, _downloaded = selection
+    said = []
+    monkeypatch.setattr(pii_runtime, "warning", said.append)
+    monkeypatch.setattr(pii_hardware, "lacks_avx2", lambda: lacks)
+    pii_runtime.deploy_step(env, yes=True, published=True)
+    assert (pii_hardware.AVX2_NOTICE in said) is lacks
+    assert pii_hardware.CPU_NOTICE in said
+
+
+@pytest.mark.parametrize(
+    ("profile", "gpu", "lacks", "warned"),
+    [
+        ("cpu", False, True, True),
+        ("cpu", False, False, False),
+        ("gpu-shared", False, True, True),  # no GPU it can use: the check falls back to the CPU
+        ("gpu-shared", True, True, False),  # on the GPU: the CPU's instructions do not matter
+    ],
+)
+def test_doctor_warns_when_pii_runs_on_a_cpu_without_avx2(tmp_path, monkeypatch, profile, gpu, lacks, warned):
+    env = tmp_path / ".env"
+    set_env_values(env, {"FADEN_PII_EXECUTION_PROFILE": profile})
+    out = io.StringIO()
+    monkeypatch.setattr(doctor, "console", Console(file=out, width=400))
+    monkeypatch.setattr(doctor, "_install_compose", lambda: (None, env))
+    device = pii_hardware.PIIGpu("0", "GPU-x", "NVIDIA example", "7.5", 6000)
+    support = pii_hardware.PIIGpuSupport(
+        devices=[device] if gpu else [], reasons=[] if gpu else ["No supported GPU"]
+    )
+    monkeypatch.setattr(pii_hardware, "detect_support", lambda *a, **kw: support)
+    monkeypatch.setattr(pii_hardware, "lacks_avx2", lambda: lacks)
+    doctor._pii_check(None)
+    assert ("does not offer AVX2" in out.getvalue()) is warned
+

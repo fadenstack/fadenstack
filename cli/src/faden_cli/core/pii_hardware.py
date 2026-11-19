@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 import csv
 import io
 import re
@@ -12,6 +13,29 @@ import subprocess
 from faden_cli.core.detect import GpuInfo, detect_gpu
 
 CPU_NOTICE = "CPU-based PII handling is slower, especially for parallel requests and long text."
+AVX2_NOTICE = (
+    "This CPU does not offer AVX2: the PII check runs about three times slower on it, and a long text "
+    "runs out of its time sooner. On a virtual machine, give it the host's CPU type "
+    "(Help: System requirements)."
+)
+
+
+def lacks_avx2(cpuinfo: Path = Path("/proc/cpuinfo")) -> bool:
+    """Whether the CPU's flags, as Linux lists them, leave out AVX2 (False where they cannot be read).
+
+    A virtual machine with a generic CPU type, such as QEMU's "QEMU Virtual CPU", hides the host's AVX2,
+    and the PII model on the CPU then runs on slow paths (measured 19 November 2026: about three times
+    slower).
+    """
+    try:
+        text = cpuinfo.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+    for line in text.splitlines():
+        key, _, value = line.partition(":")
+        if key.strip() == "flags":
+            return "avx2" not in value.split()
+    return False
 
 
 @dataclass(frozen=True)
