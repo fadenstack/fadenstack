@@ -48,8 +48,7 @@ LANGS: dict[str, dict[str, str]] = {
         "help": "Help",
         "developers": "Developers",
         "console": "Console",
-        "ai_note": "Parts of this site were created with the help of AI. Emagin8 UG (haftungsbeschränkt) is "
-        "responsible for its content.",
+        "ai_note": "Parts of this site were created with the help of AI.",
         "untranslated": "",
     },
     "de": {
@@ -66,8 +65,7 @@ LANGS: dict[str, dict[str, str]] = {
         "help": "Hilfe",
         "developers": "Developers",
         "console": "Konsole",
-        "ai_note": "Teile dieser Website wurden mit Hilfe von KI erstellt. Für den Inhalt ist die Emagin8 UG "
-        "(haftungsbeschränkt) verantwortlich.",
+        "ai_note": "Teile dieser Website wurden mit Hilfe von KI erstellt.",
         "untranslated": '!!! note "Noch nicht übersetzt"\n    Diese Seite gibt es noch nicht auf Deutsch; hier steht die englische Fassung.\n\n',
     },
 }
