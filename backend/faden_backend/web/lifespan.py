@@ -868,27 +868,14 @@ def _init_rag_lite(app: FastAPI) -> None:
     if not settings.rag_lite_enabled:
         return
 
-    from faden_backend.services.rag_lite.chunker import ChunkerConfig  # noqa: PLC0415
-    from faden_backend.services.rag_lite.file_store import LocalFileStore  # noqa: PLC0415
-    from faden_backend.services.rag_lite.service import RagLiteService  # noqa: PLC0415
+    from faden_backend.services.rag_lite.service import service_for  # noqa: PLC0415
 
-    file_root = settings.rag_lite_file_store_root
-    chunk_max = settings.rag_lite_chunk_max_tokens
-    chunk_overlap = settings.rag_lite_chunk_overlap_tokens
-
-    file_store = LocalFileStore(file_root)
-    chunker_config = ChunkerConfig(max_tokens=chunk_max, overlap_tokens=chunk_overlap)
-
-    app.state.rag_lite_file_store = file_store
-    app.state.rag_lite_service = RagLiteService(
-        file_store=file_store,
-        chunker_config=chunker_config,
-    )
+    service_for(app)
     log.info(
         "RAG Lite initialised — file_store=%s, chunk_max=%d, overlap=%d",
-        file_root,
-        chunk_max,
-        chunk_overlap,
+        settings.rag_lite_file_store_root,
+        settings.rag_lite_chunk_max_tokens,
+        settings.rag_lite_chunk_overlap_tokens,
     )
 
 

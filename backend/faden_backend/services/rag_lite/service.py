@@ -336,3 +336,35 @@ class RagLiteService:
         # Cascade deletes chunks + jobs via FK
         await document_dao.delete(document_id)
         return True
+
+
+#: What a request or an ingest job is told while RAG Lite is off.
+RAG_LITE_OFF = "RAG Lite is off. Switch the RAG Lite module on first."
+
+
+def service_for(app: Any, *, even_off: bool = False) -> RagLiteService | None:
+    """The app's RAG Lite service, made the first time it is needed; ``None`` while RAG Lite is off.
+
+    Switching RAG Lite on takes effect without a restart: the flag changes at runtime, and the service
+    is made here then, not only at startup. *even_off* gives the service while it is off, for removing
+    what is stored (deleting a document must not depend on the module being on).
+    """
+    from faden_backend.settings import settings  # noqa: PLC0415
+
+    if not settings.rag_lite_enabled and not even_off:
+        return None
+    service = getattr(app.state, "rag_lite_service", None)
+    if service is None:
+        from faden_backend.services.rag_lite.file_store import LocalFileStore  # noqa: PLC0415
+
+        file_store = LocalFileStore(settings.rag_lite_file_store_root)
+        app.state.rag_lite_file_store = file_store
+        service = RagLiteService(
+            file_store=file_store,
+            chunker_config=ChunkerConfig(
+                max_tokens=settings.rag_lite_chunk_max_tokens,
+                overlap_tokens=settings.rag_lite_chunk_overlap_tokens,
+            ),
+        )
+        app.state.rag_lite_service = service
+    return service

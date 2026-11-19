@@ -43,8 +43,11 @@ async def rag_lite_ingest_task(document_id: str, job_id: str) -> dict:
         chunk_dao = RagLiteChunkDAO(session)
         job_dao = RagLiteIngestJobDAO(session)
 
-        # Get the service from app state
-        rag_lite_service = app.state.rag_lite_service
+        # The service, made on demand: the API accepted this document while RAG Lite was on, and this
+        # process may have started before it was switched on (it had no service then).
+        from faden_backend.services.rag_lite.service import service_for  # noqa: PLC0415
+
+        rag_lite_service = service_for(app, even_off=True)
 
         # Get document processor if available
         processor = getattr(app.state, "document_processor", None)

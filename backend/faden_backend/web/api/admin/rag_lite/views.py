@@ -39,8 +39,10 @@ from faden_backend.services.knowledge_access import (
     visible_collections,
 )
 from faden_backend.services.principals import PrincipalOption, find_principals
+from faden_backend.services.rag_lite.service import RAG_LITE_OFF, RagLiteService, service_for
 from faden_backend.services.rag_lite.tasks import rag_lite_ingest_task
 from faden_backend.services.system_settings.runtime_mapping import refresh_runtime_values
+from faden_backend.settings import settings
 from faden_backend.web.api.admin.rag_lite.schema import (
     RagLiteCollectionCreate,
     RagLiteCollectionDTO,
@@ -70,6 +72,17 @@ from faden_backend.web.api.rbac import require_permission
 
 router = APIRouter()
 log = logging.getLogger(__name__)
+
+
+def _rag_service(request: Request, *, even_off: bool = False) -> RagLiteService:
+    """The RAG Lite service, or 409 ``rag_lite_off`` while the module is off (it was a 500)."""
+    service = service_for(request.app, even_off=even_off)
+    if service is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "rag_lite_off", "message": RAG_LITE_OFF},
+        )
+    return service
 
 #: Who reads: a sign-in with rag.search:read, or the gateway's knowledge token (services/knowledge_access.py).
 Reader = Annotated[KnowledgeReader, Depends(knowledge_reader)]
@@ -162,7 +175,7 @@ async def upload_file(
     collection_id: uuid.UUID | None = None,
     request: Request = None,  # type: ignore[assignment]
 ) -> RagLiteUploadResponse:
-    rag_service = request.app.state.rag_lite_service
+    rag_service = _rag_service(request)
 
     # Read file bytes (enforce size limit)
     from faden_backend.settings import settings as _settings  # noqa: PLC0415
@@ -328,7 +341,7 @@ async def delete_document(
     chunk_dao: RagLiteChunkDAO = Depends(),
     request: Request = None,  # type: ignore[assignment]
 ) -> None:
-    rag_service = request.app.state.rag_lite_service
+    rag_service = _rag_service(request, even_off=True)
     deleted = await rag_service.delete_document(
         document_id,
         document_dao=document_dao,
@@ -345,7 +358,9 @@ async def retry_document(
     document_dao: RagLiteDocumentDAO = Depends(),
     chunk_dao: RagLiteChunkDAO = Depends(),
     job_dao: RagLiteIngestJobDAO = Depends(),
+    request: Request = None,  # type: ignore[assignment]
 ) -> dict:
+    _rag_service(request)
     doc = await document_dao.get(document_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -392,7 +407,7 @@ async def search(
     if not await chunk_dao.any_searchable(body.collection_ids, scope):
         return RagLiteSearchResponse(query=body.query, results=[])
 
-    rag_service = request.app.state.rag_lite_service
+    rag_service = _rag_service(request)
 
     # Resolve embedding client at request time
     from faden_backend.services.rag_lite.embedding import EmbeddingClient  # noqa: PLC0415
@@ -469,6 +484,8 @@ async def searchable(
     The gateway asks before it offers a chat the knowledge tools, once a minute per person and agent: someone
     who may read no document is not offered a search that can find nothing.
     """
+    if not settings.rag_lite_enabled:
+        return RagLiteSearchableResponse(searchable=False)
     scope = await search_scope(chunk_dao.session, reader)
     return RagLiteSearchableResponse(searchable=await chunk_dao.any_searchable(scope=scope))
 
