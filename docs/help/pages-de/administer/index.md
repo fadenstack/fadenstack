@@ -69,6 +69,13 @@ Danach lassen sie sich unter **Einstellungen → Module** ein- und ausschalten; 
 und Anfragen, die gerade darüber laufen, werden abgebrochen. Ihre Seiten und ihre Schritte unter
 **Erste Schritte** erscheinen nur, solange das Modul eingeschaltet ist.
 
+**RAG Lite** ist die Wissensdatenbank (siehe [Wissen](../use/knowledge.md)). In einer neuen Installation ist es
+ausgeschaltet; unter **Einstellungen → Module** eingeschaltet, wirkt es sofort, ohne Neustart. Solange es
+ausgeschaltet ist, werden das Hochladen, das erneute Verarbeiten und das Durchsuchen von Dokumenten mit 409
+`rag_lite_off` abgelehnt („RAG Lite is off. Switch the RAG Lite module on first.“), und Agenten wird die
+Wissenssuche nicht angeboten. Seine Dokumente bleiben und lassen sich auch dann löschen.
+
+
 **Herkunftsnachweis** ist von Anfang an eingeschaltet: Es kennzeichnet erzeugte Inhalte als KI-generiert, wie es
 die KI-Verordnung verlangt (Art. 50 Abs. 2). Beim Ausschalten erklärt Fadenstack, was dann nicht mehr
 gekennzeichnet wird, fragt nach einer Bestätigung und hält es mit Ihrem Namen und der Uhrzeit im Audit-Protokoll
