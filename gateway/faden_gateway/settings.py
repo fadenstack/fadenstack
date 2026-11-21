@@ -285,8 +285,13 @@ class Settings(BaseSettings):
     usage_time_zone: str = "UTC"
     #: How often the usage rollup job runs (services/gateway/usage_rollup.py); 0 switches it off.
     usage_rollup_interval_sec: int = 300
-    session_max_recent_messages: int = 20
-    session_token_budget: int = 4096
+    #: The most messages a chat turn reads from its history; the token budget decides how many go (0.7.2 K).
+    session_max_recent_messages: int = 200
+    #: The prompt budget of a chat turn at most, in tokens; None: from the model's context length alone.
+    #: When the model's context length is not known, this or 4,096 is the budget (as before 0.7.2).
+    session_token_budget: int | None = None
+    #: The history's share of a chat turn's prompt at most, in tokens, however long the window.
+    session_history_max_tokens: int = 32_000
     session_summary_threshold: int = 10
     session_summarizer_model: str | None = None
     session_fact_extraction_enabled: bool = False

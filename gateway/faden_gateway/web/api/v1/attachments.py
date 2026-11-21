@@ -225,7 +225,9 @@ async def delete_project_attachment(
     found, so another person's project or file is not told apart from none.
     """
     await _own_project(dao, project_id, auth)
-    att = await dao.get_attachment(attachment_id=attachment_id, tenant_id=auth.tenant_id, user_id=auth.user_id)
+    att = await dao.get_attachment(
+        attachment_id=attachment_id, tenant_id=auth.tenant_id, user_id=auth.user_id,
+    )
     if att is None or att.project_id != project_id or att.session_id is not None:
         return JSONResponse(
             status_code=404,

@@ -25,6 +25,13 @@ from faden_gateway.db.models.gateway import (
     TurnStatus,
 )
 from faden_gateway.services.gateway.audit import AuditService
+from faden_gateway.services.gateway.context_assembler import (
+    DROPPED,
+    DROPPED_SEARCHABLE,
+    FALLBACK_BUDGET,
+    REPLY_RESERVE,
+    in_context,
+)
 from faden_gateway.services.gateway.usage_group import UsageGroupResolver, usage_team
 from faden_gateway.services.gateway import approval_settings, usage_hooks, usage_settings
 from faden_gateway.services.extensions import AdmissionContext
@@ -32,6 +39,7 @@ from faden_gateway.services.gateway.auth import AuthContext
 from faden_gateway.services.gateway import (
     answer_variety,
     attachment_search,
+    chat_search,
     faden_events,
     image_generation,
     knowledge,
@@ -657,7 +665,7 @@ def _tool_definition_name(tool: dict[str, Any]) -> str:
 
 
 #: The gateway's tools offered after the MCP tools.
-_AFTER_MCP_TOOLS = knowledge.NAMES | {attachment_search.NAME, skill_files.NAME}
+_AFTER_MCP_TOOLS = knowledge.NAMES | {attachment_search.NAME, chat_search.NAME, skill_files.NAME}
 
 
 def _with_mcp_tools(payload: dict[str, Any], mcp_tools: list[dict[str, Any]]) -> dict[str, Any]:
@@ -693,7 +701,9 @@ def _skills_allow(skills: list[ResolvedSkill], name: str) -> bool:
 
 
 #: Names the gateway's own tools answer to.
-_GATEWAY_TOOLS = system_tools.NAMES | knowledge.NAMES | {attachment_search.NAME, skill_files.NAME}
+_GATEWAY_TOOLS = (
+    system_tools.NAMES | knowledge.NAMES | {attachment_search.NAME, chat_search.NAME, skill_files.NAME}
+)
 
 
 def _short(name: str) -> str:
@@ -845,6 +855,29 @@ def _assistant_turn(content: str | None, calls: list[dict[str, Any]]) -> dict[st
             for call in calls
         ],
     }
+
+
+def _unsearchable_dropped(payload: dict[str, Any], dropped: int) -> dict[str, Any]:
+    """*payload* with the line for the left-out messages worded for a model that cannot search them."""
+    searchable, plain = DROPPED_SEARCHABLE.format(n=dropped), DROPPED.format(n=dropped)
+    return {**payload, "messages": [
+        {**m, "content": plain} if m.get("role") == "system" and m.get("content") == searchable else m
+        for m in payload.get("messages") or []
+    ]}
+
+
+def _reply_reserve(payload: dict[str, Any]) -> int:
+    """The tokens kept for the reply (0.7.2 K): the request's cap, else 4,096; twice that with thinking."""
+    for key in ("max_completion_tokens", "max_tokens"):
+        value = payload.get(key)
+        if type(value) is int and value > 0:
+            return value
+    kwargs = payload.get("chat_template_kwargs")
+    thinking = (
+        str(payload.get("reasoning_effort") or "").lower() not in ("", "none", "off", "minimal")
+        or (isinstance(kwargs, dict) and kwargs.get("enable_thinking") is True)
+    )
+    return REPLY_RESERVE * 2 if thinking else REPLY_RESERVE
 
 
 def _cap_output(payload: dict[str, Any]) -> None:
@@ -1374,6 +1407,16 @@ class _Prepared:
     #: The pictures of the project's Files the chat's context carries (their names): they go with every
     #: chat of the project, so a refusal of pictures names them.
     project_pictures: list[str] = field(default_factory=list)
+    #: The share of the prompt budget the chat's context is fitted to: 0.75 for the one retry after the
+    #: model said the context was too long (0.7.2 K).
+    context_factor: float = 1.0
+    #: How many of the chat's earlier messages its context leaves out, since when the rest go, and the chat:
+    #: ``search_chat`` searches the ones left out (0.7.2 K).
+    chat_dropped: int = 0
+    chat_kept_from: Any = None
+    chat_session: uuid.UUID | None = None
+    #: Whether ``search_chat`` is offered: a route that calls tools, a chat with messages left out.
+    chat_search: bool = False
     #: Faden events not yet sent (tool ends, citations, gateway rounds).
     faden_pending: list[dict[str, Any]] = field(default_factory=list)
     #: Faden events of a whole answer, sent in its ``faden`` object.
@@ -1486,6 +1529,9 @@ class GatewayService:
         # Whether each takes pictures (true, false, or null when not known): the chat says so at a
         # picture it would not get. An extra field, as kind is: OpenAI clients read the rest as ever.
         visions = await self.dao.alias_visions([a.alias for a in aliases])
+        # How many tokens each takes (null when not known), so a governed client sizes its context to it
+        # (0.7.2 K): the smallest of its instances', which a request may go to.
+        windows = await self.dao.alias_context_lengths([a.alias for a in aliases])
         return {
             "object": "list",
             "data": [
@@ -1499,6 +1545,7 @@ class GatewayService:
                     "enabled": alias.enabled,
                     "kind": kinds.get(alias.alias),
                     "vision": visions.get(alias.alias),
+                    "context_length": windows.get(alias.alias),
                 }
                 for alias in aliases
             ],
@@ -3151,7 +3198,7 @@ class GatewayService:
             req.knowledge_to_search,
         ) = await _together(
             self._inject_session_context(
-                payload, auth, session_id, req=req if searchable else None, saved=req.user_message_ids,
+                payload, auth, session_id, req=req, searchable=searchable, saved=req.user_message_ids,
                 # Sent before the answer, to a client that asked for the events.
                 notices=req.faden_leading,
             )
@@ -3271,6 +3318,14 @@ class GatewayService:
                 req.knowledge = True
             if req.attachments:
                 egress = _with_tools(egress, attachment_search.TOOLS)
+            if req.chat_dropped:
+                # The chat's left-out messages: searched by a model that calls tools; for one that cannot,
+                # the line in their place says to ask the person instead.
+                if req.system_tools:
+                    egress = _with_tools(egress, chat_search.TOOLS)
+                    req.chat_search = True
+                else:
+                    egress = _unsearchable_dropped(egress, req.chat_dropped)
         # Apply skill-based tool constraints (after all tools are merged)
         if req.skills:
             egress = self._apply_skill_tool_constraints(egress, req.skills)
@@ -3320,6 +3375,26 @@ class GatewayService:
         session = self.dao.session
         if session.in_transaction():
             await session.commit()
+
+    async def _search_chat(self, req: _Prepared, arguments: dict[str, Any]) -> tuple[str, bool]:
+        """``search_chat`` over this chat's messages older than the first one still in its context.
+
+        The chat was resolved for its owner before the turn (``_inject_session_context``); its messages are
+        read oldest first and numbered from 1, so a message keeps its number from one search to the next.
+        """
+        if req.chat_session is None or self.session_dao is None:
+            return chat_search.ChatSearch([]).run(arguments)
+        rows = await self.session_dao.list_messages(session_id=req.chat_session)
+        earlier = [
+            chat_search.EarlierMessage(
+                id=str(m.id), number=number, role=m.role, written=m.created_at.isoformat(),
+                text=m.content or "",
+            )
+            for number, m in enumerate(rows, start=1)
+            if m.role in ("user", "assistant") and in_context(m)
+            and (req.chat_kept_from is None or m.created_at < req.chat_kept_from)
+        ]
+        return chat_search.ChatSearch(earlier).run(arguments)
 
     async def _release(self, req: _Prepared) -> None:
         """Give the request's model slot back, once."""
@@ -3588,13 +3663,17 @@ class GatewayService:
         req: _Prepared | None = None,
         saved: list[uuid.UUID] | None = None,
         notices: list[dict[str, Any]] | None = None,
+        *,
+        searchable: bool | None = None,
     ) -> tuple[dict[str, Any], str | None, str | None]:
         """Inject session history and memory into the payload.
 
         Returns ``(updated_payload, resolved_session_id_hex)``
         where the session id is ``None`` when sessions are disabled.
-        With *req*, attached files too long to include are left for the model
-        to search, and go on ``req.attachments``. The chat's pictures go only
+        With *searchable* (the route calls tools), attached files too long to
+        include are left for the model to search, on ``req.attachments``; *req*
+        also hears what the context left out (``chat_dropped``, the project's
+        pictures). *searchable* not given: whether *req* is. The chat's pictures go only
         to a model that takes them; each one left out goes on *notices*, as a
         Faden event for the client.
         """
@@ -3603,7 +3682,7 @@ class GatewayService:
 
         import uuid as _uuid  # noqa: PLC0415
 
-        from faden_gateway.services.gateway.context_assembler import ContextAssembler, in_context  # noqa: PLC0415
+        from faden_gateway.services.gateway.context_assembler import ContextAssembler  # noqa: PLC0415
 
         try:
             sid = _uuid.UUID(session_id_str)
@@ -3625,14 +3704,22 @@ class GatewayService:
                 user_id=auth.user_id,
             )
 
+        # The reply's cap first: its reserve comes off the model's window (0.7.2 K).
+        _cap_output(payload)
+        model = str(payload.get("model") or "").strip()
         assembler = ContextAssembler(
             dao=self.session_dao,
             max_recent_messages=settings.session_max_recent_messages,
-            token_budget=settings.session_token_budget,
+            token_budget=settings.session_token_budget or FALLBACK_BUDGET,
             # The file store, for the chat's attached pictures.
             file_store=getattr(self, "_file_store", None),
-            searchable=req is not None,
+            searchable=(req is not None) if searchable is None else searchable,
             vision=self._takes_pictures(payload),
+            window=await self.dao.alias_context_length(model) if model else None,
+            reply_reserve=_reply_reserve(payload),
+            budget_cap=settings.session_token_budget,
+            history_cap=settings.session_history_max_tokens,
+            factor=req.context_factor if req is not None else 1.0,
         )
 
         # Current request messages become the "tail" of the assembled context
@@ -3685,8 +3772,9 @@ class GatewayService:
 
         _report_left_out(notices, assembled.pictures_left_out, payload, unreadable=assembled.files_unreadable)
         payload["messages"] = assembled.messages
-        _cap_output(payload)
         if req is not None:
+            req.chat_dropped, req.chat_kept_from = assembled.dropped, assembled.kept_from
+            req.chat_session = sid
             req.project_pictures = [
                 a.filename for a in assembled.attachments_used
                 if a.session_id is None and a.project_id is not None and a.content_type.startswith("image/")
@@ -3942,6 +4030,7 @@ class GatewayService:
         elif (
             (name in knowledge.NAMES and req.knowledge)
             or (name == attachment_search.NAME and req.attachments)
+            or (name == chat_search.NAME and req.chat_search)
             or (name == skill_files.NAME and req.skill_files)
             or (routed and name.startswith(("client.", "server.")))
         ):
@@ -4354,6 +4443,11 @@ class GatewayService:
                 if req.token_mapping:
                     arguments = _restored(arguments, req.token_mapping)
                 content, is_error = attachment_search.AttachmentSearch(req.attachments).run(arguments)
+            elif name == chat_search.NAME:
+                # The chat's own messages left out of its context, as the attachments are searched.
+                if req.token_mapping:
+                    arguments = _restored(arguments, req.token_mapping)
+                content, is_error = await self._search_chat(req, arguments)
             elif name == skill_files.NAME:
                 # A file of a skill resolved for this request, and no other.
                 assert self.skills_client is not None  # noqa: S101

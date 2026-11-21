@@ -40,6 +40,68 @@ logger = logging.getLogger(__name__)
 # Rough token estimate for an image content part (~85 tokens).
 _IMAGE_TOKEN_ESTIMATE = 85
 
+# ── The budget (0.7.2 K; fadenstack-dev reports/"Compaction in Copilot and Open WebUI.md") ─────────────────
+
+#: The prompt budget when the model's context length is not known: the fixed budget of 0.7.1 and before.
+FALLBACK_BUDGET = 4096
+#: Of the window less the reply's reserve, what the prompt may fill (Copilot keeps the same 10% margin).
+MARGIN = 0.9
+#: The reply's reserve when the request sets no max_tokens; with thinking on, twice that.
+REPLY_RESERVE = 4096
+#: The history at most, however long the window: a batch drop there recomputes a long prefix, and a long
+#: context answers worse (context rot).
+HISTORY_CAP = 32_000
+#: A batch drop cuts the history down to this share of its budget, so the cut moves rarely and the prompt's
+#: prefix stays the same -- and cached -- between drops (Open WebUI keeps 40%, summarizes 60%).
+LOW_WATER = 0.6
+#: The project's files go inline while all of them fit this share of the prompt budget; past it the whole
+#: project switches to one index line and ``attachment_search`` (as Claude.ai switches whole projects).
+PROJECT_FILES_SHARE = 0.25
+
+#: The model's line where the dropped messages were: for a model that can search them (``search_chat``), and
+#: for one that cannot. Fixed texts without counters that change between drops, so the prefix stays stable.
+DROPPED_SEARCHABLE = (
+    "[The first {n} messages of this chat are not included here. They are kept: search them with search_chat "
+    "if the question needs them. Do not answer from memory.]"
+)
+DROPPED = (
+    "[The first {n} messages of this chat are not included here. If the question needs them, say so and ask "
+    "the person to repeat the detail. Do not guess.]"
+)
+#: How a dropped-messages line begins, to find it again (``service.py`` words it for the turn's tools).
+DROPPED_PREFIX = "[The first "
+
+
+def prompt_budget(window: int | None, reserve: int, *, cap: int | None = None, factor: float = 1.0) -> int:
+    """P = (W - R) x 0.9 for a known window W and the reply's reserve R, at most *cap*; else *cap* or 4,096.
+
+    *factor*: 0.75 for the one retry after the model said the context was too long.
+    """
+    if window and window > reserve:
+        budget = int((window - reserve) * MARGIN)
+        if cap:
+            budget = min(budget, cap)
+    else:
+        budget = cap or FALLBACK_BUDGET
+    return max(1, int(budget * factor))
+
+
+def batch_cut(sizes: list[int], limit: int) -> int:
+    """How many of the oldest messages to leave out: the replay rule, which needs no stored state.
+
+    The history's growth is replayed from its first message: whenever the kept span passes *limit*, the
+    cut moves forward until the span is at or under 60% of it. The newest message is always kept. The
+    sizes of earlier messages never change, so every turn finds the same cut until the next drop.
+    """
+    cut = span = 0
+    for index, size in enumerate(sizes):
+        span += size
+        if span > limit:
+            while cut < index and span > LOW_WATER * limit:
+                span -= sizes[cut]
+                cut += 1
+    return cut
+
 
 @dataclass(slots=True)
 class AssembledContext:
@@ -56,6 +118,15 @@ class AssembledContext:
     #: Files whose text could not be read: named to the model and to the chat, not sent (0.7.2 H.3).
     files_unreadable: list[ChatAttachment] = field(default_factory=list)
     total_token_estimate: int = 0
+    #: The prompt budget P this context was fitted to, and the model's window W it came from (None: unknown).
+    budget: int = 0
+    window: int | None = None
+    #: How many of the chat's earlier messages are not included (0: all of them are), and when the first one
+    #: that is included was written: ``search_chat`` searches the ones before it.
+    dropped: int = 0
+    kept_from: Any = None
+    #: The project's files did not fit their share: named in one line, searched with ``attachment_search``.
+    project_files_indexed: bool = False
 
 
 def in_context(msg: Any) -> bool:
@@ -133,6 +204,22 @@ def _parseable(message: dict[str, Any]) -> dict[str, Any]:
     return {**message, "tool_calls": fixed}
 
 
+def _readable(att: ChatAttachment) -> bool:
+    """A file whose text was read (a document; not a picture, not one that failed or is still pending)."""
+    return att.extraction_status == ExtractionStatus.COMPLETED and bool(att.extracted_text)
+
+
+def _files_tokens(files: list[ChatAttachment]) -> int:
+    """About how many tokens *files* take inline: their texts as sent, a picture's estimate each."""
+    total = 0
+    for att in files:
+        if _readable(att):
+            total += _estimate_tokens(f"[Attached: {att.filename}]\n{att.extracted_text}")
+        elif att.extraction_status == ExtractionStatus.SKIPPED:
+            total += _IMAGE_TOKEN_ESTIMATE
+    return total
+
+
 def _estimate_tokens(content: str | list[Any]) -> int:
     """Rough token estimation (~4 chars per token for text, ~85 per image)."""
     if isinstance(content, str):
@@ -160,14 +247,29 @@ class ContextAssembler:
         *,
         dao: SessionDAO,
         max_recent_messages: int = 20,
-        token_budget: int = 4096,
+        token_budget: int = FALLBACK_BUDGET,
         file_store: FileStore | None = None,
         searchable: bool = False,
         vision: Callable[[], Awaitable[bool | None]] | None = None,
+        window: int | None = None,
+        reply_reserve: int = REPLY_RESERVE,
+        budget_cap: int | None = None,
+        history_cap: int = HISTORY_CAP,
+        factor: float = 1.0,
     ) -> None:
+        """The budget from *window*, the model's context length, when known.
+
+        It is then ``prompt_budget``'s, at most *budget_cap*; without a window, *token_budget* is the
+        budget, as before. *factor*: 0.75 for the retry after the model said the context was too long.
+        """
         self.dao = dao
         self.max_recent_messages = max_recent_messages
-        self.token_budget = token_budget
+        self.window = window
+        self.token_budget = (
+            prompt_budget(window, reply_reserve, cap=budget_cap, factor=factor) if window
+            else max(1, int(token_budget * factor))
+        )
+        self.history_cap = history_cap
         self.file_store = file_store
         #: Whether a file too long to include can be searched by the model.
         self.searchable = searchable
@@ -191,7 +293,7 @@ class ContextAssembler:
         ``current_messages`` contains the messages from the current request
         (typically just the latest user message).
         """
-        result = AssembledContext(messages=[])
+        result = AssembledContext(messages=[], budget=self.token_budget, window=self.window)
         budget = self.token_budget
         total_tokens = 0
 
@@ -249,45 +351,49 @@ class ContextAssembler:
             total_tokens=total_tokens,
         )
 
-        # 4. Recent messages from history (after the summary cutoff point)
-        after_id = summary.last_message_id if summary else None
-        recent = await self.dao.get_recent_messages(
+        # 4. The current request's messages are always sent: counted before the history, which gets what is
+        # left (it used to fill the budget first, and the question went on top).
+        current_tokens = sum(_estimate_tokens(m.get("content") or "") for m in current_messages)
+        budget -= current_tokens
+        total_tokens += current_tokens
+
+        # 5. The history, newest messages within the token budget (at most max_recent_messages are read),
+        # after the summary's cutoff; the oldest left out in batches, by the replay rule, with a line in
+        # their place. It used to be the newest 20 that fitted, and older turns went without a word.
+        loaded = await self.dao.get_recent_messages(
             session_id=session_id,
             limit=self.max_recent_messages,
         )
-        # If we have a summary, only include messages after the summary cutoff
-        if after_id and recent:
+        recent = loaded
+        if summary and summary.last_message_id and recent:
             recent = [m for m in recent if m.created_at > summary.created_at]
         recent = [m for m in recent if in_context(m)]
+        exchanges = [_replayed_exchange(m) for m in recent]
+        sizes = [
+            (m.token_estimate or _estimate_tokens(m.content))
+            + sum(_estimate_tokens(json.dumps(x)) for x in ex)
+            for m, ex in zip(recent, exchanges, strict=True)
+        ]
+        history_budget = max(0, min(self.history_cap, budget))
+        cut = batch_cut(sizes, history_budget)
+        # Messages older than the ones read count as left out too (a chat of more than the cap).
+        unread = 0
+        if len(loaded) >= self.max_recent_messages and not summary:
+            unread = max(0, await self.dao.count_messages(session_id=session_id) - len(loaded))
+        result.dropped = cut + unread
+        if result.dropped:
+            line = DROPPED_SEARCHABLE.format(n=result.dropped)
+            result.messages.append({"role": "system", "content": line})
+            total_tokens += _estimate_tokens(line)
+        for msg, exchange in zip(recent[cut:], exchanges[cut:], strict=True):
+            # The tool calls and results that led to a reply, before it.
+            result.messages.extend(exchange)
+            result.messages.append({"role": msg.role, "content": msg.content})
+        result.kept_from = recent[cut].created_at if cut < len(recent) else None
+        total_tokens += sum(sizes[cut:])
 
-        # The newest turns that fit, kept in order. Filled from the oldest,
-        # the budget ran out on the old turns and the latest ones -- the ones
-        # the question follows from -- were the ones left out.
-        kept: list[dict[str, Any]] = []
-        for msg in reversed(recent):
-            exchange = _replayed_exchange(msg)
-            msg_tokens = (msg.token_estimate or _estimate_tokens(msg.content)) + sum(
-                _estimate_tokens(json.dumps(m)) for m in exchange
-            )
-            if msg_tokens > budget:
-                break
-            kept.append({
-                "role": msg.role,
-                "content": msg.content,
-            })
-            # Before the reply, newest first like the rest: reversed below.
-            kept.extend(reversed(exchange))
-            total_tokens += msg_tokens
-            budget -= msg_tokens
-        result.messages.extend(reversed(kept))
-
-        # 5. Current request messages (always included)
-        for msg in current_messages:
-            # A turn that only called tools has "content": null (OpenAI's format).
-            content = msg.get("content") or ""
-            msg_tokens = _estimate_tokens(content)
-            result.messages.append(msg)
-            total_tokens += msg_tokens
+        # 6. Current request messages (always included)
+        result.messages.extend(current_messages)
 
         result.messages = merge_consecutive_users(result.messages)
         result.total_token_estimate = total_tokens
@@ -302,49 +408,86 @@ class ContextAssembler:
         budget: int,
         total_tokens: int,
     ) -> tuple[int, int]:
-        """Inject attachment context (documents as text, images as base64)."""
-        attachments: list[ChatAttachment] = []
-        attachments.extend(
-            await self.dao.list_attachments_for_session(session_id=session_id),
-        )
+        """The project's files and the chat's own: documents as text, pictures as pictures.
+
+        The project's files come first, in a stable order (oldest first), inline while all of them fit their
+        share of the budget (``PROJECT_FILES_SHARE``); past it the whole project goes as one index line and
+        its files are searched with ``attachment_search``, so one more file does not push the others out one
+        by one. Then the chat's own files, each inline while it fits.
+        """
+        own = await self.dao.list_attachments_for_session(session_id=session_id)
+        project_files: list[ChatAttachment] = []
         if project_id:
-            project_atts = await self.dao.list_attachments_for_project(
-                project_id=project_id,
+            seen = {a.id for a in own}
+            project_files = [
+                a for a in await self.dao.list_attachments_for_project(project_id=project_id)
+                if a.id not in seen and a.session_id is None
+            ]
+        if project_files and _files_tokens(project_files) > PROJECT_FILES_SHARE * self.token_budget:
+            budget, total_tokens = self._project_index(result, project_files, budget, total_tokens)
+            project_files = [a for a in project_files if not _readable(a)]
+        for att in [*project_files, *own]:
+            budget, total_tokens = await self._inject_one(result, att, budget, total_tokens)
+        return budget, total_tokens
+
+    def _project_index(
+        self,
+        result: AssembledContext,
+        files: list[ChatAttachment],
+        budget: int,
+        total_tokens: int,
+    ) -> tuple[int, int]:
+        """The project's readable files named in one line, for ``attachment_search`` (or named only)."""
+        readable = [a for a in files if _readable(a)]
+        names = ", ".join(a.filename for a in readable[:10]) + (", ..." if len(readable) > 10 else "")
+        count = f"{len(readable)} file" + ("" if len(readable) == 1 else "s")
+        if self.searchable:
+            line = (
+                f"[Project files, not included in full: {names} ({count}). "
+                "Use attachment_search to look up what the question needs.]"
             )
-            seen = {a.id for a in attachments}
-            attachments.extend(a for a in project_atts if a.id not in seen)
+            result.searchable.extend(readable)
+        else:
+            line = f"[Project files, not included in full: {names} ({count}).]"
+        result.project_files_indexed = True
+        line_tokens = _estimate_tokens(line)
+        result.messages.append({"role": "system", "content": line})
+        return budget - line_tokens, total_tokens + line_tokens
 
-        if not attachments:
-            return budget, total_tokens
+    async def _inject_one(
+        self,
+        result: AssembledContext,
+        att: ChatAttachment,
+        budget: int,
+        total_tokens: int,
+    ) -> tuple[int, int]:
+        """One file: its text while it fits, a picture as a picture, an unreadable one named."""
+        if att.extraction_status == ExtractionStatus.COMPLETED and att.extracted_text:
+            # Document attachment → inject as system message
+            truncation_note = ""
+            if att.truncated:
+                truncation_note = " (truncated)"
+            text_block = f"[Attached: {att.filename}{truncation_note}]\n{att.extracted_text}"
+            text_tokens = _estimate_tokens(text_block)
+            if text_tokens > budget:
+                return self._too_long(result, att, text_tokens, budget, total_tokens)
+            result.messages.append({
+                "role": "system",
+                "content": text_block,
+            })
+            result.attachments_used.append(att)
+            total_tokens += text_tokens
+            budget -= text_tokens
 
-        for att in attachments:
-            if att.extraction_status == ExtractionStatus.COMPLETED and att.extracted_text:
-                # Document attachment → inject as system message
-                truncation_note = ""
-                if att.truncated:
-                    truncation_note = " (truncated)"
-                text_block = f"[Attached: {att.filename}{truncation_note}]\n{att.extracted_text}"
-                text_tokens = _estimate_tokens(text_block)
-                if text_tokens > budget:
-                    budget, total_tokens = self._too_long(result, att, text_tokens, budget, total_tokens)
-                    continue
-                result.messages.append({
-                    "role": "system",
-                    "content": text_block,
-                })
-                result.attachments_used.append(att)
-                total_tokens += text_tokens
-                budget -= text_tokens
+        elif att.extraction_status == ExtractionStatus.FAILED or (
+            att.extraction_status == ExtractionStatus.COMPLETED and not att.extracted_text
+        ):
+            budget, total_tokens = self._unreadable(result, att, budget, total_tokens)
 
-            elif att.extraction_status == ExtractionStatus.FAILED or (
-                att.extraction_status == ExtractionStatus.COMPLETED and not att.extracted_text
-            ):
-                budget, total_tokens = self._unreadable(result, att, budget, total_tokens)
-
-            elif att.extraction_status == ExtractionStatus.SKIPPED and self.file_store:
-                budget, total_tokens = await self._inject_picture(
-                    result, att, self.file_store, budget, total_tokens,
-                )
+        elif att.extraction_status == ExtractionStatus.SKIPPED and self.file_store:
+            budget, total_tokens = await self._inject_picture(
+                result, att, self.file_store, budget, total_tokens,
+            )
 
         return budget, total_tokens
 

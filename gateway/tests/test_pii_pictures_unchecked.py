@@ -254,3 +254,56 @@ def test_a_picture_from_the_projects_files_is_named() -> None:
     assert refused.value.status_code == 403 and refused.value.param == "project_files"
     assert "Remove plan.png from the project's Files" in refused.value.message
     assert refused.value.extra == {"faden": {"pictures_refused": {"project_files": ["plan.png"]}}}
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("tools", [True, False], ids=["route-calls-tools", "route-without-tools"])
+async def test_a_refused_picture_from_the_projects_files_is_named_in_the_chat(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+    tools: bool,
+) -> None:
+    """The project's picture goes with every chat of the project: the refusal names it, on any route."""
+    from faden_gateway.db.models.gateway import (  # noqa: PLC0415
+        AttachmentScope,
+        ChatAttachment,
+        ChatProject,
+        ChatSession,
+        ExtractionStatus,
+        ProviderType,
+    )
+    from tests.test_gateway_chat_pictures import _Store  # noqa: PLC0415
+    from tests.test_gateway_pipeline_combined import ALIAS as PIPELINE_ALIAS  # noqa: PLC0415
+    from tests.test_gateway_pipeline_combined import _model_answers as answering  # noqa: PLC0415
+    from tests.test_gateway_pipeline_combined import _seed as seed  # noqa: PLC0415
+
+    await seed(db_session, provider=ProviderType.VLLM, pii=_refusing(enabled_for_local=True),
+               node_metadata={"task": "chat", "vision": True, "tools": tools})
+    fastapi_app.state.gateway_observability = _Observability()
+    fastapi_app.state.chat_file_store = _Store()
+    project = ChatProject(tenant_id="tenant-a", user_id="user-1", name="Plans")
+    db_session.add(project)
+    await db_session.flush()
+    chat = ChatSession(tenant_id="tenant-a", user_id="user-1", title="t", project_id=project.id)
+    db_session.add(chat)
+    db_session.add(ChatAttachment(
+        tenant_id="tenant-a", user_id="user-1", project_id=project.id, filename="plan.png", content_type="image/png",
+        size_bytes=10, storage_key="k/plan.png", extraction_status=ExtractionStatus.SKIPPED,
+        scope=AttachmentScope.PROJECT,
+    ))
+    await db_session.commit()
+    sent: list[dict[str, Any]] = []
+    answering(monkeypatch, "ok", sent)
+    service_registry.configure("pii", enabled=True, url="http://pii.local")
+    try:
+        r = await client.post("/v1/chat/completions", headers={"Authorization": f"Bearer {_token()}"}, json={
+            "model": PIPELINE_ALIAS, "session_id": str(chat.id),
+            "messages": [{"role": "user", "content": "Hello"}],
+        })
+    finally:
+        service_registry.configure("pii", enabled=False, url=None)
+
+    assert r.status_code == 403, r.text
+    assert r.json()["error"]["param"] == "project_files"
+    assert "Remove plan.png from the project's Files" in r.json()["error"]["message"]
+    assert r.json()["faden"] == {"pictures_refused": {"project_files": ["plan.png"]}}
+    assert sent == []

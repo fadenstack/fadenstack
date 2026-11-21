@@ -164,6 +164,49 @@ class GatewayDAO:
 
         return {alias: vision(values) for alias, values in said.items()}
 
+    async def alias_context_length(self, alias: str) -> int | None:
+        """The context length of the model behind *alias*, in tokens; None when no instance says (0.7.2 K)."""
+        return (await self.alias_context_lengths([alias])).get(alias)
+
+    async def alias_context_lengths(self, aliases: list[str]) -> dict[str, int | None]:
+        """Each alias's context length: the smallest any of its enabled instances says.
+
+        A deployed model says it in ``node_metadata["context_length"]`` (the backend publishes vLLM's
+        ``max_model_len``); a provider of another kind in ``capabilities["context_length"]``, as an
+        administrator configured it. A request may go to any of the instances, so the smallest counts;
+        an instance that says nothing does not lower it. None when none says.
+        """
+        if not aliases:
+            return {}
+        rows = await self.session.execute(
+            select(
+                LLMPoolMembership.model_alias,
+                LLMProviderInstance.node_metadata,
+                LLMProviderInstance.capabilities,
+            )
+            .join(LLMPoolMembership, LLMProviderInstance.id == LLMPoolMembership.provider_instance_id)
+            .where(
+                LLMPoolMembership.model_alias.in_(aliases),
+                LLMPoolMembership.enabled.is_(True),
+                LLMProviderInstance.enabled.is_(True),
+            ),
+        )
+
+        def said_by(metadata: object, caps: object) -> int | None:
+            for source in (metadata, caps):
+                value = source.get("context_length") if isinstance(source, dict) else None
+                if type(value) is int and value > 0:
+                    return value
+            return None
+
+        found: dict[str, int | None] = dict.fromkeys(aliases)
+        for alias, metadata, caps in rows.all():
+            value = said_by(metadata, caps)
+            if value is not None:
+                kept = found.get(alias)
+                found[alias] = value if kept is None else min(kept, value)
+        return found
+
     async def get_tenant_policy(self, tenant_id: str) -> TenantLLMPolicy | None:
         """Fetch tenant policy."""
         result = await self.session.execute(

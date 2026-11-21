@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_gateway.db.models.gateway import AttachmentScope, ChatAttachment, ExtractionStatus, ProviderType
 from faden_gateway.services.gateway.attachment_search import AttachmentSearch, SearchableFile, passages, words
+from faden_gateway.services.gateway.context_assembler import FALLBACK_BUDGET
 from faden_gateway.settings import settings
 from tests.test_gateway_knowledge_tools import CAN_CALL_TOOLS, _ask, _call, _Model, _say, _tool_names
 from tests.test_gateway_pipeline_combined import _Observability, _seed, _session
@@ -121,7 +122,8 @@ async def test_a_model_that_cannot_search_gets_the_beginning_marked_as_cut(
     system = _system_text(sent)
     assert "report.txt -- the first" in system and "the rest did not fit" in system
     excerpt_tokens = len(system) // 4
-    assert excerpt_tokens <= settings.session_token_budget // 2 + 100, "half the budget, the history keeps room"
+    budget = settings.session_token_budget or FALLBACK_BUDGET  # the window is not known here
+    assert excerpt_tokens <= budget // 2 + 100, "half the budget, the history keeps room"
 
 
 @pytest.mark.anyio
