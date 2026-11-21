@@ -59,7 +59,7 @@ If the model says the chat is too long for it, the chat tries once more by itsel
 
 ![A reply with its size in tokens and the ⓘ that names the model, below the answer](../images/use/chat-reply-details.png)
 
-Under each reply: how long it took (if you had the chat open), its size in tokens (point at the badge for the prompt, the reply and the total), and an ⓘ that names the model. The reply also shows how much of the model's context the chat used (**Context: 12.3k of 25.8k tokens**). To use an answer elsewhere, select its text and copy it.
+Under each reply: how long it took (if you had the chat open), its size in tokens (point at the badge for the prompt, the reply and the total), and an ⓘ that names the model. While the chat is open, its newest reply also shows how much of the model's context the chat used (**Context: 12.3K of 25.8K tokens**). To use an answer elsewhere, select its text and copy it.
 
 In a long chat, the oldest messages stop going to the model once the chat no longer fits what the model reads at once; a line in the chat marks where. A model that uses tools can still search the chat's earlier messages when a question needs them, but it can miss a detail: for a new topic, start a new chat.
 

@@ -12,6 +12,7 @@ On your organisation's server:
 - the files you attach, and the text read from them;
 - summaries of long chats, written by AI, if your administrator has switched them on;
 - your skills;
+- your choices in the chat, such as the thinking level per model;
 - usage records: when you used which model, how much text went in and out, and which tools ran. They do not contain what was said.
 
 The messages, the replies, the summaries of long chats, chat titles, project names, descriptions and instructions, file names, the files you attach and the text read from them are stored encrypted. The server does not start without the key they are encrypted with. Chats from before your organisation's upgrade to this release are encrypted by the upgrade. A model's thinking is not saved at all.

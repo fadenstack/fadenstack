@@ -12,6 +12,7 @@ Auf dem Server Ihrer Organisation:
 - die Dateien, die Sie anhängen, und der Text, der daraus gelesen wurde;
 - Zusammenfassungen langer Chats, von einer KI geschrieben, wenn Ihr Administrator sie eingeschaltet hat;
 - Ihre Skills;
+- Ihre Einstellungen im Chat, etwa die Denkstufe pro Modell;
 - Nutzungsdaten: wann Sie welches Modell genutzt haben, wie viel Text hinein- und herausging und welche Tools liefen. Sie enthalten nicht, was gesagt wurde.
 
 Die Nachrichten, die Antworten, die Zusammenfassungen langer Chats, die Chat-Titel, Projektnamen, -beschreibungen und -anweisungen, Dateinamen, die angehängten Dateien und der aus ihnen gelesene Text werden verschlüsselt gespeichert. Ohne den Schlüssel, mit dem sie verschlüsselt sind, startet der Server nicht. Chats aus der Zeit vor dem Upgrade Ihrer Organisation auf diese Version verschlüsselt das Upgrade. Das Nachdenken eines Modells wird gar nicht gespeichert.

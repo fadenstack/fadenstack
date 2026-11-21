@@ -59,7 +59,7 @@ Sagt das Modell, dass der Chat für es zu lang ist, versucht der Chat es von sel
 
 ![Eine Antwort mit ihrer Größe in Tokens und dem ⓘ, das das Modell nennt, unter der Antwort](../images/use/chat-reply-details.png)
 
-Unter jeder Antwort: wie lange sie gedauert hat (wenn der Chat bei Ihnen offen war), ihre Größe in Tokens (zeigen Sie auf das Feld für Prompt, Antwort und Summe) und ein ⓘ, das das Modell nennt. Die Antwort zeigt auch, wie viel vom Kontext des Modells der Chat genutzt hat (**Kontext: 12,3k von 25,8k Tokens**). Um eine Antwort anderswo zu verwenden, markieren Sie ihren Text und kopieren Sie ihn.
+Unter jeder Antwort: wie lange sie gedauert hat (wenn der Chat bei Ihnen offen war), ihre Größe in Tokens (zeigen Sie auf das Feld für Prompt, Antwort und Summe) und ein ⓘ, das das Modell nennt. Solange der Chat offen ist, zeigt seine neueste Antwort auch, wie viel vom Kontext des Modells der Chat genutzt hat (**Kontext: 12.302 von 25.804 Tokens**). Um eine Antwort anderswo zu verwenden, markieren Sie ihren Text und kopieren Sie ihn.
 
 In einem langen Chat gehen die ältesten Nachrichten nicht mehr an das Modell, sobald der Chat nicht mehr in das passt, was das Modell auf einmal liest; eine Zeile im Chat zeigt, ab wo. Ein Modell, das Tools nutzt, kann die früheren Nachrichten des Chats noch durchsuchen, wenn eine Frage sie braucht, kann dabei aber Einzelheiten übersehen: Beginnen Sie für ein neues Thema einen neuen Chat.
 
