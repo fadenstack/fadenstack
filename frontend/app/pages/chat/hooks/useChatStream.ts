@@ -66,13 +66,15 @@ export interface ChatErrorDetail {
   /** ``blocked``: a governance check refused the prompt (not an error: info,
    * with "edit and resend"); ``rate_limit``: try again later; ``budget``: a
    * budget that applies is used up until its period ends; ``error``: retry. */
-  kind: "blocked" | "rate_limit" | "budget" | "error";
+  kind: "blocked" | "rate_limit" | "budget" | "pictures_refused" | "error";
   message: string;
   /** The text that was refused, for "edit and resend". */
   text?: string;
   retryAfter?: number | null;
   /** ``budget``: the kind of budget (``personal``, ``team``, ``agent``, ``organisation``). */
   param?: string | null;
+  /** ``pictures_refused``: the project's files that are pictures, the first one is named. */
+  files?: string[];
 }
 
 export function errorDetail(err: unknown, text?: string): ChatErrorDetail {
@@ -80,6 +82,10 @@ export function errorDetail(err: unknown, text?: string): ChatErrorDetail {
   if (err instanceof ChatApiError) {
     if (err.code === "policy_blocked" || err.type === "governance_error") {
       return { kind: "blocked", message: err.governance?.message ?? message, text };
+    }
+    if (err.code === "pii_pictures_refused") {
+      // Worded in the reader's language where it shows (ChatWindow).
+      return { kind: "pictures_refused", message, text, files: err.projectPictures };
     }
     if (err.code === BUDGET_EXCEEDED) {
       return { kind: "budget", message, retryAfter: err.retryAfter, param: err.param };
@@ -97,6 +103,10 @@ export interface PendingApproval {
   toolName: string;
   message: string;
   timeoutS: number | null;
+  /** The tool's arguments as the gateway sent them: a JSON string, cut at a limit. */
+  arguments: string;
+  argumentsTruncated: boolean;
+  argumentsSha256: string;
 }
 
 /** A file of the chat the gateway did not send to the model (``faden.attachment_left_out``). */
@@ -114,6 +124,7 @@ export function readFadenEvent(event: FadenEvent):
   | { kind: "approval"; approval: PendingApproval }
   | { kind: "denied"; notice: string }
   | { kind: "left_out"; leftOut: LeftOutFile }
+  | { kind: "pictures_unchecked"; count: number }
   | { kind: "unmarked" }
   | null {
   const value = (event.value ?? {}) as Record<string, unknown>;
@@ -124,6 +135,10 @@ export function readFadenEvent(event: FadenEvent):
       leftOut: { reason: text("reason"), file: text("filename"), model: text("model"), message: text("message") },
     };
   }
+  if (event.name === "faden.pii_pictures_unchecked") {
+    const count = typeof value.count === "number" && value.count >= 1 ? Math.floor(value.count) : 1;
+    return { kind: "pictures_unchecked", count };
+  }
   if (event.name === "faden.approval_required" && text("approvalId")) {
     return {
       kind: "approval",
@@ -132,6 +147,9 @@ export function readFadenEvent(event: FadenEvent):
         toolName: text("toolCallName"),
         message: text("message"),
         timeoutS: typeof value.timeoutS === "number" ? value.timeoutS : null,
+        arguments: text("arguments"),
+        argumentsTruncated: value.argumentsTruncated === true,
+        argumentsSha256: text("argumentsSha256"),
       },
     };
   }
@@ -228,7 +246,39 @@ export function useChatStream({
             file: left.file,
             model: left.model,
           })
-        : left.message,
+        : left.reason === "unreadable" && left.file
+          ? t("picture_unreadable", {
+              ns: "chat",
+              defaultValue: "{{file}} was not sent: its text could not be read.",
+              file: left.file,
+            })
+          : left.message,
+    [t],
+  );
+  /** Chats that showed the note on unchecked pictures: a project's picture goes with every turn. */
+  const uncheckedShownRef = useRef<Set<string>>(new Set());
+  const uncheckedNote = useCallback(
+    (count: number, names: string[]) => {
+      // The name only when one picture went and the page knows whose.
+      if (count === 1 && names.length === 1) {
+        return t("pictures_unchecked_file", {
+          ns: "chat",
+          defaultValue: "Pictures are not checked for personal data, so {{file}} went to the model as it is.",
+          file: names[0],
+        });
+      }
+      if (count > 1) {
+        return t("pictures_unchecked_many", {
+          ns: "chat",
+          defaultValue: "Pictures are not checked for personal data, so {{count}} pictures went to the model as they are.",
+          count,
+        });
+      }
+      return t("pictures_unchecked_none", {
+        ns: "chat",
+        defaultValue: "Pictures are not checked for personal data, so the picture went to the model as it is.",
+      });
+    },
     [t],
   );
   const onFaden = useCallback((event: FadenEvent) => {
@@ -298,7 +348,8 @@ export function useChatStream({
         turn = null,
         resumed = false,
         text,
-      }: { turn?: string | null; resumed?: boolean; text?: string } = {},
+        pictureNames = [],
+      }: { turn?: string | null; resumed?: boolean; text?: string; pictureNames?: string[] } = {},
     ): Promise<void> => {
       setIsStreaming(true);
       streamThrottle.reset();
@@ -363,6 +414,11 @@ export function useChatStream({
             const read = readFadenEvent(delta.faden);
             if (read?.kind === "left_out") {
               notes.push(noteOf(read.leftOut));
+              setStreamingNotes([...notes]);
+            }
+            if (read?.kind === "pictures_unchecked" && !uncheckedShownRef.current.has(sid)) {
+              uncheckedShownRef.current.add(sid);
+              notes.push(uncheckedNote(read.count, pictureNames));
               setStreamingNotes([...notes]);
             }
             onFaden(delta.faden);
@@ -484,7 +540,7 @@ export function useChatStream({
         }
       }
     },
-    [onSessionUpdated, onFaden, noteOf],
+    [onSessionUpdated, onFaden, noteOf, uncheckedNote],
   );
 
   // Load existing messages for the current session
@@ -614,7 +670,11 @@ export function useChatStream({
         }),
         sid,
         model,
-        { text },
+        {
+          text,
+          // The names of the pictures of this message, for the note on unchecked pictures.
+          pictureNames: (files ?? []).filter((f) => f.type.startsWith("image/")).map((f) => f.name),
+        },
       );
     },
     [onSessionCreated, runStream],

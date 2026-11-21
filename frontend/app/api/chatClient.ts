@@ -71,6 +71,8 @@ export class ChatApiError extends Error {
   governance: GovernanceNotice | null;
   /** Seconds to wait, for a rate limit. */
   retryAfter: number | null;
+  /** ``pii_pictures_refused``: the project's files that are pictures (``faden.pictures_refused.project_files``). */
+  projectPictures: string[];
 
   constructor(
     message: string,
@@ -81,6 +83,7 @@ export class ChatApiError extends Error {
       param?: string | null;
       governance?: GovernanceNotice | null;
       retryAfter?: number | null;
+      projectPictures?: string[];
     } = {},
   ) {
     super(message);
@@ -91,6 +94,7 @@ export class ChatApiError extends Error {
     this.param = init.param ?? null;
     this.governance = init.governance ?? null;
     this.retryAfter = init.retryAfter ?? null;
+    this.projectPictures = init.projectPictures ?? [];
   }
 }
 
@@ -100,6 +104,7 @@ function errorFields(payload: unknown): {
   status: number | null;
   param: string | null;
   governance: GovernanceNotice | null;
+  projectPictures: string[];
 } {
   const record = (payload && typeof payload === "object" ? payload : {}) as Record<string, unknown>;
   const error = (record.error && typeof record.error === "object" ? record.error : {}) as Record<
@@ -114,7 +119,14 @@ function errorFields(payload: unknown): {
     faden.governance && typeof faden.governance === "object"
       ? (faden.governance as GovernanceNotice)
       : null;
+  const refused = (faden.pictures_refused && typeof faden.pictures_refused === "object"
+    ? faden.pictures_refused
+    : {}) as Record<string, unknown>;
+  const projectPictures = Array.isArray(refused.project_files)
+    ? refused.project_files.filter((name): name is string => typeof name === "string" && name !== "")
+    : [];
   return {
+    projectPictures,
     code: typeof error.code === "string" ? error.code : null,
     type: typeof error.type === "string" ? error.type : null,
     status: typeof error.status === "number" ? error.status : null,

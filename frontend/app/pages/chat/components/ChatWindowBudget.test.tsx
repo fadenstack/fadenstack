@@ -81,3 +81,28 @@ describe("a request refused by a budget", () => {
     expect(reply).not.toHaveTextContent("It starts again");
   });
 });
+
+describe("a request refused for its pictures", () => {
+  beforeEach(() => {
+    Element.prototype.scrollIntoView = vi.fn();
+    vi.spyOn(chatApi, "listModels").mockResolvedValue([]);
+  });
+
+  it("says in the reader's words to remove the picture", () => {
+    state.errorInfo = { kind: "pictures_refused", message: "(the gateway's English)", files: [] };
+    const reply = view();
+
+    expect(reply).toHaveTextContent(
+      "Pictures are not checked for personal data, and your organisation does not send them unchecked. Remove the picture and send again.",
+    );
+    expect(reply).not.toHaveTextContent("gateway's English");
+  });
+
+  it("names the first picture of the project's Files", () => {
+    state.errorInfo = { kind: "pictures_refused", message: "x", files: ["plan.png", "b.png"] };
+    const reply = view();
+
+    expect(reply).toHaveTextContent("Remove plan.png from the project's Files to use this project's chats.");
+    expect(reply).not.toHaveTextContent("Remove the picture");
+  });
+});

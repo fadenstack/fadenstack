@@ -71,7 +71,8 @@ describe("a tool that waits for the user", () => {
     const event = seen.find((d) => (d as { faden?: unknown }).faden) as { faden: Parameters<typeof readFadenEvent>[0] };
     expect(readFadenEvent(event.faden)).toEqual({
       kind: "approval",
-      approval: { approvalId: "a1", toolName: "mcp.gh.create_issue", message: "Needs your OK.", timeoutS: 300 },
+      approval: { approvalId: "a1", toolName: "mcp.gh.create_issue", message: "Needs your OK.", timeoutS: 300,
+        arguments: "", argumentsTruncated: false, argumentsSha256: "" },
     });
   });
 

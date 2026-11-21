@@ -60,6 +60,8 @@ export interface PIIPolicyConfig {
     enabled_for_local: boolean;
     mode: "redact" | "tokenize_reversible";
     fail_action: "block" | "allow" | "fallback_to_local";
+    /** Refuse a message with a picture where the check runs (pictures are not checked). */
+    refuse_pictures: boolean;
   };
   presidio: {
     language: string;
@@ -132,6 +134,7 @@ function defaultPolicyFromOptions(
       enabled_for_local: false,
       mode: "redact",
       fail_action: "block",
+      refuse_pictures: false,
     },
     presidio: {
       language: defaultLanguage,
@@ -194,6 +197,7 @@ export function normalizePIIPolicy(
           return candidate;
         return "block";
       })(),
+      refuse_pictures: (egressRaw as { refuse_pictures?: unknown }).refuse_pictures === true,
     },
     presidio: {
       profile_id: typeof raw.presidio?.profile_id === "string" ? raw.presidio.profile_id : null,

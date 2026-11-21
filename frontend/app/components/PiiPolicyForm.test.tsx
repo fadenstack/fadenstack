@@ -88,3 +88,25 @@ describe("local detector adoption", () => {
     expect(screen.getByText(/PII service's standard types are found/)).toBeInTheDocument();
   });
 });
+
+describe("refusing pictures", () => {
+  it("is off by default and kept when a saved policy lacks it", () => {
+    expect(normalizePIIPolicy(null).egress.refuse_pictures).toBe(false);
+    expect(normalizePIIPolicy({ egress: { fail_action: "allow" } }).egress.refuse_pictures).toBe(false);
+    expect(normalizePIIPolicy({ egress: { refuse_pictures: true } }).egress.refuse_pictures).toBe(true);
+  });
+
+  it("is a switch beside If detection fails, which is saved with the policy", () => {
+    const value = normalizePIIPolicy({ egress: { enabled_for_cloud: true, fail_action: "allow" } });
+    const change = vi.fn();
+    render(<PiiPolicyForm value={value} options={options} onChange={change} />);
+
+    expect(screen.getAllByText("If detection fails").length).toBeGreaterThan(0);
+    expect(screen.getByText(/Pictures are not checked for personal data\. On: a message with a picture is refused/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("switch", { name: "Refuse pictures" }));
+
+    expect(change).toHaveBeenCalledWith({
+      ...value, egress: { ...value.egress, refuse_pictures: true },
+    });
+  });
+});

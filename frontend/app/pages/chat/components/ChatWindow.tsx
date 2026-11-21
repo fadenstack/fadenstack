@@ -28,6 +28,15 @@ import ChatInput from "./ChatInput";
 import ChatTopbar from "./ChatTopbar";
 import { followScroll, type Follower } from "../followScroll";
 
+/** The arguments of a tool call as the card shows them: indented when they are JSON, as sent otherwise. */
+function formatArguments(raw: string): string {
+  try {
+    return JSON.stringify(JSON.parse(raw), null, 2);
+  } catch {
+    return raw;
+  }
+}
+
 interface Props {
   sessionId: string;
   selectedModel: string;
@@ -346,6 +355,41 @@ export default function ChatWindow({
               <Typography variant="body2" sx={{ mb: 1 }}>
                 {pendingApproval.message}
               </Typography>
+              {pendingApproval.arguments && (
+                <Box sx={{ mb: 1 }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+                    {t("approval_arguments", { ns: "chat", defaultValue: "Arguments" })}
+                  </Typography>
+                  <Box
+                    component="pre"
+                    data-testid="tool-approval-arguments"
+                    tabIndex={0}
+                    sx={{
+                      m: 0,
+                      p: 1,
+                      maxHeight: 200,
+                      overflow: "auto",
+                      fontFamily: "monospace",
+                      fontSize: "0.8rem",
+                      whiteSpace: "pre-wrap",
+                      overflowWrap: "anywhere",
+                      borderRadius: 1,
+                      border: `1px solid ${theme.palette.divider}`,
+                      bgcolor: theme.palette.action.hover,
+                    }}
+                  >
+                    {formatArguments(pendingApproval.arguments)}
+                  </Box>
+                  {pendingApproval.argumentsTruncated && (
+                    <Typography variant="caption" color="warning.main" sx={{ display: "block", mt: 0.5 }}>
+                      {t("approval_arguments_truncated", {
+                        ns: "chat",
+                        defaultValue: "Cut off: only the first part of the arguments is shown.",
+                      })}
+                    </Typography>
+                  )}
+                </Box>
+              )}
               <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
                 <Button size="small" variant="outlined" onClick={() => void answerApproval(false)} sx={{ textTransform: "none" }}>
                   {t("approval_decline", { ns: "chat", defaultValue: "Decline" })}
@@ -382,6 +426,24 @@ export default function ChatWindow({
                       defaultValue: "Try again in {{seconds}} s.",
                       seconds: errorInfo.retryAfter,
                     })}`
+                  : errorInfo?.kind === "pictures_refused"
+                    ? [
+                        t("pictures_refused_lead", {
+                          ns: "chat",
+                          defaultValue:
+                            "Pictures are not checked for personal data, and your organisation does not send them unchecked.",
+                        }),
+                        errorInfo.files?.[0]
+                          ? t("pictures_refused_file", {
+                              ns: "chat",
+                              defaultValue: "Remove {{file}} from the project's Files to use this project's chats.",
+                              file: errorInfo.files[0],
+                            })
+                          : t("pictures_refused_picture", {
+                              ns: "chat",
+                              defaultValue: "Remove the picture and send again.",
+                            }),
+                      ].join(" ")
                   : errorInfo?.kind === "budget"
                     ? [
                         // Worded here from the kind of budget, in the reader's language.
