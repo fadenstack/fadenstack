@@ -54,7 +54,7 @@ with the same key.
 
 | In the provider's row | What it does |
 |---|---|
-| **Edit** | Changes the **Name**, the **Endpoint URL**, the **API Key** the **Model** and the **Context length (tokens)**, and the switches **Offer the gateway's tools** and **Send the chat's pictures to this model**. |
+| **Edit** | Changes the **Name**, the **Endpoint URL**, the **API Key**, the **Model** and the **Context length (tokens)**, and the switches **Offer the gateway's tools** and **Send the chat's pictures to this model**. |
 | **Stop** | Stops sending requests to it without removing it; **Start** sends them again. |
 | **Delete** | Removes a stopped provider. It cannot be undone. |
 
