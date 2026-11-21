@@ -8,7 +8,7 @@ import mimetypes
 import re
 import time
 import uuid
-from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import PurePosixPath
@@ -863,12 +863,17 @@ def _cap_output(payload: dict[str, Any]) -> None:
 
 def _report_left_out(
     notices: list[dict[str, Any]] | None, pictures: list[Any], payload: dict[str, Any],
+    *, unreadable: Sequence[Any] = (),
 ) -> None:
-    """Each of the chat's pictures the turn's model did not get, as a Faden event on *notices*."""
+    """Each of the chat's files the turn's model did not get, as a Faden event on *notices*.
+
+    Pictures for a model that does not take pictures, and files whose text could not be read.
+    """
     if notices is None:
         return
     model = str(payload.get("model") or "").strip()
     notices.extend(faden_events.picture_left_out(str(p.id), p.filename, model) for p in pictures)
+    notices.extend(faden_events.file_unreadable(str(f.id), f.filename) for f in unreadable)
 
 
 def _allowing_personal_data(mcp_tools: list[dict[str, Any]] | None) -> set[str]:
@@ -3678,7 +3683,7 @@ class GatewayService:
             project=project,
         )
 
-        _report_left_out(notices, assembled.pictures_left_out, payload)
+        _report_left_out(notices, assembled.pictures_left_out, payload, unreadable=assembled.files_unreadable)
         payload["messages"] = assembled.messages
         _cap_output(payload)
         if req is not None:

@@ -22,7 +22,7 @@ OpenAI stream: an OpenAI SDK would not know what to do with a named event.
   the SDK to keep and send back as history. The gateway accepts it back.
 - ``CUSTOM`` ``faden.attachment_left_out``: a file of the chat that was not
   sent to the model, and why (``no_vision``: a picture, and the model does not
-  take pictures).
+  take pictures; ``unreadable``: a file whose text could not be read).
 - ``CUSTOM`` ``faden.provenance``: the answer's signed receipt from the
   provenance engine, after its last token and before ``[DONE]``, or that it
   is unsigned (``text_receipts``).
@@ -140,6 +140,17 @@ def picture_left_out(attachment_id: str, filename: str, model: str) -> dict[str,
         "model": model,
         "reason": "no_vision",
         "message": f"{filename} was not sent: {model} does not take pictures. Choose a model that does.",
+    }}
+
+
+def file_unreadable(attachment_id: str, filename: str) -> dict[str, Any]:
+    """A file of the chat not sent: its text could not be read (0.7.2 H.3)."""
+    return {"type": "CUSTOM", "name": "faden.attachment_left_out", "value": {
+        "attachmentId": attachment_id,
+        "filename": filename,
+        "model": "",
+        "reason": "unreadable",
+        "message": f"{filename} was not sent: its text could not be read.",
     }}
 
 

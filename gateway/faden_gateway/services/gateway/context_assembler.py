@@ -53,6 +53,8 @@ class AssembledContext:
     searchable: list[ChatAttachment] = field(default_factory=list)
     #: Pictures not sent: the turn's model does not take pictures.
     pictures_left_out: list[ChatAttachment] = field(default_factory=list)
+    #: Files whose text could not be read: named to the model and to the chat, not sent (0.7.2 H.3).
+    files_unreadable: list[ChatAttachment] = field(default_factory=list)
     total_token_estimate: int = 0
 
 
@@ -334,6 +336,11 @@ class ContextAssembler:
                 total_tokens += text_tokens
                 budget -= text_tokens
 
+            elif att.extraction_status == ExtractionStatus.FAILED or (
+                att.extraction_status == ExtractionStatus.COMPLETED and not att.extracted_text
+            ):
+                budget, total_tokens = self._unreadable(result, att, budget, total_tokens)
+
             elif att.extraction_status == ExtractionStatus.SKIPPED and self.file_store:
                 budget, total_tokens = await self._inject_picture(
                     result, att, self.file_store, budget, total_tokens,
@@ -401,6 +408,24 @@ class ContextAssembler:
         note_tokens = _estimate_tokens(note)
         result.messages.append({"role": "system", "content": note})
         result.pictures_left_out.append(att)
+        return budget - note_tokens, total_tokens + note_tokens
+
+    def _unreadable(
+        self,
+        result: AssembledContext,
+        att: ChatAttachment,
+        budget: int,
+        total_tokens: int,
+    ) -> tuple[int, int]:
+        """A file whose text could not be read: named, not sent.
+
+        The model never saw it and nobody said so, so it answered as if nothing had
+        been attached. Now the model is told, and the chat through ``files_unreadable``.
+        """
+        note = f"[Attached file: {att.filename} -- not sent: its text could not be read.]"
+        note_tokens = _estimate_tokens(note)
+        result.messages.append({"role": "system", "content": note})
+        result.files_unreadable.append(att)
         return budget - note_tokens, total_tokens + note_tokens
 
     def _too_long(
