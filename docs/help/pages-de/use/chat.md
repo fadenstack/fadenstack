@@ -12,7 +12,7 @@ Sprechen Sie mit den Modellen Ihrer Organisation: einen Chat beginnen, ein Model
 2. Wählen Sie in der Auswahl **Modell** ein Modell.
 3. Geben Sie Ihre Nachricht ein und drücken Sie die Eingabetaste. Umschalt+Eingabetaste beginnt eine neue Zeile.
 
-Die Antwort erscheint, während sie geschrieben wird. Um eine Datei hinzuzufügen, wählen Sie vor dem Senden die Büroklammer.
+Die Antwort erscheint, während sie geschrieben wird. Um eine Datei hinzuzufügen, wählen Sie vor dem Senden die Büroklammer. Ein Bild, das Sie anhängen, sehen Sie in der gesendeten Nachricht.
 
 ??? info "Mehr zum Beginnen eines Chats"
     Ein Modell ist bereits ausgewählt: das erste der Liste oder das, das Sie zuletzt gewählt haben. Ein neuer Chat wird nach dem Anfang Ihrer ersten Nachricht benannt. Das Modell liest eine angehängte Datei zusammen mit Ihrer Frage und kann sie für den Rest des Chats nutzen. Welche Dateien Sie hinzufügen können und welche Grenzen gelten, steht unter [Wissen](knowledge.md).
@@ -22,6 +22,10 @@ Die Antwort erscheint, während sie geschrieben wird. Um eine Datei hinzuzufüge
 ![Die geöffnete Auswahl „Modell“ mit den Modellen zur Wahl](../images/use/chat-model.png)
 
 Sie können mitten in einem Chat das Modell wechseln: Die nächste Antwort kommt von dem jetzt gewählten Modell, und es sieht das bisherige Gespräch.
+
+Im Nachrichtenfeld steht der Text in einer eigenen Zeile. Darunter liegen links Tools, Skills und die Büroklammer, rechts das Modell, die Denkstufe und die Senden-Schaltfläche.
+
+Die Denkstufe ist **Auto**, **Aus**, **Niedrig**, **Mittel** oder **Hoch**. Bei **Auto** entscheidet das Modell. Das Menü zeigt nur die Stufen, die das gewählte Modell unterscheidet; bei manchen Modellen macht nur **Aus** einen Unterschied. **Aus** antwortet schneller; höhere Stufen denken länger nach, bevor sie antworten. Die Wahl wird pro Person und pro Modell gespeichert und gilt ab Ihrer nächsten Nachricht.
 
 ??? info "Wo läuft ein Modell?"
     Manche Modelle laufen auf den eigenen Maschinen Ihrer Organisation, andere bei einem externen Provider. Der Name in der Liste verrät nicht immer, was davon zutrifft; fragen Sie Ihren Administrator, wenn es für das, was Sie schreiben, eine Rolle spielt. Siehe [Ihre Daten und Datenschutz](privacy.md).
@@ -46,6 +50,8 @@ Das geht: Die Antwort wird weiter geschrieben, wenn Sie einen anderen Chat öffn
 
 Eine fehlgeschlagene Antwort bleibt mit dem Grund im Chat stehen. Wählen Sie **Erneut versuchen** unter der letzten Antwort des Chats, um mit dem jetzt gewählten Modell erneut zu fragen; die neue Antwort tritt an ihre Stelle.
 
+Sagt das Modell, dass der Chat für es zu lang ist, versucht der Chat es von selbst noch einmal, mit weniger der älteren Nachrichten. Erst wenn auch das fehlschlägt, schlägt die Antwort fehl.
+
 ??? info "Was das Modell danach sieht"
     Eine fehlgeschlagene Antwort wird mit Ihren späteren Nachrichten nicht an das Modell gesendet. Eine gestoppte Antwort schon. Wenn Sie die letzte Antwort gestoppt haben, steht **Erneut versuchen** ebenfalls daneben.
 
@@ -53,24 +59,29 @@ Eine fehlgeschlagene Antwort bleibt mit dem Grund im Chat stehen. Wählen Sie **
 
 ![Eine Antwort mit ihrer Größe in Tokens und dem ⓘ, das das Modell nennt, unter der Antwort](../images/use/chat-reply-details.png)
 
-Unter jeder Antwort: wie lange sie gedauert hat (wenn der Chat bei Ihnen offen war), ihre Größe in Tokens (zeigen Sie auf das Feld für Prompt, Antwort und Summe) und ein ⓘ, das das Modell nennt. Um eine Antwort anderswo zu verwenden, markieren Sie ihren Text und kopieren Sie ihn.
+Unter jeder Antwort: wie lange sie gedauert hat (wenn der Chat bei Ihnen offen war), ihre Größe in Tokens (zeigen Sie auf das Feld für Prompt, Antwort und Summe) und ein ⓘ, das das Modell nennt. Die Antwort zeigt auch, wie viel vom Kontext des Modells der Chat genutzt hat (**Kontext: 12,3k von 25,8k Tokens**). Um eine Antwort anderswo zu verwenden, markieren Sie ihren Text und kopieren Sie ihn.
+
+In einem langen Chat gehen die ältesten Nachrichten nicht mehr an das Modell, sobald der Chat nicht mehr in das passt, was das Modell auf einmal liest; eine Zeile im Chat zeigt, ab wo. Ein Modell, das Tools nutzt, kann die früheren Nachrichten des Chats noch durchsuchen, wenn eine Frage sie braucht, kann dabei aber Einzelheiten übersehen: Beginnen Sie für ein neues Thema einen neuen Chat.
+
+!!! note "Zusammenfassungen langer Chats"
+    Ihr Administrator kann für ein Modell Zusammenfassungen einschalten. In einem langen Chat schreibt das Modell dann eine Zusammenfassung der älteren Nachrichten, und die Zusammenfassung geht an ihrer Stelle an das Modell. Das Schreiben zählt wie eine Antwort zu Ihrer Nutzung. Die Zusammenfassung schreibt eine KI; sie kann Gesagtes auslassen oder falsch wiedergeben. Mit **Zusammenfassung anzeigen** in der Zeile, ab der ältere Nachrichten nicht mehr an das Modell gehen, lesen Sie sie. Sie wird verschlüsselt mit dem Chat gespeichert, Administratoren sehen sie in der Konsole nicht, und sie wird mit dem Chat gelöscht. Zusammenfassungen sind aus, solange Ihr Administrator sie nicht einschaltet.
 
 ## Titel, Projekte und Suche {#titles-projects-and-search}
 
 ![Die Seitenleiste: „Neuer Chat“, „Chats durchsuchen“, ein Projekt mit Einstellungen und Papierkorb, und die Chats nach Tagen](../images/use/chat-sidebar.png)
 
 - **Einen Chat umbenennen:** Wählen Sie den Stift neben seinem Titel in der oberen Leiste.
-- **Projekte** fassen Chats zusammen. Wählen Sie **Neues Projekt** neben **Projekte**. Die **Projekteinstellungen** eines Projekts enthalten eine Beschreibung und einen **System-Prompt**: Anweisungen, die jeder Nachricht in seinen Chats vorangestellt werden.
+- **Projekte** fassen Chats zusammen. Wählen Sie **Neues Projekt** neben **Projekte**. Die **Projekteinstellungen** eines Projekts enthalten eine Beschreibung, einen **System-Prompt** (Anweisungen, die jeder Nachricht in seinen Chats vorangestellt werden) und **Dateien** (Dateien, die mit jeder Nachricht in seinen Chats mitgehen). Eine Datei, die zu lang ist, um ganz mitzugehen, wird stattdessen durchsucht: Das Modell sucht die Teile heraus, die es braucht. In den **Projekteinstellungen** können Sie auch das Standardmodell des Projekts festlegen: Seine neuen Chats beginnen damit.
 - **Einen Chat in ein Projekt verschieben:** Ziehen Sie ihn auf das Projekt, oder verwenden Sie **In Projekt verschieben**.
 - **Chats durchsuchen** findet Chats schon während der Eingabe anhand ihres Titels, nicht anhand dessen, was darin geschrieben wurde.
 
 ![„Chats durchsuchen“ mit einem eingegebenen Wort: Die Seitenleiste listet die Chats, deren Titel passt](../images/use/chat-search.png)
 
 ??? info "Mehr zur Seitenleiste"
-    Die Seitenleiste listet Ihre neuesten Chats danach, wann Sie sie genutzt haben (**Heute**, **Gestern**, **Letzte 7 Tage**, **Letzte 30 Tage**, **Älter**); **Mehr anzeigen** lädt ältere. **Einklappen** (der Pfeil unten) klappt sie zu einem schmalen Streifen zusammen, das Logo öffnet sie wieder. **Kein Projekt** unter **In Projekt verschieben** nimmt einen Chat aus seinem Projekt. Ihre Chats gehören Ihnen: Aus dem Chat heraus lässt sich ein Chat nicht mit Kollegen teilen.
+    Die Seitenleiste listet Ihre neuesten Chats danach, wann Sie sie genutzt haben (**Heute**, **Gestern**, **Letzte 7 Tage**, **Letzte 30 Tage**, **Älter**); **Mehr anzeigen** lädt ältere. **Einklappen** (der Pfeil unten) klappt sie zu einem schmalen Streifen zusammen, das Logo öffnet sie wieder. Auch der schmale Streifen hat eine Schaltfläche **Neues Projekt**: Sie öffnet die Seitenleiste, und das Namensfeld ist bereit. **Kein Projekt** unter **In Projekt verschieben** nimmt einen Chat aus seinem Projekt. Ihre Chats gehören Ihnen: Aus dem Chat heraus lässt sich ein Chat nicht mit Kollegen teilen.
 
 !!! warning "Löschen lässt sich nicht rückgängig machen"
-    **Löschen** bei einem Chat entfernt ihn sofort, ohne Rückfrage, und er lässt sich nicht zurückholen. Wenn Sie ein Projekt löschen, werden alle Chats darin endgültig gelöscht, ebenfalls ohne Rückfrage. Was mit gelöschten Chats auf dem Server geschieht, steht unter [Ihre Daten und Datenschutz](privacy.md#deleting).
+    **Löschen** bei einem Chat fragt zuerst nach. Wenn Sie bestätigen, wird er sofort entfernt und lässt sich nicht zurückholen. Auch beim Löschen eines Projekts wird zuerst nachgefragt; danach werden alle Chats darin endgültig gelöscht. Was mit gelöschten Chats auf dem Server geschieht, steht unter [Ihre Daten und Datenschutz](privacy.md#deleting).
 
 ## Auf dem Smartphone {#on-a-phone}
 
