@@ -451,6 +451,9 @@ class LLMGatewayRequestLog(Base):
     mcp_tool_loop_iterations: Mapped[int | None] = mapped_column(
         Integer, nullable=True, server_default="0",
     )
+    #: Pictures the PII scan passed on unchecked (it reads text only; 0.7.2 G): their count, never what they
+    #: show. NULL when the scan did not run or the request carried none.
+    pii_pictures_unchecked: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

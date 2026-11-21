@@ -134,6 +134,8 @@ class PIISanitizeResponse(BaseModel):
     coverage_status: str = "complete"
     profile_fingerprint: str = "presidio-v2"
     duration_ms: float | None = None
+    #: Picture parts passed on unchecked (the check reads text only); the caller tells the person.
+    pictures_unchecked: int = 0
 
 
 class PIIDetokenizeRequest(BaseModel):

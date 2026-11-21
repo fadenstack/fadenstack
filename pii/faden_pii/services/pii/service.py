@@ -105,6 +105,8 @@ class SanitizeResult:
     pii_report: list[DetectedEntity]
     token_mapping: dict[str, str] | None
     entities_found: int
+    #: Picture parts passed on unchecked: the check reads text only.
+    pictures_unchecked: int = 0
 
 
 class PIIService:
@@ -518,6 +520,7 @@ class PIIService:
             pii_report=all_entities,
             token_mapping=token_mapping or None,
             entities_found=len(all_entities),
+            pictures_unchecked=extracted.pictures,
         )
 
     async def detokenize_payload(

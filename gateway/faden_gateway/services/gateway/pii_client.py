@@ -30,6 +30,8 @@ class SanitizeResult:
     token_mapping: dict[str, str] | None = None
     #: What was found, by entity type -- counts only, never the values.
     entity_types: dict[str, int] = field(default_factory=dict)
+    #: Pictures the check passed on unchecked: it reads text only (0.7.2 G).
+    pictures_unchecked: int = 0
 
 
 def _entity_types(report: Any) -> dict[str, int]:
@@ -197,12 +199,14 @@ class PIIClient:
                 raise ValueError("PII contract lacks tool argument coverage")
             _validate_shape(payload, data["sanitized_payload"])
             _validate_tool_arguments(payload, data["sanitized_payload"])
+            pictures = _pictures_unchanged(payload, data["sanitized_payload"])
             return SanitizeResult(
                 sanitized_payload=data["sanitized_payload"],
                 entities_found=data["entities_found"],
                 pii_detected=data["entities_found"] > 0,
                 token_mapping=data.get("token_mapping"),
                 entity_types=_entity_types(data.get("pii_report")),
+                pictures_unchecked=pictures,
             )
         except PIIPolicyMismatchError as exc:
             logger.warning("The PII service refused the policy (%s): it does not fit the detector", exc.code)
@@ -235,6 +239,32 @@ def _validate_shape(original: Any, sanitized: Any, depth: int = 0) -> None:
             _validate_shape(before, after, depth + 1)
     elif not isinstance(original, str) and original != sanitized:
         raise ValueError("Invalid PII response value")
+
+
+def _is_picture(part: Any) -> bool:
+    """A chat message's picture part, as the PII service passes it on unchecked."""
+    image = part.get("image_url") if isinstance(part, dict) and part.get("type") == "image_url" else None
+    return isinstance(image, dict) and isinstance(image.get("url"), str)
+
+
+def _pictures_unchanged(original: dict, sanitized: dict) -> int:
+    """How many pictures *original* carries; each must come back exactly as it went.
+
+    The check reads text only and passes a picture on as it came (0.7.2 G). The shape check lets a
+    string change -- a text is masked -- so a picture is compared whole: a response that altered one
+    is refused like any other broken response.
+    """
+    count = 0
+    for before, after in zip(original.get("messages", []), sanitized.get("messages", []), strict=True):
+        parts = before.get("content") if isinstance(before, dict) else None
+        if not isinstance(parts, list):
+            continue
+        for part, back in zip(parts, after["content"], strict=True):
+            if _is_picture(part):
+                if back != part:
+                    raise ValueError("Invalid PII response: a picture changed")
+                count += 1
+    return count
 
 
 def _validate_tool_arguments(original: dict, sanitized: dict) -> None:

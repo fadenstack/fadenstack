@@ -15,6 +15,8 @@ OpenAI stream: an OpenAI SDK would not know what to do with a named event.
 - ``CUSTOM`` ``faden.citations``: the sources a knowledge search returned --
   document, chunk, score; not the text.
 - ``CUSTOM`` ``faden.pii``: what the PII scan found -- types and counts only.
+- ``CUSTOM`` ``faden.pii_pictures_unchecked``: the PII scan ran and passed the
+  request's pictures on unchecked (it reads text only) -- their count.
 - ``CUSTOM`` ``faden.gateway_round``: the round as the model saw it (its
   tool-calling turn and the tools' answers, with PII values put back), for
   the SDK to keep and send back as history. The gateway accepts it back.
@@ -109,6 +111,25 @@ def pii_notice(types: dict[str, int], mode: str | None) -> dict[str, Any] | None
         return None
     value = {"mode": mode, "entities": dict(sorted(types.items()))}
     return {"type": "CUSTOM", "name": "faden.pii", "value": value}
+
+
+def pictures_unchecked(count: int) -> dict[str, Any] | None:
+    """The PII scan passed *count* pictures on unchecked: it reads text only; ``None`` for none.
+
+    The chat says so under the reply, and an agent's panel can: the limit shows, where a picture
+    used to have the whole message refused (0.7.2 G). The message is the gateway's own words, for a
+    client that does not word it itself.
+    """
+    if count <= 0:
+        return None
+    went = (
+        "the picture went to the model as it is" if count == 1
+        else f"{count} pictures went to the model as they are"
+    )
+    return {"type": "CUSTOM", "name": "faden.pii_pictures_unchecked", "value": {
+        "count": count,
+        "message": f"Pictures are not checked for personal data, so {went}.",
+    }}
 
 
 def picture_left_out(attachment_id: str, filename: str, model: str) -> dict[str, Any]:

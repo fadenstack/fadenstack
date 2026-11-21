@@ -12,7 +12,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import PurePosixPath
-from typing import Any, TypedDict, cast
+from typing import Any, Final, TypedDict, cast
 
 from faden_gateway.db.dao.gateway_dao import GatewayDAO
 from faden_gateway.db.dao.session_dao import SessionDAO
@@ -393,6 +393,51 @@ _PII_OUT_OF_TIME_MESSAGE = (
     "The PII check took longer than its limit for this request ({code}), and the PII policy blocks what it "
     "cannot check, so nothing was sent. A shorter text fits; an administrator can run the check on a GPU."
 )
+
+
+#: The refusal when the organisation refuses pictures under the PII check (``refuse_pictures``, 0.7.2 G).
+PICTURES_REFUSED: Final = "pii_pictures_refused"
+_PICTURES_REFUSED_MESSAGE = (
+    "Pictures are not checked for personal data, and your organisation does not send them unchecked. "
+    "Remove the picture and send again."
+)
+_PROJECT_PICTURE_REFUSED_MESSAGE = (
+    "Pictures are not checked for personal data, and your organisation does not send them unchecked. "
+    "Remove {file} from the project's Files to use this project's chats."
+)
+
+
+def _picture_count(payload: dict[str, Any]) -> int:
+    """How many picture parts the chat's messages carry."""
+    return sum(
+        1
+        for message in payload.get("messages") or []
+        if isinstance(message, dict) and isinstance(message.get("content"), list)
+        for part in message["content"]
+        if isinstance(part, dict) and part.get("type") == "image_url"
+    )
+
+
+def _refuse_pictures(payload: dict[str, Any], project_pictures: list[str]) -> None:
+    """403 ``pii_pictures_refused`` when *payload* carries a picture: the check cannot read one.
+
+    A picture from the project's Files goes with every chat of the project, so the refusal names it
+    (and ``faden.pictures_refused.project_files`` lists them): removing it there is the way on.
+    """
+    if not _picture_count(payload):
+        return
+    message = (
+        _PROJECT_PICTURE_REFUSED_MESSAGE.format(file=project_pictures[0]) if project_pictures
+        else _PICTURES_REFUSED_MESSAGE
+    )
+    raise GatewayError(
+        status_code=403,
+        message=message,
+        error_type="invalid_request_error",
+        param="project_files" if project_pictures else None,
+        code=PICTURES_REFUSED,
+        extra={"faden": {"pictures_refused": {"project_files": list(project_pictures)}}},
+    )
 
 
 def _pii_blocked(exc: BaseException, unavailable: str) -> GatewayError:
@@ -834,15 +879,17 @@ def _allowing_personal_data(mcp_tools: list[dict[str, Any]] | None) -> set[str]:
 def _pii_events(req: _Prepared) -> list[dict[str, Any]]:
     """What goes before the answer, when the client asked for events.
 
-    The PII notice (when something was found), and the client's tools a rule
-    refused.
+    The PII notice (when something was found), that pictures went on unchecked
+    (when the scan ran and the request carried any), and the client's tools a
+    rule refused.
     """
     if not req.faden_events:
         return []
     notice = (
         faden_events.pii_notice(req.pii_types, req.pii_policy.egress.mode) if req.pii_policy is not None else None
     )
-    return [*([notice] if notice is not None else []), *req.faden_leading]
+    unchecked = faden_events.pictures_unchecked(req.pii_pictures_unchecked)
+    return [*(event for event in (notice, unchecked) if event is not None), *req.faden_leading]
 
 
 async def _leading(events: list[dict[str, Any]], stream: AsyncIterator[bytes]) -> AsyncIterator[bytes]:
@@ -1316,6 +1363,12 @@ class _Prepared:
     faden_events: bool = False
     #: What the egress PII scan found: entity type -> count.
     pii_types: dict[str, int] = field(default_factory=dict)
+    #: Pictures the PII scan passed on unchecked (it reads text only): the most any scan of this request
+    #: saw, as each scan reads the whole conversation (0.7.2 G).
+    pii_pictures_unchecked: int = 0
+    #: The pictures of the project's Files the chat's context carries (their names): they go with every
+    #: chat of the project, so a refusal of pictures names them.
+    project_pictures: list[str] = field(default_factory=list)
     #: Faden events not yet sent (tool ends, citations, gateway rounds).
     faden_pending: list[dict[str, Any]] = field(default_factory=list)
     #: Faden events of a whole answer, sent in its ``faden`` object.
@@ -1750,6 +1803,7 @@ class GatewayService:
                 rag_context=req.rag_context,
                 mcp_tool_call_count=len(req.tool_calls),
                 mcp_tool_loop_iterations=req.tool_iterations,
+                pii_pictures_unchecked=req.pii_pictures_unchecked or None,
                 tool_calls=req.tool_calls,
                 **_agent_log_fields(req),
             )
@@ -2212,6 +2266,7 @@ class GatewayService:
                     rag_context=req.rag_context,
                     mcp_tool_call_count=0,
                     mcp_tool_loop_iterations=0,
+                    pii_pictures_unchecked=req.pii_pictures_unchecked or None,
                     tool_calls=[],
                     **_agent_log_fields(req),
                 )
@@ -3300,6 +3355,10 @@ class GatewayService:
             # (the backend seeds that default on every install): nothing to enforce.
             _note_default_policy_unenforced()
             return None, candidates
+        if pii_policy.egress.refuse_pictures:
+            # The organisation's choice: a picture cannot be checked, so a request with one is refused here,
+            # before the scan and whatever fail_action says (0.7.2 G). By default it goes on, with a note.
+            _refuse_pictures(req.payload, req.project_pictures)
         try:
             # A policy someone saved, with the PII module off, fails like a scan that errors:
             # fail_action decides. It used to send the payload unscanned, without a word.
@@ -3355,6 +3414,7 @@ class GatewayService:
             # Types and counts only, for a notice in the UI -- never the values.
             for kind, count in result.entity_types.items():
                 req.pii_types[kind] = req.pii_types.get(kind, 0) + count
+            req.pii_pictures_unchecked = max(req.pii_pictures_unchecked, result.pictures_unchecked)
         return result.sanitized_payload, result.token_mapping
 
     async def _lease(
@@ -3622,6 +3682,10 @@ class GatewayService:
         payload["messages"] = assembled.messages
         _cap_output(payload)
         if req is not None:
+            req.project_pictures = [
+                a.filename for a in assembled.attachments_used
+                if a.session_id is None and a.project_id is not None and a.content_type.startswith("image/")
+            ]
             req.attachments = [
                 attachment_search.SearchableFile(id=str(a.id), filename=a.filename, text=a.extracted_text or "")
                 for a in assembled.searchable
@@ -4624,6 +4688,7 @@ class GatewayService:
                 rag_context=req.rag_context,
                 mcp_tool_call_count=len(req.tool_calls),
                 mcp_tool_loop_iterations=req.tool_iterations,
+                pii_pictures_unchecked=req.pii_pictures_unchecked or None,
                 tool_calls=req.tool_calls,
                 **_agent_log_fields(req),
             )
