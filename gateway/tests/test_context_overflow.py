@@ -79,6 +79,67 @@ async def test_a_whole_answers_refusal_is_a_400_with_the_code(monkeypatch: pytes
     assert result.payload["error"]["code"] == CONTEXT_OVERFLOW
 
 
+# ── Behind Ray Serve: the overflow as a 500, its sentence at the end of a traceback ─────────────────────────
+
+#: What vLLM behind Ray Serve answered on the release server's DGX cluster (21 Nov): a 500 whose traceback runs
+#: past the 2,000 characters a refusal's message is cut to, the sentence on its last line.
+RAY_SERVE_500 = (
+    "Traceback (most recent call last):\n"
+    + "".join(f'  File "/usr/local/lib/python3.12/dist-packages/vllm/renderers/x{i}.py", line {i}, in step\n'
+              for i in range(60))
+    + "vllm.exceptions.VLLMValidationError: This model's maximum context length is 32768 tokens. However, you "
+    "requested 16 output tokens and your prompt contains at least 32753 input tokens, for a total of at least "
+    "32769 tokens. Please reduce the length of the input prompt or the number of requested output tokens. "
+    "(parameter=input_tokens, value=32753)\n"
+)
+
+
+def test_a_streamed_500_that_says_it_is_the_overflow_and_passes_on_only_the_sentence() -> None:
+    assert len(RAY_SERVE_500) > 2_000
+    error = llm_adapter._engine_refusal(500, RAY_SERVE_500[:2000], RAY_SERVE_500)["error"]  # noqa: SLF001
+    assert (error["type"], error["code"]) == ("invalid_request_error", CONTEXT_OVERFLOW)
+    assert "maximum context length is 32768 tokens" in error["message"]
+    assert "Traceback" not in error["message"] and 'File "' not in error["message"]
+
+
+@pytest.mark.parametrize("body", [
+    "Traceback (most recent call last):\n  File \"x.py\", line 1\nKeyError: 'max_context_length'\n",
+    "Internal Server Error: the context window manager crashed",
+])
+def test_another_500_stays_the_models_failure(body: str) -> None:
+    error = llm_adapter._engine_refusal(500, body[:2000], body)["error"]  # noqa: SLF001
+    assert error["code"] == "server_error" and "max_context_length" not in error["message"]
+
+
+@pytest.mark.anyio
+async def test_a_whole_answers_500_that_says_it_is_a_400_with_the_code(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def failed(**_: Any) -> Any:
+        raise litellm.exceptions.InternalServerError(message=RAY_SERVE_500, model="m", llm_provider="openai")
+
+    monkeypatch.setattr(litellm, "acompletion", failed)
+    result = await llm_adapter.LLMAdapter()._non_stream_completion(model="openai/m", messages=[])  # noqa: SLF001
+    assert result.status_code == 400
+    assert result.payload["error"]["code"] == CONTEXT_OVERFLOW
+    assert "Traceback" not in result.payload["error"]["message"]
+
+
+@pytest.mark.anyio
+async def test_a_whole_answers_other_500_stays_a_502(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def failed(**_: Any) -> Any:
+        raise litellm.exceptions.InternalServerError(message="CUDA out of memory", model="m", llm_provider="openai")
+
+    monkeypatch.setattr(litellm, "acompletion", failed)
+    result = await llm_adapter.LLMAdapter()._non_stream_completion(model="openai/m", messages=[])  # noqa: SLF001
+    assert result.status_code == 502 and result.payload["error"]["code"] == "server_error"
+
+
+def test_a_pre_stream_failure_that_says_it_is_the_overflow() -> None:
+    exc = litellm.exceptions.InternalServerError(message=RAY_SERVE_500, model="m", llm_provider="openai")
+    assert llm_adapter._failure(exc)["error"]["code"] == CONTEXT_OVERFLOW  # noqa: SLF001
+    plain = litellm.exceptions.InternalServerError(message="boom", model="m", llm_provider="openai")
+    assert llm_adapter._failure(plain)["error"]["code"] == "server_error"  # noqa: SLF001
+
+
 @pytest.mark.anyio
 async def test_the_streams_error_event_is_logged_as_the_overflow_it_was() -> None:
     async def events() -> Any:
