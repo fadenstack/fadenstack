@@ -4,7 +4,7 @@
  * Handles: session creation (lazy), message state, SSE streaming, abort,
  * file attachments, and token‐usage extraction.
  */
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -23,6 +23,7 @@ import {
   type FadenEvent,
   type TokenUsage,
 } from "~/api/chatTypes";
+import { localPictureParts, withPictures } from "../messagePictures";
 
 /** Small helper: flush accumulated text to state at display frame rate. */
 function useStreamThrottle(setter: (v: string) => void) {
@@ -216,7 +217,8 @@ export function useChatStream({
   // The messages as the callbacks read them: set with the state.
   const setMessages = useCallback((next: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => {
     setMessagesState((prev) => {
-      const value = typeof next === "function" ? next(prev) : next;
+      // A list read from the gateway keeps the pictures this page showed on the messages it sent.
+      const value = typeof next === "function" ? next(prev) : withPictures(prev, next);
       messagesRef.current = value;
       return value;
     });
@@ -309,6 +311,18 @@ export function useChatStream({
   const turnRef = useRef<string | null>(null);
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
+  /** The notes of replies (this page only), for a retry to read. */
+  const replyNotesRef = useRef(replyNotes);
+  replyNotesRef.current = replyNotes;
+  /** Object URLs made for the pictures of sent messages: let go of with the chat. */
+  const pictureUrlsRef = useRef<string[]>([]);
+  useEffect(
+    () => () => {
+      for (const url of pictureUrlsRef.current) URL.revokeObjectURL(url);
+      pictureUrlsRef.current = [];
+    },
+    [],
+  );
 
   /** Stores the last send args so retry can re-issue the request. */
   const lastSendRef = useRef<{
@@ -349,7 +363,16 @@ export function useChatStream({
         resumed = false,
         text,
         pictureNames = [],
-      }: { turn?: string | null; resumed?: boolean; text?: string; pictureNames?: string[] } = {},
+        carryNotes = [],
+      }: {
+        turn?: string | null;
+        resumed?: boolean;
+        text?: string;
+        /** The names of the pictures of this message, for the note on unchecked pictures. */
+        pictureNames?: string[];
+        /** What the reply being tried again said was left out: kept, in case the new one does not say it again. */
+        carryNotes?: string[];
+      } = {},
     ): Promise<void> => {
       setIsStreaming(true);
       streamThrottle.reset();
@@ -371,7 +394,7 @@ export function useChatStream({
       let finish: string | null = null;
       const localId = `tmp-${Date.now()}-a`;
       // Files of the chat the gateway did not send with this reply: shown on it.
-      const notes: string[] = [];
+      const notes: string[] = [...carryNotes];
 
       const settle = () => {
         turnRef.current = null;
@@ -407,13 +430,14 @@ export function useChatStream({
       });
 
       setToolNotices([]);
-      setStreamingNotes([]);
+      setStreamingNotes([...notes]);
       try {
         for await (const delta of handle.reader) {
           if (delta.faden) {
             const read = readFadenEvent(delta.faden);
             if (read?.kind === "left_out") {
-              notes.push(noteOf(read.leftOut));
+              const note = noteOf(read.leftOut);
+              if (!notes.includes(note)) notes.push(note);
               setStreamingNotes([...notes]);
             }
             if (read?.kind === "pictures_unchecked" && !uncheckedShownRef.current.has(sid)) {
@@ -624,13 +648,16 @@ export function useChatStream({
           );
         }
 
-        // 3. Append the user message optimistically (skip if duplicate)
+        // 3. Append the user message optimistically (skip if duplicate),
+        // with its pictures, as the composer showed them.
+        const pictures = localPictureParts(files);
+        pictureUrlsRef.current.push(...pictures.urls);
         const userMsg: ChatMessage = {
           id: `tmp-${Date.now()}`,
           session_id: sid,
           role: "user",
           content: text,
-          content_parts: null,
+          content_parts: pictures.parts.length > 0 ? pictures.parts : null,
           tool_call_json: null,
           model_alias: null,
           provider_instance_id: null,
@@ -703,6 +730,8 @@ export function useChatStream({
         }),
         sid,
         model || last.model_alias || "",
+        // The note the reply had (a picture left out) goes with the new one.
+        { carryNotes: replyNotesRef.current[last.id] ?? [] },
       );
       return;
     }

@@ -1,6 +1,6 @@
 /**
- * ProjectSettingsDialog — edit a project's name, description, system prompt
- * and files.
+ * ProjectSettingsDialog — edit a project's name, description, system prompt,
+ * default model and files.
  */
 import { useEffect, useState } from "react";
 import Button from "@mui/material/Button";
@@ -8,11 +8,13 @@ import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
+import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { useTranslation } from "react-i18next";
 
-import type { ChatProject } from "~/api/chatTypes";
+import { chatApi } from "~/api/chatClient";
+import { isChatModel, type ChatProject } from "~/api/chatTypes";
 import ProjectFiles from "./ProjectFiles";
 
 interface Props {
@@ -25,6 +27,8 @@ interface Props {
       name?: string;
       description?: string;
       system_instructions?: string;
+      /** ``null`` takes the project's default model away: the chat's own choice. */
+      model_alias?: string | null;
     },
   ) => Promise<void>;
 }
@@ -39,6 +43,9 @@ export default function ProjectSettingsDialog({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
+  // "" is None: the chat's own choice.
+  const [modelAlias, setModelAlias] = useState("");
+  const [models, setModels] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -46,8 +53,26 @@ export default function ProjectSettingsDialog({
       setName(project.name);
       setDescription(project.description ?? "");
       setSystemPrompt(project.system_instructions ?? "");
+      setModelAlias(project.model_alias ?? "");
     }
   }, [project]);
+
+  // The chat's own model list, chat models only (an embedding model fails on the first message).
+  useEffect(() => {
+    if (!open) return;
+    let live = true;
+    chatApi
+      .listModels()
+      .then((all) => {
+        if (live) setModels(all.filter(isChatModel).map((m) => m.alias));
+      })
+      .catch(() => {
+        // The picker then offers None, and the project's current model if it has one.
+      });
+    return () => {
+      live = false;
+    };
+  }, [open]);
 
   const handleSave = async () => {
     if (!project) return;
@@ -57,6 +82,8 @@ export default function ProjectSettingsDialog({
         name: name.trim(),
         description: description.trim() || undefined,
         system_instructions: systemPrompt.trim() || undefined,
+        // Sent only when it changed.
+        ...(modelAlias !== (project.model_alias ?? "") ? { model_alias: modelAlias || null } : {}),
       });
       onClose();
     } finally {
@@ -104,6 +131,24 @@ export default function ProjectSettingsDialog({
             defaultValue: "You are a helpful assistant that specialises in…",
           })}
         />
+        <TextField
+          select
+          label={t("chat.project_model")}
+          value={modelAlias}
+          onChange={(e) => setModelAlias(e.target.value)}
+          size="small"
+          fullWidth
+          helperText={t("chat.project_model_hint")}
+          slotProps={{ select: { displayEmpty: true } }}
+        >
+          <MenuItem value="">{t("chat.project_model_none")}</MenuItem>
+          {/* The project's model stays in the list even if the list does not carry it now. */}
+          {(modelAlias && !models.includes(modelAlias) ? [modelAlias, ...models] : models).map((alias) => (
+            <MenuItem key={alias} value={alias}>
+              {alias}
+            </MenuItem>
+          ))}
+        </TextField>
         {project && <ProjectFiles projectId={project.id} />}
       </DialogContent>
       <DialogActions>

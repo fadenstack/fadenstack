@@ -3179,7 +3179,12 @@
     "project_file_read": "Text gelesen",
     "project_file_unread": "Text konnte nicht gelesen werden",
     "project_file_picture": "Bild",
-    "project_file_pending": "Text wird gelesen…"
+    "project_file_pending": "Text wird gelesen…",
+    "project_model": "Standardmodell",
+    "project_model_hint": "Neue Chats in diesem Projekt beginnen mit diesem Modell.",
+    "project_model_none": "Keines (die Wahl des Chats)",
+    "picture_attached": "Angehängtes Bild: {{name}}",
+    "picture_attached_unnamed": "Angehängtes Bild"
   },
   "tools": {
     "executionMode": "Ausführung",

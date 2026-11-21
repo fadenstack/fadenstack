@@ -114,6 +114,7 @@ interface Props {
       name?: string;
       description?: string;
       system_instructions?: string;
+      model_alias?: string | null;
     },
   ) => Promise<void>;
   onMoveSession: (sessionId: string, projectId: string | null) => void;

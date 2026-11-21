@@ -27,6 +27,7 @@ import MessageDebugPanel from "./MessageDebugPanel";
 import ChatInput from "./ChatInput";
 import ChatTopbar from "./ChatTopbar";
 import { followScroll, type Follower } from "../followScroll";
+import { picturesOf } from "../messagePictures";
 
 /** The arguments of a tool call as the card shows them: indented when they are JSON, as sent otherwise. */
 function formatArguments(raw: string): string {
@@ -285,6 +286,7 @@ export default function ChatWindow({
                 notes={msg.role === "assistant" ? getReplyNotes(msg.id) : undefined}
                 stopped={msg.status === "stopped"}
                 onRetry={msg.status === "stopped" ? onRetry : undefined}
+                pictures={msg.role === "user" ? picturesOf(msg.content_parts) : undefined}
               />
             );
             if (!failed) return bubble;

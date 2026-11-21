@@ -3179,7 +3179,12 @@
     "project_file_read": "已读取文字",
     "project_file_unread": "无法读取文字",
     "project_file_picture": "图片",
-    "project_file_pending": "正在读取文字…"
+    "project_file_pending": "正在读取文字…",
+    "project_model": "默认模型",
+    "project_model_hint": "本项目中的新聊天将以此模型开始。",
+    "project_model_none": "无（由聊天自行选择）",
+    "picture_attached": "已附图片：{{name}}",
+    "picture_attached_unnamed": "已附图片"
   },
   "tools": {
     "executionMode": "执行",

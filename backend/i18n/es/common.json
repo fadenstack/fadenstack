@@ -3179,7 +3179,12 @@
     "project_file_read": "Texto leído",
     "project_file_unread": "No se pudo leer el texto",
     "project_file_picture": "Imagen",
-    "project_file_pending": "Leyendo el texto…"
+    "project_file_pending": "Leyendo el texto…",
+    "project_model": "Modelo predeterminado",
+    "project_model_hint": "Los chats nuevos de este proyecto empiezan con este modelo.",
+    "project_model_none": "Ninguno (la elección del propio chat)",
+    "picture_attached": "Imagen adjunta: {{name}}",
+    "picture_attached_unnamed": "Imagen adjunta"
   },
   "tools": {
     "executionMode": "Ejecución",

@@ -2853,7 +2853,12 @@
     "project_file_read": "Texte lu",
     "project_file_unread": "Le texte n’a pas pu être lu",
     "project_file_picture": "Image",
-    "project_file_pending": "Lecture du texte…"
+    "project_file_pending": "Lecture du texte…",
+    "project_model": "Modèle par défaut",
+    "project_model_hint": "Les nouvelles conversations de ce projet commencent avec ce modèle.",
+    "project_model_none": "Aucun (le choix de la conversation)",
+    "picture_attached": "Image jointe : {{name}}",
+    "picture_attached_unnamed": "Image jointe"
   },
   "mcp": {
     "servers_title": "Serveurs MCP",

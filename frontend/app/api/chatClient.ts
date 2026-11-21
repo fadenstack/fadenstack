@@ -498,7 +498,8 @@ export const chatApi = {
       name: string;
       description: string;
       system_instructions: string;
-      model_alias: string;
+      /** ``null`` clears it. */
+      model_alias: string | null;
     }>,
   ) =>
     request<ChatProject>(`/projects/${id}`, {

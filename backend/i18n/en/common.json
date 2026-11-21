@@ -2851,7 +2851,12 @@
     "project_file_read": "Text read",
     "project_file_unread": "Text could not be read",
     "project_file_picture": "Picture",
-    "project_file_pending": "Reading text…"
+    "project_file_pending": "Reading text…",
+    "project_model": "Default model",
+    "project_model_hint": "New chats in this project start with this model.",
+    "project_model_none": "None (the chat's own choice)",
+    "picture_attached": "Attached picture: {{name}}",
+    "picture_attached_unnamed": "Attached picture"
   },
   "mcp": {
     "servers_title": "MCP Servers",
