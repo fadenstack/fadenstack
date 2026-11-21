@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import hmac
 import json
 import logging
 import time
@@ -379,7 +380,9 @@ def _require_agent_token(request: Request) -> None:
     if not token:
         return
     header = request.headers.get("Authorization", "")
-    if header != f"Bearer {token}":
+    # In constant time: a plain comparison stops at the first differing byte, and its timing tells a
+    # caller how much of a guess was right (OWASP ASVS 5.0, V11: secrets compared in constant time).
+    if not hmac.compare_digest(header.encode(), f"Bearer {token}".encode()):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid agent token.")
 
 
