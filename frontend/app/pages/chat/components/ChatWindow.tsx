@@ -22,6 +22,7 @@ import { useChatSkills } from "../hooks/useChatSkills";
 import { useChatStream } from "../hooks/useChatStream";
 import FailedReply from "./FailedReply";
 import MessageBubble from "./MessageBubble";
+import OlderMessagesNote from "./OlderMessagesNote";
 import ThinkingBlock from "./ThinkingBlock";
 import MessageDebugPanel from "./MessageDebugPanel";
 import ChatInput from "./ChatInput";
@@ -105,6 +106,8 @@ export default function ChatWindow({
     streamingNotes,
     getReplyNotes,
     getResponseMs,
+    context,
+    olderNote,
     send,
     retry,
     stop,
@@ -209,6 +212,8 @@ export default function ChatWindow({
     send(text, selectedModel, files, skills.selected, reasoningEffort);
   };
 
+  const lastReplyId = [...messages].reverse().find((m) => m.role === "assistant")?.id;
+
   const handleRetry = () => {
     jumpToLatest();
     return retry();
@@ -267,9 +272,12 @@ export default function ChatWindow({
             // The chat's last reply, once it failed or stopped, is tried again from here.
             const onRetry = i === messages.length - 1 && !isStreaming ? handleRetry : undefined;
             const failed = msg.status === "failed" || msg.status === "interrupted";
+            // The latest reply of this page shows what its turn said about the context.
+            const lastReply = Boolean(context) && msg.id === lastReplyId;
             const bubble = (!failed || msg.content) && (
               <MessageBubble
                 key={msg.id}
+                context={lastReply ? context : null}
                 role={msg.role}
                 content={msg.content}
                 modelAlias={msg.model_alias}
@@ -292,9 +300,14 @@ export default function ChatWindow({
                 pictures={msg.role === "user" ? picturesOf(msg.content_parts) : undefined}
               />
             );
-            if (!failed) return bubble;
+            // Where older messages stopped going to the model: said once, above the message the turn answered.
+            const older = olderNote && olderNote.index === i && (
+              <OlderMessagesNote key={`older-${msg.id}`} summary={olderNote.summary} />
+            );
+            if (!failed) return older ? <Fragment key={msg.id}>{older}{bubble}</Fragment> : bubble;
             return (
               <Fragment key={msg.id}>
+                {older}
                 {bubble}
                 <FailedReply
                   message={

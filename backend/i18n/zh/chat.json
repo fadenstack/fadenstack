@@ -109,6 +109,11 @@
   "thinking_low": "低",
   "thinking_medium": "中",
   "thinking_high": "高",
+  "older_dropped": "较早的消息不再发送给模型。模型需要时可以搜索它们。",
+  "older_summarised": "较早的消息不再发送给模型；由模型撰写的摘要代替它们。",
+  "context_use": "上下文：{{used}} / {{budget}} 个令牌",
+  "context_use_tooltip": "为本次回复发送给模型的上下文（估算值）及其适配的预算。",
+  "context_use_window": "模型的上下文窗口：{{window}} 个令牌。",
   "tips": {
     "title": "提示",
     "dismiss": "知道了",

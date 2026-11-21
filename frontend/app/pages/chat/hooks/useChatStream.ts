@@ -17,9 +17,11 @@ import {
   type StreamHandle,
 } from "~/api/chatClient";
 import {
+  CONTEXT_LENGTH_EXCEEDED,
   RETRYABLE_TURNS,
   type ChatMessage,
   type ChatSession,
+  type ContextUse,
   type FadenEvent,
   type TokenUsage,
 } from "~/api/chatTypes";
@@ -98,6 +100,14 @@ export function errorDetail(err: unknown, text?: string): ChatErrorDetail {
   return { kind: "error", message };
 }
 
+/** The line that says older messages no longer go to the model: once per chat, where they stopped. */
+export interface OlderNote {
+  /** A summary written by a model stands for them. */
+  summary: boolean;
+  /** The line stands before the message at this index (the one the turn answers). */
+  index: number;
+}
+
 /** A tool call that waits for the user in the answer that streams. */
 export interface PendingApproval {
   approvalId: string;
@@ -127,9 +137,24 @@ export function readFadenEvent(event: FadenEvent):
   | { kind: "left_out"; leftOut: LeftOutFile }
   | { kind: "pictures_unchecked"; count: number }
   | { kind: "unmarked" }
+  | { kind: "context"; context: ContextUse }
   | null {
   const value = (event.value ?? {}) as Record<string, unknown>;
   const text = (key: string) => (typeof value[key] === "string" ? (value[key] as string) : "");
+  if (event.name === "faden.context") {
+    const count = (key: string) => (typeof value[key] === "number" && value[key] >= 0 ? (value[key] as number) : 0);
+    return {
+      kind: "context",
+      context: {
+        tokens: count("tokens"),
+        budget: count("budget"),
+        window: typeof value.window === "number" && value.window > 0 ? value.window : null,
+        dropped: count("dropped"),
+        summary: value.summary === true,
+        summarised: value.summarised === true,
+      },
+    };
+  }
   if (event.name === "faden.attachment_left_out") {
     return {
       kind: "left_out",
@@ -191,6 +216,10 @@ export interface UseChatStreamReturn {
   streamingNotes: string[];
   /** The same for a reply, once written (this page only; not saved). */
   getReplyNotes: (msgId: string) => string[];
+  /** What the last turn said about its context (`faden.context`): how much went, of what budget. */
+  context: ContextUse | null;
+  /** The line for the chat once older messages stopped going to the model; null before. */
+  olderNote: OlderNote | null;
   /** Response time in ms for the last completed assistant message. */
   lastResponseMs: number | null;
   /** Get response time for a specific message id, if tracked. */
@@ -243,6 +272,11 @@ export function useChatStream({
     setErrorInfo(message === null ? null : { kind: "error", message });
   }, []);
   const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null);
+  const [context, setContext] = useState<ContextUse | null>(null);
+  /** The line on older messages, by chat: said once per chat for the page's life. */
+  const [olderNotes, setOlderNotes] = useState<Record<string, OlderNote>>({});
+  const olderNotesRef = useRef(olderNotes);
+  olderNotesRef.current = olderNotes;
   const [toolNotices, setToolNotices] = useState<string[]>([]);
   const [streamingNotes, setStreamingNotes] = useState<string[]>([]);
   const [replyNotes, setReplyNotes] = useState<Record<string, string[]>>({});
@@ -372,6 +406,7 @@ export function useChatStream({
         text,
         pictureNames = [],
         carryNotes = [],
+        contextRetry = false,
       }: {
         turn?: string | null;
         resumed?: boolean;
@@ -380,6 +415,8 @@ export function useChatStream({
         pictureNames?: string[];
         /** What the reply being tried again said was left out: kept, in case the new one does not say it again. */
         carryNotes?: string[];
+        /** This run is the one retry after a context that was too long: another overflow is shown as failed. */
+        contextRetry?: boolean;
       } = {},
     ): Promise<void> => {
       setIsStreaming(true);
@@ -452,6 +489,21 @@ export function useChatStream({
               uncheckedShownRef.current.add(sid);
               notes.push(uncheckedNote(read.count, pictureNames));
               setStreamingNotes([...notes]);
+            }
+            if (read?.kind === "context") {
+              setContext(read.context);
+              if (read.context.dropped > 0) {
+                const said = olderNotesRef.current[sid];
+                const next = said
+                  ? said.summary || !read.context.summary
+                    ? null
+                    : { ...said, summary: true }
+                  : { summary: read.context.summary, index: Math.max(0, messagesRef.current.length - 1) };
+                if (next) {
+                  olderNotesRef.current = { ...olderNotesRef.current, [sid]: next };
+                  setOlderNotes(olderNotesRef.current);
+                }
+              }
             }
             onFaden(delta.faden);
             continue;
@@ -527,7 +579,28 @@ export function useChatStream({
             setMessages(stored);
             return;
           }
-          if (last?.role === "assistant" && last.status && RETRYABLE_TURNS.has(last.status)) {
+          const overflow = err instanceof ChatApiError && err.code === CONTEXT_LENGTH_EXCEEDED;
+          const failedTurn =
+            last?.role === "assistant" && last.status && RETRYABLE_TURNS.has(last.status) ? last.id : null;
+          const turnToRetry = failedTurn ?? (overflow ? ((err as ChatApiError).turnId ?? turnId) : null);
+          if (overflow && !contextRetry && turnToRetry && !turnToRetry.startsWith("tmp-")) {
+            // The context was too long for the model: once, without asking, with less of it.
+            const sent = lastSendRef.current;
+            setMessages(failedTurn ? stored.slice(0, -1) : stored);
+            await runStream(
+              retryTurn(sid, turnToRetry, {
+                context_factor: 0.75,
+                ...(model ? { model } : {}),
+                ...(sent?.skills && sent.skills.length > 0 ? { skills: sent.skills } : {}),
+                ...(sent?.reasoningEffort ? { reasoning_effort: sent.reasoningEffort } : {}),
+              }),
+              sid,
+              model,
+              { text, contextRetry: true },
+            );
+            return;
+          }
+          if (failedTurn) {
             // Failed, and stored with its error, to be tried again.
             setMessages(stored);
             setError(null);
@@ -781,6 +854,8 @@ export function useChatStream({
     error,
     errorInfo,
     lastResponseMs,
+    context,
+    olderNote: olderNotes[sessionId ?? sessionIdRef.current ?? ""] ?? null,
     /** Get response time for a specific message id, if tracked. */
     getResponseMs: (msgId: string) =>
       responseMsMapRef.current.get(msgId) ?? null,

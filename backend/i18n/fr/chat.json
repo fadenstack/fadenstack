@@ -109,6 +109,11 @@
   "thinking_low": "Faible",
   "thinking_medium": "Moyenne",
   "thinking_high": "Élevée",
+  "older_dropped": "Les messages plus anciens ne sont plus envoyés au modèle. Il peut les rechercher quand il en a besoin.",
+  "older_summarised": "Les messages plus anciens ne sont plus envoyés au modèle ; un résumé écrit par le modèle les remplace.",
+  "context_use": "Contexte : {{used}} sur {{budget}} jetons",
+  "context_use_tooltip": "Le contexte envoyé au modèle pour cette réponse (une estimation) et le budget auquel il a été ajusté.",
+  "context_use_window": "Fenêtre de contexte du modèle : {{window}} jetons.",
   "tips": {
     "title": "Astuces",
     "dismiss": "Compris",

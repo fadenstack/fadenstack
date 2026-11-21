@@ -165,6 +165,25 @@ export interface StreamDelta {
   faden?: FadenEvent;
 }
 
+/** What `faden.context` says about a turn: how much was sent, what it was fitted to, what no longer goes. */
+export interface ContextUse {
+  /** The context as sent (an estimate). */
+  tokens: number;
+  /** What it was fitted to. */
+  budget: number;
+  /** The model's context length, when known. */
+  window: number | null;
+  /** How many earlier messages no longer go to the model. */
+  dropped: number;
+  /** A summary written by a model stands for them. */
+  summary: boolean;
+  /** It was written this turn. */
+  summarised: boolean;
+}
+
+/** The code of a turn whose context was too long for the model (the chat tries it again with less). */
+export const CONTEXT_LENGTH_EXCEEDED = "context_length_exceeded";
+
 /** An AG-UI event the gateway sends beside the answer (``event: faden``). */
 export interface FadenEvent {
   type: string;

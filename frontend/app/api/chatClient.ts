@@ -73,6 +73,8 @@ export class ChatApiError extends Error {
   retryAfter: number | null;
   /** ``pii_pictures_refused``: the project's files that are pictures (``faden.pictures_refused.project_files``). */
   projectPictures: string[];
+  /** The reply's turn, when the response named it (`x-faden-turn-id`): what a retry is made for. */
+  turnId: string | null;
 
   constructor(
     message: string,
@@ -84,6 +86,7 @@ export class ChatApiError extends Error {
       governance?: GovernanceNotice | null;
       retryAfter?: number | null;
       projectPictures?: string[];
+      turnId?: string | null;
     } = {},
   ) {
     super(message);
@@ -95,6 +98,7 @@ export class ChatApiError extends Error {
     this.governance = init.governance ?? null;
     this.retryAfter = init.retryAfter ?? null;
     this.projectPictures = init.projectPictures ?? [];
+    this.turnId = init.turnId ?? null;
   }
 }
 
@@ -203,6 +207,7 @@ async function buildApiError(res: Response): Promise<Error> {
           ...errorFields(parsed),
           status: res.status,
           retryAfter: Number.isFinite(retry) && retry > 0 ? retry : null,
+          turnId: res.headers.get("x-faden-turn-id"),
         });
       }
     } catch {
@@ -328,7 +333,7 @@ async function* deltasOf(
               parsed.error.message ||
               parsed.error.type ||
               "Unknown streaming error",
-            errorFields(parsed),
+            { ...errorFields(parsed), turnId },
           );
         }
         continue;

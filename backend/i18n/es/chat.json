@@ -109,6 +109,11 @@
   "thinking_low": "Bajo",
   "thinking_medium": "Medio",
   "thinking_high": "Alto",
+  "older_dropped": "Los mensajes anteriores ya no se envían al modelo. Puede buscarlos cuando los necesite.",
+  "older_summarised": "Los mensajes anteriores ya no se envían al modelo; un resumen escrito por el modelo los sustituye.",
+  "context_use": "Contexto: {{used}} de {{budget}} tokens",
+  "context_use_tooltip": "El contexto enviado al modelo para esta respuesta (una estimación) y el presupuesto al que se ajustó.",
+  "context_use_window": "Ventana de contexto del modelo: {{window}} tokens.",
   "tips": {
     "title": "Consejos",
     "dismiss": "Entendido",
