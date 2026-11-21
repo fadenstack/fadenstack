@@ -17,6 +17,8 @@ OpenAI stream: an OpenAI SDK would not know what to do with a named event.
 - ``CUSTOM`` ``faden.pii``: what the PII scan found -- types and counts only.
 - ``CUSTOM`` ``faden.pii_pictures_unchecked``: the PII scan ran and passed the
   request's pictures on unchecked (it reads text only) -- their count.
+- ``CUSTOM`` ``faden.context``: a chat turn's context -- its tokens, the budget
+  and the model's window, and how many earlier messages no longer go.
 - ``CUSTOM`` ``faden.gateway_round``: the round as the model saw it (its
   tool-calling turn and the tools' answers, with PII values put back), for
   the SDK to keep and send back as history. The gateway accepts it back.
@@ -129,6 +131,18 @@ def pictures_unchecked(count: int) -> dict[str, Any] | None:
     return {"type": "CUSTOM", "name": "faden.pii_pictures_unchecked", "value": {
         "count": count,
         "message": f"Pictures are not checked for personal data, so {went}.",
+    }}
+
+
+def context_usage(*, tokens: int, budget: int, window: int | None, dropped: int) -> dict[str, Any]:
+    """How much of the chat's context budget this turn used (0.7.2 K), as Open WebUI's ``context_usage`` says it.
+
+    *tokens*: the context as sent, estimated; *budget*: what it was fitted to; *window*: the model's context length
+    (null: not known); *dropped*: how many of the chat's earlier messages no longer go to the model. Said only in the
+    response: nothing of it is kept.
+    """
+    return {"type": "CUSTOM", "name": "faden.context", "value": {
+        "tokens": tokens, "budget": budget, "window": window, "dropped": dropped,
     }}
 
 

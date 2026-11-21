@@ -560,6 +560,39 @@ _PROVIDER_REFUSED_MESSAGE = (
 )
 
 
+#: The one code for a request longer than the model's context window, whoever said it (0.7.2 K): an SDK and
+#: the chat page retry on it with a smaller context, so it must not depend on an engine's own words.
+CONTEXT_OVERFLOW = "context_length_exceeded"
+_OVERFLOW_MESSAGE = (
+    "The conversation is longer than the model's context window. "
+    "Try again with less of it, or start a new chat."
+)
+#: How engines and providers say it: vLLM ("maximum context length", "longer than the maximum model length"),
+#: Ollama ("the input length exceeds the context length"), OpenAI-style providers' own code and wording.
+_OVERFLOW_WORDS = re.compile(
+    r"context[ _]length|context window|maximum model length|maximum context"
+    r"|prompt is too long|too many tokens|input (?:length|tokens?) .{0,40}exceed",
+    re.IGNORECASE,
+)
+
+
+def is_context_overflow(exc_or_text: BaseException | str) -> bool:
+    """Whether an upstream refusal says the request is longer than the model's context window."""
+    if isinstance(exc_or_text, litellm.exceptions.ContextWindowExceededError):
+        return True
+    return bool(_OVERFLOW_WORDS.search(str(exc_or_text)))
+
+
+def _overflow(said: object = "") -> dict[str, Any]:
+    """The error for a request longer than the model's context window: 400 ``context_length_exceeded``.
+
+    The model's server's own words follow, as for any refusal of the request: they give the numbers.
+    """
+    words = str(said).strip()[:500]
+    message = f"{_OVERFLOW_MESSAGE} The model's server said: {words}" if words else _OVERFLOW_MESSAGE
+    return _error_payload("invalid_request_error", message, code=CONTEXT_OVERFLOW)
+
+
 def _provider_refused() -> dict[str, Any]:
     """The error for a provider that refused the gateway's credentials."""
     return _error_payload("server_error", _PROVIDER_REFUSED_MESSAGE, code="upstream_authentication_failed")
@@ -575,6 +608,8 @@ def _failure(exc: BaseException) -> dict[str, Any]:
     """The error a stream's caller is told of *exc*: an upstream 4xx in its own words, anything else not."""
     if isinstance(exc, _PROVIDER_REFUSED):
         return _provider_refused()
+    if isinstance(exc, litellm.exceptions.BadRequestError) and is_context_overflow(exc):
+        return _overflow(exc)
     return _error_payload("server_error", str(exc) if isinstance(exc, _SAID_AS_IS) else _UPSTREAM_FAILED)
 
 
@@ -582,6 +617,8 @@ def _engine_refusal(status: int, detail: str) -> dict[str, Any]:
     """The error event for an engine that refused a streamed chat with *status* and *detail*."""
     if status in _PROVIDER_REFUSED_STATUSES:
         return _provider_refused()
+    if 400 <= status < 500 and is_context_overflow(detail):
+        return _overflow(detail)
     # A 4xx is about the request (too long for the context, a parameter vLLM does not take),
     # which the caller reads; a 5xx's body is the engine's own, for the log.
     said = detail if status < 500 else _UPSTREAM_FAILED
@@ -960,7 +997,10 @@ class LLMAdapter:
         except litellm.exceptions.BadRequestError as exc:
             return CompletionResult(
                 status_code=400,
-                payload=_error_payload("invalid_request_error", str(exc)),
+                payload=(
+                    _overflow(exc) if is_context_overflow(exc)
+                    else _error_payload("invalid_request_error", str(exc))
+                ),
             )
         except litellm.exceptions.InternalServerError as exc:
             return _internal_error_result(exc)

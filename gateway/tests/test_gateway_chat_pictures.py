@@ -106,10 +106,11 @@ def _system_text(sent: dict[str, Any]) -> str:
 
 
 def _events(r: Any, *, stream: bool) -> list[dict[str, Any]]:
-    """The Faden events of an answer, the tool mode notice aside (test_tool_modes)."""
+    """The Faden events of an answer, the tool mode notice and the context's use aside (their own tests)."""
+    aside = {"faden.tool_mode", "faden.context"}
     if stream:
-        return _faden(r.text)
-    return [e for e in r.json()["faden"]["events"] if e.get("name") != "faden.tool_mode"]
+        return [e for e in _faden(r.text) if e.get("name") not in aside]
+    return [e for e in r.json()["faden"]["events"] if e.get("name") not in aside]
 
 
 @pytest.mark.anyio

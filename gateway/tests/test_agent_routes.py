@@ -1556,6 +1556,7 @@ async def test_the_models_are_the_agents_model(client: AsyncClient, backend: _Ba
     assert r.status_code == 200
     assert r.json() == {"object": "list", "data": [{
         "id": ALIAS, "object": "model", "created": 0, "owned_by": "faden", "vision": None, "context_length": None,
+        "reasoning_levels": None,
     }]}
 
 

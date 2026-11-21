@@ -18,6 +18,9 @@ class StreamStats:
     #: The error an event carried in place of the answer, when one did: the
     #: upstream refused, and the client got that event with a 200.
     error: str | None = None
+    #: That error's code, when it gave one (``context_length_exceeded`` for a request longer than the
+    #: model's context window: the client tries again with less of it).
+    error_code: str | None = None
 
 
 async def wrap_sse_stream(
@@ -80,6 +83,8 @@ def _extract_usage_from_chunk(chunk: bytes, stats: StreamStats) -> None:
         if isinstance(parsed, dict) and parsed.get("error") and not parsed.get("choices"):
             error = parsed["error"]
             stats.error = str(error.get("message") if isinstance(error, dict) else error)[:500]
+            code = error.get("code") if isinstance(error, dict) else None
+            stats.error_code = code[:128] if isinstance(code, str) else None
         # The last event that carries usage holds the answer's (with its cached and reasoning tokens).
         usage = usage_from_payload(parsed)
         if usage.reported:

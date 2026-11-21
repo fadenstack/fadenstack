@@ -198,3 +198,63 @@ async def test_the_smallest_window_of_a_models_instances_counts_and_none_when_no
     assert await GatewayDAO(db_session).alias_context_lengths(["two", "none", "unknown"]) == {
         "two": 16_384, "none": None, "unknown": None,
     }
+
+
+@pytest.mark.anyio
+async def test_the_turn_says_how_much_of_the_context_it_used(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """0.7.2 K, layer 7: ``faden.context`` -- the context's tokens, its budget and window, what was left out."""
+    from faden_gateway.services.gateway import faden_events  # noqa: PLC0415
+
+    await _seed(db_session, provider=ProviderType.VLLM, pii=None,
+                node_metadata={"task": "chat", "tools": False, "context_length": 8_192})
+    fastapi_app.state.gateway_observability = _Observability()
+    sid = await _long_chat(db_session)
+    _Model(monkeypatch, _say("ok"))
+
+    r = await client.post("/v1/chat/completions", headers={
+        "Authorization": f"Bearer {_token()}", faden_events.HEADER: "ag-ui",
+    }, json={"model": ALIAS, "session_id": str(sid), "messages": [{"role": "user", "content": "And?"}]})
+
+    assert r.status_code == 200, r.text
+    [used] = [e["value"] for e in r.json()["faden"]["events"] if e.get("name") == "faden.context"]
+    assert used["window"] == 8_192 and used["budget"] == 3_686  # (8,192 - 4,096) x 0.9
+    assert used["dropped"] > 0 and 0 < used["tokens"] <= used["budget"]
+
+
+@pytest.mark.anyio
+async def test_the_model_list_says_which_thinking_levels_each_model_tells_apart(db_session: AsyncSession) -> None:
+    """0.7.2 I.2: a Qwen3 on vLLM honours only its off switch; a model that says its levels, those; else unknown."""
+    from faden_gateway.db.dao.gateway_dao import GatewayDAO  # noqa: PLC0415
+    from faden_gateway.db.models.gateway import (  # noqa: PLC0415
+        LLMModelAlias,
+        LLMPoolMembership,
+        LLMProviderInstance,
+        ProviderHealthStatus,
+    )
+
+    now = datetime.now(timezone.utc)
+    rows = [
+        ("qwen", ProviderType.VLLM, "Qwen/Qwen3.8-27B-FP8", None),
+        ("gpt-oss", ProviderType.VLLM, "openai/gpt-oss-20b", {"reasoning_levels": ["low", "high", "medium", "loud"]}),
+        ("mixed", ProviderType.VLLM, "Qwen/Qwen3-8B", None),
+        ("mixed", ProviderType.VLLM, "other", {"reasoning_levels": ["off", "low"]}),
+        ("unknown", ProviderType.VLLM, "meta-llama/Llama-3.3-70B", None),
+    ]
+    db_session.add_all([LLMModelAlias(alias=a, description="", enabled=True, created_at=now, updated_at=now)
+                        for a in ("qwen", "gpt-oss", "mixed", "unknown")])
+    for alias, kind, model, meta in rows:
+        instance = LLMProviderInstance(
+            id=uuid.uuid4(), type=kind, base_url=f"http://{uuid.uuid4().hex}.local", enabled=True, weight=1.0,
+            max_concurrency=1, health_status=ProviderHealthStatus.HEALTHY, created_at=now, updated_at=now,
+            litellm_model=model, node_metadata=meta,
+        )
+        db_session.add(instance)
+        await db_session.flush()
+        db_session.add(LLMPoolMembership(model_alias=alias, provider_instance_id=instance.id, enabled=True))
+    await db_session.flush()
+
+    assert await GatewayDAO(db_session).alias_reasoning_levels(["qwen", "gpt-oss", "mixed", "unknown"]) == {
+        "qwen": ["off"], "gpt-oss": ["low", "medium", "high"], "mixed": ["off"], "unknown": None,
+    }

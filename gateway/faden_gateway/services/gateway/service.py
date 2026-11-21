@@ -58,7 +58,7 @@ from faden_gateway.services.gateway import grants
 from faden_gateway.services.gateway import tool_classes
 from faden_gateway.services.gateway.errors import GatewayError
 from faden_gateway.services.gateway.agents import AgentRequest
-from faden_gateway.services.gateway.llm_adapter import LLMAdapter, reasoning_of
+from faden_gateway.services.gateway.llm_adapter import CONTEXT_OVERFLOW, LLMAdapter, reasoning_of
 from faden_gateway.services.gateway.observability import (
     GatewayObservability,
 )
@@ -866,6 +866,16 @@ def _unsearchable_dropped(payload: dict[str, Any], dropped: int) -> dict[str, An
     ]}
 
 
+def _context_factor(value: object) -> float:
+    """The share of the chat's budget a request asks for, 0.5 to 1; anything else is 1.
+
+    The chat page sends 0.75 once, when the model said the context was too long.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return 1.0
+    return float(value) if 0.5 <= value <= 1.0 else 1.0
+
+
 def _reply_reserve(payload: dict[str, Any]) -> int:
     """The tokens kept for the reply (0.7.2 K): the request's cap, else 4,096; twice that with thinking."""
     for key in ("max_completion_tokens", "max_tokens"):
@@ -918,8 +928,8 @@ def _pii_events(req: _Prepared) -> list[dict[str, Any]]:
     """What goes before the answer, when the client asked for events.
 
     The PII notice (when something was found), that pictures went on unchecked
-    (when the scan ran and the request carried any), and the client's tools a
-    rule refused.
+    (when the scan ran and the request carried any), a chat turn's context use
+    (``faden.context``), and the client's tools a rule refused.
     """
     if not req.faden_events:
         return []
@@ -927,7 +937,8 @@ def _pii_events(req: _Prepared) -> list[dict[str, Any]]:
         faden_events.pii_notice(req.pii_types, req.pii_policy.egress.mode) if req.pii_policy is not None else None
     )
     unchecked = faden_events.pictures_unchecked(req.pii_pictures_unchecked)
-    return [*(event for event in (notice, unchecked) if event is not None), *req.faden_leading]
+    leading = (notice, unchecked, req.context_usage)
+    return [*(event for event in leading if event is not None), *req.faden_leading]
 
 
 async def _leading(events: list[dict[str, Any]], stream: AsyncIterator[bytes]) -> AsyncIterator[bytes]:
@@ -1011,6 +1022,9 @@ def _stream_outcome(stats: StreamStats, status_code: int, error_code: str | None
     that event inside a 200: it is logged as the failure it was.
     """
     if stats.error and status_code == 200:
+        if stats.error_code == CONTEXT_OVERFLOW:
+            # Longer than the model's context window: the caller's to shorten, and to try again.
+            return 400, CONTEXT_OVERFLOW
         return 502, "upstream_refused"
     return status_code, error_code
 
@@ -1417,6 +1431,8 @@ class _Prepared:
     chat_session: uuid.UUID | None = None
     #: Whether ``search_chat`` is offered: a route that calls tools, a chat with messages left out.
     chat_search: bool = False
+    #: The chat turn's context use, for ``faden.context`` (0.7.2 K); None outside a chat.
+    context_usage: dict[str, Any] | None = None
     #: Faden events not yet sent (tool ends, citations, gateway rounds).
     faden_pending: list[dict[str, Any]] = field(default_factory=list)
     #: Faden events of a whole answer, sent in its ``faden`` object.
@@ -1532,6 +1548,8 @@ class GatewayService:
         # How many tokens each takes (null when not known), so a governed client sizes its context to it
         # (0.7.2 K): the smallest of its instances', which a request may go to.
         windows = await self.dao.alias_context_lengths([a.alias for a in aliases])
+        # Which thinking levels each tells apart (null: not known), so a chat offers only those (0.7.2 I.2).
+        levels = await self.dao.alias_reasoning_levels([a.alias for a in aliases])
         return {
             "object": "list",
             "data": [
@@ -1546,6 +1564,7 @@ class GatewayService:
                     "kind": kinds.get(alias.alias),
                     "vision": visions.get(alias.alias),
                     "context_length": windows.get(alias.alias),
+                    "reasoning_levels": levels.get(alias.alias),
                 }
                 for alias in aliases
             ],
@@ -1564,6 +1583,7 @@ class GatewayService:
         faden_events: bool = False,
         tool_mode: str | None = None,
         purpose: str | None = None,
+        context_factor: float = 1.0,
     ) -> GatewayResponse:
         started = time.perf_counter()
         rerank: dict[str, Any] | None = None
@@ -1582,7 +1602,7 @@ class GatewayService:
 
         req = _Prepared(
             payload=payload, requested_skills=list(skills or []), agent=agent, faden_events=faden_events,
-            tool_mode_header=tool_mode, purpose=purpose,
+            tool_mode_header=tool_mode, purpose=purpose, context_factor=_context_factor(context_factor),
         )
         result: UpstreamResult | None = None
         error_code: str | None = None
@@ -2028,6 +2048,7 @@ class GatewayService:
         tool_mode: str | None = None,
         background: bool = False,
         purpose: str | None = None,
+        context_factor: float = 1.0,
     ) -> StreamingGatewayResponse:
         """A streamed chat completion.
 
@@ -2042,7 +2063,7 @@ class GatewayService:
 
         req = _Prepared(
             payload=payload, requested_skills=list(skills or []), agent=agent, faden_events=faden_events,
-            tool_mode_header=tool_mode, purpose=purpose,
+            tool_mode_header=tool_mode, purpose=purpose, context_factor=_context_factor(context_factor),
         )
         background = background and bool(session_id) and self.session_dao is not None
         stream_started = False
@@ -3774,6 +3795,10 @@ class GatewayService:
         payload["messages"] = assembled.messages
         if req is not None:
             req.chat_dropped, req.chat_kept_from = assembled.dropped, assembled.kept_from
+            req.context_usage = faden_events.context_usage(
+                tokens=assembled.total_token_estimate, budget=assembled.budget, window=assembled.window,
+                dropped=assembled.dropped,
+            )
             req.chat_session = sid
             req.project_pictures = [
                 a.filename for a in assembled.attachments_used

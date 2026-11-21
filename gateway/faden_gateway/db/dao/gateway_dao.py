@@ -207,6 +207,54 @@ class GatewayDAO:
                 found[alias] = value if kept is None else min(kept, value)
         return found
 
+    async def alias_reasoning_levels(self, aliases: list[str]) -> dict[str, list[str] | None]:
+        """The thinking levels each alias's model tells apart (``off``, ``low``, ``medium``, ``high``; 0.7.2 I.2).
+
+        An instance says it in ``node_metadata`` or ``capabilities`` (``reasoning_levels``, a list); a Qwen3 model
+        on vLLM honours only its template's switch, so for it only ``off`` changes anything (on .22 Low, Medium and
+        High thought as long as Auto). The levels every instance tells apart count, since a request may go to any;
+        None when one of them is not known: the chat then offers all of them.
+        """
+        if not aliases:
+            return {}
+        rows = await self.session.execute(
+            select(
+                LLMPoolMembership.model_alias,
+                LLMProviderInstance.type,
+                LLMProviderInstance.litellm_model,
+                LLMProviderInstance.node_metadata,
+                LLMProviderInstance.capabilities,
+            )
+            .join(LLMPoolMembership, LLMProviderInstance.id == LLMPoolMembership.provider_instance_id)
+            .where(
+                LLMPoolMembership.model_alias.in_(aliases),
+                LLMPoolMembership.enabled.is_(True),
+                LLMProviderInstance.enabled.is_(True),
+            ),
+        )
+        known = ("off", "low", "medium", "high")
+
+        def said_by(kind: object, model: object, metadata: object, caps: object) -> list[str] | None:
+            for source in (metadata, caps):
+                value = source.get("reasoning_levels") if isinstance(source, dict) else None
+                if isinstance(value, list):
+                    return [level for level in known if level in value]
+            if kind == ProviderType.VLLM and "qwen3" in str(model or "").lower():
+                return ["off"]
+            return None
+
+        found: dict[str, list[str] | None] = {}
+        seen: set[str] = set()
+        for alias, kind, model, metadata, caps in rows.all():
+            levels = said_by(kind, model, metadata, caps)
+            if alias in seen:
+                kept = found.get(alias)
+                found[alias] = None if kept is None or levels is None else [lv for lv in kept if lv in levels]
+            else:
+                seen.add(alias)
+                found[alias] = levels
+        return {alias: found.get(alias) for alias in aliases}
+
     async def get_tenant_policy(self, tenant_id: str) -> TenantLLMPolicy | None:
         """Fetch tenant policy."""
         result = await self.session.execute(
