@@ -106,6 +106,9 @@ class ProviderUpdateRequest(BaseModel):
     #: Whether the model is sent the chat's pictures. false: they are left out and
     #: the chat says so; null: not known, they are sent.
     sees_pictures: bool | None = None
+    #: The model's context length in tokens, for the gateway to size a chat's context to (0.7.2 K).
+    #: null: not known (the gateway keeps a small budget).
+    context_length: int | None = Field(None, ge=1024, le=10_000_000)
 
 
 class ManagedByDTO(BaseModel):
@@ -192,6 +195,8 @@ class ProviderDTO(BaseModel):
     calls_tools: bool | None = None
     #: Sent the chat's pictures: true, false, or null (not known: sent).
     sees_pictures: bool | None = None
+    #: The model's context length in tokens; null: not known.
+    context_length: int | None = None
     #: What owns this provider, when something does. ``inference_deployment``
     #: means a deployment created it and will remove it; the screen shows it
     #: differently and refuses edits, because they would not survive the next

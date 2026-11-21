@@ -72,6 +72,12 @@ def _sees_pictures(provider: LLMProvider) -> bool | None:
     return value if isinstance(value, bool) else None
 
 
+def _context_length(provider: LLMProvider) -> int | None:
+    """The context length an administrator configured for the provider's model (None: not given)."""
+    value = provider.capabilities.get("context_length") if isinstance(provider.capabilities, dict) else None
+    return value if type(value) is int and value > 0 else None
+
+
 def _remote_base_url(provider: LLMProvider) -> str:
     """Where a remote provider's runtimes send prompts."""
     if provider.endpoint_url:
@@ -782,6 +788,7 @@ class LLMService:
             tools=_calls_tools(provider),
             vision=_sees_pictures(provider),
             text_marking=provider.text_marking,
+            context_length=_context_length(provider),
         )
 
     async def publish_text_marking(self, runtime_dao: RuntimeDAO, provider: LLMProvider) -> None:
