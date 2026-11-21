@@ -93,7 +93,7 @@
   "turn_stopped": "Angehalten",
   "jump_to_latest": "Zur neuesten Nachricht",
   "picture_not_sent": "{{file}} wurde nicht gesendet: {{model}} kann keine Bilder lesen. Wählen Sie ein Modell, das Bilder lesen kann.",
-  "picture_unreadable": "{{file}} wurde nicht gesendet: Ihr Text konnte nicht gelesen werden.",
+  "picture_unreadable": "{{file}} wurde nicht gesendet: Der Text konnte nicht gelesen werden.",
   "pictures_unchecked_file": "Bilder werden nicht auf personenbezogene Daten geprüft; {{file}} ging deshalb unverändert an das Modell.",
   "pictures_unchecked_many": "Bilder werden nicht auf personenbezogene Daten geprüft; {{count}} Bilder gingen deshalb unverändert an das Modell.",
   "pictures_unchecked_none": "Bilder werden nicht auf personenbezogene Daten geprüft; das Bild ging deshalb unverändert an das Modell.",
