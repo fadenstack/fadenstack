@@ -141,6 +141,8 @@ export interface Provider {
   calls_tools?: boolean | null;
   /** Whether the chat's pictures are sent to its model: false leaves them out; null: not known (sent). */
   sees_pictures?: boolean | null;
+  /** The model's context length in tokens that an administrator gave; null: as its server reports it. */
+  context_length?: number | null;
   /**
    * What owns this provider, when something does. `"inference_deployment"`
    * means a deployment created it and will remove it with itself — it cannot
@@ -308,6 +310,8 @@ export interface UpdateProviderPayload {
   calls_tools?: boolean | null;
   /** false: the chat's pictures are left out for this model; null: not known (sent). */
   sees_pictures?: boolean | null;
+  /** 1,024 to 10,000,000 tokens; null: as the model's server reports it. */
+  context_length?: number | null;
 }
 
 export interface DownloadModelPayload {

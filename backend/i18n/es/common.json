@@ -1562,6 +1562,9 @@
     "endpoint_url_filled": "La dirección de {{provider}}, ya rellenada. Cámbiela solo para un proxy.",
     "calls_tools": "Ofrecer las herramientas del gateway",
     "calls_tools_help": "La hora, la búsqueda de herramientas y las herramientas MCP del chat. Desactívelo para un modelo o router que no llame herramientas: el router gratuito de OpenRouter elige entonces entre todos los modelos gratuitos, y cada solicitud es unos 440 tokens más corta.",
+    "context_length": "Longitud de contexto (tokens)",
+    "context_length_help": "Vacío: tal como la informa el servidor del modelo.",
+    "context_length_range": "Un número entero de {{min}} a {{max}}.",
     "sees_pictures": "Enviar las imágenes del chat a este modelo",
     "sees_pictures_help": "Desactívelo para un modelo que no puede leer imágenes: el chat las omite y lo indica, en lugar de que la respuesta falle."
   },

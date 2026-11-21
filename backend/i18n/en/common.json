@@ -1557,6 +1557,9 @@
     "endpoint_url_filled": "{{provider}}'s address, filled in for you. Change it only for a proxy.",
     "calls_tools": "Offer the gateway's tools",
     "calls_tools_help": "The time, the tool search and the chat's MCP tools. Switch it off for a model or router that does not call tools: OpenRouter's free router then chooses among all free models, and each request is about 440 tokens shorter.",
+    "context_length": "Context length (tokens)",
+    "context_length_help": "Empty: as the model's server reports it.",
+    "context_length_range": "A whole number from {{min}} to {{max}}.",
     "sees_pictures": "Send the chat's pictures to this model",
     "sees_pictures_help": "Switch it off for a model that cannot read pictures: the chat then leaves them out and says so, instead of the reply failing."
   },
