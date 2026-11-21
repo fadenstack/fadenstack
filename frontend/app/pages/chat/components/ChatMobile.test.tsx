@@ -56,6 +56,9 @@ describe("the chat on a touch screen", () => {
     const menu = screen.getByRole("menu");
     expect(within(menu).getByText("Move to project")).toBeInTheDocument();
     fireEvent.click(within(menu).getByText("Delete"));
+    // Asked first: nothing is deleted until the dialog is confirmed.
+    expect(onDelete).not.toHaveBeenCalled();
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Delete" }));
 
     expect(onDelete).toHaveBeenCalledWith("s2");
   });
