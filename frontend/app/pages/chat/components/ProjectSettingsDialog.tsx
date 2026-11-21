@@ -1,5 +1,6 @@
 /**
- * ProjectSettingsDialog — edit project name, description, and system prompt.
+ * ProjectSettingsDialog — edit a project's name, description, system prompt
+ * and files.
  */
 import { useEffect, useState } from "react";
 import Button from "@mui/material/Button";
@@ -12,6 +13,7 @@ import Typography from "@mui/material/Typography";
 import { useTranslation } from "react-i18next";
 
 import type { ChatProject } from "~/api/chatTypes";
+import ProjectFiles from "./ProjectFiles";
 
 interface Props {
   open: boolean;
@@ -102,6 +104,7 @@ export default function ProjectSettingsDialog({
             defaultValue: "You are a helpful assistant that specialises in…",
           })}
         />
+        {project && <ProjectFiles projectId={project.id} />}
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={saving}>

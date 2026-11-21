@@ -214,6 +214,12 @@ async function buildApiError(res: Response): Promise<Error> {
   return new Error(`API ${res.status}: ${text}`);
 }
 
+/** Whether the API said the thing asked for is gone (404). */
+export function isNotFound(err: unknown): boolean {
+  if (err instanceof ChatApiError) return err.status === 404;
+  return err instanceof Error && /^API 404\b/.test(err.message);
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
@@ -567,6 +573,36 @@ export const chatApi = {
 
   deleteAttachment: (id: string) =>
     request<void>(`/attachments/${id}`, { method: "DELETE" }),
+
+  // A project's own files: the gateway adds them to every chat of the project.
+  listProjectAttachments: (projectId: string) =>
+    request<{ data: ChatAttachment[] }>(
+      `/projects/${projectId}/attachments`,
+    ).then((r) => r.data),
+
+  uploadProjectAttachment: async (projectId: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${BASE}/projects/${projectId}/attachments`, {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
+    if (!res.ok) {
+      throw await buildApiError(res);
+    }
+    return res.json() as Promise<{
+      attachment: ChatAttachment;
+      extracted_text_length: number;
+      token_estimate: number;
+    }>;
+  },
+
+  /** Deletes the file at once; 404 (already gone) is an error with ``isNotFound`` true. */
+  deleteProjectAttachment: (projectId: string, attachmentId: string) =>
+    request<void>(`/projects/${projectId}/attachments/${attachmentId}`, {
+      method: "DELETE",
+    }),
 
   // Non-streaming chat
   chatCompletion: (payload: Record<string, unknown>) =>
