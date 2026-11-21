@@ -1050,7 +1050,8 @@
       "grants": "Autorisations",
       "evidence": "Preuves",
       "vendor_links": "Liens vers fadenstack.com",
-      "apps": "Apps"
+      "apps": "Apps",
+      "summaries": "Résumés des longues conversations"
     },
     "current_value": "(actuel : {{value}})",
     "appearance": {

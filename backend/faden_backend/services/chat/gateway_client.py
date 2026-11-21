@@ -573,6 +573,13 @@ class GatewayChatClient:
         resp.raise_for_status()
         return resp.json()
 
+    async def get_session_summary(self, session_id: str, jwt: str) -> Any:
+        """The chat's summary of its earlier messages, written by a model (0.7.2 K)."""
+        client = self._ensure_client()
+        resp = await client.get(f"/v1/sessions/{session_id}/summary", headers=self._headers(jwt))
+        resp.raise_for_status()
+        return resp.json()
+
     # -- attachments --------------------------------------------------------
 
     async def upload_attachment(

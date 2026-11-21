@@ -1055,7 +1055,8 @@
       "grants": "授权",
       "evidence": "凭证",
       "vendor_links": "指向 fadenstack.com 的链接",
-      "apps": "应用"
+      "apps": "应用",
+      "summaries": "长对话摘要"
     },
     "current_value": "（当前：{{value}}）",
     "appearance": {

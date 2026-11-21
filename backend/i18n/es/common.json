@@ -1055,7 +1055,8 @@
       "grants": "Autorizaciones",
       "evidence": "Pruebas",
       "vendor_links": "Enlaces a fadenstack.com",
-      "apps": "Apps"
+      "apps": "Apps",
+      "summaries": "Resúmenes de chats largos"
     },
     "current_value": "(actual: {{value}})",
     "appearance": {

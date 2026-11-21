@@ -12,6 +12,7 @@ Streaming chat completions are forwarded as SSE passthrough using
 from __future__ import annotations
 
 import logging
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile
@@ -267,6 +268,18 @@ async def list_messages(
     client = _client()
     try:
         data = await client.list_messages(session_id, jwt, limit=limit)
+        return JSONResponse(content=data)
+    except Exception as exc:
+        return await _proxy_error(exc)
+
+
+@router.get("/sessions/{session_id}/summary")
+async def get_session_summary(session_id: uuid.UUID, request: Request) -> JSONResponse:
+    """The chat's summary of its earlier messages, written by a model (0.7.2 K); ``{"data": null}`` without one."""
+    jwt = _jwt_from_cookie(request)
+    client = _client()
+    try:
+        data = await client.get_session_summary(str(session_id), jwt)
         return JSONResponse(content=data)
     except Exception as exc:
         return await _proxy_error(exc)

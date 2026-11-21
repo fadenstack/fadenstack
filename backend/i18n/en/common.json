@@ -1050,7 +1050,8 @@
       "grants": "Grants",
       "evidence": "Evidence",
       "vendor_links": "Links to fadenstack.com",
-      "apps": "Apps"
+      "apps": "Apps",
+      "summaries": "Summaries of long chats"
     },
     "current_value": "(current: {{value}})",
     "appearance": {

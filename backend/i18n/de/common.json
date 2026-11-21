@@ -1055,7 +1055,8 @@
       "grants": "Zeitfreigaben",
       "evidence": "Nachweise",
       "vendor_links": "Links zu fadenstack.com",
-      "apps": "Apps"
+      "apps": "Apps",
+      "summaries": "Zusammenfassungen langer Chats"
     },
     "current_value": "(aktuell: {{value}})",
     "appearance": {
