@@ -230,6 +230,16 @@ How long chats people delete themselves are kept before they are erased is under
 unless `faden deploy` was told otherwise). Chat data of accounts deleted before this release stayed on the
 server; `faden chats orphans` lists it and `faden chats orphans --erase` erases it.
 
+!!! note "Summaries of long chats"
+    **Summaries of long chats** (**Settings → Chat**, a switch per chat model, all off by default; a summary is
+    written only in chats whose model is switched on): in a long chat, the model writes a summary of the messages
+    that no longer fit, and the summary goes to the model in their place. A summary can drop constraints, names and
+    numbers, so switch it on for a model only after trying it on your own chats. Summaries are stored encrypted with
+    the chat, checked for personal data like other text, recorded in the request log (that one was written, for
+    which chat and model, and its token counts, never its text), and deleted with the chat. Approvals and tool
+    permissions never come from a summary. Like the chats, summaries are content: list them where your works
+    agreement lists what the chat keeps.
+
 ## Administrators and auditors
 
 Two rights are about trust rather than work, and each can be given, taken back and handed over:

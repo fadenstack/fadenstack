@@ -248,6 +248,18 @@ Wie lange Chats, die Personen selbst löschen, aufbewahrt werden, bevor sie endg
 vor dieser Version gelöscht wurden, sind auf dem Server geblieben; `faden chats orphans` listet sie auf und
 `faden chats orphans --erase` löscht sie.
 
+!!! note "Zusammenfassungen langer Chats"
+    **Zusammenfassungen langer Chats** (**Einstellungen → Chat**, ein Schalter pro Chat-Modell, alle standardmäßig
+    aus; eine Zusammenfassung entsteht nur in Chats, deren Modell eingeschaltet ist): In einem langen Chat schreibt
+    das Modell eine Zusammenfassung der Nachrichten, die nicht mehr hineinpassen, und die Zusammenfassung geht an
+    ihrer Stelle an das Modell. Eine Zusammenfassung kann Vorgaben, Namen und Zahlen verlieren; schalten Sie sie für
+    ein Modell deshalb erst ein, wenn Sie sie an Ihren eigenen Chats ausprobiert haben. Zusammenfassungen werden
+    verschlüsselt mit dem Chat gespeichert, wie anderer Text auf personenbezogene Daten geprüft, im
+    Anfrageprotokoll festgehalten (dass eine geschrieben wurde, für welchen Chat und welches Modell und wie viele
+    Tokens, nie ihr Text) und mit dem Chat gelöscht. Freigaben und Tool-Berechtigungen kommen nie aus einer
+    Zusammenfassung. Wie die Chats sind Zusammenfassungen Inhalte: Führen Sie sie dort auf, wo Ihre
+    Betriebsvereinbarung aufzählt, was der Chat speichert.
+
 ## Administratoren und Prüfer {#administrators-and-auditors}
 
 Zwei Rechte betreffen Vertrauen statt Arbeit; jedes lässt sich vergeben, entziehen und übergeben:

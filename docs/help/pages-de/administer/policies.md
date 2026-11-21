@@ -154,8 +154,15 @@ ausdrücklich. Der Dienst lehnt nicht unterstützte Kategorien ab, statt sie sti
     Testen Sie die Inhalte und Feldformate Ihrer Organisation.
 
     Numerische Werte oder Container unter einem geschützten sensiblen Schlüssel in Tool-Argumenten können
-    abgelehnt werden, wenn eine Ersetzung den Datentyp ändern würde. Andere Werte behalten ihre Typen. Bilder und
-    Audio sind keine Textprüfungen; für nicht unterstützte geschützte Inhalte gilt **Wenn die Erkennung fehlschlägt**.
+    abgelehnt werden, wenn eine Ersetzung den Datentyp ändern würde. Andere Werte behalten ihre Typen. Bilder werden
+    nicht geprüft: Ein Bild geht unverändert an das Modell, gleich, was unter **Wenn die Erkennung fehlschlägt**
+    eingestellt ist, und der Chat sagt es der Person. Um Nachrichten mit Bildern abzulehnen, solange die Prüfung aktiv
+    ist, schalten Sie **Bilder ablehnen** (unter **Einstellungen → Module → PII / Datenschutz → Moduleinstellungen**,
+    neben **Wenn die Erkennung fehlschlägt**) ein: Die Person erfährt dann, warum, und es wird nichts gesendet. Um
+    Bilder nur von einem Modell bei einem externen Provider fernzuhalten, schalten Sie bei seinem Provider **Bilder
+    aus dem Chat an dieses Modell senden** aus (siehe [Externe Provider](providers.md)): Der Web-Chat lässt sie dann
+    weg und sagt es. Für Audio und andere Inhalte, die kein Text sind, gilt weiter **Wenn die Erkennung
+    fehlschlägt**.
 
 ### Chats und Agenten {#chats-and-agents}
 
@@ -447,6 +454,7 @@ Anwendungen, die die erneute Anmeldung nicht können (ältere SDK-Versionen), er
 | Der Filter brauchte für einen langen Text zu lange, und die Richtlinie blockiert | Die Antwort schlägt fehl mit „The PII check took longer than its limit for this request (pii_deadline_exceeded) …“. Es wurde nichts gesendet. Siehe [Lokale PII-Verarbeitung auf CPU oder GPU](../operate/installing.md#local-pii-on-cpu-or-gpu). |
 | Die Anfrage ist größer, als der Filter auf einmal prüft, und die Richtlinie blockiert | Die Antwort schlägt fehl mit „The request is too large for the PII check (pii_input_too_large) …“. Es wurde nichts gesendet. Ein kürzerer Verlauf, weniger Tools oder kleinere Tool-Ergebnisse passen. |
 | Die Richtlinie passt nicht zur installierten Erkennung (ein Schwellenwert für das ältere Profil oder eine Kategorie, die sie nicht findet), und die Richtlinie blockiert | Die Antwort schlägt fehl mit „The PII policy does not fit the installed PII detector (…), so nothing was sent.“ Übernehmen Sie das installierte Profil in der Richtlinie (siehe [oben](#adopt-an-installed-detector-profile)). |
+| Bilder werden nach der Richtlinie abgelehnt, und eine Nachricht enthält eines | Die Antwort schlägt fehl mit „Bilder werden nicht auf personenbezogene Daten geprüft, und Ihre Organisation sendet sie nicht ungeprüft …“. Es wurde nichts gesendet. |
 | Eine Eingabe wurde abgelehnt (Inhaltsrichtlinien, <span class="fs-planned">Geplant</span>) | Die Nachricht wird als **Nicht gesendet** markiert, mit der Nachricht der Richtlinie oder „Dies wurde durch eine Richtlinie Ihrer Organisation gestoppt.“ Nichts wird an ein Modell gesendet oder gespeichert. |
 | Eine Antwort wurde abgelehnt (Inhaltsrichtlinien, <span class="fs-planned">Geplant</span>) | Die Antwort bricht ab und wird als **Antwort zurückgehalten** markiert. |
 
