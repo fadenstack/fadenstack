@@ -1,115 +1,52 @@
-"""Rolling session summarizer.
+"""A long chat's rolling summary, written when its earlier messages stop going to the model (0.7.2 K, layer 5).
 
-When the number of unsummarised messages in a session crosses a threshold,
-the summarizer compresses older turns into a rolling summary by calling
-a (configurable) LLM model alias through the gateway's own upstream proxy.
+The context builder leaves a long chat's oldest messages out in batches (``context_assembler.batch_cut``). Where
+an administrator switched summaries on for the chat's model (``chat_settings``; all are off by default), the
+gateway asks that model to fold the messages just left out into the chat's summary -- anchored and incremental:
+the earlier summary and the new messages in, one summary out, in a fixed template (the person's goal and
+constraints, decisions, files and sources, open questions). A batch drop already costs one full recompute of the
+prompt, so summarising exactly then adds no second one.
+
+The summary is written through the gateway's own answer path (``GatewayService._summarise``): checked for personal
+data as any request is, on a route that marks what it writes, logged as a request, and signed as AI-written
+content of the kind ``summarised``. It is stored encrypted with the chat and deleted with it. In the context it
+stands under a header that says a model wrote it and that it may be incomplete. Approvals, permissions and the
+tool mode are never taken from it: they are read from their own state every turn, and the template tells the
+model to leave them out. When writing it fails, the chat goes on with the line in place of the left-out messages.
 """
 
 from __future__ import annotations
 
-import logging
-import uuid
+from typing import Any
 
-from faden_gateway.db.dao.session_dao import SessionDAO
-from faden_gateway.db.models.gateway import ChatMessage, SessionSummary
-from faden_gateway.services.gateway.context_assembler import _estimate_tokens, in_context
+from faden_gateway.db.models.gateway import ChatMessage
+from faden_gateway.services.gateway.context_assembler import SUMMARY_HEADER, in_context
 
-logger = logging.getLogger(__name__)
+__all__ = ["MAX_TOKENS", "SUMMARY_HEADER", "as_context", "prompt"]
+#: The longest summary, in tokens.
+MAX_TOKENS = 1024
 
-_SUMMARISE_SYSTEM_PROMPT = (
-    "You are a concise conversation summarizer. "
-    "Compress the following conversation into a brief summary that preserves "
-    "key facts, decisions, and context needed to continue the conversation. "
-    "Keep the summary under 300 words. Output ONLY the summary, no preamble."
+_SYSTEM = (
+    "You keep the running summary of a chat between a person and an assistant. You get the earlier summary, if "
+    "there is one, and the messages to add to it. Write the updated summary in four parts, as short lines:\n"
+    "Goal and constraints: what the person wants, and every condition, name, number and date they set.\n"
+    "Decisions: what was agreed or done.\n"
+    "Files and sources: the files, documents and links the chat used, by name.\n"
+    "Open questions: what is not answered yet.\n"
+    "Keep everything from the earlier summary that still holds, and add what the new messages say. Do not invent "
+    "anything. Never record an approval, a permission or a tool mode: they are not part of the summary. Write in "
+    "the language of the chat. Output only the summary."
 )
 
 
-class Summarizer:
-    """Produces rolling summaries for a chat session."""
+def prompt(previous: str | None, messages: list[ChatMessage]) -> list[dict[str, Any]]:
+    """The request that folds *messages* into the summary *previous* (None for the first)."""
+    lines = [f"{m.role}: {m.content}" for m in messages if in_context(m) and m.content]
+    parts = [f"[Earlier summary]\n{previous}"] if previous else []
+    parts.append("[Messages to add]\n" + "\n\n".join(lines))
+    return [{"role": "system", "content": _SYSTEM}, {"role": "user", "content": "\n\n".join(parts)}]
 
-    def __init__(
-        self,
-        *,
-        dao: SessionDAO,
-        threshold: int = 10,
-        proxy_fn: object = None,
-    ) -> None:
-        self.dao = dao
-        self.threshold = threshold
-        # proxy_fn is an async callable(messages, model) -> str
-        # injected from GatewayService when EE or a summarizer model is configured
-        self._proxy_fn = proxy_fn
 
-    async def maybe_summarise(
-        self,
-        *,
-        session_id: uuid.UUID,
-    ) -> SessionSummary | None:
-        """Check if summarisation is needed and produce one if so.
-
-        Returns the new summary, or None if the threshold wasn't reached
-        or no proxy function is configured.
-        """
-        if self._proxy_fn is None:
-            return None
-
-        existing = await self.dao.get_latest_summary(session_id=session_id)
-
-        # Count messages since last summary
-        messages = await self.dao.list_messages(
-            session_id=session_id,
-            after_message_id=existing.last_message_id if existing else None,
-        )
-
-        if len(messages) < self.threshold:
-            return None
-
-        return await self._produce_summary(
-            session_id=session_id,
-            previous_summary=existing,
-            new_messages=messages,
-        )
-
-    async def _produce_summary(
-        self,
-        *,
-        session_id: uuid.UUID,
-        previous_summary: SessionSummary | None,
-        new_messages: list[ChatMessage],
-    ) -> SessionSummary | None:
-        """Build summary by calling the configured LLM."""
-        # Build the conversation text to summarise
-        parts: list[str] = []
-        if previous_summary:
-            parts.append(f"[Previous Summary]\n{previous_summary.summary_text}")
-        for msg in new_messages:
-            # Blocked, failed and unfinished turns are not summarised, as they
-            # are not sent to the model (context_assembler.in_context).
-            if in_context(msg):
-                parts.append(f"{msg.role}: {msg.content}")
-
-        conversation_text = "\n\n".join(parts)
-
-        try:
-            summary_text = await self._proxy_fn(
-                [
-                    {"role": "system", "content": _SUMMARISE_SYSTEM_PROMPT},
-                    {"role": "user", "content": conversation_text},
-                ],
-            )
-        except Exception:
-            logger.exception("Failed to produce summary for session %s", session_id)
-            return None
-
-        if not summary_text:
-            return None
-
-        last_msg = new_messages[-1]
-        token_est = _estimate_tokens(summary_text)
-
-        return await self.dao.create_summary(
-            session_id=session_id,
-            summary_text=summary_text,
-            last_message_id=last_msg.id,
-            token_estimate=token_est,
-        )
+def as_context(summary_text: str) -> str:
+    """The summary as the model reads it in the chat's context: under its header."""
+    return f"{SUMMARY_HEADER}\n{summary_text}"

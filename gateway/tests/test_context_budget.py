@@ -130,8 +130,11 @@ def test_the_cut_moves_in_batches_down_to_sixty_percent() -> None:
     assert batch_cut([100] * 16, 1_000) == 10
 
 
-def test_the_newest_message_is_always_kept() -> None:
-    assert batch_cut([100, 100, 5_000], 1_000) == 2
+def test_the_newest_three_messages_are_always_kept() -> None:
+    # The question, its answer and the message before them go word for word, whatever their size: a summary
+    # never stands for them (KEEP_NEWEST).
+    assert batch_cut([100, 100, 5_000], 1_000) == 0
+    assert batch_cut([100, 100, 100, 100, 5_000], 1_000) == 2
     assert batch_cut([5_000], 1_000) == 0
 
 

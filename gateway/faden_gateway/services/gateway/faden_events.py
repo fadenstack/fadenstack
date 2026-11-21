@@ -134,15 +134,19 @@ def pictures_unchecked(count: int) -> dict[str, Any] | None:
     }}
 
 
-def context_usage(*, tokens: int, budget: int, window: int | None, dropped: int) -> dict[str, Any]:
+def context_usage(
+    *, tokens: int, budget: int, window: int | None, dropped: int, summary: bool = False, summarised: bool = False,
+) -> dict[str, Any]:
     """How much of the chat's context budget this turn used (0.7.2 K), as Open WebUI's ``context_usage`` says it.
 
     *tokens*: the context as sent, estimated; *budget*: what it was fitted to; *window*: the model's context length
-    (null: not known); *dropped*: how many of the chat's earlier messages no longer go to the model. Said only in the
-    response: nothing of it is kept.
+    (null: not known); *dropped*: how many of the chat's earlier messages no longer go to the model; *summary*: the
+    chat's summary went in their place (written by a model); *summarised*: it was written this turn. Said only in
+    the response: nothing of it is kept.
     """
     return {"type": "CUSTOM", "name": "faden.context", "value": {
         "tokens": tokens, "budget": budget, "window": window, "dropped": dropped,
+        "summary": summary, "summarised": summarised,
     }}
 
 

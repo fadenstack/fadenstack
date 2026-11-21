@@ -415,6 +415,11 @@ class SessionDAO:
         await self.session.flush()
         return (result.rowcount or 0) > 0
 
+    async def message_written_at(self, *, message_id: uuid.UUID) -> datetime | None:
+        """When a message was written; None when it is gone."""
+        result = await self.session.execute(select(ChatMessage.created_at).where(ChatMessage.id == message_id))
+        return result.scalar_one_or_none()
+
     async def count_messages(self, *, session_id: uuid.UUID) -> int:
         result = await self.session.execute(
             select(func.count(ChatMessage.id)).where(
@@ -443,12 +448,16 @@ class SessionDAO:
         summary_text: str,
         last_message_id: uuid.UUID,
         token_estimate: int = 0,
+        model_alias: str | None = None,
+        record_id: str | None = None,
     ) -> SessionSummary:
         summary = SessionSummary(
             session_id=session_id,
             summary_text=summary_text,
             last_message_id=last_message_id,
             token_estimate=token_estimate,
+            model_alias=model_alias,
+            record_id=record_id,
         )
         self.session.add(summary)
         await self.session.flush()

@@ -52,6 +52,7 @@ from faden_gateway.services.gateway import (
     text_marking,
     text_receipts,
 )
+from faden_gateway.services.gateway import chat_settings, content_hash, summarizer
 from faden_gateway.services.extensions import registry as extension_registry
 from faden_gateway.services.gateway import governance as gov
 from faden_gateway.services.gateway import grants
@@ -876,6 +877,44 @@ def _context_factor(value: object) -> float:
     return float(value) if 0.5 <= value <= 1.0 else 1.0
 
 
+#: A chat whose summary could not be written is not asked again for this long, on this worker: the turn would
+#: wait for a failing model each time (0.7.2 K, layer 5).
+SUMMARY_RETRY_SEC = 600.0
+#: At most this many chats are remembered as failed; the oldest go first.
+_SUMMARY_FAILED_MAX = 1000
+_summary_failed: dict[uuid.UUID, float] = {}
+#: How a summary's answer may not end: cut at its cap, held back by a check, or a tool call instead of text.
+_SUMMARY_UNFINISHED = frozenset({"length", "content_filter", "tool_calls", "function_call"})
+
+
+def _summary_due(sid: uuid.UUID) -> bool:
+    """Whether a summary may be written for chat *sid* now: not while its last attempt is recent."""
+    until = _summary_failed.get(sid)
+    if until is None:
+        return True
+    if time.monotonic() < until:
+        return False
+    _summary_failed.pop(sid, None)
+    return True
+
+
+def _summary_failing(sid: uuid.UUID) -> None:
+    """Remember that chat *sid*'s summary could not be written (``SUMMARY_RETRY_SEC``)."""
+    while len(_summary_failed) >= _SUMMARY_FAILED_MAX:
+        _summary_failed.pop(next(iter(_summary_failed)))
+    _summary_failed[sid] = time.monotonic() + SUMMARY_RETRY_SEC
+
+
+def _summary_text(payload: Any) -> str | None:
+    """A summary's text from the model's whole answer; None for one that did not end as an answer ends."""
+    choices = payload.get("choices") if isinstance(payload, dict) else None
+    first = choices[0] if isinstance(choices, list) and choices and isinstance(choices[0], dict) else None
+    if first is None or first.get("finish_reason") in _SUMMARY_UNFINISHED:
+        return None
+    text = _answer_text({"choices": [first]}).strip()
+    return text or None
+
+
 def _reply_reserve(payload: dict[str, Any]) -> int:
     """The tokens kept for the reply (0.7.2 K): the request's cap, else 4,096; twice that with thinking."""
     for key in ("max_completion_tokens", "max_tokens"):
@@ -1421,6 +1460,8 @@ class _Prepared:
     #: The pictures of the project's Files the chat's context carries (their names): they go with every
     #: chat of the project, so a refusal of pictures names them.
     project_pictures: list[str] = field(default_factory=list)
+    #: A request the gateway makes for itself (``chat_summary``): no session, skills, knowledge or tools.
+    internal: str | None = None
     #: The share of the prompt budget the chat's context is fitted to: 0.75 for the one retry after the
     #: model said the context was too long (0.7.2 K).
     context_factor: float = 1.0
@@ -1584,6 +1625,7 @@ class GatewayService:
         tool_mode: str | None = None,
         purpose: str | None = None,
         context_factor: float = 1.0,
+        internal: str | None = None,
     ) -> GatewayResponse:
         started = time.perf_counter()
         rerank: dict[str, Any] | None = None
@@ -1603,6 +1645,7 @@ class GatewayService:
         req = _Prepared(
             payload=payload, requested_skills=list(skills or []), agent=agent, faden_events=faden_events,
             tool_mode_header=tool_mode, purpose=purpose, context_factor=_context_factor(context_factor),
+            internal=internal,
         )
         result: UpstreamResult | None = None
         error_code: str | None = None
@@ -3153,6 +3196,9 @@ class GatewayService:
         import hashlib
         req.pii_scope = hashlib.sha256(f"{auth.tenant_id}:{session_id or ''}".encode()).hexdigest()
         chat = endpoint == "/v1/chat/completions"
+        # A chat the gateway asks for itself (a chat's summary): checked, routed, marked and logged as any chat,
+        # but with no session, skills, knowledge or tools of its own.
+        tooled = chat and req.internal is None
         payload = req.payload
         req.client_tools = {_tool_definition_name(t) for t in payload.get("tools") or []}
         req.client_offered = frozenset(req.client_tools)
@@ -3210,7 +3256,7 @@ class GatewayService:
         # The files the chat has, for skills that come in on a file type. Read
         # before the lookups below: the session step uses the same database
         # session, which cannot run two queries at once.
-        file_types = await self._chat_file_types(auth, session_id) if chat and self.skills_client else []
+        file_types = await self._chat_file_types(auth, session_id) if tooled and self.skills_client else []
         (
             (payload, req.session_id, req.project_id),
             req.skills,
@@ -3223,7 +3269,7 @@ class GatewayService:
                 # Sent before the answer, to a client that asked for the events.
                 notices=req.faden_leading,
             )
-            if chat else _value((payload, None, None)),
+            if tooled else _value((payload, None, None)),
             self._resolve_skills(
                 question,
                 auth,
@@ -3234,13 +3280,13 @@ class GatewayService:
                 inline_files_chars=0 if searchable else skill_files.INLINE_CHARS,
                 agent=req.agent,
             )
-            if chat
+            if tooled
             else _value([]),
-            self.mcp_tool_cache.get_tools(auth.tenant_id) if chat and self.mcp_tool_cache else _value(None),
+            self.mcp_tool_cache.get_tools(auth.tenant_id) if tooled and self.mcp_tool_cache else _value(None),
             self.usage_groups.resolve(auth.user_id) if self.usage_groups else _value(None),
             # Asked before the slot, beside the lookups above; kept a minute (knowledge.py), so most
             # turns wait for nothing.
-            self._knowledge_to_search(req, auth, payload, candidates) if chat else _value(None),
+            self._knowledge_to_search(req, auth, payload, candidates) if tooled else _value(None),
         )
         self._book_on(req, team)
         # The tenant's whole catalog, so that a tool keeps its name from chat to chat (tool_names.py).
@@ -3249,7 +3295,7 @@ class GatewayService:
             blocks = [skill_files.skill_block(skill, as_tool=searchable) for skill in req.skills]
             payload = _with_skills(payload, blocks)
         req.payload = payload
-        if chat:
+        if tooled:
             # The session is resolved (and the user's): its tool mode applies.
             await self._resolve_tool_mode(req, auth, {
                 t.get("qualified_name", ""): t["annotations"] for t in mcp_tools or [] if t.get("annotations")
@@ -3271,7 +3317,8 @@ class GatewayService:
         req.pii_policy = _resolve_pii_policy(
             policy,
             session_override=(
-                await self._session_pii_override(req.session_id, auth) or _agent_pii_override(req)
+                await self._session_pii_override(req.session_id or (session_id if req.internal else None), auth)
+                or _agent_pii_override(req)
             ),
             agent_allow_mode_override=(
                 req.agent.agent.pii_allow_mode_override if req.agent is not None else None
@@ -3322,7 +3369,7 @@ class GatewayService:
             routing_metadata={"pii_fallback_outcome": req.fallback_outcome},
         )
 
-        if chat:
+        if tooled:
             # Inject current date/time so the model is aware of "today"
             egress = self._inject_datetime_context(egress)
             # Tools only to a route that calls them, when the client has not
@@ -3790,6 +3837,20 @@ class GatewayService:
             current_messages=current_messages,
             project=project,
         )
+        summarised = False
+        if req is not None and await self._summary_wanted(req, sid, model, assembled):
+            summarised = await self._summarise(
+                auth, sid=sid, model=model, previous=assembled.summary_used, left_out=assembled.uncovered,
+            )
+            if summarised:
+                # The messages just left out are in the chat's summary now: the context again, with it.
+                assembled = await assembler.assemble(
+                    session_id=sid,
+                    tenant_id=auth.tenant_id,
+                    user_id=auth.user_id,
+                    current_messages=current_messages,
+                    project=project,
+                )
 
         _report_left_out(notices, assembled.pictures_left_out, payload, unreadable=assembled.files_unreadable)
         payload["messages"] = assembled.messages
@@ -3797,7 +3858,7 @@ class GatewayService:
             req.chat_dropped, req.chat_kept_from = assembled.dropped, assembled.kept_from
             req.context_usage = faden_events.context_usage(
                 tokens=assembled.total_token_estimate, budget=assembled.budget, window=assembled.window,
-                dropped=assembled.dropped,
+                dropped=assembled.dropped, summary=assembled.summary_used is not None, summarised=summarised,
             )
             req.chat_session = sid
             req.project_pictures = [
@@ -3845,6 +3906,75 @@ class GatewayService:
             await self.session_dao.session.commit()
 
         return payload, str(sid), (str(sess.project_id) if sess.project_id else None)
+
+    async def _summary_wanted(self, req: _Prepared, sid: uuid.UUID, model: str, assembled: Any) -> bool:
+        """Whether this turn writes the chat's summary: messages were just left out that no summary covers, on
+        a person's own chat (not an agent's, not the gateway's own request), on a model an administrator
+        switched summaries on for (``chat_settings``, off by default), and not soon after one failed."""
+        return bool(
+            assembled.uncovered and req.internal is None and req.agent is None and model
+            and _summary_due(sid) and await chat_settings.summary_on(model)
+        )
+
+    async def _summarise(
+        self, auth: AuthContext, *, sid: uuid.UUID, model: str, previous: Any, left_out: list[Any],
+    ) -> bool:
+        """Fold the messages just *left_out* into the chat's summary (``summarizer``; 0.7.2 K, layer 5).
+
+        The chat's own model writes it through the gateway's answer path, as the gateway's own request
+        (``internal``): its personal data checked under the chat's settings, on a route that marks what it
+        writes, logged as a request of the chat, with no session, skills, knowledge or tools of its own and
+        nothing stored as a message. With the provenance module on, the summary is signed as content of the
+        kind ``summarised`` (linked to the answer's receipt), or not kept at all. Then it is stored, encrypted,
+        with the chat. Anything failing leaves the chat with the line in place of the left-out messages, and
+        the next try waits ``SUMMARY_RETRY_SEC``. Returns whether a summary was stored.
+        """
+        if self.session_dao is None:
+            return False
+        body: dict[str, Any] = {
+            "model": model,
+            "messages": summarizer.prompt(previous.summary_text if previous is not None else None, left_out),
+            "max_tokens": summarizer.MAX_TOKENS,
+            "temperature": 0.2,
+        }
+        # A model that thinks first would spend the summary's tokens on it: where it can be turned off, it is.
+        if "off" in ((await self.dao.alias_reasoning_levels([model])).get(model) or []):
+            body["reasoning_effort"] = "none"
+        request_id = f"chat-summary-{uuid.uuid4().hex}"
+        # What the turn wrote so far is kept, whatever becomes of the summary.
+        await self._release_request_connection()
+        try:
+            answer = await self.route_non_stream(
+                auth=auth, endpoint="/v1/chat/completions", payload=body, request_id=request_id,
+                session_id=str(sid), internal="chat_summary",
+            )
+            text = _summary_text(answer.payload) if answer.status_code == 200 else None
+            if text is None:
+                raise ValueError(f"the model's answer was not a summary (status {answer.status_code})")
+            record_id = None
+            if self.provenance_client is not None:
+                signed = await self.provenance_client.sign_record({
+                    "content_sha256": content_hash.text_sha256(text),
+                    "media_type": "text/plain",
+                    "edit_kind": "summarised",
+                    "receipt_id": answer.provenance[0] if answer.provenance else None,
+                    "model": model,
+                }, agent=None)
+                record_id = str(signed["record"]["id"])
+            # A savepoint: a summary that cannot be stored takes nothing else of the turn with it (a rollback of
+            # the whole session would also expire what the turn has loaded).
+            async with self.session_dao.session.begin_nested():
+                await self.session_dao.create_summary(
+                    session_id=sid, summary_text=text, last_message_id=left_out[-1].id,
+                    token_estimate=len(summarizer.as_context(text)) // 4 + 1, model_alias=model,
+                    record_id=record_id,
+                )
+            await self.session_dao.session.commit()
+        except Exception as exc:  # the chat goes on without a summary: the line stands for the messages
+            _summary_failing(sid)
+            logger.warning("Chat %s: no summary was written (%s): %s", sid, request_id, exc)
+            return False
+        return True
 
     # ── Skills helpers ───────────────────────────────────────────────────────
 

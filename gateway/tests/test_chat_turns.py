@@ -210,6 +210,23 @@ async def test_the_last_failed_reply_is_tried_again_in_its_place(
 
 
 @pytest.mark.anyio
+@pytest.mark.parametrize(("asked", "sent_effort"), [("none", "none"), ("high", "high"), ("loud", None), (3, None)])
+async def test_a_retry_keeps_the_thinking_level_the_person_picked(
+    asked: object, sent_effort: str | None,
+    chat: uuid.UUID, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await _stored(db_session, chat, ("user", "q1", "complete"), ("assistant", "", "failed"))
+    failed = (await _turns(db_session, chat))[-1]
+    sent: list[dict[str, Any]] = []
+    _model_says(monkeypatch, _chunk("a1"), b"data: [DONE]\n\n", sent=sent)
+
+    r = await client.post(f"/v1/sessions/{chat}/turns/{failed.id}/retry", headers=_auth(),
+                          json={"reasoning_effort": asked})
+    assert r.status_code == 200
+    assert sent[0].get("reasoning_effort") == sent_effort
+
+
+@pytest.mark.anyio
 @pytest.mark.parametrize(
     ("rows", "which"),
     [
