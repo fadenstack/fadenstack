@@ -8,12 +8,13 @@ On your organisation's server:
 
 - your account;
 - your chats: the messages, the replies and their titles;
-- your projects, with their settings;
+- your projects, with their settings and their files;
 - the files you attach, and the text read from them;
+- summaries of long chats, written by AI, if your administrator has switched them on;
 - your skills;
 - usage records: when you used which model, how much text went in and out, and which tools ran. They do not contain what was said.
 
-The messages, the replies, chat titles, project names, descriptions and instructions, file names, the files you attach and the text read from them are stored encrypted. The server does not start without the key they are encrypted with. Chats from before your organisation's upgrade to this release are encrypted by the upgrade. A model's thinking is not saved at all.
+The messages, the replies, the summaries of long chats, chat titles, project names, descriptions and instructions, file names, the files you attach and the text read from them are stored encrypted. The server does not start without the key they are encrypted with. Chats from before your organisation's upgrade to this release are encrypted by the upgrade. A model's thinking is not saved at all.
 
 On your own computer:
 
@@ -49,7 +50,7 @@ When it is on, personal data is masked in one of two ways:
     If the check cannot run, the policy decides: your message is not sent, it is sent anyway, or it goes to one of your organisation's own models instead.
 
 !!! note "Detection is not always right"
-    Personal data is found automatically, and how well that works depends on the language and on how the text is written: tables, lists, code and short fragments are harder than plain sentences. It finds most personal data in English text, not all of it; in German or other languages it often misses names and places. It can also mask words that are not personal data. Do not paste anything you are not allowed to share.
+    Personal data is found automatically, and how well that works depends on the language and on how the text is written: tables, lists, code and short fragments are harder than plain sentences. It finds most personal data in English text, not all of it; in German or other languages it often misses names and places. It can also mask words that are not personal data. Only text is checked: a picture goes to the model as it is, with any personal data it shows, and the chat says so under the reply. Your organisation can refuse pictures instead; then the message is not sent, and the chat says why. Do not paste anything you are not allowed to share.
 
 ### See and tighten it for one chat
 
@@ -76,7 +77,7 @@ You can only make the protection stricter than your organisation's policy, never
 
 ## Models at outside providers
 
-Your administrator can offer models that run at an outside provider, such as OpenAI or Azure, next to your organisation's own. When you pick one of those, everything the model needs to answer goes to that provider: your message, the earlier messages of the chat, the text of your attached files, project and skill instructions, tool results and knowledge passages. Personal data is masked first if the policy says so. The provider's own terms then apply.
+Your administrator can offer models that run at an outside provider, such as OpenAI or Azure, next to your organisation's own. When you pick one of those, everything the model needs to answer goes to that provider: your message and its pictures, the earlier messages of the chat, as many as fit, or their summary, the text of your attached files and of the project's files, project and skill instructions, tool results and knowledge passages. Personal data in the text is masked first if the policy says so; pictures go as they are. The provider's own terms then apply.
 
 The model list does not always show where a model runs. If it matters for what you write, ask your administrator, or pick a model you know runs inside your organisation. See [Remote providers](../administer/providers.md).
 
@@ -95,14 +96,15 @@ When a limit stops a request, the message names the limit, for example the insta
 ## Tools and the knowledge base
 
 - A tool your administrator connected receives what the model passes to it, often a search term or text from your conversation. Your administrator decides, per service, how personal data in those calls is handled. See [Tools in the chat](tools.md).
-- Everything in the organisation's knowledge base can come up in anyone's chat. Your attached files do not go into it. See [Knowledge](knowledge.md).
+- Everything in the organisation's knowledge base can come up in anyone's chat. Your attached files and your projects' files do not go into it. See [Knowledge](knowledge.md).
 
 ## Deleting
 
 | You delete | What happens |
 |---|---|
-| **A chat** | It disappears from your list at once and cannot be brought back. The server keeps it for the time your organisation set (30 days unless it chose another), then erases it for good, with its files and what the assistant remembered from it. |
-| **A project** | It is erased at once, with all its chats and their files. |
+| **A chat** | It disappears from your list at once and cannot be brought back. The server keeps it for the time your organisation set (30 days unless it chose another), then erases it for good, with its files, its summary and what the assistant remembered from it. |
+| **A project** | It is erased at once, with its files and all its chats and their files. |
+| **A file in a project's Files** (**Remove**) | It is erased at once. |
 | **Your account** (an administrator does it) | Your chats, projects, files and what the assistant remembered are erased with it, and so is what your apps reported to the server: which tools ran and when, and your devices' reports. |
 | A chat in **Chat history**, in the browser agent | It is removed from your browser. |
 | **Remove my data…**, under **Your data in this browser** in the browser agent's settings | The chats, saved prompts, **Allow always** choices and record of tool calls kept for you in that browser are erased, with their key, and your connection ends. **Remove all my Fadenstack data in this browser…** does the same for every Fadenstack app there. **Export my data** saves them first, as a file. |
@@ -130,6 +132,7 @@ release notes on **Updates**): **Settings → Branding → Show links to fadenst
 | **PII service unavailable and fail_action=block.** | The personal-data check could not run, and your organisation's policy says not to send messages without it. Try again later; if it keeps happening, tell your administrator. |
 | **The PII check took longer than its limit for this request …** | The text was too long to check in time, so nothing was sent. Send a shorter text, or tell your administrator, who can make the check faster. |
 | **The request is too large for the PII check …** | The conversation or what a tool returned is more than the check takes at once, so nothing was sent. Start a new chat or send less. |
+| **Pictures are not checked for personal data, and your organisation does not send them unchecked.** | Your organisation's policy refuses pictures while personal data is checked. Nothing was sent. Remove the picture (in a project, also from its **Files**) and send again, or ask your administrator. |
 | An answer shows `<PERSON>` or `[PERSON_1]` where a name should be | The name was masked before it reached the model. With `redact` this is expected. With `tokenize_reversible` the name should come back; if it does not, tell your administrator. |
 | **Your admin hasn't allowed changing the PII mode for this chat.** | Your organisation fixes the mode. The other settings in **Privacy** may still be open to you. |
 | **… is not applied. Choose it again to apply it.** | The mode you chose earlier did not take effect. Choose it again in **Mode**. |
