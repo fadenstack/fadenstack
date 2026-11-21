@@ -160,9 +160,14 @@ export default function ChatWindow({
   }, [sessionId]);
 
   // The chat's menu offers the summary when there is one: asked when the chat opens, and again
-  // once a reply is written (the gateway may have made one for it).
+  // only when a turn says one was written for it, or that one stands for its older messages and
+  // this page has not seen it (the gateway writes it before the turn, so its event comes first).
+  const summaryNews = context?.summarised === true || (context?.summary === true && !hasSummary);
+  const [summaryAsked, setSummaryAsked] = useState(0);
   useEffect(() => {
-    if (isStreaming) return;
+    if (summaryNews) setSummaryAsked((n) => n + 1);
+  }, [summaryNews, context]);
+  useEffect(() => {
     let alive = true;
     chatApi
       .getSummary(sessionId)
@@ -171,7 +176,7 @@ export default function ChatWindow({
     return () => {
       alive = false;
     };
-  }, [sessionId, isStreaming, olderNote?.summary]);
+  }, [sessionId, summaryAsked]);
 
   // The sidebar marks the chat while its reply is written; it goes on when
   // the user moves to another chat.

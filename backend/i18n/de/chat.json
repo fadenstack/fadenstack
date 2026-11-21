@@ -109,7 +109,7 @@
   "thinking_low": "Niedrig",
   "thinking_medium": "Mittel",
   "thinking_high": "Hoch",
-  "older_dropped": "Ältere Nachrichten werden nicht mehr an das Modell gesendet. Es kann sie durchsuchen, wenn es sie braucht.",
+  "older_dropped": "Ältere Nachrichten werden nicht mehr an das Modell gesendet. Ein Modell, das Tools nutzt, kann sie noch durchsuchen.",
   "older_summarised": "Ältere Nachrichten werden nicht mehr an das Modell gesendet; eine vom Modell geschriebene Zusammenfassung steht für sie.",
   "context_use": "Kontext: {{used}} von {{budget}} Tokens",
   "context_use_tooltip": "Der Kontext, der für diese Antwort an das Modell ging (geschätzt), und das Budget, auf das er zugeschnitten wurde.",

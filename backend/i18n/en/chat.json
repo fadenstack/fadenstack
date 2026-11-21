@@ -109,7 +109,7 @@
   "thinking_low": "Low",
   "thinking_medium": "Medium",
   "thinking_high": "High",
-  "older_dropped": "Older messages are no longer sent to the model. It can search them when it needs them.",
+  "older_dropped": "Older messages are no longer sent to the model. A model that uses tools can still search them.",
   "older_summarised": "Older messages are no longer sent to the model; a summary written by the model stands for them.",
   "context_use": "Context: {{used}} of {{budget}} tokens",
   "context_use_tooltip": "The context sent to the model for this reply (an estimate), and the budget it was fitted to.",

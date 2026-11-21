@@ -159,8 +159,17 @@ export function writeCachedAccess(entry: Omit<AccessCacheEntry, "expiresAt">) {
   }
 }
 
+/** What else is kept per person in this page: forgotten with the access, whenever who is signed in may change. */
+const perPersonResets = new Set<() => void>();
+
+/** Forget *reset*'s per-person cache together with the access (sign-out, the login page, a 401). */
+export function onAccessCleared(reset: () => void): void {
+  perPersonResets.add(reset);
+}
+
 export function clearCachedAccess() {
   accessCacheMemory = null;
+  for (const reset of perPersonResets) reset();
   if (typeof window === "undefined") return;
   try {
     window.sessionStorage.removeItem(ACCESS_CACHE_KEY);

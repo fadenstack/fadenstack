@@ -96,7 +96,7 @@ describe("ChatWindow context budget", () => {
     hook.olderNote = { summary: false, index: 2 };
     renderChat();
     const note = screen.getByTestId("older-messages-note");
-    expect(note).toHaveTextContent("Older messages are no longer sent to the model. It can search them when it needs them.");
+    expect(note).toHaveTextContent("Older messages are no longer sent to the model. A model that uses tools can still search them.");
     const box = screen.getByTestId("chat-messages");
     const order = within(box).getByText("second").compareDocumentPosition(note);
     expect(order & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
@@ -149,5 +149,41 @@ describe("ChatWindow context budget", () => {
     renderChat();
     await waitFor(() => expect(chatApi.getSummary).toHaveBeenCalled());
     expect(screen.queryByTestId("show-summary")).toBeNull();
+  });
+
+  it("asks for the summary when the chat opens, and again only when a turn says one was written", async () => {
+    const use = (over: Partial<ContextUse>): ContextUse => ({
+      tokens: 900, budget: 4096, window: 8192, dropped: 0, summary: false, summarised: false, ...over,
+    });
+    const tree = () => (
+      <MemoryRouter initialEntries={["/chat/s1"]}>
+        <Routes>
+          <Route
+            path="/chat/:sessionId?"
+            element={
+              <ChatWindow
+                sessionId="s1" selectedModel="m" onModelChange={() => {}} onSessionCreated={() => {}}
+                onSessionUpdated={() => {}} onToggleSidebar={() => {}} sidebarOpen languages={[]} language="en"
+                onLanguageChange={() => {}} isSuperuser={false} onToolsToggle={() => {}} toolsOpen={false}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>
+    );
+    const view = render(tree());
+    const again = () => view.rerender(tree());
+    await waitFor(() => expect(chatApi.getSummary).toHaveBeenCalledTimes(1));
+
+    hook.context = use({ dropped: 12 });
+    again();
+    hook.context = use({ dropped: 12, tokens: 950 });
+    again();
+    await new Promise((done) => setTimeout(done, 30));
+    expect(chatApi.getSummary).toHaveBeenCalledTimes(1);
+
+    hook.context = use({ dropped: 12, summary: true, summarised: true });
+    again();
+    await waitFor(() => expect(chatApi.getSummary).toHaveBeenCalledTimes(2));
   });
 });

@@ -31,7 +31,7 @@ export default function OlderMessagesNote({
           : t("older_dropped", {
               ns: "chat",
               defaultValue:
-                "Older messages are no longer sent to the model. It can search them when it needs them.",
+                "Older messages are no longer sent to the model. A model that uses tools can still search them.",
             })}
       </Typography>
       {summary && onShowSummary && (
