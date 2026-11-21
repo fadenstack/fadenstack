@@ -87,6 +87,8 @@ export default function ChatWindow({
   const location = useLocation();
   const initialSentRef = useRef(false);
   const skills = useChatSkills();
+  // What the thinking pill stands for (nothing for Auto), as the composer tells it.
+  const [reasoningEffort, setReasoningEffort] = useState<string | undefined>(undefined);
 
   const {
     messages,
@@ -133,6 +135,7 @@ export default function ChatWindow({
           state.initialModel,
           state.initialFiles,
           state.initialSkills,
+          state.initialReasoning,
         );
         // Clear navigation state so a page refresh won't re-send the message.
         // Preserve React Router's internal history keys while removing user state.
@@ -203,7 +206,7 @@ export default function ChatWindow({
 
   const handleSend = (text: string, files: File[]) => {
     jumpToLatest();
-    send(text, selectedModel, files, skills.selected);
+    send(text, selectedModel, files, skills.selected, reasoningEffort);
   };
 
   const handleRetry = () => {
@@ -552,6 +555,7 @@ export default function ChatWindow({
         onToolsToggle={onToolsToggle}
         toolsOpen={toolsOpen}
         draft={draft}
+        onReasoningChange={setReasoningEffort}
       />
 
       {/* Debug panel — only rendered when RBAC allows */}

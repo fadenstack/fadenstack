@@ -113,7 +113,17 @@ export interface ModelAlias {
    * A picture attached to a chat goes only to a model that takes pictures.
    */
   vision?: boolean | null;
+  /**
+   * The thinking levels the model tells apart, when the gateway knows; null when it does not
+   * (then every level is offered). An empty list: it takes no level at all.
+   */
+  reasoning_levels?: ReasoningLevel[] | null;
+  /** The model's context length in tokens, when known. */
+  context_length?: number | null;
 }
+
+/** A level passed to the model as `reasoning_effort` (`off` goes as `none`). */
+export type ReasoningLevel = "off" | "low" | "medium" | "high";
 
 /** Whether a model can hold a conversation: an embedding or rerank model cannot. */
 export function isChatModel(model: ModelAlias): boolean {

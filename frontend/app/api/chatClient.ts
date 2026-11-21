@@ -420,7 +420,14 @@ export function streamChat(payload: Record<string, unknown>): StreamHandle {
 export function retryTurn(
   sessionId: string,
   turnId: string,
-  body: { model?: string; skills?: string[] } = {},
+  body: {
+    model?: string;
+    skills?: string[];
+    /** How much to think, as on the turn itself (`none` for off). */
+    reasoning_effort?: string;
+    /** Fit the context to this share of its usual budget: a turn that overflowed is tried again with less. */
+    context_factor?: number;
+  } = {},
 ): StreamHandle {
   return postStream(`/sessions/${sessionId}/turns/${turnId}/retry`, body);
 }

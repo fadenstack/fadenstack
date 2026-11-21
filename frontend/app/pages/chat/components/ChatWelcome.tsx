@@ -44,6 +44,8 @@ export interface InitialMessageState {
   initialFiles?: File[];
   /** The skills picked before the chat had its first message. */
   initialSkills?: string[];
+  /** The thinking pill's level as `reasoning_effort`; nothing for Auto. */
+  initialReasoning?: string;
 }
 
 export default function ChatWelcome({
@@ -63,6 +65,7 @@ export default function ChatWelcome({
   const skills = useChatSkills();
   const theme = useTheme();
   const [sending, setSending] = useState(false);
+  const [reasoning, setReasoning] = useState<string | undefined>(undefined);
 
   const suggestions = [
     t("suggestion_1", {
@@ -95,6 +98,7 @@ export default function ChatWelcome({
         initialModel: selectedModel,
         initialFiles: files.length > 0 ? files : undefined,
         initialSkills: skills.selected.length > 0 ? skills.selected : undefined,
+        initialReasoning: reasoning,
       });
     } catch {
       setSending(false);
@@ -199,6 +203,7 @@ export default function ChatWelcome({
         streaming={sending}
         onToolsToggle={onToolsToggle}
         toolsOpen={toolsOpen}
+        onReasoningChange={setReasoning}
       />
     </Box>
   );

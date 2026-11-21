@@ -2,6 +2,7 @@
  * ModelSelector — dropdown to pick active model alias.
  */
 import { useEffect } from "react";
+import Box from "@mui/material/Box";
 import Chip from "@mui/material/Chip";
 import FormControl from "@mui/material/FormControl";
 import InputLabel from "@mui/material/InputLabel";
@@ -99,8 +100,8 @@ export default function ModelSelector({
 
   if (compact) {
     return (
+      <Box id="model-selector" sx={{ minWidth: 0, maxWidth: "100%", display: "flex" }}>
       <Select
-        id="model-selector"
         size="small"
         value={models.some((m) => m.alias === value) ? value : ""}
         onChange={handleChange}
@@ -109,6 +110,8 @@ export default function ModelSelector({
         sx={{
           fontSize: "0.8rem",
           height: 32,
+          // A pill, like the thinking pill beside it.
+          borderRadius: 4,
           maxWidth: "100%",
           minWidth: 0,
           "& .MuiSelect-select": { py: 0.5, pl: 1.5, overflow: "hidden", textOverflow: "ellipsis" },
@@ -124,6 +127,7 @@ export default function ModelSelector({
           </MenuItem>
         ))}
       </Select>
+      </Box>
     );
   }
 

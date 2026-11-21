@@ -196,7 +196,14 @@ export interface UseChatStreamReturn {
   /** Get response time for a specific message id, if tracked. */
   getResponseMs: (msgId: string) => number | null;
   /** ``skills``: the slugs picked for the chat, sent with the message. */
-  send: (text: string, model: string, files?: File[], skills?: string[]) => Promise<void>;
+  send: (
+    text: string,
+    model: string,
+    files?: File[],
+    skills?: string[],
+    /** The thinking level as the gateway takes it (`none`, `low`, ...); nothing for Auto. */
+    reasoningEffort?: string,
+  ) => Promise<void>;
   /** Retry the last failed request. */
   retry: () => Promise<void>;
   stop: () => void;
@@ -330,6 +337,7 @@ export function useChatStream({
     model: string;
     files?: File[];
     skills?: string[];
+    reasoningEffort?: string;
   } | null>(null);
 
   const stop = useCallback(() => {
@@ -625,9 +633,9 @@ export function useChatStream({
   }, [runStream]);
 
   const send = useCallback(
-    async (text: string, model: string, files?: File[], skills?: string[]) => {
+    async (text: string, model: string, files?: File[], skills?: string[], reasoningEffort?: string) => {
       setError(null);
-      lastSendRef.current = { text, model, files, skills };
+      lastSendRef.current = { text, model, files, skills, reasoningEffort };
       let sid = sessionIdRef.current;
 
       try {
@@ -694,6 +702,8 @@ export function useChatStream({
           messages: [{ role: "user", content: text }],
           // The gateway takes them off before the model sees the request.
           ...(skills && skills.length > 0 ? { skills } : {}),
+          // Auto sends nothing: the model decides.
+          ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
         }),
         sid,
         model,
@@ -723,10 +733,12 @@ export function useChatStream({
     ) {
       setMessages((prev) => prev.filter((m) => m.id !== last.id));
       const skills = lastSendRef.current?.skills;
+      const effort = lastSendRef.current?.reasoningEffort;
       await runStream(
         retryTurn(sid, last.id, {
           ...(model ? { model } : {}),
           ...(skills && skills.length > 0 ? { skills } : {}),
+          ...(effort ? { reasoning_effort: effort } : {}),
         }),
         sid,
         model || last.model_alias || "",
@@ -751,7 +763,7 @@ export function useChatStream({
       }
     }
 
-    await send(lastSend.text, model, lastSend.files, lastSend.skills);
+    await send(lastSend.text, model, lastSend.files, lastSend.skills, lastSend.reasoningEffort);
   }, [send, runStream]);
 
   return {
