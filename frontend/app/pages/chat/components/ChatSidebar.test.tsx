@@ -5,6 +5,7 @@
  * before anything showed.
  */
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { useState } from "react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
@@ -115,5 +116,39 @@ describe("deleting a chat or a project", () => {
     expect(screen.getByRole("dialog")).toHaveTextContent('The project "Plans" and all its chats will be deleted.');
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Delete" }));
     expect(onDeleteProject).toHaveBeenCalledWith("p1");
+  });
+});
+
+describe("the collapsed rail", () => {
+  function Rail() {
+    const [open, setOpen] = useState(false);
+    return (
+      <MemoryRouter>
+        <ChatSidebar
+          open={open}
+          onToggle={() => setOpen((v) => !v)}
+          sessions={[]}
+          projects={[]}
+          onNewChat={() => {}}
+          onSelectSession={() => {}}
+          onDeleteSession={() => {}}
+          onCreateProject={vi.fn()}
+          onDeleteProject={() => {}}
+          onUpdateProject={vi.fn()}
+          onMoveSession={() => {}}
+          width={260}
+          isMobile={false}
+        />
+      </MemoryRouter>
+    );
+  }
+
+  it("has a New project button that opens the sidebar with the name field focused", async () => {
+    render(<Rail />);
+
+    fireEvent.click(screen.getByRole("button", { name: "New project" }));
+
+    const field = await screen.findByRole("textbox", { name: "Project name" });
+    await waitFor(() => expect(field).toHaveFocus());
   });
 });

@@ -167,6 +167,17 @@ export default function ChatSidebar({
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const activeDragSession = activeDragId ? sessions.find((s) => s.id === activeDragId) : null;
 
+  // The rail's new-project button opens the sidebar with the name field ready;
+  // the field takes focus as it appears (autoFocus), and again here once open.
+  const projectNameRef = useRef<HTMLInputElement>(null);
+  const focusProjectOnOpen = useRef(false);
+  useEffect(() => {
+    if (open && focusProjectOnOpen.current) {
+      focusProjectOnOpen.current = false;
+      setTimeout(() => projectNameRef.current?.focus(), 0);
+    }
+  }, [open]);
+
   // The rail's search button opens the sidebar with the search focused.
   useEffect(() => {
     if (open && focusSearchOnOpen.current) {
@@ -279,6 +290,18 @@ export default function ChatSidebar({
               <AddIcon />
             </IconButton>
           </Tooltip>
+          <Tooltip title={t("chat.new_project", { defaultValue: "New project" })} placement="right" arrow>
+            <IconButton
+              onClick={() => {
+                focusProjectOnOpen.current = true;
+                setCreatingProject(true);
+                onToggle();
+              }}
+              aria-label={t("chat.new_project", { defaultValue: "New project" })}
+            >
+              <CreateNewFolderIcon />
+            </IconButton>
+          </Tooltip>
           <Tooltip title={t("chat.search_placeholder")} placement="right" arrow>
             <IconButton
               onClick={() => {
@@ -361,9 +384,11 @@ export default function ChatSidebar({
         <Box sx={{ px: 1.5, pb: 1 }}>
           <TextField
             autoFocus
+            inputRef={projectNameRef}
             fullWidth
             size="small"
             placeholder={t("chat.project_name", { defaultValue: "Project name" })}
+            slotProps={{ htmlInput: { "aria-label": t("chat.project_name", { defaultValue: "Project name" }) } }}
             value={newProjectName}
             onChange={(e) => setNewProjectName(e.target.value)}
             onKeyDown={(e) => {
