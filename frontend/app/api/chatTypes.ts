@@ -181,6 +181,19 @@ export interface ContextUse {
   summarised: boolean;
 }
 
+/** The summary a model wrote of a long chat's older messages (`GET /sessions/{id}/summary`). */
+export interface ChatSummary {
+  id: string;
+  session_id: string;
+  summary_text: string;
+  last_message_id: string | null;
+  token_estimate: number | null;
+  created_at: string;
+  model_alias: string | null;
+  /** Set when the text is marked as AI-written in the content record. */
+  record_id: string | null;
+}
+
 /** The code of a turn whose context was too long for the model (the chat tries it again with less). */
 export const CONTEXT_LENGTH_EXCEEDED = "context_length_exceeded";
 

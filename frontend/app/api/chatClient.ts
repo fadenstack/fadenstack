@@ -11,6 +11,7 @@ import type {
   ChatSession,
   ChatMessage,
   ChatAttachment,
+  ChatSummary,
   ModelAlias,
   Capacity,
   TokenUsage,
@@ -549,6 +550,10 @@ export const chatApi = {
 
   deleteSession: (id: string) =>
     request<void>(`/sessions/${id}`, { method: "DELETE" }),
+
+  /** The summary standing for the chat's older messages; null when it has none. */
+  getSummary: (sessionId: string) =>
+    request<{ data: ChatSummary | null }>(`/sessions/${sessionId}/summary`).then((r) => r.data),
 
   // Messages
   listMessages: (sessionId: string, limit = 100) =>

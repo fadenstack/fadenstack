@@ -4,10 +4,20 @@
  * With a summary written by a model standing for them, it says so (and offers it, see SummaryDialog).
  */
 import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
 import { useTranslation } from "react-i18next";
 
-export default function OlderMessagesNote({ summary }: { summary: boolean }) {
+import { SummaryLabel } from "./SummaryDialog";
+
+export default function OlderMessagesNote({
+  summary,
+  onShowSummary,
+}: {
+  summary: boolean;
+  /** Opens the summary (the dialog); the action shows only with a summary. */
+  onShowSummary?: () => void;
+}) {
   const { t } = useTranslation();
   return (
     <Box data-testid="older-messages-note" role="note" sx={{ px: 2, py: 0.5, mb: 1.5, textAlign: "center" }}>
@@ -24,6 +34,14 @@ export default function OlderMessagesNote({ summary }: { summary: boolean }) {
                 "Older messages are no longer sent to the model. It can search them when it needs them.",
             })}
       </Typography>
+      {summary && onShowSummary && (
+        <Box sx={{ mt: 0.5 }}>
+          <Button size="small" onClick={onShowSummary} sx={{ textTransform: "none" }}>
+            {t("summary_show", { ns: "chat", defaultValue: "Show summary" })}
+          </Button>
+          <SummaryLabel dense />
+        </Box>
+      )}
     </Box>
   );
 }

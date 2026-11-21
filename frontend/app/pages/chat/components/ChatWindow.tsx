@@ -13,6 +13,7 @@ import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import { useTranslation } from "react-i18next";
 import { useLocation } from "react-router";
 
+import { chatApi } from "~/api/chatClient";
 import type { ChatSession } from "~/api/chatTypes";
 import type { UiLanguage } from "~/api/i18n";
 import { budgetRefusalKey } from "~/components/budgets/budgetFormat";
@@ -23,6 +24,7 @@ import { useChatStream } from "../hooks/useChatStream";
 import FailedReply from "./FailedReply";
 import MessageBubble from "./MessageBubble";
 import OlderMessagesNote from "./OlderMessagesNote";
+import SummaryDialog from "./SummaryDialog";
 import ThinkingBlock from "./ThinkingBlock";
 import MessageDebugPanel from "./MessageDebugPanel";
 import ChatInput from "./ChatInput";
@@ -89,6 +91,9 @@ export default function ChatWindow({
   const initialSentRef = useRef(false);
   const skills = useChatSkills();
   // What the thinking pill stands for (nothing for Auto), as the composer tells it.
+  // Whether the chat has a summary of its older messages, and whether its dialog is open.
+  const [hasSummary, setHasSummary] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const [reasoningEffort, setReasoningEffort] = useState<string | undefined>(undefined);
 
   const {
@@ -153,6 +158,20 @@ export default function ChatWindow({
     loadHistory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
+
+  // The chat's menu offers the summary when there is one: asked when the chat opens, and again
+  // once a reply is written (the gateway may have made one for it).
+  useEffect(() => {
+    if (isStreaming) return;
+    let alive = true;
+    chatApi
+      .getSummary(sessionId)
+      .then((found) => alive && setHasSummary(found !== null))
+      .catch(() => alive && setHasSummary(false));
+    return () => {
+      alive = false;
+    };
+  }, [sessionId, isStreaming, olderNote?.summary]);
 
   // The sidebar marks the chat while its reply is written; it goes on when
   // the user moves to another chat.
@@ -238,6 +257,7 @@ export default function ChatWindow({
         onLanguageChange={onLanguageChange}
         isSuperuser={isSuperuser}
         divider
+        onShowSummary={hasSummary ? () => setSummaryOpen(true) : undefined}
       />
 
       {/* Messages area */}
@@ -302,7 +322,11 @@ export default function ChatWindow({
             );
             // Where older messages stopped going to the model: said once, above the message the turn answered.
             const older = olderNote && olderNote.index === i && (
-              <OlderMessagesNote key={`older-${msg.id}`} summary={olderNote.summary} />
+              <OlderMessagesNote
+                key={`older-${msg.id}`}
+                summary={olderNote.summary}
+                onShowSummary={() => setSummaryOpen(true)}
+              />
             );
             if (!failed) return older ? <Fragment key={msg.id}>{older}{bubble}</Fragment> : bubble;
             return (
@@ -570,6 +594,8 @@ export default function ChatWindow({
         draft={draft}
         onReasoningChange={setReasoningEffort}
       />
+
+      <SummaryDialog open={summaryOpen} sessionId={sessionId} onClose={() => setSummaryOpen(false)} />
 
       {/* Debug panel — only rendered when RBAC allows */}
       {canDebug && debugTraceId && (

@@ -28,6 +28,7 @@ import Stack from "@mui/material/Stack";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import MenuIcon from "@mui/icons-material/Menu";
+import SummarizeOutlinedIcon from "@mui/icons-material/SummarizeOutlined";
 import TranslateIcon from "@mui/icons-material/Translate";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
@@ -51,6 +52,8 @@ export interface ChatTopbarProps {
   isSuperuser: boolean;
   /** A line under the bar (the conversation has one; the welcome view not). */
   divider?: boolean;
+  /** Set when the chat has a summary of its older messages: opens it. */
+  onShowSummary?: () => void;
 }
 
 export default function ChatTopbar({
@@ -63,6 +66,7 @@ export default function ChatTopbar({
   onLanguageChange,
   isSuperuser,
   divider = false,
+  onShowSummary,
 }: ChatTopbarProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -106,6 +110,30 @@ export default function ChatTopbar({
         )}
       </Box>
       <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+        {onShowSummary && (
+          // The label that it was written by an AI goes with what opens it.
+          <Tooltip
+            title={
+              <>
+                <strong>{t("summary_show", { ns: "chat", defaultValue: "Show summary" })}</strong>
+                <br />
+                {t("summary_ai_label", {
+                  ns: "chat",
+                  defaultValue: "Summary written by AI. It can leave out or get wrong what was said.",
+                })}
+              </>
+            }
+          >
+            <IconButton
+              size="small"
+              onClick={onShowSummary}
+              aria-label={t("summary_show", { ns: "chat", defaultValue: "Show summary" })}
+              data-testid="show-summary"
+            >
+              <SummarizeOutlinedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        )}
         {isSuperuser && (
           <Tooltip title={t("nav.admin", { defaultValue: "Admin panel" })}>
             <IconButton size="small" onClick={() => navigate("/admin")}>
