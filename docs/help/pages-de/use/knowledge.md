@@ -12,7 +12,7 @@ Ein Modell weiß, was es im Training gelernt hat, nicht aber, was in den Dokumen
 
 ## Eine Datei anhängen {#attach-a-file}
 
-![Das Nachrichtenfeld: die Büroklammer neben Schraubenschlüssel und Puzzleteil, rechts die Auswahl „Modell“ und die Senden-Schaltfläche](../images/use/chat-composer.png)
+![Das Nachrichtenfeld: die Büroklammer neben Schraubenschlüssel und Puzzleteil, unter dem Text; rechts das Modell, die Denkstufe und die Senden-Schaltfläche](../images/use/chat-composer.png)
 
 1. Wählen Sie im Chat die Büroklammer neben dem Nachrichtenfeld.
 2. Wählen Sie eine oder mehrere Dateien aus. Jede erscheint als Chip über dem Feld; das × entfernt sie.

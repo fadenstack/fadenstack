@@ -6,7 +6,7 @@ Talk to your organisation's models: start a chat, pick a model, and find your ch
 
 ## Start a chat
 
-![The message box: Tools, Skills and the paper clip on the left, the Model picker and the send button on the right](../images/use/chat-composer.png)
+![The message box: the text on top; under it the wrench, the puzzle piece and the paper clip on the left, the model, the thinking level and the send button on the right](../images/use/chat-composer.png)
 
 1. Select **New chat** in the sidebar.
 2. Pick a model in the **Model** picker.
@@ -65,6 +65,10 @@ In a long chat, the oldest messages stop going to the model once the chat no lon
 
 !!! note "Summaries of long chats"
     Your administrator can switch on summaries for a model. In a long chat, the model then writes a summary of the older messages, and the summary goes to the model in their place. Writing it counts in your usage, as a reply does. The summary is written by AI and can leave out or get wrong what was said; select **Show summary** on the line where older messages stop going to the model to read it. It is kept encrypted with the chat, administrators do not see it in the console, and it is deleted with the chat. Summaries are off unless your administrator switches them on.
+
+    ![A long chat: the line where older messages stop going to the model, with Show summary and the label that AI wrote the summary; under it a question, its answer and how much of the model's context the chat used](../images/use/chat-summary.png)
+
+    ![The summary opened: the label that AI wrote it, the summary itself, and the model that wrote it and when](../images/use/chat-summary-dialog.png)
 
 ## Titles, projects and search
 

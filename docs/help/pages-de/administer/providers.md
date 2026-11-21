@@ -77,6 +77,8 @@ für jedes einen eigenen Eintrag an, mit demselben Schlüssel.
     Nachrichten hinein. Bleibt das Feld leer, gilt, was der Server des Modells meldet. Tragen Sie sie für ein Modell
     bei einem externen Provider ein, dessen Server dazu nichts sagt.
 
+    ![Provider bearbeiten: Name, Endpunkt-URL, API-Schlüssel, Modell, die beiden Schalter und zuletzt Kontextlänge (Tokens)](../images/administer/provider-edit.png)
+
 ![Der Preisdialog des Modells eines Providers: „Eingabepreis“ und „Ausgabepreis“ in USD pro 1 Mio. Tokens, mit „Speichern“](../images/administer/provider-set-price.png)
 
 **Preis festlegen** (in der Spalte **Preis $/1 Mio.**) legt den Preis nachträglich fest oder ändert ihn.

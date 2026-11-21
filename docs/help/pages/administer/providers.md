@@ -72,6 +72,8 @@ with the same key.
     it. Left empty, it is what the model's server reports. Fill it in for a model at an outside provider, whose
     server says nothing.
 
+    ![Edit Provider: Name, Endpoint URL, API Key, Model, the two switches and, last, Context length (tokens)](../images/administer/provider-edit.png)
+
 ![The price dialog of a provider's model: Input price and Output price in USD per 1M tokens, with Save](../images/administer/provider-set-price.png)
 
 **Set price** (in the **Price $/1M** column) sets or changes the price later.

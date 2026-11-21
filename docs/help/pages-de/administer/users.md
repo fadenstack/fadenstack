@@ -260,6 +260,8 @@ vor dieser Version gelöscht wurden, sind auf dem Server geblieben; `faden chats
     Zusammenfassung. Wie die Chats sind Zusammenfassungen Inhalte: Führen Sie sie dort auf, wo Ihre
     Betriebsvereinbarung aufzählt, was der Chat speichert.
 
+    ![Einstellungen, Zusammenfassungen langer Chats: ein Schalter pro Chat-Modell, hier für ein Modell an und für das andere aus](../images/administer/settings-summaries.png)
+
 ## Administratoren und Prüfer {#administrators-and-auditors}
 
 Zwei Rechte betreffen Vertrauen statt Arbeit; jedes lässt sich vergeben, entziehen und übergeben:

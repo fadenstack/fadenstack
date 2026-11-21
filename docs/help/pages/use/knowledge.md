@@ -12,7 +12,7 @@ A model knows what it learned in training, not your organisation's documents. Th
 
 ## Attach a file
 
-![The message box: the paper clip beside the wrench and the puzzle piece, the Model picker and the send button on the right](../images/use/chat-composer.png)
+![The message box: the paper clip beside the wrench and the puzzle piece, under the text; the model, the thinking level and the send button on the right](../images/use/chat-composer.png)
 
 1. In the chat, select the paper clip beside the message box.
 2. Pick one or more files. Each shows as a chip above the box; the × removes it.

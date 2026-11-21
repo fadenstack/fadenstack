@@ -20,7 +20,7 @@ Jedes Tool hat eine Klasse, die angibt, was es tut:
 
 ## Die Tools öffnen {#open-the-tools}
 
-![Das Nachrichtenfeld: links Schraubenschlüssel, Puzzleteil und Büroklammer, rechts die Auswahl „Modell“ und die Senden-Schaltfläche](../images/use/chat-composer.png)
+![Das Nachrichtenfeld: oben der Text; darunter links Schraubenschlüssel, Puzzleteil und Büroklammer, rechts das Modell, die Denkstufe und die Senden-Schaltfläche](../images/use/chat-composer.png)
 
 Wählen Sie den Schraubenschlüssel neben dem Nachrichtenfeld. Der Bereich, der sich öffnet, hat zwei Reiter: **Tools** und **Datenschutz** für den Schutz personenbezogener Daten in diesem Chat (siehe [Ihre Daten und Datenschutz](privacy.md)).
 

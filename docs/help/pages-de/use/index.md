@@ -34,7 +34,7 @@ Sie landen im Chat.
 
 ## Wo Sie was im Chat finden {#where-things-are-in-the-chat}
 
-![Das Nachrichtenfeld: links Schraubenschlüssel, Puzzleteil und Büroklammer, rechts die Auswahl „Modell“ und die Senden-Schaltfläche](../images/use/chat-composer.png)
+![Das Nachrichtenfeld: oben der Text; darunter links Schraubenschlüssel, Puzzleteil und Büroklammer, rechts das Modell, die Denkstufe und die Senden-Schaltfläche](../images/use/chat-composer.png)
 
 | Wo | Was dort ist |
 |---|---|

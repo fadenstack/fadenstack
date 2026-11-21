@@ -240,6 +240,8 @@ server; `faden chats orphans` lists it and `faden chats orphans --erase` erases 
     permissions never come from a summary. Like the chats, summaries are content: list them where your works
     agreement lists what the chat keeps.
 
+    ![Settings, Summaries of long chats: one switch per chat model, here on for one model and off for the other](../images/administer/settings-summaries.png)
+
 ## Administrators and auditors
 
 Two rights are about trust rather than work, and each can be given, taken back and handed over:

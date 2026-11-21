@@ -6,7 +6,7 @@ Sprechen Sie mit den Modellen Ihrer Organisation: einen Chat beginnen, ein Model
 
 ## Einen Chat beginnen {#start-a-chat}
 
-![Das Nachrichtenfeld: links Tools, Skills und die Büroklammer, rechts die Auswahl „Modell“ und die Senden-Schaltfläche](../images/use/chat-composer.png)
+![Das Nachrichtenfeld: oben der Text; darunter links Schraubenschlüssel, Puzzleteil und Büroklammer, rechts das Modell, die Denkstufe und die Senden-Schaltfläche](../images/use/chat-composer.png)
 
 1. Wählen Sie in der Seitenleiste **Neuer Chat**.
 2. Wählen Sie in der Auswahl **Modell** ein Modell.
@@ -65,6 +65,10 @@ In einem langen Chat gehen die ältesten Nachrichten nicht mehr an das Modell, s
 
 !!! note "Zusammenfassungen langer Chats"
     Ihr Administrator kann für ein Modell Zusammenfassungen einschalten. In einem langen Chat schreibt das Modell dann eine Zusammenfassung der älteren Nachrichten, und die Zusammenfassung geht an ihrer Stelle an das Modell. Das Schreiben zählt wie eine Antwort zu Ihrer Nutzung. Die Zusammenfassung schreibt eine KI; sie kann Gesagtes auslassen oder falsch wiedergeben. Mit **Zusammenfassung anzeigen** in der Zeile, ab der ältere Nachrichten nicht mehr an das Modell gehen, lesen Sie sie. Sie wird verschlüsselt mit dem Chat gespeichert, Administratoren sehen sie in der Konsole nicht, und sie wird mit dem Chat gelöscht. Zusammenfassungen sind aus, solange Ihr Administrator sie nicht einschaltet.
+
+    ![Ein langer Chat: die Zeile, ab der ältere Nachrichten nicht mehr an das Modell gehen, mit „Zusammenfassung anzeigen“ und dem Hinweis, dass eine KI die Zusammenfassung schrieb; darunter eine Frage, ihre Antwort und wie viel vom Kontext des Modells der Chat genutzt hat](../images/use/chat-summary.png)
+
+    ![Die geöffnete Zusammenfassung: der Hinweis, dass eine KI sie schrieb, die Zusammenfassung selbst und welches Modell sie wann schrieb](../images/use/chat-summary-dialog.png)
 
 ## Titel, Projekte und Suche {#titles-projects-and-search}
 

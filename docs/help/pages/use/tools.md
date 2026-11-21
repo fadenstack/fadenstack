@@ -20,7 +20,7 @@ Every tool has a class that says what it does:
 
 ## Open the tools
 
-![The message box: the wrench, the puzzle piece and the paper clip on the left, the Model picker and the send button on the right](../images/use/chat-composer.png)
+![The message box: the text on top; under it the wrench, the puzzle piece and the paper clip on the left, the model, the thinking level and the send button on the right](../images/use/chat-composer.png)
 
 Select the wrench beside the message box. The panel that opens has two tabs: **Tools** for the tools, and **Privacy** for the protection of personal data in this chat (see [Your data and privacy](privacy.md)).
 
