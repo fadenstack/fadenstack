@@ -3,7 +3,7 @@ ARG BASE_IMAGE=ghcr.io/fadenstack/base:latest
 # Node.js for npx-based MCP servers: the LTS from Node's own image. Debian bookworm's package is Node 18, out of
 # support since April 2025, and current MCP servers need 20 or later (server-everything 2.0 stopped on its missing
 # global crypto, 0.5.0 on the release server).
-FROM node:24.22.0-bookworm-slim AS node
+FROM node:26.13.1-bookworm-slim AS node
 # npm runs MCP servers here (npx): one whose own undici and brace-expansion are fixed. The npm in node:24 (11.19.1)
 # bundles undici 6.28.0 and brace-expansion 5.0.9 (GHSA-2m5v-pch6-74hx and others, fixed in 6.29.1 and 5.0.11).
 RUN npm install -g --no-fund --no-audit npm@11.21.2 && npm cache clean --force
