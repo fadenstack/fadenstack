@@ -926,7 +926,7 @@ class DeploymentService:
         from faden_backend.services.inference.drivers.standalone import metal_policy  # noqa: PLC0415
 
         refused = metal_policy.check(engine) or metal_policy.check_extra_args(
-            ((spec.get("extensions") or {}).get("standalone") or {}).get("extra_args"),
+            ((spec.get("extensions") or {}).get("standalone") or {}).get("extra_args"), engine,
         )
         if refused:
             raise ConflictError(f"{node.agent_id or node.host} cannot run this: {refused}")

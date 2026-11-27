@@ -196,8 +196,59 @@ def test_a_context_above_the_models_own_is_planned_at_its_own() -> None:
     assert fit.status == "fits" and fit.context == 8192 and "context_over_model_max" in fit.notes
 
 
-def test_extension_extra_args_cannot_override_the_plan() -> None:
-    assert "set from the memory plan" in (metal_policy.check_extra_args(["--gpu-memory-utilization", "0.99"]) or "")
-    assert metal_policy.check_extra_args(["--no-enable-prefix-caching"]) is not None
-    assert metal_policy.check_extra_args(["--max-model-len=999"]) is not None
-    assert metal_policy.check_extra_args(["--some-other-flag"]) is None
+@pytest.mark.parametrize(
+    ("args", "words"),
+    [
+        (["--gpu_memory_utilization=0.99"], "--gpu_memory_utilization is not allowed"),
+        (["--max_model_len", "99999"], "--max_model_len is not allowed"),
+        (["--gpu-memory", "0.99"], "--gpu-memory is not allowed"),
+        (["--gpu-memory-utilization=0.99"], "--gpu-memory-utilization is not allowed"),
+        (["--seed", "--gpu-memory-utilization=0.99"], "--seed '--gpu-memory-utilization=0.99' is not allowed"),
+        (["--unknown-flag"], "--unknown-flag is not allowed"),
+        (["--seed"], "needs a value"),
+        (["--enable-auto-tool-choice=1"], "takes no value"),
+        (["--dtype", "float64"], "not allowed"),
+        (["--no-enable-prefix-caching"], "set from the memory plan"),
+        (["--enable-prefix-caching"], "set from the memory plan"),
+    ],
+)
+def test_extension_extra_args_the_agent_would_refuse_or_the_plan_owns_are_refused(args: list, words: str) -> None:
+    assert words in (metal_policy.check_extra_args(args, {}) or "")
+
+
+def test_a_flag_the_plan_sets_cannot_be_repeated_but_is_free_otherwise() -> None:
+    plan = {"max_num_seqs": 4}
+    assert "set from the memory plan" in (metal_policy.check_extra_args(["--max-num-seqs", "9"], plan) or "")
+    assert metal_policy.check_extra_args(["--max-num-seqs", "9"], {}) is None  # nothing set it
+
+
+@pytest.mark.parametrize(
+    "args",
+    [["--dtype", "bfloat16"], ["--dtype=auto"], ["--max-num-seqs", "8"], ["--max-num-batched-tokens=4096"],
+     ["--seed", "7"], ["--tool-call-parser", "hermes"], ["--reasoning-parser=qwen3"],
+     ["--generation-config", "vllm"], ["--enable-auto-tool-choice"]],
+)
+def test_each_flag_the_agent_allows_is_accepted_with_a_valid_value(args: list) -> None:
+    assert metal_policy.check_extra_args(args, {}) is None
+
+
+def test_the_backend_list_equals_the_agents() -> None:
+    """The two allowlists must stay identical: same flags, same value patterns."""
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[2] / "agent" / "faden_agent" / "native" / "worker.py"
+    if not path.exists():
+        pytest.skip("the agent source is not in this checkout")
+    # Only the one table is evaluated: the module's own imports need the agent's environment.
+    import ast
+    import re
+
+    tree = ast.parse(path.read_text())
+    node = next(
+        n for n in tree.body
+        if isinstance(n, ast.AnnAssign) and getattr(n.target, "id", "") == "_EXTRA"
+    )
+    table = eval(compile(ast.Expression(node.value), "_EXTRA", "eval"), {"re": re})  # noqa: S307
+    theirs = {k: (v.pattern if v else None) for k, v in table.items()}  # noqa: SLF001
+    ours = {k: (v.pattern if v else None) for k, v in metal_policy.EXTRA_ALLOWED.items()}
+    assert ours == theirs

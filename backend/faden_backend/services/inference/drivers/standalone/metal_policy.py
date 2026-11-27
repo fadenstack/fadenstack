@@ -8,6 +8,7 @@ what is named but unproven is left out until it is certified.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 #: Parsers tested on a Mac with Qwen3 (``c3/ACCEPTANCE.md``). Others are hidden, not flagged.
@@ -111,21 +112,63 @@ def apply_fit(suggestion: dict[str, Any], fit: Any) -> dict[str, Any]:
     return suggestion
 
 
-#: Flags the backend sets from the plan and the allowlist; an extension's ``extra_args`` may not repeat them.
-_POLICY_FLAGS = frozenset({
-    "--gpu-memory-utilization", "--max-model-len", "--max-num-seqs", "--max-num-batched-tokens", "--dtype",
-    "--seed", "--generation-config", "--enable-prefix-caching", "--no-enable-prefix-caching",
-    "--tool-call-parser", "--reasoning-parser", "--enable-auto-tool-choice", "--kv-cache-dtype", "--quantization",
-})
+#: What an extension's ``extra_args`` may hold: a copy of the agent's allowlist
+#: (``agent/faden_agent/native/worker.py::_EXTRA``), flag for flag and pattern for
+#: pattern. It MUST stay equal to it (CONTRACTS § C3); a test compares the two.
+EXTRA_ALLOWED: dict[str, re.Pattern[str] | None] = {
+    "--dtype": re.compile(r"^(auto|float16|bfloat16|float32|half)$"),
+    "--max-num-seqs": re.compile(r"^[1-9][0-9]{0,4}$"),
+    "--max-num-batched-tokens": re.compile(r"^[1-9][0-9]{0,7}$"),
+    "--seed": re.compile(r"^[0-9]{1,10}$"),
+    "--tool-call-parser": re.compile(r"^[a-z0-9_]{1,64}$"),
+    "--reasoning-parser": re.compile(r"^[a-z0-9_]{1,64}$"),
+    "--generation-config": re.compile(r"^(auto|vllm)$"),
+    "--enable-prefix-caching": None,
+    "--no-enable-prefix-caching": None,
+    "--enable-auto-tool-choice": None,
+}
+
+#: Flags the backend always sets itself (prefix caching is off on a Mac).
+_ALWAYS_OWNED = frozenset({"--enable-prefix-caching", "--no-enable-prefix-caching"})
 
 
-def check_extra_args(args: Any) -> str | None:
-    """A sentence when *args* (an extension's ``extra_args``) repeats a flag the plan or the allowlist owns."""
-    for arg in args or []:
-        flag = str(arg).split("=", 1)[0]
-        if flag in _POLICY_FLAGS:
+def check_extra_args(args: Any, engine: dict[str, Any] | None = None) -> str | None:
+    """A sentence when *args* (an extension's ``extra_args``) would be refused or override the plan.
+
+    Walks the list exactly as the agent does (``--flag value`` or
+    ``--flag=value``; a switch takes none), accepts only the agent's flags with
+    the agent's value patterns, and refuses a flag the plan sets from *engine*
+    (the agent appends extra_args last, so the last one would win).
+    """
+    if not args:
+        return None
+    if not isinstance(args, list) or not all(isinstance(a, str) for a in args):
+        return "extra_args must be a list of strings."
+    owned = _ALWAYS_OWNED | {
+        arg for arg in start_fields(engine)["extra_args"] if arg.startswith("--")
+    }
+    i = 0
+    while i < len(args):
+        flag, eq, value = args[i].partition("=")
+        if flag not in EXTRA_ALLOWED:
+            return f"extra_args: {flag} is not allowed on a Mac (allowed: {', '.join(sorted(EXTRA_ALLOWED))})."
+        if flag in owned:
             return (
                 f"extra_args: {flag} is set from the memory plan and the Mac allowlist; "
                 "change it in the engine settings instead."
             )
+        pattern = EXTRA_ALLOWED[flag]
+        if pattern is None:
+            if eq:
+                return f"extra_args: {flag} takes no value."
+            i += 1
+            continue
+        if not eq:
+            if i + 1 >= len(args):
+                return f"extra_args: {flag} needs a value."
+            value = args[i + 1]
+            i += 1
+        if not pattern.fullmatch(value):
+            return f"extra_args: {flag} {value!r} is not allowed."
+        i += 1
     return None
