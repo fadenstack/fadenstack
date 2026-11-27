@@ -1,10 +1,12 @@
 /** The Mac's status and its memory plan, as the console shows them. */
 import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import type { Fit } from "~/api/marketplace";
 
 import { MacFitPanel } from "./MacFitPanel";
+import { MacServeSection } from "./MacServeSection";
 import { MacStatusCard } from "./MacStatusCard";
 
 const GIB = 2 ** 30;
@@ -56,5 +58,18 @@ describe("MacFitPanel", () => {
   it("shows nothing for a cluster that is not a Mac", () => {
     const { container } = render(<MacFitPanel fit={fit({ metal: null })} />);
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe("MacServeSection", () => {
+  it("offers the button only to a Mac whose proxy is native", () => {
+    const { rerender } = render(
+      <MemoryRouter><MacServeSection nodeId="n" capabilities={{ native_runtime: 1 }} /></MemoryRouter>,
+    );
+    expect(screen.queryByTestId("mac-serve-button")).not.toBeInTheDocument();
+    rerender(
+      <MemoryRouter><MacServeSection nodeId="n" capabilities={{ native_runtime: 1, model_tls_native: 1 }} /></MemoryRouter>,
+    );
+    expect(screen.getByTestId("mac-serve-button")).toBeInTheDocument();
   });
 });

@@ -11,6 +11,8 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 
+import { useCan } from "~/lib/useCan";
+
 import { inferenceApi } from "~/api/inference";
 
 import { MacStatusCard } from "./MacStatusCard";
@@ -24,6 +26,12 @@ export function MacServeSection({
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const can = useCan();
+  // The server refuses the rest; this only keeps a button off a Mac that cannot serve.
+  const mayServe =
+    can("inference.environments:create") &&
+    can("inference.environments:update") &&
+    Number(capabilities.model_tls_native ?? 0) > 0;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,6 +51,7 @@ export function MacServeSection({
   return (
     <Stack spacing={1.5} data-testid="mac-serve">
       <MacStatusCard capabilities={capabilities} />
+      {mayServe && (
       <Stack direction="row" spacing={2} alignItems="center">
         <Button variant="contained" disabled={busy} onClick={() => void serve()} data-testid="mac-serve-button">
           {t("mac.serve_button")}
@@ -51,6 +60,7 @@ export function MacServeSection({
           {t("mac.serve_hint")}
         </Typography>
       </Stack>
+      )}
       {error && <Alert severity="error">{error}</Alert>}
     </Stack>
   );

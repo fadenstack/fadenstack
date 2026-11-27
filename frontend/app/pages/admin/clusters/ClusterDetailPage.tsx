@@ -193,8 +193,13 @@ export default function ClusterDetailPage() {
     [cluster?.control_plane_id],
     { initialValue: null as ControlPlane | null },
   );
-  const ui = driverUi(controlPlane.data?.driver);
-  const macNode = !ui.multiNode ? members.data[0] : undefined;
+  // Until the control plane has answered, show no driver-specific controls: a standalone
+  // environment must not flash the Ray ones. A failed lookup falls back to the Ray page.
+  const driverKnown = controlPlane.data !== null || Boolean(controlPlane.error);
+  const ui = driverKnown
+    ? driverUi(controlPlane.data?.driver)
+    : { network: false, drain: false, multiNode: false, scaling: false };
+  const macNode = driverKnown && !ui.multiNode ? members.data[0] : undefined;
 
   // The one most likely to hang on a sick cluster, and now the one whose
   // hanging costs the least.
