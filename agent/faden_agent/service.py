@@ -157,6 +157,8 @@ class NodeAgentService:
         self._ray_manager: Any = None  # typed import is local (optional dep)
         #: The native vLLM-Metal runtime (native/manager.py), on a Mac only.
         self._native: Any = None
+        #: macOS: the idle-sleep guard (power.py).
+        self._power: Any = None
         self._model_tls: ModelTls | None = None
         self._hf_cache: str | None = None
 
@@ -186,6 +188,7 @@ class NodeAgentService:
         )
         add_agent_capabilities(static_capabilities)
         native_manager = await self._start_native(static_capabilities)
+        await self._start_power_guard()
         log.info("Static capabilities: %s", static_capabilities)
         if not bool(static_capabilities.get("docker_available")):
             log.warning("Container runtime is not available; runtime commands will fail until daemon is reachable.")
@@ -365,6 +368,8 @@ class NodeAgentService:
             native_manager=native_manager,
         )
         stream._dispatcher = dispatcher
+        if self._power is not None:
+            stream.power_status = self._power.status
         self._stream = stream
 
         # Log forwarding to Loki. An explicit FADEN_NODE_AGENT_LOKI_URL wins;
@@ -485,6 +490,18 @@ class NodeAgentService:
         self._client.http.base_url = target
         return True
 
+    async def _start_power_guard(self) -> None:
+        """macOS: keep the Mac from idle-sleeping (and dropping offline) while the agent runs."""
+        if sys.platform != "darwin" or self._power is not None:
+            return
+        from faden_agent.power import IdleSleepGuard  # noqa: PLC0415
+
+        self._power = IdleSleepGuard(
+            enabled=self._config.prevent_idle_sleep,
+            config_error=self._config.prevent_idle_sleep_error,
+        )
+        await self._power.start()
+
     async def _start_native(self, static_capabilities: dict[str, Any]) -> Any:
         """On a Mac: the native vLLM-Metal runtime, its workers adopted before any command arrives.
 
@@ -558,6 +575,8 @@ class NodeAgentService:
         if proxy is not None:
             # Open streams get up to 30 s (inside the LaunchDaemon's ExitTimeOut 45); an upgrade drops the rest.
             await asyncio.to_thread(proxy.stop)
+        if self._power is not None:
+            await self._power.stop()
         if self._native is not None:
             # Stops watching only: the workers keep serving, the next agent adopts them.
             await self._native.close()
