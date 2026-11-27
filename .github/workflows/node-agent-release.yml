@@ -90,7 +90,10 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          sparse-checkout: agent
+          # release/licenses: the texts for what a Mac libpython links in.
+          sparse-checkout: |
+            agent
+            release/licenses
 
       - name: Mac signing mode
         id: mac
@@ -151,7 +154,7 @@ jobs:
           "$BIN" license > "$RUNNER_TEMP/agent-license.txt"
           grep -q 'Apache License' "$RUNNER_TEMP/agent-license.txt"
           "$BIN" license --third-party > "$RUNNER_TEMP/agent-third-party.txt"
-          for text in 'Mozilla Public License' 'The interpreter and its standard library' 'Bootloader Exception'; do
+          for text in 'Mozilla Public License' 'The interpreter and its standard library' 'Bootloader Exception' '--- openssl'; do
             grep -q "$text" "$RUNNER_TEMP/agent-third-party.txt" || { echo "::error::Third-party notices lack: $text"; exit 1; }
           done
           test -s "$BIN.THIRD-PARTY-NOTICES.txt"
