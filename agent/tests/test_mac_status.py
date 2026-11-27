@@ -41,3 +41,30 @@ async def test_a_missing_tool_is_none_not_an_error(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(mac_status, "_SOCKETFILTERFW", "/nonexistent/socketfilterfw")
     got = await mac_status.collect()
     assert got["filevault"] is None and got["firewall"]["enabled"] is None
+
+
+@pytest.mark.anyio
+async def test_a_slow_command_is_killed_not_left_running(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(mac_status, "_TIMEOUT_SEC", 0.3)
+    assert await mac_status._run("/bin/sleep", "30") is None  # noqa: SLF001
+    import subprocess
+
+    left = subprocess.run(["pgrep", "-f", "sleep 30"], capture_output=True, text=True, check=False)
+    assert left.stdout.strip() == ""
+
+
+@pytest.mark.anyio
+async def test_the_status_is_refreshed(monkeypatch: pytest.MonkeyPatch) -> None:
+    import asyncio
+
+    calls = iter([{"filevault": True}, {"filevault": False}])
+
+    async def fake() -> dict:
+        return next(calls)
+
+    monkeypatch.setattr(mac_status, "collect", fake)
+    target: dict = {}
+    task = asyncio.create_task(mac_status.refresh_forever(target, interval=0.01))
+    await asyncio.sleep(0.1)
+    task.cancel()
+    assert target["mac_status"] in ({"filevault": True}, {"filevault": False})

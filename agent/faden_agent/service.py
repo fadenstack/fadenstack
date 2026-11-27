@@ -33,6 +33,7 @@ from faden_agent.model_puller import pull_model
 from faden_agent.model_tls import ModelTls
 from faden_agent.policy_guard import PolicyGuard
 from faden_agent.mac_status import collect as collect_mac_status
+from faden_agent.mac_status import refresh_forever as refresh_mac_status
 from faden_agent.preflight import build_static_capabilities
 from faden_agent.runtimes import detect_runtime
 from faden_agent.runtime_manager import RuntimeManager
@@ -170,6 +171,7 @@ class NodeAgentService:
         if sys.platform == "darwin":
             # Read-only facts for the console's Mac card; a Mac only (Linux keys stay as 0.2.12's).
             static_capabilities["mac_status"] = await collect_mac_status()
+            self._log_tasks.append(asyncio.create_task(refresh_mac_status(static_capabilities)))
         log.info("Static capabilities: %s", static_capabilities)
         if not bool(static_capabilities.get("docker_available")):
             log.warning("Container runtime is not available; runtime commands will fail until daemon is reachable.")

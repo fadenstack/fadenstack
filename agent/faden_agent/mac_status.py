@@ -11,6 +11,7 @@ unprivileged user; neither changes anything. Anything that cannot be read is
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import re
 import sys
@@ -24,13 +25,20 @@ _TIMEOUT_SEC = 5.0
 
 
 async def _run(*argv: str) -> str | None:
-    """The command's output, or ``None`` when it is missing, fails or is slow."""
+    """The command's output, or ``None`` when it is missing, fails or is slow (a slow one is killed)."""
     try:
         proc = await asyncio.create_subprocess_exec(
             *argv, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
         )
+    except OSError:
+        return None
+    try:
         out, _ = await asyncio.wait_for(proc.communicate(), _TIMEOUT_SEC)
-    except (OSError, TimeoutError, asyncio.TimeoutError):
+    except (TimeoutError, asyncio.TimeoutError):
+        with contextlib.suppress(ProcessLookupError):
+            proc.kill()
+        with contextlib.suppress(Exception):
+            await asyncio.wait_for(proc.wait(), 2.0)
         return None
     return out.decode("utf-8", "replace") if proc.returncode == 0 else None
 
@@ -97,3 +105,17 @@ async def collect() -> dict[str, Any]:
             "block_all": parse_block_all(block_all),
         },
     }
+
+
+#: How often the state is read again: FileVault and the firewall change while the agent runs.
+REFRESH_SEC = 300.0
+
+
+async def refresh_forever(target: dict[str, Any], *, interval: float = REFRESH_SEC) -> None:
+    """Keep ``target["mac_status"]`` current (the dict the agent sends with every inventory)."""
+    while True:
+        await asyncio.sleep(interval)
+        try:
+            target["mac_status"] = await collect()
+        except Exception:  # noqa: BLE001 - a status read never stops the agent
+            log.exception("Could not refresh the Mac status")
