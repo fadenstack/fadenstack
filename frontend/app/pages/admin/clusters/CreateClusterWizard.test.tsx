@@ -290,4 +290,43 @@ describe("CreateClusterWizard", () => {
     expect(await screen.findByRole("button", { name: "Create cluster" })).toBeInTheDocument();
     expect(inferenceApi.applyEnvironmentPlan).not.toHaveBeenCalled();
   });
+
+  it("binds a Ray cluster to the ray plane while a standalone plane exists", async () => {
+    const standalone = { ...controlPlane, id: "standalone-plane", driver: "standalone" };
+    vi.spyOn(inferenceApi, "listControlPlanes").mockResolvedValue([standalone, controlPlane]);
+    const create = vi.spyOn(inferenceApi, "createControlPlane");
+    renderWizard();
+    await walkToNetworkStep();
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() =>
+      expect(inferenceApi.createEnvironment).toHaveBeenCalledWith(
+        expect.objectContaining({ control_plane_id: CONTROL_PLANE_ID }),
+      ),
+    );
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("creates a ray plane when only a standalone plane exists, never drivers[0]", async () => {
+    const standalone = { ...controlPlane, id: "standalone-plane", driver: "standalone" };
+    vi.spyOn(inferenceApi, "listControlPlanes").mockResolvedValue([standalone]);
+    vi.spyOn(inferenceApi, "listDrivers").mockResolvedValue(["standalone", "ray"]);
+    const create = vi.spyOn(inferenceApi, "createControlPlane").mockResolvedValue(controlPlane);
+    renderWizard();
+    await walkToNetworkStep();
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() => expect(create).toHaveBeenCalled());
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ driver: "ray" }));
+    expect(inferenceApi.createEnvironment).toHaveBeenCalledWith(
+      expect.objectContaining({ control_plane_id: CONTROL_PLANE_ID }),
+    );
+  });
+
+  it("does not offer a Mac with a native runtime", async () => {
+    const mac = { ...managedNodes[1], agent_id: "mac-01", capabilities: { native_runtime: 1 } };
+    renderWizard([mac, managedNodes[0]]);
+    await userEvent.type(screen.getByLabelText("Cluster name"), "x");
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(await screen.findByLabelText("Use gpu-02")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Use mac-01")).not.toBeInTheDocument();
+  });
 });
