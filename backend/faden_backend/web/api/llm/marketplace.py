@@ -18,6 +18,7 @@ from starlette import status
 
 from faden_backend.db.dependencies import get_db_session
 from faden_backend.db.models.users import User, current_active_user
+from faden_backend.services.inference.drivers.standalone import metal_policy
 from faden_backend.services.llm import image_generation
 from faden_backend.services.marketplace import compat as compat_mod
 from faden_backend.services.marketplace import curated as curated_mod
@@ -298,6 +299,22 @@ async def kept(
     return {"items": items}
 
 
+def _needs(detail: dict[str, Any]) -> fit_mod.ModelNeeds:
+    """What serving the model takes, from its card."""
+    arch = detail.get("architecture_facts") or {}
+    return fit_mod.ModelNeeds(
+        weights_bytes=detail.get("weights_bytes"),
+        kv_bytes_per_token=detail.get("kv_bytes_per_token"),
+        max_context=detail.get("max_context"),
+        attention_heads=arch.get("num_attention_heads"),
+        kv_heads=arch.get("num_kv_heads"),
+        kv_replicated=bool(arch.get("kv_lora_rank")),
+        single_device=detail.get("task") == "images",
+        recurrent=bool(arch.get("recurrent_layers")),
+        state_bytes_per_sequence=arch.get("state_bytes_per_sequence"),
+    )
+
+
 @router.get("/models/{repo_id:path}")
 async def model_detail(
     repo_id: str,
@@ -331,17 +348,7 @@ async def model_detail(
         if entry.capabilities:
             detail["capabilities"] = sorted(set(detail.get("capabilities") or []) | set(entry.capabilities))
     arch = detail.get("architecture_facts") or {}
-    needs = fit_mod.ModelNeeds(
-        weights_bytes=detail.get("weights_bytes"),
-        kv_bytes_per_token=detail.get("kv_bytes_per_token"),
-        max_context=detail.get("max_context"),
-        attention_heads=arch.get("num_attention_heads"),
-        kv_heads=arch.get("num_kv_heads"),
-        kv_replicated=bool(arch.get("kv_lora_rank")),
-        single_device=detail.get("task") == "images",
-        recurrent=bool(arch.get("recurrent_layers")),
-        state_bytes_per_sequence=arch.get("state_bytes_per_sequence"),
-    )
+    needs = _needs(detail)
     fits = {c.environment_id: fit_mod.plan(needs, c, context=context).to_dict() for c in hardware}
     # Whether each cluster's runtime can load it at all -- said here, before
     # anyone downloads 132 GB to find out (services/marketplace/compat.py).
@@ -363,6 +370,10 @@ async def model_detail(
         suggestion["reasons"].update({k: "curated" for k in entry.settings})
     # A recipe is written for its own hardware: the fit checks what it set for this cluster.
     checked_fit = chosen_fit if chosen_fit and chosen_fit.status == "fits" else None
+    if chosen is not None and chosen.metal:
+        # A Mac: only what vLLM-Metal can run, with the memory of its own plan.
+        metal_policy.restrict(suggestion)
+        metal_policy.apply_fit(suggestion, checked_fit)
     settings_mod.reconcile(suggestion, checked_fit, needs)
     return {
         "hub": hub_state,
@@ -429,6 +440,66 @@ async def _sees_pictures(session: AsyncSession, repo_id: str) -> bool | None:
     return "vision" in capabilities if capabilities is not None else None
 
 
+async def _check_for_mac(session: AsyncSession, body: HostBody) -> dict[str, Any]:
+    """On a Mac environment: refuse settings vLLM-Metal cannot run and a model that does not fit.
+
+    Returns the engine settings to use, with the Mac plan's memory share
+    filled in where the form left it out. Other clusters: unchanged.
+    """
+    cluster = next((c for c in await cluster_hardware(session) if c.environment_id == str(body.environment_id)), None)
+    if cluster is None or not cluster.metal:
+        return body.engine_config
+    problem = metal_policy.check(body.engine_config)
+    if problem:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=problem)
+    config = dict(body.engine_config)
+    try:
+        detail = await (await _hub(session)).detail(body.repo_id.strip())
+    except (HubNotFound, HubUnavailable):
+        return config  # size unknown: the machine's own admission has the last word
+    asked_len = config.get("max_model_len")
+    asked_seqs = config.get("max_num_seqs")
+    needs = _needs(detail)
+    chosen = fit_mod.plan_metal(
+        needs, cluster.metal, context=int(asked_len) if asked_len else None,
+        sequences=int(asked_seqs) if asked_seqs else None,
+    )
+    info = chosen.metal or {}
+    if chosen.status == "too_large":
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=(
+                f"This model does not fit this Mac: it needs about {(chosen.needed_bytes_per_gpu or 0) / 2**30:.1f} GiB "
+                f"and the engine may use {(info.get('ceiling_bytes') or 0) / 2**30:.1f} GiB"
+                f"{' (estimated)' if info.get('estimated') else ''}."
+            ),
+        )
+    if chosen.status != "fits":
+        return config
+    if asked_len and chosen.context is not None and int(asked_len) != chosen.context:
+        if needs.max_context and int(asked_len) > needs.max_context:
+            config["max_model_len"] = chosen.context  # the model's own limit: a start with more would fail
+        else:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=f"A context of {int(asked_len)} tokens does not fit this Mac; {chosen.context} does.",
+            )
+    asked_share = config.get("gpu_memory_utilization")
+    working_set = int(info.get("working_set_bytes") or 0)
+    if asked_share and working_set and float(asked_share) * working_set < (chosen.needed_bytes_per_gpu or 0):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=(
+                f"A memory share of {float(asked_share):.0%} is too little: the model needs about "
+                f"{(chosen.needed_bytes_per_gpu or 0) / 2**30:.1f} GiB of {working_set / 2**30:.1f} GiB."
+            ),
+        )
+    config.setdefault("gpu_memory_utilization", chosen.suggested_gpu_memory_utilization)
+    config.setdefault("max_num_seqs", chosen.max_num_seqs)
+    config.setdefault("max_model_len", chosen.context)
+    return config
+
+
 @router.post("/host", status_code=status.HTTP_201_CREATED)
 async def host_model(
     body: HostBody,
@@ -449,6 +520,7 @@ async def host_model(
 
     if not body.ignore_compatibility:
         await _refuse_if_it_cannot_run(session, body.repo_id.strip(), body.environment_id)
+    engine_config = await _check_for_mac(session, body)
     capabilities = await _capabilities(session, body.repo_id.strip()) or []
     try:
         return await host(session, llm_service, HostRequest(
@@ -458,7 +530,7 @@ async def host_model(
             alias=(body.alias or "").strip() or None,
             copies=body.copies,
             gpus_per_copy=body.gpus_per_copy,
-            engine_config=body.engine_config,
+            engine_config=engine_config,
             revision=(body.revision or "").strip() or None,
             vision=await _sees_pictures(session, body.repo_id.strip()),
             images="images" in capabilities,

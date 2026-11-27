@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field, StringConstraints
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
@@ -92,6 +92,35 @@ async def create_environment(
         )
     except InferenceError as exc:
         raise _map_inference_error(exc)
+    return _dto_from_env(env)
+
+
+class StandaloneCreate(BaseModel):
+    """Request body for putting one Mac in its own standalone environment."""
+
+    node_id: uuid.UUID
+    name: str | None = Field(None, min_length=1, max_length=128)
+
+
+@router.post("/standalone", response_model=EnvironmentDTO, status_code=status.HTTP_201_CREATED)
+async def create_standalone_environment(
+    body: StandaloneCreate,
+    response: Response,
+    _user: User = Depends(require_permission(_ENV, "create")),
+    _can_add: User = Depends(require_permission(_ENV, "update")),
+    service: EnvironmentService = Depends(),
+) -> EnvironmentDTO:
+    """Serve models on one Mac, on its own: the environment, its machine and the standalone control plane.
+
+    Idempotent per machine (200 with the one it already has, 201 when made);
+    409 with a sentence when its agent cannot serve natively.
+    """
+    try:
+        env, created = await service.create_standalone(body.node_id, body.name)
+    except InferenceError as exc:
+        raise _map_inference_error(exc)
+    if not created:
+        response.status_code = status.HTTP_200_OK
     return _dto_from_env(env)
 
 

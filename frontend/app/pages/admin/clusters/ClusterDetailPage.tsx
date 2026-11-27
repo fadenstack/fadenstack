@@ -13,6 +13,9 @@ import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router";
 
 import { inferenceApi } from "~/api/inference";
+import type { ControlPlane } from "~/api/inference";
+import { MacStatusCard } from "~/components/macs/MacStatusCard";
+import { driverUi } from "~/lib/driverCaps";
 import type {
   ComputePool,
   EnvironmentMetrics,
@@ -184,6 +187,20 @@ export default function ClusterDetailPage() {
   const models = useAsyncData(() => modelsApi.list(), [], {
     initialValue: [] as Model[],
   });
+  // The driver decides what is offered: a standalone (Mac) environment has no network plan or drains.
+  const controlPlane = useAsyncData(
+    () => (cluster?.control_plane_id ? inferenceApi.getControlPlane(cluster.control_plane_id) : Promise.resolve(null)),
+    [cluster?.control_plane_id],
+    { initialValue: null as ControlPlane | null },
+  );
+  // Until the control plane has answered, show no driver-specific controls: a standalone
+  // environment must not flash the Ray ones. A failed lookup falls back to the Ray page.
+  const driverKnown = controlPlane.data !== null || Boolean(controlPlane.error);
+  const ui = driverKnown
+    ? driverUi(controlPlane.data?.driver)
+    : { network: false, drain: false, multiNode: false, scaling: false };
+  const macNode = driverKnown && !ui.multiNode ? members.data[0] : undefined;
+
   // The one most likely to hang on a sick cluster, and now the one whose
   // hanging costs the least.
   const metrics = useAsyncData(() => inferenceApi.environmentMetrics(id!), [id], {
@@ -245,7 +262,7 @@ export default function ClusterDetailPage() {
     );
   }
 
-  const step = clusterReadiness(cluster, data.members, data.deployments);
+  const step = clusterReadiness(cluster, data.members, data.deployments, ui.network);
   const observed = asRecord(cluster.observed_status);
   const conditions = asRecordArray(observed.conditions);
   // Models the last health check found running with no deployment here --
@@ -358,6 +375,14 @@ export default function ClusterDetailPage() {
   return (
     <Stack spacing={2} sx={{ pb: 4 }}>
       {error && <Alert severity="error">{error}</Alert>}
+
+      {macNode && (
+        <MacStatusCard
+          capabilities={
+            (data.nodes.find((n) => n.id === macNode.node_id)?.capabilities ?? {}) as Record<string, unknown>
+          }
+        />
+      )}
 
       <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
         <Button size="small" startIcon={<ArrowBackIcon />} onClick={() => navigate("/admin/clusters")}>
@@ -765,9 +790,11 @@ export default function ClusterDetailPage() {
             )}
 
 
-            <Button size="small" onClick={() => setNetworkOpen(true)} sx={{ alignSelf: "flex-start" }}>
-              {t("clusters.detail.change_network")}
-            </Button>
+            {ui.network && (
+              <Button size="small" onClick={() => setNetworkOpen(true)} sx={{ alignSelf: "flex-start" }}>
+                {t("clusters.detail.change_network")}
+              </Button>
+            )}
 
             <JsonBlock value={cluster.observed_status} label={t("clusters.detail.raw_status")} />
           </Stack>
@@ -878,7 +905,7 @@ export default function ClusterDetailPage() {
                 {drainOf(selectedMember.node_id)!.message ? `: ${drainOf(selectedMember.node_id)!.message}` : ""}
               </Alert>
             )}
-            {selectedMember.role !== "head" && !drainOf(selectedMember.node_id) && (
+            {ui.drain && selectedMember.role !== "head" && !drainOf(selectedMember.node_id) && (
               <Button
                 size="small"
                 variant="outlined"

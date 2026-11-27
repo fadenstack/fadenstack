@@ -48,6 +48,18 @@ def gpus_from_utilization(utilization: dict[str, Any] | None) -> list[Gpu]:
     return []
 
 
+def metal_from_node(node: Any) -> dict[str, Any] | None:
+    """A Mac's memory for :func:`fit.plan_metal`, from its ``metal`` capability (estimated until a runtime is staged)."""
+    from faden_backend.services.inference.drivers.standalone.admission import working_set_bytes  # noqa: PLC0415
+
+    working_set, estimated = working_set_bytes(node)
+    if not working_set:
+        return None
+    metal = ((getattr(node, "capabilities_json", None) or {}).get("metal")) or {}
+    unified = int(metal.get("unified_memory_bytes") or 0) if isinstance(metal, dict) else 0
+    return {"working_set_bytes": working_set, "unified_bytes": unified, "estimated": estimated}
+
+
 async def cluster_hardware(session: Any) -> list[ClusterHardware]:
     """Every cluster this server manages, with its machines' accelerators."""
     from sqlalchemy import select  # noqa: PLC0415
@@ -83,6 +95,7 @@ async def cluster_hardware(session: Any) -> list[ClusterHardware]:
         machines: list[Machine] = []
         version: str | None = None
         support: RuntimeSupport | None = None
+        metal: dict[str, Any] | None = None
         for member in (m for m in members if m.environment_id == env.id):
             node = nodes.get(member.node_id)
             if node is None:
@@ -93,6 +106,8 @@ async def cluster_hardware(session: Any) -> list[ClusterHardware]:
                 name=node.agent_id or node.host,
                 gpus=gpus_from_utilization(getattr(snapshot, "utilization_json", None)),
             ))
+            if driver == "standalone" and metal is None:
+                metal = metal_from_node(node) or {"working_set_bytes": 0, "estimated": True}
             if version is None:
                 try:
                     bundle = default_bundle_registry.resolve_for_node(
@@ -118,5 +133,6 @@ async def cluster_hardware(session: Any) -> list[ClusterHardware]:
             machines=machines,
             vllm_version=version or None,
             runtime=support,
+            metal=metal,
         ))
     return clusters

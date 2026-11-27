@@ -103,6 +103,8 @@ export function clusterReadiness(
   cluster: InferenceEnvironment,
   members: EnvironmentNode[],
   deployments: InferenceDeployment[],
+  /** False for a standalone (Mac) environment: it has no network plan to make. */
+  needsNetwork = true,
 ): NextStep {
   if (members.length === 0) {
     return {
@@ -114,7 +116,7 @@ export function clusterReadiness(
     };
   }
 
-  if (!hasNetwork(cluster)) {
+  if (needsNetwork && !hasNetwork(cluster)) {
     return {
       stage: "no-network",
       title: i18n.t("clusters.next.network.title"),

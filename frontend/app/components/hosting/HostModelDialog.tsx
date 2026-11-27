@@ -24,6 +24,7 @@ import { PictureSettings } from "~/components/hosting/PictureSettings";
 import { ImagesOffNote } from "~/components/hosting/ImagesOffNote";
 import { RecipeNotice } from "~/components/hosting/RecipeNotice";
 import { useImageGeneration } from "~/lib/useImageGeneration";
+import { MacFitPanel } from "~/components/macs/MacFitPanel";
 import { formatBytes, parseExtraFlags, type EngineConfig } from "~/lib/engine";
 import {
   DEPLOYMENT_NAME,
@@ -683,6 +684,8 @@ function WhereStep({
         <Alert severity="warning">{t("hosting.no_fit", { error: detailError ?? "" })}</Alert>
       )}
       {!hasRepo && <Alert severity="info">{t("hosting.local_no_fit")}</Alert>}
+
+      {hasRepo && chosen?.metal && <MacFitPanel fit={fit} />}
 
       <Typography variant="subtitle2">{t("hosting.where_title")}</Typography>
       <Stack spacing={1}>

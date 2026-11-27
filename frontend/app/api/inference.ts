@@ -881,6 +881,14 @@ export const inferenceApi = {
     });
   },
 
+  /** Serve models on one Mac, on its own (idempotent per machine). */
+  createStandaloneEnvironment(nodeId: string, name?: string) {
+    return request<InferenceEnvironment>("/environments/standalone", {
+      method: "POST",
+      body: JSON.stringify({ node_id: nodeId, ...(name ? { name } : {}) }),
+    });
+  },
+
   updateEnvironment(id: string, payload: EnvironmentUpdatePayload) {
     return request<InferenceEnvironment>(`/environments/${enc(id)}`, {
       method: "PATCH",

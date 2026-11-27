@@ -55,6 +55,10 @@ describe("clusterReadiness", () => {
     expect(step.actionLabel).toBe("Choose the network");
   });
 
+  it("does not ask a standalone Mac for a network", () => {
+    expect(clusterReadiness(noNetwork, environmentNodes, [], false).stage).not.toBe("no-network");
+  });
+
   it("offers to start a stopped cluster", () => {
     const stopped = { ...environment, desired_state: "stopped", status: "stopped" };
     expect(clusterReadiness(stopped, environmentNodes, []).stage).toBe("stopped");

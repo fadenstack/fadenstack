@@ -80,39 +80,59 @@ def parse_bytes(text: str | None) -> int | None:
     return int(float(lower))
 
 
-#: The utilization handed to vLLM-Metal when a deployment names no memory: what
-#: Gate 0 ran with. A fraction of the recommended working set.
+#: The utilization handed to vLLM-Metal when a deployment names no memory, at most (the Mac's
+#: own ceiling applies below it). A fraction of the recommended working set.
 DEFAULT_GPU_MEMORY_UTILIZATION = 0.8
 
 
-def memory_budget(node: Any, memory: str | None) -> dict[str, Any]:
-    """The ``gpu_memory_utilization`` for a deployment asking *memory* on *node*.
+def memory_ceiling(node: Any) -> tuple[int | None, float | None]:
+    """``(bytes, fraction of R)`` an engine may use on *node*, or ``(None, None)`` before it reports.
+
+    The same function the plan uses (``fit.metal_ceiling_share``), so a plan
+    that says it fits is never refused here.
+    """
+    from faden_backend.services.marketplace.fit import metal_ceiling, metal_ceiling_share  # noqa: PLC0415
+
+    working_set, _ = working_set_bytes(node)
+    if not working_set:
+        return None, None
+    metal = (getattr(node, "capabilities_json", None) or {}).get("metal") or {}
+    unified = int(metal.get("unified_memory_bytes") or 0) if isinstance(metal, dict) else 0
+    return metal_ceiling(working_set, unified), metal_ceiling_share(working_set, unified)
+
+
+def memory_budget(node: Any, memory: str | None, utilization: Any = None) -> dict[str, Any]:
+    """The ``gpu_memory_utilization`` for a deployment on *node*.
 
     vLLM-Metal sizes its cache as a fraction of Metal's recommended working set
-    (Gate 0 semantics), so a budget in bytes becomes that fraction. Raises
-    ``ValueError`` with a sentence when the budget cannot fit.
+    (Gate 0 semantics). The deployment may name the fraction itself (the Host
+    Model form fills it from the Mac plan) or a budget in bytes
+    (``resources.replica.memory``); either is held to the machine's ceiling
+    (``min(0.95 R, R - reserve)``, CONTRACTS § C3). With neither, the default is
+    0.8 or the ceiling, whichever is lower. Raises ``ValueError`` with a
+    sentence when the budget cannot fit.
     """
     working_set, estimated = working_set_bytes(node)
+    ceiling_bytes, ceiling_fraction = memory_ceiling(node)
+    base = {"working_set_bytes": working_set, "estimated": estimated, "ceiling_bytes": ceiling_bytes}
     requested = parse_bytes(memory)
-    if requested is None:
-        return {
-            "gpu_memory_utilization": DEFAULT_GPU_MEMORY_UTILIZATION,
-            "working_set_bytes": working_set,
-            "estimated": estimated,
-        }
+    if utilization is None and requested is None:
+        default = DEFAULT_GPU_MEMORY_UTILIZATION if ceiling_fraction is None else min(
+            DEFAULT_GPU_MEMORY_UTILIZATION, ceiling_fraction,
+        )
+        return {"gpu_memory_utilization": default, **base}
     if not working_set:
         raise ValueError(
             "This machine has not reported its memory yet, so a memory budget cannot be checked. "
-            "Wait for it to report, or deploy without resources.replica.memory."
+            "Wait for it to report, or deploy without a memory setting."
         )
-    fraction = requested / working_set
-    if fraction > 0.95:
+    fraction = float(utilization) if utilization is not None else requested / working_set
+    if fraction <= 0:
+        raise ValueError("The memory share must be more than zero.")
+    if ceiling_fraction is not None and fraction > ceiling_fraction + 1e-9:
+        asked = fraction * working_set
         raise ValueError(
-            f"The model asks for {requested / 2**30:.1f} GiB but this machine's GPU can use about "
-            f"{working_set / 2**30:.1f} GiB{' (estimated)' if estimated else ''}."
+            f"The model asks for {asked / 2**30:.1f} GiB but this Mac's GPU can give an engine at most about "
+            f"{ceiling_bytes / 2**30:.1f} GiB{' (estimated)' if estimated else ''}, after keeping memory for the system."
         )
-    return {
-        "gpu_memory_utilization": round(max(fraction, 0.05), 4),
-        "working_set_bytes": working_set,
-        "estimated": estimated,
-    }
+    return {"gpu_memory_utilization": round(max(fraction, 0.05), 4), **base}
