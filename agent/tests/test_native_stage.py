@@ -226,3 +226,76 @@ def test_an_exact_unpacked_size_passes(tmp_path: Path, paths: NativePaths) -> No
     total = sum(p.stat().st_size for p in (src / "runtime").rglob("*") if p.is_file() and not p.is_symlink())
     c = carrier(tmp_path / "img.tar", layer_from_dir(src))
     assert _stage(paths, c, unpacked_size_bytes=total)
+
+
+# ── the layer as docker save hands it over ───────────────────────
+
+
+def test_a_gzip_layer_from_the_containerd_store_is_verified_over_its_decompressed_tar(
+    tmp_path: Path, paths: NativePaths
+) -> None:
+    import hashlib
+
+    build_runtime(tmp_path / "src")
+    plain = layer_from_dir(tmp_path / "src")
+    c = carrier(tmp_path / "img.tar", plain, compress=True)
+    # The diff_id is the plain tar's; the blob in the image tar is the gzip.
+    assert c.layer_digest == "sha256:" + hashlib.sha256(plain).hexdigest()
+    with tarfile.open(c.tar) as outer:
+        _config, layer = st.read_image(outer)
+        assert outer.extractfile(layer).read(2) == b"\x1f\x8b"
+    final = _stage(paths, c, rootfs_digest=st.rootfs_digest_of([c.layer_digest]), unpacked_size_bytes=len(plain))
+    assert st.read_stamp(final)["layer_digest"] == c.layer_digest
+
+
+def test_a_gzip_layer_unpacking_past_its_declared_size_is_refused(tmp_path: Path, paths: NativePaths) -> None:
+    # The bomb cap with the backend's figure: declared unpacked size + 1 % + 1 MiB.
+    layer = layer_from_members([file_member("runtime/zeros", b"\0" * 8_000_000)])
+    c = carrier(tmp_path / "img.tar", layer, compress=True)
+    with pytest.raises(NativeError) as err:
+        _stage(paths, c, unpacked_size_bytes=1_000_000)
+    assert err.value.error_code == "unsafe_archive"
+
+
+def test_a_zstd_layer_is_refused_clearly(tmp_path: Path, paths: NativePaths) -> None:
+    plain = layer_from_members([file_member("runtime/x")])
+    fake_zstd = b"\x28\xb5\x2f\xfd" + b"\0" * 64
+    c = carrier(tmp_path / "img.tar", plain)
+    # Replace the layer blob with a zstd-looking one (the diff_id stays the plain tar's).
+    with tarfile.open(c.tar) as outer:
+        members = [(m, outer.extractfile(m).read()) for m in outer.getmembers()]
+    import io
+
+    with tarfile.open(c.tar, "w") as out:
+        for m, data in members:
+            if data == plain:
+                data = fake_zstd
+                m.size = len(data)
+            out.addfile(m, io.BytesIO(data))
+    with pytest.raises(NativeError) as err:
+        _stage(paths, c)
+    assert err.value.error_code == "invalid_image" and "zstd" in str(err.value)
+
+
+@pytest.mark.parametrize("damage", ["truncated_gzip", "garbage_layer", "garbage_image"])
+def test_damaged_downloads_fail_cleanly(tmp_path: Path, paths: NativePaths, damage: str) -> None:
+    import gzip
+    import io
+
+    plain = layer_from_members([file_member("runtime/x", b"y" * 100_000)])
+    c = carrier(tmp_path / "img.tar", plain, compress=True)
+    if damage == "garbage_image":
+        c.tar.write_bytes(b"not a tar at all" * 100)
+    else:
+        with tarfile.open(c.tar) as outer:
+            members = [(m, outer.extractfile(m).read()) for m in outer.getmembers()]
+        with tarfile.open(c.tar, "w") as out:
+            for m, data in members:
+                if data[:2] == b"\x1f\x8b":
+                    data = data[: len(data) // 2] if damage == "truncated_gzip" else gzip.compress(b"\x01" * 4096)
+                    m.size = len(data)
+                out.addfile(m, io.BytesIO(data))
+    with pytest.raises(NativeError) as err:
+        _stage(paths, c)
+    assert err.value.error_code in {"invalid_image", "digest_mismatch"}
+    assert not list(paths.bundle_dir("faden-native-vllm-metal").glob(".staging-*"))

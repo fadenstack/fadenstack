@@ -23,6 +23,7 @@ import logging
 import os
 import re
 import shutil
+import sys
 import uuid
 from collections.abc import Callable
 from pathlib import Path
@@ -42,8 +43,29 @@ _CONTENT_RANGE_RE = re.compile(r"^bytes (\d+)-(\d+)/(\d+|\*)$")
 _MODEL_PULL_LOCKS: dict[str, asyncio.Lock] = {}
 
 
+def canonical_key(path: str | Path) -> str:
+    """One name for one directory: realpath (so /var and /private/var agree), case- and Unicode-folded on a Mac.
+
+    APFS is case-insensitive by default, and ``Path.resolve`` does not fold case, so ``models--Org--x`` and
+    ``models--org--x`` are one directory that the lock table and the in-use check must see as one. Folding
+    on a case-sensitive volume only makes them more careful (more locking, more refusals).
+    """
+    text = str(Path(path).resolve(strict=False))
+    if _darwin():
+        import unicodedata  # noqa: PLC0415
+
+        text = unicodedata.normalize("NFD", text).casefold()
+    return text
+
+
+def is_within(path: str | Path, directory: str | Path) -> bool:
+    """*path* is *directory* or below it, compared by canonical key."""
+    a, b = canonical_key(path), canonical_key(directory)
+    return a == b or a.startswith(b.rstrip("/") + "/")
+
+
 def _lock_for_model_dir(model_dir: Path) -> asyncio.Lock:
-    key = str(model_dir.resolve(strict=False))
+    key = canonical_key(model_dir)
     lock = _MODEL_PULL_LOCKS.get(key)
     if lock is None:
         lock = asyncio.Lock()
@@ -219,6 +241,116 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+# ── macOS store hardening (darwin only; Linux behaviour is unchanged) ────────
+
+_GIT_SHA1_RE = re.compile(r"^[a-f0-9]{40}$")
+#: Free space kept beyond a download, so the volume is not driven to zero.
+SPACE_HEADROOM = 1 << 30
+
+
+def _darwin() -> bool:
+    return sys.platform == "darwin"
+
+
+def preflight_space(store: Path, missing_bytes: int) -> None:
+    """Refuse a download the volume cannot hold (darwin only): missing bytes plus 1 GiB headroom."""
+    if not _darwin() or missing_bytes <= 0:
+        return
+    probe = store
+    while not probe.exists() and probe != probe.parent:
+        probe = probe.parent
+    free = shutil.disk_usage(probe).free
+    need = missing_bytes + SPACE_HEADROOM
+    if free < need:
+        raise ModelPullerError(
+            f"Not enough disk space in the model store {store}: need {need} bytes "
+            f"({missing_bytes} to download plus 1 GiB headroom), {free} free, short by {need - free}."
+        )
+
+
+def _store_is_case_insensitive(store: Path) -> bool:
+    store.mkdir(parents=True, exist_ok=True)
+    name = f".case-probe-{uuid.uuid4().hex}"
+    probe = store / name
+    try:
+        probe.write_bytes(b"")
+        return (store / name.upper()).exists()
+    except OSError:
+        return False
+    finally:
+        probe.unlink(missing_ok=True)
+
+
+def _refuse_case_collisions(store: Path, snapshot_entries: list[Any]) -> None:
+    """On a case-insensitive volume (APFS default) two paths differing only in case are one file (darwin only)."""
+    if not _darwin():
+        return
+    clashes: list[str] = []
+    for snap in snapshot_entries:
+        if not isinstance(snap, dict):
+            continue
+        seen: dict[str, str] = {}
+        for link in snap.get("links", []):
+            if not isinstance(link, dict):
+                continue
+            path = str(link.get("path", ""))
+            other = seen.setdefault(path.casefold(), path)
+            if other != path:
+                clashes.append(f"{other!r} and {path!r}")
+    if clashes and _store_is_case_insensitive(store):
+        raise ModelPullerError(
+            "This model has files whose names differ only in case ("
+            + "; ".join(clashes[:5])
+            + f"); the model store {store} is case-insensitive and would merge them."
+        )
+
+
+def _content_check(blob_hash: str) -> tuple[str, str] | None:
+    """(algorithm, hex digest) a blob's name lets us check: SHA-256 always, git SHA-1 on darwin only."""
+    sha256 = _expected_sha256(blob_hash)
+    if sha256:
+        return ("sha256", sha256)
+    h = blob_hash.lower()
+    if _darwin() and _GIT_SHA1_RE.fullmatch(h):
+        return ("git-sha1", h)
+    return None
+
+
+def _digest_file(path: Path, algorithm: str) -> str:
+    if algorithm == "sha256":
+        return _sha256_file(path)
+    # git blob id: sha1("blob <size>\0" + content)
+    digest = hashlib.sha1(f"blob {path.stat().st_size}\0".encode(), usedforsecurity=False)
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _publish(tmp: Path, target: Path) -> None:
+    """fsync *tmp*, then move it into place, so a power loss cannot publish a short blob."""
+    fd = os.open(tmp, os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+    os.replace(tmp, target)
+
+
+def _clean_leftovers(snapshots_dir: Path, blobs_dir: Path, wanted_blobs: set[str]) -> None:
+    """Remove what a crashed sync left: temp snapshot dirs and partial blobs the manifest does not name (darwin only)."""
+    if not _darwin():
+        return
+    if snapshots_dir.is_dir():
+        for entry in snapshots_dir.iterdir():
+            if entry.name.startswith(".") and ".tmp-" in entry.name and entry.is_dir() and not entry.is_symlink():
+                shutil.rmtree(entry, ignore_errors=True)
+    if blobs_dir.is_dir():
+        for entry in blobs_dir.iterdir():
+            if entry.name.endswith(".part") and entry.name[:-5] not in wanted_blobs and not entry.is_symlink():
+                entry.unlink(missing_ok=True)
+
+
 def _validate_content_range(
     *,
     content_range: str | None,
@@ -312,6 +444,11 @@ async def pull_model(
         blobs_dir.mkdir(parents=True, exist_ok=True)
         refs_dir.mkdir(parents=True, exist_ok=True)
         snapshots_dir.mkdir(parents=True, exist_ok=True)
+        _refuse_case_collisions(hf_cache_root, snapshot_entries)
+        _clean_leftovers(
+            snapshots_dir, blobs_dir,
+            {str(e.get("hash", "")) for e in blob_entries if isinstance(e, dict)},
+        )
 
         # The machine already has this model in its own Hugging Face cache:
         # its blobs are linked into the store below, so the loop finds them
@@ -324,6 +461,23 @@ async def pull_model(
                 "Model %s is complete in the Hugging Face cache %s; reusing %d files",
                 model_sync.get("hf_repo_id", model_id), machine_hf_cache, adopted,
             )
+
+        if _darwin():
+            missing = 0
+            for entry in blob_entries:
+                if not isinstance(entry, dict):
+                    continue
+                try:
+                    want = max(0, int(entry.get("size", 0)))
+                    name = _safe_leaf_name(str(entry.get("hash", "")), field="blob hash")
+                except (TypeError, ValueError, ModelPullerError):
+                    continue
+                have = 0
+                for candidate in (blobs_dir / name, blobs_dir / f"{name}.part"):
+                    if candidate.is_file():
+                        have = max(have, candidate.stat().st_size)
+                missing += max(0, want - have)
+            preflight_space(hf_cache_root, missing)
 
         headers = {"Authorization": f"Bearer {credential}"}
         downloaded = 0
@@ -359,6 +513,7 @@ async def pull_model(
                 ) from exc
 
             expected_digest = _expected_sha256(blob_hash)
+            check = _content_check(blob_hash)
 
             # A link into another tool's content store: reading through it is
             # safe once the file's SHA-256 is the blob's, so it is used as it
@@ -393,9 +548,9 @@ async def pull_model(
 
             # Skip verified blobs already present in cache.
             if target.is_file() and (not expected_size or target_size == expected_size):
-                if expected_digest:
-                    actual_digest = await asyncio.to_thread(_sha256_file, target)
-                    if actual_digest == expected_digest:
+                if check:
+                    actual_digest = await asyncio.to_thread(_digest_file, target, check[0])
+                    if actual_digest == check[1]:
                         skipped += target_size
                         completed += expected_size or target_size
                         log.debug(
@@ -440,12 +595,12 @@ async def pull_model(
 
                 # A fully downloaded .part can happen after interruption right before replace().
                 if start_byte > 0 and expected_size and start_byte == expected_size:
-                    if expected_digest and await asyncio.to_thread(_sha256_file, tmp_path) != expected_digest:
+                    if check and await asyncio.to_thread(_digest_file, tmp_path, check[0]) != check[1]:
                         log.warning("Discarding invalid completed partial blob %s", blob_hash)
                         tmp_path.unlink(missing_ok=True)
                         start_byte = 0
                     else:
-                        os.replace(tmp_path, target)
+                        _publish(tmp_path, target)
                         skipped += expected_size
                         completed += expected_size
                         await _emit_blob_progress(blob_hash)
@@ -501,17 +656,17 @@ async def pull_model(
                     f"Size mismatch for blob {blob_hash}: "
                     f"expected {expected_size}, got {actual}"
                 )
-            if expected_digest:
-                actual_digest = _sha256_file(tmp_path)
-                if actual_digest != expected_digest:
+            if check:
+                actual_digest = _digest_file(tmp_path, check[0])
+                if actual_digest != check[1]:
                     tmp_path.unlink(missing_ok=True)
                     raise ModelPullerError(
                         f"Hash mismatch for blob {blob_hash}: "
-                        f"expected {expected_digest}, got {actual_digest}"
+                        f"expected {check[1]}, got {actual_digest}"
                     )
 
-            # Atomically move to final path
-            os.replace(tmp_path, target)
+            # Atomically move to final path (fsynced first)
+            _publish(tmp_path, target)
             if resumed:
                 skipped += start_byte
             downloaded += bytes_written

@@ -96,7 +96,18 @@ def log_stream_failure(exc: BaseException, retry_in: float) -> None:
 
 
 def add_agent_capabilities(static_capabilities: dict[str, Any]) -> None:
-    """What this agent can do, beside what preflight found (the same on every platform)."""
+    """What this agent can do, beside what preflight found.
+
+    Linux: exactly 0.2.12's set. A Mac runs no containers and no Ray, so it
+    advertises none of those; ``model_tls`` and ``model_tls_native`` come from
+    :func:`add_native_proxy_capabilities`, only once the proxy has passed its self-test.
+    """
+    if sys.platform == "darwin":
+        for key in ("container_runtime", "ray_tls", "ray_drain", "serve_scale", "model_tls"):
+            static_capabilities.pop(key, None)
+        static_capabilities["model_download"] = 1
+        static_capabilities["command_continuity"] = 1
+        return
     # This agent can put the model-TLS proxy in front of what it serves
     # (model_tls.py); the backend sends loopback binds only to agents that say so.
     static_capabilities["model_tls"] = 1
@@ -120,6 +131,15 @@ def add_agent_capabilities(static_capabilities: dict[str, Any]) -> None:
     static_capabilities["serve_scale"] = 1
 
 
+def add_native_proxy_capabilities(static_capabilities: dict[str, Any], failure: str | None) -> None:
+    """A Mac advertises the model-TLS proxy only after its self-test passed (*failure* is ``None``)."""
+    if failure is None:
+        static_capabilities["model_tls"] = 1
+        static_capabilities["model_tls_native"] = 1
+    else:
+        log.error("The native model-TLS proxy failed its self-test; model_tls is not advertised: %s", failure)
+
+
 class NodeAgentService:
     """Bootstraps onboarding and runs persistent stream loop."""
 
@@ -139,6 +159,8 @@ class NodeAgentService:
         self._ray_manager: Any = None  # typed import is local (optional dep)
         #: The native vLLM-Metal runtime (native/manager.py), on a Mac only.
         self._native: Any = None
+        #: macOS: the idle-sleep guard (power.py).
+        self._power: Any = None
         self._model_tls: ModelTls | None = None
         self._hf_cache: str | None = None
 
@@ -172,6 +194,7 @@ class NodeAgentService:
             # Read-only facts for the console's Mac card; a Mac only (Linux keys stay as 0.2.12's).
             static_capabilities["mac_status"] = await collect_mac_status()
             self._log_tasks.append(asyncio.create_task(refresh_mac_status(static_capabilities)))
+        await self._start_power_guard()
         log.info("Static capabilities: %s", static_capabilities)
         if not bool(static_capabilities.get("docker_available")):
             log.warning("Container runtime is not available; runtime commands will fail until daemon is reachable.")
@@ -285,6 +308,15 @@ class NodeAgentService:
                 await self._refresh_model_tls(credential)
 
         self._model_tls.refresher = _refresh_now
+        if sys.platform == "darwin":
+            from faden_agent.native_proxy import self_test  # noqa: PLC0415
+
+            add_native_proxy_capabilities(static_capabilities, await asyncio.to_thread(self_test))
+            backend = self._model_tls._backend  # noqa: SLF001
+            if hasattr(backend, "check_firewall"):
+                state = await backend.check_firewall()
+                log.info("macOS application firewall: %s", state.get("state"))
+            await self._model_tls.restore()
 
         from faden_agent.ray.manager import RayManager
 
@@ -342,6 +374,8 @@ class NodeAgentService:
             native_manager=native_manager,
         )
         stream._dispatcher = dispatcher
+        if self._power is not None:
+            stream.power_status = self._power.status
         self._stream = stream
 
         # Log forwarding to Loki. An explicit FADEN_NODE_AGENT_LOKI_URL wins;
@@ -462,6 +496,18 @@ class NodeAgentService:
         self._client.http.base_url = target
         return True
 
+    async def _start_power_guard(self) -> None:
+        """macOS: keep the Mac from idle-sleeping (and dropping offline) while the agent runs."""
+        if sys.platform != "darwin" or self._power is not None:
+            return
+        from faden_agent.power import IdleSleepGuard  # noqa: PLC0415
+
+        self._power = IdleSleepGuard(
+            enabled=self._config.prevent_idle_sleep,
+            config_error=self._config.prevent_idle_sleep_error,
+        )
+        await self._power.start()
+
     async def _start_native(self, static_capabilities: dict[str, Any]) -> Any:
         """On a Mac: the native vLLM-Metal runtime, its workers adopted before any command arrives.
 
@@ -493,6 +539,7 @@ class NodeAgentService:
             manager = NativeRuntimeManager(
                 paths=NativePaths.for_state_path(self._config.state_path),
                 fetch_tar=_fetch_tar,
+                model_root=Path(self._config.model_store_root),
                 max_workers=self._config.native_max_workers,
                 sandbox=self._config.native_sandbox,
                 sandbox_config_error=self._config.native_sandbox_error,
@@ -510,6 +557,8 @@ class NodeAgentService:
         if result["adopted"] or result["failed"]:
             log.info("Native workers after restart: %s", result)
         static_capabilities.update(manager.capabilities())
+        # Darwin only (a native manager exists only there): the backend sends remove_model only to agents saying so.
+        static_capabilities["model_remove"] = 1
         await manager.refresh_metal()
         self._native = manager
         return manager
@@ -528,6 +577,12 @@ class NodeAgentService:
     async def close(self) -> None:
         """Close outbound HTTP resources, SDK attach, and flush state."""
         self._state_store.flush_seq()
+        proxy = getattr(getattr(self._model_tls, "_backend", None), "proxy", None)
+        if proxy is not None:
+            # Open streams get up to 30 s (inside the LaunchDaemon's ExitTimeOut 45); an upgrade drops the rest.
+            await asyncio.to_thread(proxy.stop)
+        if self._power is not None:
+            await self._power.stop()
         if self._native is not None:
             # Stops watching only: the workers keep serving, the next agent adopts them.
             await self._native.close()

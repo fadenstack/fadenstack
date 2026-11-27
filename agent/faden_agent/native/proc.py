@@ -210,7 +210,7 @@ def trim_family(entries: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def marked(
     *, uid: int, marker: str | None = None, prefix: str | None = None, any_marker: bool = False,
-    not_before: float | None = None,
+    deployments: set[str] | frozenset[str] | None = None, not_before: float | None = None,
 ) -> list[psutil.Process]:
     """Processes of *uid* whose environment carries the worker marker.
 
@@ -226,7 +226,12 @@ def marked(
             value = proc.environ().get(MARKER_ENV)
             if value is None:
                 continue
-            if not (any_marker or value == marker or (prefix is not None and value.startswith(prefix))):
+            if not (
+                any_marker
+                or value == marker
+                or (prefix is not None and value.startswith(prefix))
+                or (deployments is not None and value.split(":", 1)[0] in deployments)
+            ):
                 continue
             if not_before is not None and proc.create_time() + CREATE_TOLERANCE_S < not_before:
                 continue

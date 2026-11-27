@@ -1505,6 +1505,52 @@ def _darwin_join_child() -> int:
     return 0 if asyncio.run(_join_flow(config)) else 1
 
 
+_DARWIN_STORE_FORBIDDEN = (
+    "/Users/", "/Library/", "/System/", "/usr/", "/bin/", "/sbin/", "/etc/", "/private/etc/", "/Applications/",
+)
+
+
+def _darwin_model_store(configured: str | None, layout: Any) -> str:
+    """The model store a Mac service uses: the configured one when it is safe, else ``layout.models``.
+
+    Safe: an absolute, existing directory owned by the service user, mode 0700, not in a user's home, on
+    the system volume's protected paths, or the Linux default. An external volume qualifies. Root never
+    changes such a directory (A1's rule), so the owner must have made it.
+    """
+    default = str(layout.models)
+    if not configured or configured == default:
+        return default
+
+    def refuse(why: str) -> str:
+        print(f"WARNING: the configured model store {configured} is not used: {why}. Using {default}; "
+              "models in the old store are not found there.")
+        return default
+
+    path = Path(configured)
+    if not path.is_absolute() or ".." in path.parts:
+        return refuse("it is not an absolute path")
+    real = path.resolve(strict=False)
+    text = str(real) + "/"
+    if text.startswith(_DARWIN_STORE_FORBIDDEN) or str(real) == "/srv/faden/models":
+        return refuse("it is in a home folder, a protected system path, the agent's own folders or the Linux default")
+    state_dir = Path(layout.state_dir).resolve(strict=False)
+    models = Path(layout.models).resolve(strict=False)
+    if (real == state_dir or state_dir in real.parents) and real != models and models not in real.parents:
+        return refuse("it is inside the agent's state directory (outside its models folder)")
+    if not real.is_dir() or path.is_symlink():
+        return refuse("it is not an existing directory")
+    try:
+        import pwd  # noqa: PLC0415
+
+        owner = pwd.getpwnam(darwin_service.SERVICE_USER).pw_uid
+        st = real.stat()
+    except (KeyError, OSError):
+        return refuse("its owner cannot be checked")
+    if st.st_uid != owner or (st.st_mode & 0o777) != 0o700:
+        return refuse(f"it must be owned by {darwin_service.SERVICE_USER} with mode 0700")
+    return str(real)
+
+
 def _cmd_start_darwin(user: bool | None, ca_file: str | None) -> None:
     identity = _darwin_prepare(user)
     if ca_file:
@@ -1515,7 +1561,7 @@ def _cmd_start_darwin(user: bool | None, ca_file: str | None) -> None:
     env = dict(line.split("=", 1) for line in _collect_env_lines())
     layout = darwin_service.Layout()
     env[f"{_ENV_PREFIX}STATE_PATH"] = str(layout.state_file)
-    env[f"{_ENV_PREFIX}MODEL_STORE"] = env.get(f"{_ENV_PREFIX}MODEL_STORE") or str(layout.models)
+    env[f"{_ENV_PREFIX}MODEL_STORE"] = _darwin_model_store(env.get(f"{_ENV_PREFIX}MODEL_STORE"), layout)
     if not env.get(f"{_ENV_PREFIX}BACKEND_URL"):
         _err("BACKEND_URL is not set. Run 'sudo faden-agent join <backend>' first.")
         sys.exit(1)
@@ -1563,6 +1609,14 @@ def _cmd_status_darwin() -> None:
     print(f"  Build:  {darwin_service.current_build(layout)}")
     print(f"  Config: {layout.env_file}")
     print(f"  Logs:   {layout.log_file}")
+    if state.pid:
+        from faden_agent.power import IdleSleepGuard  # noqa: PLC0415
+
+        holder = IdleSleepGuard.holder_of(state.pid)
+        print(
+            f"  Sleep:  idle sleep prevented (caffeinate PID {holder}); keep this Mac on AC power"
+            if holder else "  Sleep:  idle sleep NOT prevented: this Mac may sleep and drop offline"
+        )
 
 
 def cmd_uninstall() -> None:

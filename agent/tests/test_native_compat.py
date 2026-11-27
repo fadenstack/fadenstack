@@ -29,6 +29,8 @@ async def test_linux_capability_keys_equal_0_2_12(monkeypatch: pytest.MonkeyPatc
     assert await NodeAgentService._start_native(host, caps) is None  # type: ignore[arg-type]
     expected = json.loads(FIXTURE.read_text())["linux_capability_keys"]
     assert sorted(caps) == expected
+    values = json.loads(FIXTURE.read_text())["linux_static_values"]
+    assert {k: caps[k] for k in values} == values
     assert "native_runtime" not in caps and "metal" not in caps
 
 

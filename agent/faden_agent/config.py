@@ -172,6 +172,10 @@ class AgentConfig:
     native_sandbox: bool = True
     #: Set when FADEN_NODE_AGENT_NATIVE_SANDBOX holds an unknown value: no worker starts.
     native_sandbox_error: str | None = None
+    #: macOS: hold a "prevent idle system sleep" assertion while the agent runs
+    #: (power.py). Strictly parsed like the sandbox flag; unset is on.
+    prevent_idle_sleep: bool = True
+    prevent_idle_sleep_error: str | None = None
     #: Built from the fields above plus the backend's authority the agent
     #: learnt (server_trust.build_context); shared by every connection to the
     #: backend. ``None`` while verification is off.
@@ -251,6 +255,8 @@ class AgentConfig:
             native_max_workers=_env_count("FADEN_NODE_AGENT_NATIVE_MAX_WORKERS", 1),
             native_sandbox=_env_strict_switch("FADEN_NODE_AGENT_NATIVE_SANDBOX", True)[0],
             native_sandbox_error=_env_strict_switch("FADEN_NODE_AGENT_NATIVE_SANDBOX", True)[1],
+            prevent_idle_sleep=_env_strict_switch("FADEN_NODE_AGENT_PREVENT_IDLE_SLEEP", True)[0],
+            prevent_idle_sleep_error=_env_strict_switch("FADEN_NODE_AGENT_PREVENT_IDLE_SLEEP", True)[1],
             require_signed_commands=(
                 os.getenv("FADEN_NODE_AGENT_REQUIRE_SIGNED_COMMANDS", "auto").strip().lower() or "auto"
             ),

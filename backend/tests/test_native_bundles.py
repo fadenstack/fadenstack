@@ -273,3 +273,18 @@ def test_a_mac_that_has_not_reported_its_gpu_is_refused(registry: RuntimeBundleR
 def test_reading_the_reported_os(reported: str, name: str | None, version: str | None) -> None:
     assert bundles.node_os_name({"os": reported}) == name
     assert bundles.node_os_version({"os": reported}) == version
+
+
+
+def test_unpacked_size_is_optional_and_checked() -> None:
+    """Optional: a manifest minted before it existed parses as before."""
+    assert native_bundle().native.unpacked_size_bytes is None
+    manifest = native_manifest()
+    manifest["native"]["unpacked_size_bytes"] = 2_158_704_640
+    bundle = native_bundle_from_manifest(
+        manifest, bundle_id="x", display_name="x", driver="standalone", target_architecture=darwin_target(),
+    )
+    assert bundle.native.unpacked_size_bytes == 2_158_704_640
+    manifest["native"]["unpacked_size_bytes"] = 0
+    with pytest.raises(ValidationError):
+        NativeRuntimeSpec.model_validate(manifest["native"])

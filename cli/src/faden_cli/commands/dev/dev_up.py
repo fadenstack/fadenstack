@@ -291,6 +291,9 @@ def _ensure_backend_env(backend_dir: Path, workspace: Path) -> None:
             # database has no llm_user any more (shared/initdb).
             "FADEN_BACKEND_LLM_GRAPH_DB_USER",
             "FADEN_BACKEND_LLM_GRAPH_DB_PASS",
+            # Off the install's /data/faden, which a dev host does not have.
+            "FADEN_BACKEND_AUDIT_DIR",
+            "FADEN_BACKEND_RAG_LITE_FILE_STORE_ROOT",
         )
     }
 

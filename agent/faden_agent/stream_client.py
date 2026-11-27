@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections.abc import Callable
 from typing import Any
 from urllib.parse import urlparse
 
@@ -84,6 +85,9 @@ class StreamClient:
         self._state = state_store
         self._dispatcher = dispatcher
         self._static_capabilities = static_capabilities
+        #: macOS: the idle-sleep guard's status (power.py), reported in the
+        #: inventory -- not a capability. None elsewhere: the inventory is unchanged.
+        self.power_status: Callable[[], dict[str, Any]] | None = None
         self._events = events
         self._backend_client = backend_client
         self._gpu_collector: GpuCollector = gpu_collector or NullCollector()
@@ -324,6 +328,8 @@ class StreamClient:
             inventory = await collect_inventory(self._static_capabilities, gpu_snapshot=gpu_snapshot)
             inventory["vllm_containers"] = await self._find_vllm()
             inventory["ray_runtime"] = await self._ray_runtime()
+            if self.power_status is not None:
+                inventory["power"] = self.power_status()
             utilization = await collect_utilization(gpu_snapshot=gpu_snapshot)
             await self._send_json(
                 ws,

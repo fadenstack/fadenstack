@@ -147,3 +147,36 @@ def test_healing_the_backend_env_leaves_the_bind_address_to_dev_up(tmp_path: Pat
     dev_up._ensure_backend_env(backend, ws)
 
     assert _env(backend / ".env")["FADEN_BACKEND_HOST"] == "0.0.0.0", "set by _apply_bind_hosts, not here"
+
+
+# ── the install's /data/faden is not a dev host's ─────────────────────────
+
+
+def test_a_new_backend_env_keeps_its_files_under_faden_dev(tmp_path: Path, monkeypatch) -> None:  # noqa: ANN001
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path / "home"))
+    ws = _workspace(tmp_path)
+    backend = ws / "backend"
+    backend.mkdir()
+
+    dev_up._ensure_backend_env(backend, ws)
+
+    env = _env(backend / ".env")
+    assert env["FADEN_BACKEND_AUDIT_DIR"] == str(tmp_path / "home" / ".faden-dev" / "audit")
+    assert env["FADEN_BACKEND_RAG_LITE_FILE_STORE_ROOT"] == str(tmp_path / "home" / ".faden-dev" / "rag-lite")
+    assert not any(value.startswith("/data/") for value in env.values())
+
+
+def test_an_existing_backend_env_gains_them_and_keeps_its_own(tmp_path: Path, monkeypatch) -> None:  # noqa: ANN001
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path / "home"))
+    ws = _workspace(tmp_path)
+    backend = ws / "backend"
+    backend.mkdir()
+    (backend / ".env").write_text(
+        "FADEN_BACKEND_DB_HOST=127.0.0.1\nFADEN_BACKEND_AUDIT_DIR=/srv/my-audit\n", encoding="utf-8"
+    )
+
+    dev_up._ensure_backend_env(backend, ws)
+
+    env = _env(backend / ".env")
+    assert env["FADEN_BACKEND_AUDIT_DIR"] == "/srv/my-audit", "a value the developer set is kept"
+    assert env["FADEN_BACKEND_RAG_LITE_FILE_STORE_ROOT"] == str(tmp_path / "home" / ".faden-dev" / "rag-lite")

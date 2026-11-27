@@ -133,8 +133,10 @@ class LLMService:
         if ctx is None:
             return HealthStatus(healthy=False, detail="machine TLS identity not made yet")
         try:
+            # vLLM serves /health at the root, not under /v1 (the published URL ends in /v1).
+            base = endpoint_url.rstrip("/").removesuffix("/v1")
             async with httpx.AsyncClient(verify=ctx, timeout=5.0) as client:
-                resp = await client.get(f"{endpoint_url.rstrip('/')}/health")
+                resp = await client.get(f"{base}/health")
             if resp.status_code == 200:
                 return HealthStatus(healthy=True)
             return HealthStatus(healthy=False, detail=f"HTTP {resp.status_code}")
