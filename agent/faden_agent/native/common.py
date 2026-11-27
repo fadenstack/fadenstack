@@ -79,7 +79,9 @@ def fsync_dir(directory: Path) -> None:
         os.close(dfd)
 
 
-def read_json_nofollow(path: Path, *, limit: int = 1 << 20, owner: int | None = None) -> dict[str, Any] | None:
+def read_json_nofollow(
+    path: Path, *, limit: int = 1 << 20, owner: int | None = None, dir_fd: int | None = None
+) -> dict[str, Any] | None:
     """Read a small JSON object: no symlink, no fifo, one link, optionally a given owner.
 
     Root reads worker records in the service's directory when it stops the
@@ -88,7 +90,7 @@ def read_json_nofollow(path: Path, *, limit: int = 1 << 20, owner: int | None = 
     """
     flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
     try:
-        fd = os.open(path, flags)
+        fd = os.open(path, flags, dir_fd=dir_fd)
     except OSError:
         return None
     try:
@@ -108,7 +110,7 @@ def read_json_nofollow(path: Path, *, limit: int = 1 << 20, owner: int | None = 
         return None
     try:
         value = json.loads(data)
-    except ValueError:
+    except (ValueError, RecursionError):  # a deep nest is not a record either
         return None
     return value if isinstance(value, dict) else None
 

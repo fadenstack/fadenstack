@@ -5,12 +5,28 @@ creation time, a hash of its arguments), never by user: the per-user
 ``distnoted``/``cfprefsd`` agents run as the service account too, and are
 not ours. The agent (as ``_fadenagent``) and ``faden-agent stop|uninstall``
 (as root, reading the record only) both end workers through this module.
+
+Only verified processes are signalled, one by one -- no ``killpg`` on a
+number read from a file:
+
+- the leader, when it is still the recorded process (``matching``);
+- while that leader is alive: its descendants and the members of its own
+  process group (the group is its own: ``start_new_session``);
+- the descendants recorded while the worker ran (``family``: pid and
+  creation time, refreshed by the agent), each only while it is still that
+  same process -- so a helper that called ``setsid`` and outlived the
+  leader is still found;
+- and the descendants of any of these.
+
+Never the agent itself nor anything in the agent's own process group.
 """
 
 from __future__ import annotations
 
 import hashlib
+import math
 import os
+import re
 import signal
 import time
 from collections.abc import Callable, Iterable
@@ -18,15 +34,23 @@ from typing import Any
 
 import psutil
 
-#: create_time is stored as a float; a worker matches within this many seconds.
+#: create_time is stored as a float; the leader matches within this many seconds.
 CREATE_TOLERANCE_S = 1.0
+#: A recorded descendant matches its creation time this closely (same clock source).
+FAMILY_TOLERANCE_S = 0.05
+MAX_FAMILY = 512
+_HASH = re.compile(r"^sha256:[0-9a-f]{64}$")
+
+
+class BadRecord(ValueError):
+    """A worker record with a field of the wrong type or range."""
 
 
 def cmd_hash(argv: Iterable[str]) -> str:
     """Hash of the arguments from ``serve`` on.
 
-    The worker is ``/bin/sh -c <shim> … vllm serve …``, which execs the vllm
-    script, which execs the venv's Python: the program changes, the
+    The worker is ``[sandbox-exec -p …] /bin/sh -c <shim> … vllm serve …``,
+    which execs on until the venv's Python: the program changes, the
     arguments from ``serve`` on do not.
     """
     args = list(argv)
@@ -35,6 +59,55 @@ def cmd_hash(argv: Iterable[str]) -> str:
     except ValueError:
         tail = args
     return "sha256:" + hashlib.sha256("\0".join(tail).encode("utf-8", "surrogateescape")).hexdigest()
+
+
+def _int(value: Any, what: str, lo: int, hi: int) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or not lo <= value <= hi:
+        raise BadRecord(f"{what} is not an integer in [{lo}, {hi}]: {str(value)[:40]!r}")
+    return value
+
+
+def _float(value: Any, what: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+        raise BadRecord(f"{what} is not a time: {str(value)[:40]!r}")
+    return float(value)
+
+
+def validate(record: Any) -> dict[str, Any]:
+    """The fields this module acts on, checked; raises :class:`BadRecord`.
+
+    Root runs this on files the service account can write: nothing in them
+    may raise anything else or reach a signal unchecked.
+    """
+    if not isinstance(record, dict):
+        raise BadRecord("not an object")
+    out: dict[str, Any] = {
+        "pid": _int(record.get("pid"), "pid", 2, 1 << 31),
+        "started_at": _float(record.get("started_at"), "started_at"),
+    }
+    pgid = record.get("pgid", out["pid"])
+    out["pgid"] = _int(pgid, "pgid", 2, 1 << 31)
+    if out["pgid"] != out["pid"]:
+        raise BadRecord("pgid is not the leader's own group")
+    digest = record.get("cmd_sha256")
+    if not isinstance(digest, str) or not _HASH.fullmatch(digest):
+        raise BadRecord("cmd_sha256 is not a sha256 digest")
+    out["cmd_sha256"] = digest
+    root = record.get("runtime_root")
+    if root is not None and (not isinstance(root, str) or not root.startswith("/") or len(root) > 4096):
+        raise BadRecord("runtime_root is not an absolute path")
+    out["runtime_root"] = root
+    port = record.get("port")
+    out["port"] = None if port is None else _int(port, "port", 1, 65535)
+    family = record.get("family") or []
+    if not isinstance(family, list) or len(family) > MAX_FAMILY:
+        raise BadRecord("family is not a short list")
+    out["family"] = [
+        {"pid": _int(e.get("pid") if isinstance(e, dict) else None, "family pid", 2, 1 << 31),
+         "ct": _float(e.get("ct") if isinstance(e, dict) else None, "family ct")}
+        for e in family
+    ]
+    return out
 
 
 def _proc(pid: int) -> psutil.Process | None:
@@ -54,23 +127,6 @@ def alive(proc: psutil.Process) -> bool:
         return False
 
 
-def matching(record: dict[str, Any], *, uid: int | None = None) -> psutil.Process | None:
-    """The recorded worker's leader when it is still that same process, else ``None``."""
-    proc = _proc(record.get("pid") or 0)
-    if proc is None:
-        return None
-    try:
-        if abs(proc.create_time() - float(record.get("started_at") or 0)) > CREATE_TOLERANCE_S:
-            return None
-        if uid is not None and proc.uids().real != uid:
-            return None
-        if cmd_hash(proc.cmdline()) != record.get("cmd_sha256") and not _runs_from(proc, record.get("runtime_root")):
-            return None
-    except (psutil.Error, ValueError, TypeError):
-        return None
-    return proc
-
-
 def _runs_from(proc: psutil.Process, runtime_root: Any) -> bool:
     """Its program lives in the recorded runtime (vLLM may retitle itself, changing its cmdline)."""
     if not runtime_root:
@@ -83,6 +139,55 @@ def _runs_from(proc: psutil.Process, runtime_root: Any) -> bool:
     return exe.startswith(root.rstrip("/") + "/")
 
 
+def matching(record: dict[str, Any], *, uid: int | None = None) -> psutil.Process | None:
+    """The recorded worker's leader when it is still that same process, else ``None``.
+
+    Same pid and creation time, and either the same arguments from ``serve``
+    on, or a program from the recorded runtime still serving on the recorded
+    port (a retitled vLLM).
+    """
+    try:
+        rec = validate(record)
+    except BadRecord:
+        return None
+    proc = _proc(rec["pid"])
+    if proc is None:
+        return None
+    try:
+        if abs(proc.create_time() - rec["started_at"]) > CREATE_TOLERANCE_S:
+            return None
+        if uid is not None and proc.uids().real != uid:
+            return None
+        cmdline = proc.cmdline()
+        if cmd_hash(cmdline) == rec["cmd_sha256"]:
+            return proc
+        if (
+            _runs_from(proc, rec["runtime_root"])
+            and "serve" in cmdline
+            and rec["port"] is not None
+            and str(rec["port"]) in cmdline
+        ):
+            return proc
+    except (psutil.Error, ValueError, TypeError):
+        return None
+    return None
+
+
+def family_of(leader: psutil.Process) -> list[dict[str, Any]]:
+    """The leader's descendants now, as ``{pid, ct}`` for the record."""
+    out = []
+    try:
+        kids = leader.children(recursive=True)
+    except psutil.Error:
+        return out
+    for kid in kids[:MAX_FAMILY]:
+        try:
+            out.append({"pid": kid.pid, "ct": kid.create_time()})
+        except psutil.Error:
+            continue
+    return sorted(out, key=lambda e: e["pid"])
+
+
 def _pgid(pid: int) -> int | None:
     try:
         return os.getpgid(pid)
@@ -90,102 +195,98 @@ def _pgid(pid: int) -> int | None:
         return None
 
 
-def tree(pid: int | None, pgid: int | None, *, not_before: float = 0.0, uid: int | None = None) -> list[psutil.Process]:
-    """The leader, its descendants, everything in its process group, and their descendants.
-
-    Group members must be no older than *not_before* (a reused group id is
-    not ours) and, when *uid* is given, run as that user.
-    """
+def collect(record: dict[str, Any], leader: psutil.Process | None, *, uid: int | None = None) -> list[psutil.Process]:
+    """Every verified process of the worker (see the module docstring)."""
+    rec = validate(record)
+    me, own_group = os.getpid(), os.getpgrp()
     found: dict[int, psutil.Process] = {}
 
-    def add(proc: psutil.Process) -> None:
-        if proc.pid in found or proc.pid == os.getpid():
+    def add(proc: psutil.Process, *, with_children: bool = True) -> None:
+        if proc.pid in found or proc.pid == me or proc.pid <= 1:
             return
+        if _pgid(proc.pid) == own_group:
+            return  # never the agent's own group
         try:
             if uid is not None and proc.uids().real != uid:
                 return
-            kids = proc.children(recursive=True)
+            kids = proc.children(recursive=True) if with_children else []
         except psutil.Error:
+            return
+        if not alive(proc):
             return
         found[proc.pid] = proc
         for kid in kids:
-            try:
-                if uid is not None and kid.uids().real != uid:
-                    continue
-            except psutil.Error:
-                continue
-            found.setdefault(kid.pid, kid)
+            add(kid, with_children=False)
 
-    if pid:
-        leader = _proc(pid)
-        if leader is not None:
-            add(leader)
-    if pgid and pgid > 1:
-        for proc in psutil.process_iter():
-            if proc.pid in found or _pgid(proc.pid) != pgid:
-                continue
-            try:
-                if proc.create_time() + CREATE_TOLERANCE_S < not_before:
-                    continue
-            except psutil.Error:
-                continue
-            add(proc)
-    return [p for p in found.values() if alive(p)]
-
-
-def _signal(procs: Iterable[psutil.Process], sig: int) -> None:
-    for proc in procs:
+    if leader is not None and alive(leader):
+        assert leader.pid != me and _pgid(leader.pid) != own_group, "a worker must not be the agent's own group"
+        add(leader)
+        if _pgid(leader.pid) == leader.pid:
+            for proc in psutil.process_iter():
+                if proc.pid not in found and _pgid(proc.pid) == leader.pid:
+                    add(proc)
+    for entry in rec["family"]:
+        proc = _proc(entry["pid"])
+        if proc is None:
+            continue
         try:
-            proc.send_signal(sig)  # psutil checks the pid is still this process
+            if abs(proc.create_time() - entry["ct"]) > FAMILY_TOLERANCE_S:
+                continue  # the pid now names another process
         except psutil.Error:
-            pass
+            continue
+        add(proc)
+    return list(found.values())
 
 
-def stop_tree(
-    pid: int | None,
-    pgid: int | None,
+def stop_worker(
+    record: dict[str, Any],
+    leader: psutil.Process | None,
     *,
     grace_s: float,
-    not_before: float = 0.0,
     uid: int | None = None,
-    use_killpg: bool = True,
     reap: Callable[[], None] | None = None,
     sleep: Callable[[float], None] = time.sleep,
 ) -> list[int]:
-    """SIGTERM, wait *grace_s*, SIGKILL; returns the pids still alive afterwards (``[]`` = gone).
+    """SIGTERM, wait *grace_s*, SIGKILL; returns the pids still alive afterwards (``[]`` = gone)."""
+    procs = collect(record, leader, uid=uid)
+    me, own_group = os.getpid(), os.getpgrp()
 
-    ``use_killpg`` is for the agent, which owns the group. Root (``uid`` set)
-    signals the verified processes one by one instead: a group id read from a
-    file the service can write is not trusted to name only its processes.
-    """
-    procs = tree(pid, pgid, not_before=not_before, uid=uid)
-
-    def kill(sig: int) -> None:
-        if use_killpg and pgid and pgid > 1:
+    def signal_all(sig: int) -> None:
+        for proc in procs:
+            if proc.pid == me or _pgid(proc.pid) == own_group:
+                continue
             try:
-                os.killpg(pgid, sig)
-            except OSError:
+                proc.send_signal(sig)  # psutil checks the pid is still this process
+            except psutil.Error:
                 pass
-        _signal(procs, sig)
 
     def wait(seconds: float) -> None:
         deadline = time.monotonic() + max(seconds, 0.0)
         while True:
             if reap is not None:
                 reap()
-            procs[:] = [p for p in procs if alive(p)]
-            for extra in tree(pid, pgid, not_before=not_before, uid=uid):
-                if extra.pid not in {p.pid for p in procs}:
-                    procs.append(extra)
+            survivors = [p for p in procs if alive(p)]
+            known = {p.pid for p in survivors}
+            for proc in list(survivors):
+                try:  # children born meanwhile are the worker's too
+                    for kid in proc.children(recursive=True):
+                        if kid.pid not in known and kid.pid != me and alive(kid) and (
+                            uid is None or kid.uids().real == uid
+                        ):
+                            survivors.append(kid)
+                            known.add(kid.pid)
+                except psutil.Error:
+                    pass
+            procs[:] = survivors
             if not procs or time.monotonic() >= deadline:
                 return
             sleep(0.1)
 
     if not procs:
         return []
-    kill(signal.SIGTERM)
+    signal_all(signal.SIGTERM)
     wait(grace_s)
     if procs:
-        kill(signal.SIGKILL)
+        signal_all(signal.SIGKILL)
         wait(5.0)
     return [p.pid for p in procs]

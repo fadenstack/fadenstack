@@ -92,6 +92,32 @@ def log_stream_failure(exc: BaseException, retry_in: float) -> None:
         log.warning("Node stream unavailable: %s; retrying in %.0f s.", reason, retry_in)
 
 
+
+def add_agent_capabilities(static_capabilities: dict[str, Any]) -> None:
+    """What this agent can do, beside what preflight found (the same on every platform)."""
+    # This agent can put the model-TLS proxy in front of what it serves
+    # (model_tls.py); the backend sends loopback binds only to agents that say so.
+    static_capabilities["model_tls"] = 1
+    # ... and run Ray with mutual TLS between the cluster's machines (ray/ray_tls.py).
+    # 2: and say in each ENSURE_RAY_RUNTIME result what the container runs
+    # (1 was a lab build that did not).
+    static_capabilities["ray_tls"] = 2
+    # ... and download a model from the Hub itself, and say whether it can
+    # reach it (hf_download.py): a cluster's "machines download models".
+    static_capabilities["model_download"] = 1
+    # ... and keep a command running when its connection drops, deliver its
+    # result on the next, and say on connecting what runs and what finished
+    # (stream_client.py): the server then leaves them alone when it sees a
+    # connection close, instead of failing them as lost.
+    static_capabilities["command_continuity"] = 1
+    # ... and drain a machine out of its Ray cluster, Serve moving its
+    # copies first (ray/drain.py, serve_drain_patch.py).
+    static_capabilities["ray_drain"] = 1
+    # ... and change how many copies a model runs without restarting the
+    # copies that run (ray/scale.py, SCALE_SERVE_APP).
+    static_capabilities["serve_scale"] = 1
+
+
 class NodeAgentService:
     """Bootstraps onboarding and runs persistent stream loop."""
 
@@ -138,27 +164,7 @@ class NodeAgentService:
             gpu_collector,
             paths=paths,
         )
-        # This agent can put the model-TLS proxy in front of what it serves
-        # (model_tls.py); the backend sends loopback binds only to agents that say so.
-        static_capabilities["model_tls"] = 1
-        # ... and run Ray with mutual TLS between the cluster's machines (ray/ray_tls.py).
-        # 2: and say in each ENSURE_RAY_RUNTIME result what the container runs
-        # (1 was a lab build that did not).
-        static_capabilities["ray_tls"] = 2
-        # ... and download a model from the Hub itself, and say whether it can
-        # reach it (hf_download.py): a cluster's "machines download models".
-        static_capabilities["model_download"] = 1
-        # ... and keep a command running when its connection drops, deliver its
-        # result on the next, and say on connecting what runs and what finished
-        # (stream_client.py): the server then leaves them alone when it sees a
-        # connection close, instead of failing them as lost.
-        static_capabilities["command_continuity"] = 1
-        # ... and drain a machine out of its Ray cluster, Serve moving its
-        # copies first (ray/drain.py, serve_drain_patch.py).
-        static_capabilities["ray_drain"] = 1
-        # ... and change how many copies a model runs without restarting the
-        # copies that run (ray/scale.py, SCALE_SERVE_APP).
-        static_capabilities["serve_scale"] = 1
+        add_agent_capabilities(static_capabilities)
         native_manager = await self._start_native(static_capabilities)
         log.info("Static capabilities: %s", static_capabilities)
         if not bool(static_capabilities.get("docker_available")):
@@ -482,6 +488,12 @@ class NodeAgentService:
                 paths=NativePaths.for_state_path(self._config.state_path),
                 fetch_tar=_fetch_tar,
                 max_workers=self._config.native_max_workers,
+                sandbox=self._config.native_sandbox,
+                sandbox_deny=[
+                    Path(self._config.state_path).parent,
+                    *([Path(self._config.model_tls_dir)] if self._config.model_tls_dir else []),
+                    Path("/Library/Fadenstack"),
+                ],
                 on_capabilities=_capabilities,
             )
             result = await manager.reconcile()

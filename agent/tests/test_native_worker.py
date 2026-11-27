@@ -7,6 +7,7 @@ import json
 import os
 import signal
 import socket
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -33,6 +34,12 @@ def _free_port() -> int:
         return s.getsockname()[1]
 
 
+@pytest.fixture(autouse=True)
+def _fake_env_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The fake's own switches, beside the production allowlist.
+    monkeypatch.setattr(workers, "ENV_ALLOWED", workers.ENV_ALLOWED | {"VLLM_FAKE_MODE", "VLLM_FAKE_SETSID"})
+
+
 @pytest.fixture()
 def env(tmp_path: Path):
     paths = NativePaths(tmp_path / "state" / "native")
@@ -48,8 +55,16 @@ def env(tmp_path: Path):
     # Nothing a failed test started may outlive it.
     for record_path in paths.workers.glob("*.json"):
         record = json.loads(record_path.read_text())
-        procs.stop_tree(record.get("pid"), record.get("pgid"), grace_s=0.5,
-                        not_before=float(record.get("started_at") or 0))
+        try:
+            leader = psutil.Process(record["pid"])
+            if abs(leader.create_time() - record["started_at"]) > 1:
+                leader = None
+        except (psutil.Error, KeyError):
+            leader = None
+        try:
+            procs.stop_worker(record, leader, grace_s=0.5)
+        except procs.BadRecord:
+            pass
 
 
 def _manager(paths: NativePaths, models: Path, **kw) -> NativeRuntimeManager:
@@ -78,6 +93,16 @@ async def _settle(manager: NativeRuntimeManager, deployment_id: str = "dep-1", t
             return status
         await asyncio.sleep(0.05)
     raise AssertionError("worker never left starting")
+
+
+async def _settle_state(manager: NativeRuntimeManager, state: str, timeout: float = 20) -> dict:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        status = await manager.native_worker_status({"deployment_id": "dep-1"})
+        if status["state"] == state:
+            return status
+        await asyncio.sleep(0.05)
+    return status
 
 
 def _kids(paths: NativePaths, port: int) -> list[int]:
@@ -176,6 +201,9 @@ async def test_never_ready_times_out_and_is_stopped(env, monkeypatch: pytest.Mon
     kids = _kids(paths, port)
     status = await _settle(manager, timeout=30)
     assert status["state"] == "failed" and "not ready after 1 s" in status["last_error"]
+    deadline = time.monotonic() + 15  # the reason is recorded before the stop finishes
+    while not _gone([started["pid"], *kids]) and time.monotonic() < deadline:
+        await asyncio.sleep(0.1)
     assert _gone([started["pid"], *kids])
     await manager.close()
 
@@ -238,7 +266,7 @@ async def test_agent_restart_adopts_a_live_worker(env) -> None:
 
 
 @pytest.mark.asyncio
-async def test_agent_restart_fails_and_cleans_up_a_mismatched_worker(env) -> None:
+async def test_a_stale_record_never_signals_a_process_that_reused_its_pid(env) -> None:
     paths, models, snap = env
     first = _manager(paths, models)
     port = _free_port()
@@ -246,17 +274,56 @@ async def test_agent_restart_fails_and_cleans_up_a_mismatched_worker(env) -> Non
     assert (await _settle(first))["state"] == "ready"
     kids = _kids(paths, port)
     await first.close()
-    record = json.loads(paths.worker_record("dep-1").read_text())
-    record["cmd_sha256"] = "sha256:" + "0" * 64
-    record["runtime_root"] = "/nowhere"
-    paths.worker_record("dep-1").write_text(json.dumps(record))
+    os.kill(started["pid"], signal.SIGKILL)  # the leader dies, its children stay
+    # The recorded number now names an unrelated group leader of the same user.
+    stranger = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"], start_new_session=True)
+    try:
+        record = json.loads(paths.worker_record("dep-1").read_text())
+        record.update(pid=stranger.pid, pgid=stranger.pid)  # started_at and cmd stay the worker's
+        paths.worker_record("dep-1").write_text(json.dumps(record))
 
-    second = _manager(paths, models)
-    assert await second.reconcile() == {"adopted": [], "failed": ["dep-1"]}
-    assert _gone([started["pid"], *kids])  # no ownerless vLLM
-    status = await second.native_worker_status({"deployment_id": "dep-1"})
+        second = _manager(paths, models)
+        assert await second.reconcile() == {"adopted": [], "failed": ["dep-1"]}
+        assert stranger.poll() is None  # untouched
+        assert _gone(kids)  # the recorded children, verified by creation time, are not
+        await second.close()
+    finally:
+        stranger.kill()
+        stranger.wait()
+
+
+@pytest.mark.asyncio
+async def test_a_setsid_helper_that_outlives_the_leader_is_stopped(env) -> None:
+    paths, models, snap = env
+    manager = _manager(paths, models)
+    port = _free_port()
+    started = await manager.start_native_worker(_payload(snap, port, env={"VLLM_FAKE_SETSID": "1"}))
+    assert (await _settle(manager))["state"] == "ready"
+    kids = _kids(paths, port)
+    helper = kids[-1]
+    assert os.getpgid(helper) == helper != started["pid"]  # its own session
+    deadline = time.monotonic() + 10
+    while helper not in {e["pid"] for e in json.loads(paths.worker_record("dep-1").read_text()).get("family", [])}:
+        assert time.monotonic() < deadline, "the helper was never recorded"
+        await asyncio.sleep(0.05)
+    os.kill(started["pid"], signal.SIGKILL)
+    status = await _settle_state(manager, "failed")
     assert status["state"] == "failed"
-    await second.close()
+    deadline = time.monotonic() + 10
+    while not _gone(kids) and time.monotonic() < deadline:
+        await asyncio.sleep(0.1)
+    assert _gone(kids)  # including the setsid helper
+    await manager.close()
+
+
+def test_the_agents_own_process_and_group_are_never_signalled() -> None:
+    me = psutil.Process()
+    record = {"pid": 999_999, "pgid": 999_999, "started_at": 1.0, "cmd_sha256": "sha256:" + "0" * 64,
+              "family": [{"pid": me.pid, "ct": me.create_time()}]}
+    assert procs.collect(record, None) == []
+    assert procs.stop_worker(record, None, grace_s=0.1) == []
+    with pytest.raises(AssertionError):
+        procs.collect(record, me)  # a "leader" in the agent's own group
 
 
 @pytest.mark.asyncio
@@ -277,8 +344,29 @@ async def test_agent_restart_marks_a_dead_worker_failed(env) -> None:
     await second.close()
 
 
+BAD_RECORDS = {
+    "started_at_text": {"started_at": "x"},
+    "started_at_list": {"started_at": [1]},
+    "started_at_dict": {"started_at": {"a": 1}},
+    "started_at_none": {"started_at": None},
+    "started_at_nan": {"started_at": float("nan")},
+    "pid_text": {"pid": "123"},
+    "pid_bool": {"pid": True},
+    "pid_one": {"pid": 1, "pgid": 1},
+    "pid_negative": {"pid": -5, "pgid": -5},
+    "pid_huge": {"pid": 1 << 40, "pgid": 1 << 40},
+    "pgid_other": {"pgid": 1},
+    "cmd_hash_bad": {"cmd_sha256": 5},
+    "family_not_list": {"family": "x"},
+    "family_bad_entry": {"family": [{"pid": "x", "ct": 1}]},
+    "family_huge": {"family": [{"pid": 2, "ct": 1.0}] * 5000},
+    "runtime_root_relative": {"runtime_root": "rel"},
+    "port_text": {"port": "80"},
+}
+
+
 @pytest.mark.asyncio
-async def test_root_stop_ends_verified_workers_only(tmp_path: Path, env) -> None:
+async def test_root_stop_ends_verified_workers_and_skips_every_forged_record(tmp_path: Path, env) -> None:
     _paths, models, snap = env
     layout = ds.Layout(tmp_path / "root")
     paths = NativePaths(layout.state_dir / "native")
@@ -292,18 +380,58 @@ async def test_root_stop_ends_verified_workers_only(tmp_path: Path, env) -> None
     assert (await _settle(manager))["state"] == "ready"
     kids = _kids(paths, port)
     await manager.close()
-    # A forged record naming a process that is not a worker (this test).
     me = psutil.Process()
-    (paths.workers / "forged.json").write_text(json.dumps({
-        "deployment_id": "forged", "state": "ready", "pid": me.pid, "pgid": me.pid,
-        "started_at": me.create_time(), "cmd_sha256": "sha256:" + "2" * 64,
+    good = json.loads(paths.worker_record("dep-1").read_text())
+    workers_dir = paths.workers
+    # Forged: names sorting before the real one, so they are read first.
+    for name, change in BAD_RECORDS.items():
+        (workers_dir / f"a-{name}.json").write_text(json.dumps({**good, "deployment_id": f"a-{name}", **change}))
+    (workers_dir / "a-not-json.json").write_text("{nope")
+    (workers_dir / "a-array.json").write_text("[1, 2]")
+    (workers_dir / "a-deep.json").write_text("[" * 100_000 + "]" * 100_000)
+    (workers_dir / "a-self.json").write_text(json.dumps({
+        **good, "deployment_id": "a-self", "pid": me.pid, "pgid": me.pid, "started_at": me.create_time(),
     }))
+    (workers_dir / "a-\x1b[31mred.json").write_text(json.dumps({**good, "state": "ready", "started_at": "x"}))
+    os.symlink(paths.worker_record("dep-1"), workers_dir / "a-symlink.json")
+    os.link(paths.worker_record("dep-1"), tmp_path / "hardlink-of-dep-1")  # dep-1 itself now has 2 links
+    os.mkfifo(workers_dir / "a-fifo.json")
+
     said: list[str] = []
     left = ds.stop_native_workers(layout, os.getuid(), say=said.append, grace_s=1)
     assert left == []
-    assert _gone([started["pid"], *kids])
     assert me.is_running()
+    # dep-1 has two links now: root refuses to read it (a hardlink could be anything).
+    assert not _gone([started["pid"]])
+    assert any("a-started_at_text" in s and "Skipped" in s for s in said)
+    assert not any("\x1b" in s for s in said)  # no terminal escapes reach root's terminal
+    (tmp_path / "hardlink-of-dep-1").unlink()
+
+    said.clear()
+    assert ds.stop_native_workers(layout, os.getuid(), say=said.append, grace_s=1) == []
+    assert _gone([started["pid"], *kids])
     assert any("Stopped the model worker dep-1" in s for s in said)
+    assert me.is_running()
+
+
+def test_root_reads_nothing_through_a_symlinked_native_dir(tmp_path: Path) -> None:
+    layout = ds.Layout(tmp_path / "root")
+    layout.state_dir.mkdir(parents=True)
+    elsewhere = tmp_path / "elsewhere" / "workers"
+    elsewhere.mkdir(parents=True)
+    (elsewhere / "x.json").write_text(json.dumps({"state": "ready", "pid": os.getpid()}))
+    os.symlink(tmp_path / "elsewhere", layout.state_dir / "native")
+    said: list[str] = []
+    assert ds._worker_records(layout, os.getuid(), say=said.append) == []
+
+
+def test_a_record_of_another_owner_is_not_read(tmp_path: Path) -> None:
+    from faden_agent.native.common import read_json_nofollow
+
+    path = tmp_path / "r.json"
+    path.write_text("{}")
+    assert read_json_nofollow(path, owner=os.getuid()) == {}
+    assert read_json_nofollow(path, owner=os.getuid() + 1) is None
 
 
 @pytest.mark.parametrize(
@@ -318,6 +446,8 @@ async def test_root_stop_ends_verified_workers_only(tmp_path: Path, env) -> None
         ({"extra_args": ["--dtype", "$(id)"]}, "not allowed"),
         ({"env": {"HF_TOKEN": "x"}}, "not allowed"),
         ({"env": {"VLLM_API_KEY": "x"}}, "not allowed"),
+        ({"env": {"VLLM_PLUGINS": "evil"}}, "not allowed"),
+        ({"env": {"VLLM_LOGGING_LEVEL": "/etc/passwd"}}, "not allowed"),
         ({"deployment_id": "../etc"}, "deployment_id"),
         ({"served_model_name": "a b"}, "served_model_name"),
         ({"model": {"name": "m", "snapshot_path": "relative/path"}}, "absolute"),
@@ -389,3 +519,41 @@ def test_ready_timeout_scales_with_model_size() -> None:
     assert workers.ready_timeout(600 << 20) == 300
     assert workers.ready_timeout(40 << 30) == 3600
     assert 300 < workers.ready_timeout(5 << 30) < 3600
+
+
+@pytest.mark.asyncio
+async def test_the_sandboxed_worker_cannot_read_or_write_the_agents_state(env) -> None:
+    paths, models, snap = env
+    if not (await _sandbox_ok()):
+        pytest.skip("sandbox-exec not available")
+    state = paths.root.parent / "state.json"
+    state.write_text('{"credential": "the-node-credential"}')
+    for sandbox, port in ((True, _free_port()), (False, _free_port())):
+        manager = _manager(paths, models, sandbox=sandbox)
+        await manager.start_native_worker(_payload(snap, port))
+        assert (await _settle(manager))["state"] == "ready"
+        probe = json.loads((paths.home / f"probe-{port}.json").read_text())
+        record = json.loads(paths.worker_record("dep-1").read_text())
+        await manager.stop_native_worker({"deployment_id": "dep-1", "grace_s": 1})
+        await manager.close()
+        if sandbox:
+            assert record["sandboxed"] is True and record["argv"][0] == "/usr/bin/sandbox-exec"
+            assert probe["read"].startswith("denied") and probe["write"].startswith("denied")
+            assert not (paths.root.parent / "planted").exists()
+        else:  # the test can tell: without the sandbox the same worker reads it
+            assert "the-node-credential" in probe["read"]
+
+
+async def _sandbox_ok() -> bool:
+    from faden_agent.native import sandbox
+
+    return sys.platform == "darwin" and sandbox.available()
+
+
+def test_a_program_from_the_runtime_alone_is_not_the_worker() -> None:
+    # This pytest runs a Python from the agent's venv: "exe inside runtime_root" holds,
+    # but it serves nothing on the recorded port, so it is not adopted or signalled.
+    me = psutil.Process()
+    record = {"pid": me.pid, "pgid": me.pid, "started_at": me.create_time(), "cmd_sha256": "sha256:" + "0" * 64,
+              "runtime_root": os.path.dirname(os.path.dirname(os.path.realpath(me.exe()))), "port": 38999}
+    assert procs.matching(record) is None

@@ -30,6 +30,7 @@ import httpx
 import psutil
 
 from faden_agent.native import proc as procs
+from faden_agent.native import sandbox as sandboxing
 from faden_agent.native import stage as staging
 from faden_agent.native import worker as workers
 from faden_agent.native.common import (
@@ -80,6 +81,8 @@ class NativeRuntimeManager:
         on_capabilities: Callable[[dict[str, Any]], None] | None = None,
         poll_interval: float = 2.0,
         probe_metal: bool = True,
+        sandbox: bool = True,
+        sandbox_deny: list[Path] | None = None,
     ) -> None:
         self.paths = paths
         self._fetch_tar = fetch_tar
@@ -88,6 +91,12 @@ class NativeRuntimeManager:
         self._on_capabilities = on_capabilities
         self._poll = poll_interval
         self._probe_metal = probe_metal
+        #: Run the worker under sandbox-exec (native/sandbox.py), denying it the
+        #: agent's state (credential, env file, model-TLS key). On by default.
+        self._sandbox = sandbox and sandboxing.available()
+        self._sandbox_deny = list(sandbox_deny) if sandbox_deny is not None else [
+            paths.root.parent, Path("/Library/Fadenstack"),
+        ]
         self._handles: dict[str, _Handle] = {}
         self._lock = asyncio.Lock()
         self._stage_locks: dict[str, asyncio.Lock] = {}
@@ -109,6 +118,9 @@ class NativeRuntimeManager:
             record = read_json_nofollow(path)
             if record and record.get("deployment_id") == path.stem:
                 out.append(record)
+            else:
+                # Written atomically, so this is not a crash mid-write: say so loudly.
+                log.error("Native worker record %s is unreadable or not this deployment's; ignoring it", path)
         return out
 
     # ── capabilities ──────────────────────────────────────────────
@@ -292,6 +304,12 @@ class NativeRuntimeManager:
                 raise NativeError(f"runtime {runtime} has no valid staged stamp", code="not_staged")
             venv = runtime / "runtime" / "venv"
             argv = workers.argv(spec, venv)
+            if self._sandbox:
+                argv = sandboxing.wrap(argv, sandboxing.profile(
+                    denied=self._sandbox_deny,
+                    readable=[runtime, self._model_root],
+                    writable=[self.paths.home, self.paths.tmp(spec.deployment_id)],
+                ))
             env = workers.environment(spec, self.paths, venv)
             ensure_private_dir(self.paths.tmp(spec.deployment_id))
             ensure_private_dir(self.paths.home / "hf")
@@ -301,7 +319,8 @@ class NativeRuntimeManager:
             fd = os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
             try:
                 os.write(fd, f"faden: starting {spec.deployment_id} generation {spec.generation}: "
-                             f"{' '.join(argv[4:])}\n".encode())
+                             f"{' '.join(workers.vllm_args(spec, venv))}"
+                             f"{' (sandboxed)' if self._sandbox else ''}\n".encode())
                 popen = subprocess.Popen(  # noqa: S603 - argv list, no shell interpolation
                     argv, stdin=subprocess.DEVNULL, stdout=fd, stderr=subprocess.STDOUT, env=env,
                     cwd=str(self.paths.tmp(spec.deployment_id)), start_new_session=True, close_fds=True,
@@ -322,6 +341,7 @@ class NativeRuntimeManager:
                 "pgid": popen.pid,
                 "started_at": created,
                 "argv": argv,
+                "sandboxed": self._sandbox,
                 "cmd_sha256": procs.cmd_hash(argv),
                 "env_sha256": _env_hash(spec.env),
                 "port": spec.port,
@@ -381,12 +401,19 @@ class NativeRuntimeManager:
                 code = handle.popen.poll() if handle.popen is not None else None
                 record.update(state="failed", exit_code=code,
                               last_error=workers.last_error(log_path) or f"the worker exited (code {code})")
-                # Its children may outlive it.
-                await asyncio.to_thread(procs.stop_tree, None, record.get("pgid"), grace_s=self.cleanup_grace_s / 2,
-                                        not_before=float(record.get("started_at") or 0))
+                # Its children may outlive it: the recorded ones are still found.
+                await asyncio.to_thread(procs.stop_worker, record, None, grace_s=self.cleanup_grace_s / 2)
                 self._save(record)
                 log.warning("Native worker %s exited: %s", deployment_id, record["last_error"])
                 return
+            leader = self._leader(record)
+            family = procs.family_of(leader) if leader is not None else []
+            if family and family != record.get("family"):
+                # Kept so a descendant that leaves the group (setsid) is still stopped.
+                known = {e["pid"]: e for e in record.get("family") or []}
+                known.update({e["pid"]: e for e in family})
+                record["family"] = sorted(known.values(), key=lambda e: e["pid"])[-procs.MAX_FAMILY:]
+                self._save(record)
             if record["state"] == "starting":
                 if await self._probe_ready(int(record["port"]), record["served_model_name"]):
                     record.update(state="ready", ready_at=time.time())
@@ -394,9 +421,11 @@ class NativeRuntimeManager:
                     log.info("Native worker %s is ready", deployment_id)
                 elif time.time() - float(record["started_at"]) > float(record.get("timeout_s") or 300):
                     tail = workers.last_error(log_path)
-                    await self._stop_record(record, grace_s=self.cleanup_grace_s)
-                    record.update(state="failed", stopped_at=time.time(),
+                    record.update(state="failed",
                                   last_error=f"not ready after {record['timeout_s']} s" + (f": {tail}" if tail else ""))
+                    self._save(record)  # before stopping: a status asked meanwhile says why
+                    await self._stop_record(record, grace_s=self.cleanup_grace_s)
+                    record.update(stopped_at=time.time())
                     self._save(record)
                     return
             workers.rotate_if_big(log_path)
@@ -412,15 +441,22 @@ class NativeRuntimeManager:
         if record.get("state") in LIVE and deployment_id not in self._handles:
             out["state"] = "failed"  # nothing watches it: the agent never adopted it
             out["last_error"] = "the worker is not tracked by this agent"
+        elif record.get("state") in LIVE and self._leader(record) is None:
+            # Between two watcher passes: say it now; the watcher records it.
+            handle = self._handles.get(deployment_id)
+            out["state"] = "failed"
+            out["exit_code"] = handle.popen.poll() if handle is not None and handle.popen is not None else None
+            out["last_error"] = workers.last_error(Path(record["log_path"])) or "the worker exited"
         return out
 
     async def _stop_record(self, record: dict[str, Any], *, grace_s: float) -> list[int]:
         handle = self._handles.get(record["deployment_id"])
         popen = handle.popen if handle is not None and handle.popen is not None and handle.popen.pid == record.get("pid") else None
-        pid = record.get("pid") if (popen is not None or procs.matching(record) is not None) else None
+        leader = self._leader(record)
+        if leader is not None:
+            record["family"] = procs.family_of(leader) + list(record.get("family") or [])
         return await asyncio.to_thread(
-            procs.stop_tree, pid, record.get("pgid"), grace_s=grace_s,
-            not_before=float(record.get("started_at") or 0),
+            procs.stop_worker, record, leader, grace_s=grace_s,
             reap=(lambda: popen.poll()) if popen is not None else None,
         )
 
@@ -474,10 +510,13 @@ class NativeRuntimeManager:
                 adopted.append(deployment_id)
                 log.info("Adopted native worker %s (pid %s)", deployment_id, record.get("pid"))
                 continue
-            left = await asyncio.to_thread(
-                procs.stop_tree, None, record.get("pgid"), grace_s=self.cleanup_grace_s,
-                not_before=float(record.get("started_at") or 0), uid=os.getuid(),
-            )
+            try:
+                left = await asyncio.to_thread(
+                    procs.stop_worker, record, None, grace_s=self.cleanup_grace_s, uid=os.getuid(),
+                )
+            except procs.BadRecord as exc:
+                log.error("Native worker record %s is malformed (%s); nothing signalled", deployment_id, exc)
+                left = []
             record.update(state="failed", stopped_at=time.time(),
                           last_error="the agent restarted and the worker was gone or not the recorded process"
                           + (f"; {left} survived" if left else ""))

@@ -31,6 +31,22 @@ FAKE_VLLM = textwrap.dedent(
     home = os.environ["HOME"]
     with open(os.path.join(home, f"env-{port}.json"), "w") as fh:
         json.dump(dict(os.environ), fh)
+    # What a hostile worker would try: the agent's state beside the native root.
+    state = os.path.join(home, "..", "..", "state.json")
+    probe = {}
+    try:
+        with open(state) as fh:
+            probe["read"] = fh.read()
+    except OSError as exc:
+        probe["read"] = f"denied: {exc.strerror}"
+    try:
+        with open(os.path.join(home, "..", "..", "planted"), "w") as fh:
+            fh.write("x")
+        probe["write"] = "written"
+    except OSError as exc:
+        probe["write"] = f"denied: {exc.strerror}"
+    with open(os.path.join(home, f"probe-{port}.json"), "w") as fh:
+        json.dump(probe, fh)
     print("INFO fake vllm starting", flush=True)
     if mode == "exit":
         print("ValueError: boom, no Metal device", flush=True)
@@ -40,6 +56,10 @@ FAKE_VLLM = textwrap.dedent(
                           "import signal, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(600)"]),
         subprocess.Popen([sys.executable, "-c", "import time; time.sleep(600)"]),
     ]
+    if os.environ.get("VLLM_FAKE_SETSID") == "1":
+        # A helper in a session of its own: neither in the group nor, once
+        # the leader dies, a descendant.
+        kids.append(subprocess.Popen([sys.executable, "-c", "import time; time.sleep(600)"], start_new_session=True))
     with open(os.path.join(home, f"kids-{port}.txt"), "w") as fh:
         fh.write(" ".join(str(k.pid) for k in kids))
     if mode == "never":
