@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import json
 import logging
 
@@ -60,7 +61,7 @@ class AppleMetalCollector:
             devices.append(
                 GpuDevice(
                     memory_total_mib=vram_mib,
-                    memory_used_mib=0,  # not directly available
+                    memory_used_mib=0,  # set below from the system's available memory
                     utilization_pct=None,
                     temperature_c=None,
                     vendor="apple",
@@ -72,13 +73,30 @@ class AppleMetalCollector:
             return GpuSnapshot()
 
         total_vram = sum(d.memory_total_mib for d in devices) * 1024 * 1024
+        # Unified memory: what the GPU can still take is what the system has
+        # available (free + inactive pages), not the total -- free == total
+        # told the scheduler a Mac running a 40 GB model was empty.
+        free = self._available_bytes(total_vram)
+        used = total_vram - free
+        devices = [
+            dataclasses.replace(d, memory_used_mib=min(d.memory_total_mib, used // (1024 * 1024))) for d in devices
+        ]
         return GpuSnapshot(
             count=len(devices),
             devices=devices,
             total_vram_bytes=total_vram,
-            used_vram_bytes=0,
-            free_vram_bytes=total_vram,
+            used_vram_bytes=used,
+            free_vram_bytes=free,
         )
+
+    @staticmethod
+    def _available_bytes(total: int) -> int:
+        try:
+            available = int(psutil.virtual_memory().available)
+        except Exception:  # noqa: BLE001 - unknown is reported as nothing free
+            log.debug("virtual_memory() failed", exc_info=True)
+            return 0
+        return max(0, min(available, total))
 
     async def device_count(self) -> int:
         snap = await self.snapshot()
