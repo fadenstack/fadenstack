@@ -3934,6 +3934,7 @@
       "fit": "Enough for the model and a working context cache.",
       "shared_gpu": "A small model: it leaves the rest of the card for other models.",
       "recurrent_state": "A hybrid model keeps a state for every conversation it runs at once; this many fit in the memory planned.",
+      "mac_prefix_caching_off": "Prefix caching stays off on a Mac.",
       "embedding_model": "An embedding model: served at /v1/embeddings.",
       "embedding_from_causal_lm": "A chat architecture used for embeddings: vLLM adapts it.",
       "needs_remote_code": "This model ships its own code to load.",
