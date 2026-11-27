@@ -719,6 +719,23 @@ async def test_an_offline_mac_degrades_its_environment_and_its_serving_models(
 
 
 
+async def test_a_failed_workers_log_tail_is_returned_and_a_failed_answer_is_explained(
+    dbsession: AsyncSession, script: Script,
+) -> None:
+    env, _mac = await _ready_environment(dbsession)
+    dep = await _deployment(dbsession, env)
+    driver = registry.get("standalone")()
+    script.status = {"ok": True, "lines": ["faden: starting", "zmq.error.ZMQError: ipc path too long"], "cursor": "9"}
+    page = await driver.logs(dbsession, dep, source="engine", node_control=object())
+    assert [line.message for line in page.lines][-1].startswith("zmq.error.ZMQError")
+    assert page.next_cursor == "9"
+    assert script.asked[-1][1] == "native_worker_logs"
+
+    script.status = {"ok": False, "error": "no such deployment"}
+    page = await driver.logs(dbsession, dep, source="engine", node_control=object())
+    assert page.lines == [] and "no such deployment" in page.detail
+
+
 # ── a delete on a Mac that is gone for good (round-2 review) ─────────────
 
 

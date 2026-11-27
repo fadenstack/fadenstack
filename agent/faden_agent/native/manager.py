@@ -48,6 +48,7 @@ log = logging.getLogger(__name__)
 
 #: The model store M syncs into; snapshot paths must resolve inside it.
 MODEL_STORE_ROOT = Path("/var/db/fadenstack/agent/models")
+IPC_PATH_MAX = 103  # sizeof(sockaddr_un.sun_path) - 1 on macOS
 RECORD_VERSION = 1
 LIVE = ("starting", "ready")
 _HEADROOM = 1 << 30
@@ -362,6 +363,11 @@ class NativeRuntimeManager:
             if stamp is None:
                 raise NativeError(f"runtime {runtime} has no valid staged stamp", code="not_staged")
             venv = runtime / "runtime" / "venv"
+            if self.paths.ipc_path_length(spec.deployment_id) > IPC_PATH_MAX:
+                raise NativeError(
+                    f"the state directory is too long: the worker's IPC socket path would be "
+                    f"{self.paths.ipc_path_length(spec.deployment_id)} characters (limit {IPC_PATH_MAX}); "
+                    f"use a shorter state directory than {self.paths.root}", code="state_dir_too_long")
             argv = workers.argv(spec, venv)
             if self._sandbox:
                 argv = sandboxing.wrap(argv, sandboxing.profile(

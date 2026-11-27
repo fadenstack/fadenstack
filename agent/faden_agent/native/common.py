@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -146,7 +147,12 @@ class NativePaths:
         return self.root / "home"
 
     def tmp(self, deployment_id: str) -> Path:
-        return self.root / "tmp" / deployment_id
+        """The worker's TMPDIR and ZMQ IPC directory. Kept SHORT: vLLM puts a 36-character uuid socket in it
+        and a unix socket path may be at most 103 bytes on macOS (sockaddr_un.sun_path)."""
+        return self.root / "t" / hashlib.sha256(deployment_id.encode()).hexdigest()[:12]
+
+    def ipc_path_length(self, deployment_id: str) -> int:
+        return len(str(self.tmp(deployment_id))) + 1 + 36
 
     def bundle_dir(self, bundle_id: str) -> Path:
         return self.runtimes / bundle_id

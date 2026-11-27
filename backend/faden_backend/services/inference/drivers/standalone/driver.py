@@ -67,6 +67,9 @@ class StandaloneDriver:
         )
         if answer is None:
             return LogPage(source=source, node_id=str(node.id), detail="The machine did not answer in time.")
+        if answer.get("ok") is False:
+            return LogPage(source=source, node_id=str(node.id),
+                           detail=f"The machine could not read the engine's log: {answer.get('error') or 'unknown error'}")
         lines = [
             LogLine(message=str(line), host=node.host, source="engine")
             for line in (answer.get("lines") or [])
