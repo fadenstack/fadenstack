@@ -4,18 +4,22 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import getpass
 import logging
 import os
 import platform
 import re
 import shutil
+import signal
 import socket
 import subprocess
 import sys
 import tempfile
 import time
+from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 import psutil
 
@@ -129,10 +133,57 @@ async def _run(note: tuple[int, str] | None = None) -> None:
 
     service = NodeAgentService(config)
     try:
-        await service.run_forever()
+        await _run_until_stopped(service)
     finally:
-        await service.close()
+        try:
+            await asyncio.wait_for(service.close(), timeout=5)
+        except Exception as exc:  # noqa: BLE001 - exiting regardless
+            logging.getLogger("faden_agent").warning("Stopping: cleanup did not finish: %s", exc)
         lock.release()
+
+
+#: How long a stop may spend closing the node stream; launchd allows 45 s
+#: (ExitTimeOut) and systemd 90 s, and the network may already be gone.
+_STOP_CLOSE_TIMEOUT_SEC = 3.0
+
+
+async def _run_until_stopped(service: Any, *, signals: Sequence[int] | None = None) -> None:
+    """Run the agent until it ends, or until SIGTERM/SIGINT asks it to stop.
+
+    On a signal the node stream is closed with 1001 (going away), within
+    ``_STOP_CLOSE_TIMEOUT_SEC``, the agent's tasks are cancelled, and the
+    process exits 0. Killed outright, the agent left the backend holding a
+    half-open session until its keepalive gave up on it.
+    """
+    loop = asyncio.get_running_loop()
+    stop = asyncio.Event()
+    installed: list[int] = []
+    for sig in signals if signals is not None else (signal.SIGTERM, signal.SIGINT):
+        try:
+            loop.add_signal_handler(sig, stop.set)
+            installed.append(sig)
+        except (NotImplementedError, RuntimeError, ValueError):
+            pass  # Windows: no loop signal handlers; the default behaviour stays.
+    runner = asyncio.create_task(service.run_forever(), name="agent")
+    stopper = asyncio.create_task(stop.wait(), name="stop")
+    try:
+        await asyncio.wait({runner, stopper}, return_when=asyncio.FIRST_COMPLETED)
+        if stop.is_set():
+            why = await service.stop(timeout=_STOP_CLOSE_TIMEOUT_SEC)
+            agent_log = logging.getLogger("faden_agent")
+            if why is None:
+                agent_log.info("Stopping: closed the node stream.")
+            else:
+                agent_log.info("Stopping: could not close the node stream: %s", why)
+            runner.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await runner
+        else:
+            runner.result()  # an error that ended the agent ends the process with it
+    finally:
+        stopper.cancel()
+        for sig in installed:
+            loop.remove_signal_handler(sig)
 
 
 # ── Helpers (shared) ──────────────────────────────────────────────
@@ -1867,8 +1918,8 @@ def _signal_agent(proc: psutil.Process, how: str) -> None:
         if _IS_WINDOWS:
             _run_cmd(["taskkill", "/F", "/PID", str(proc.pid)], check=False, quiet=True)
         else:
-            signal = "-KILL" if how == "kill" else "-TERM"
-            _run_cmd([*_sudo_prefix(), "kill", signal, str(proc.pid)], check=False, quiet=True)
+            flag = "-KILL" if how == "kill" else "-TERM"
+            _run_cmd([*_sudo_prefix(), "kill", flag, str(proc.pid)], check=False, quiet=True)
 
 
 def cmd_stop() -> None:

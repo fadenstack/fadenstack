@@ -140,6 +140,10 @@ class AgentConfig:
     #: The same directory as the container runtime's host sees it, when the
     #: agent itself runs in a container (Docker-out-of-Docker). Empty: the same.
     model_tls_host_dir: str = ""
+    #: How long an open node stream waits for the backend's ``hello_ack``
+    #: before it is closed and opened again: a stream the backend never
+    #: acknowledged is not one it reads, however healthy the socket looks.
+    hello_ack_timeout_sec: float = 30.0
 
     @classmethod
     def from_env(cls) -> AgentConfig:
@@ -203,6 +207,7 @@ class AgentConfig:
             ),
             model_tls_dir=os.getenv("FADEN_NODE_AGENT_MODEL_TLS_DIR", "").strip(),
             model_tls_host_dir=os.getenv("FADEN_NODE_AGENT_MODEL_TLS_HOST_DIR", "").strip(),
+            hello_ack_timeout_sec=float(os.getenv("FADEN_NODE_AGENT_HELLO_ACK_TIMEOUT_SEC", "30")),
         )
         if not instance.verify_tls:
             log.warning("TLS verification is disabled — connections are vulnerable to MITM.")

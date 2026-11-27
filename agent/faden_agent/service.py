@@ -36,7 +36,7 @@ from faden_agent.runtimes import detect_runtime
 from faden_agent.runtime_manager import RuntimeManager
 from faden_agent.server_trust import ServerTrust
 from faden_agent.state_store import StateStore
-from faden_agent.stream_client import StreamClient
+from faden_agent.stream_client import HelloAckTimeout, StreamClient
 
 log = logging.getLogger(__name__)
 
@@ -102,6 +102,8 @@ class NodeAgentService:
         self._trust = ServerTrust(config)
         self._client = BackendClient(config)
         self._stream: StreamClient | None = None
+        #: Set by :meth:`stop`: the stream loop then ends instead of reconnecting.
+        self._stopping = False
         self._loki: LokiClient | None = None
         # Held so the forwarders are never garbage-collected mid-run.
         self._log_tasks: list[asyncio.Task[None]] = []
@@ -344,7 +346,7 @@ class NodeAgentService:
         # Backend restarts can take 10-30 s; use a generous floor so the
         # agent doesn't burn through all retries before the backend is back.
         _AUTH_RETRY_DELAY_SEC = 15.0
-        while True:
+        while not self._stopping:
             try:
                 await self._ensure_credential(static_capabilities)
                 credential = self._state_store.state.credential
@@ -388,12 +390,18 @@ class NodeAgentService:
                         continue
                 else:
                     log.warning("Stream rejected with status=%s", status)
+            except HelloAckTimeout:
+                # Already said, as a warning, by the stream; reconnect with the backoff.
+                if self._stopping:
+                    return
             except RuntimeError as exc:
                 # Terminal errors (enrollment token consumed, no credential)
                 # should not be silently retried forever.
                 log.error("Fatal agent error: %s", exc)
                 raise
             except Exception as exc:
+                if self._stopping:
+                    return
                 log_stream_failure(exc, backoff)
                 if await self._follow_to_https():
                     backoff = self._config.reconnect_min_sec
@@ -436,6 +444,17 @@ class NodeAgentService:
         # so moving its base URL moves all of them.
         self._client.http.base_url = target
         return True
+
+    async def stop(self, *, timeout: float = 3.0) -> str | None:
+        """Stop reconnecting and close the node stream with 1001, within *timeout*.
+
+        Returns ``None`` when the stream closed (or none was open), otherwise why
+        it could not be closed. Never takes longer than about *timeout*.
+        """
+        self._stopping = True
+        if self._stream is None:
+            return None
+        return await self._stream.close_for_shutdown(timeout=timeout)
 
     async def close(self) -> None:
         """Close outbound HTTP resources, SDK attach, and flush state."""

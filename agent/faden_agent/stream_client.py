@@ -32,6 +32,13 @@ from faden_agent.tls import websockets_ssl
 
 log = logging.getLogger(__name__)
 
+
+class HelloAckTimeout(Exception):  # noqa: N818 - reads as what happened
+    """The backend opened the stream but never acknowledged it; reconnect."""
+
+    def __init__(self, timeout: float) -> None:
+        super().__init__(f"no hello_ack within {timeout:.0f} s")
+
 #: Header the agent connects with: ``v1; running=<ids>; finished=<ids>`` --
 #: the commands it is still executing, and the ones it finished last, whose
 #: result the server may not have (backend ``NodeControlService.COMMANDS_HEADER``).
@@ -106,6 +113,7 @@ class StreamClient:
             SIGNING_HEADER: SIGNING_SCHEME,
             COMMANDS_HEADER: self._commands_header(),
         }
+        self._hello_ack = asyncio.Event()
         log.info("Connecting node stream to %s", ws_url)
         async with websockets.connect(
             ws_url,
@@ -126,6 +134,7 @@ class StreamClient:
                 asyncio.create_task(self._seq_flush_loop(), name="seq_flush"),
                 asyncio.create_task(self._health_supervisor.run_forever(), name="health"),
                 asyncio.create_task(self._credential_rotation_loop(), name="cred_rotate"),
+                asyncio.create_task(self._await_hello_ack(), name="hello_ack"),
             }
             try:
                 done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
@@ -140,6 +149,46 @@ class StreamClient:
                 exc = task.exception()
                 if exc is not None:
                     raise exc
+
+    async def _await_hello_ack(self) -> None:
+        """End the connection when the backend never acknowledges it.
+
+        Live on a Mac after a reboot, a stream stayed open for seven minutes,
+        its pings answered, while the backend recorded none of its heartbeats
+        and showed the machine offline. Without the backend's ``hello_ack`` the
+        agent cannot tell such a stream from a working one, so it stops
+        waiting after ``hello_ack_timeout_sec`` and connects again.
+        """
+        timeout = float(getattr(self._config, "hello_ack_timeout_sec", 30.0) or 30.0)
+        try:
+            await asyncio.wait_for(self._hello_ack.wait(), timeout=timeout)
+        except TimeoutError:
+            log.warning(
+                "The backend did not acknowledge the node stream within %.0f s; reconnecting.", timeout,
+            )
+            raise HelloAckTimeout(timeout) from None
+
+    async def close_for_shutdown(self, *, timeout: float = 3.0) -> str | None:
+        """Close the open stream with 1001 (going away), bounded by *timeout*.
+
+        Returns ``None`` when closed (or when nothing was open), otherwise why
+        not. At shutdown the network may already be gone: the close frame is
+        queued and the wait for the other end is cut off, never the exit.
+        """
+        ws = self._ws
+        if ws is None:
+            return None
+        try:
+            ws.close_timeout = timeout
+        except AttributeError:
+            pass
+        try:
+            await asyncio.wait_for(ws.close(1001, "going away"), timeout=timeout + 1)
+        except TimeoutError:
+            return f"no answer within {timeout:.0f} s"
+        except Exception as exc:  # noqa: BLE001 - shutting down whatever the socket says
+            return f"{type(exc).__name__}: {exc}"
+        return None
 
     def _commands_header(self) -> str:
         """What the server should make of the commands it sent here, said as the agent connects.
@@ -218,6 +267,11 @@ class StreamClient:
             if payload is None:
                 continue
             msg_type = str(payload.get("type") or "").strip().lower()
+            hello_ack = getattr(self, "_hello_ack", None)
+            if msg_type == "hello_ack" and hello_ack is not None and not hello_ack.is_set():
+                hello_ack.set()
+                log.info("Node stream acknowledged by the backend (hello_ack, session %s).",
+                         payload.get("session_id") or "unknown")
             if msg_type == "hello_ack" and payload.get("signs_commands") is True and not self._state.state.commands_signed:
                 self._state.state.commands_signed = True
                 self._state.save()
