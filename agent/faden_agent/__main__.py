@@ -1580,7 +1580,7 @@ def cmd_uninstall() -> None:
         _err("Uninstall is not complete: see above. Remove what is left, then run it again.")
         sys.exit(1)
     print(f"{SERVICE_NAME} is uninstalled; its state and enrollment credential are deleted.")
-    print("  Remove this machine from Fadenstack too: Machines, the machine, Remove.")
+    print("  Remove this machine from Fadenstack too: Machines → the machine → Delete machine.")
 
 
 # -- the service without root --------------------------------------------------

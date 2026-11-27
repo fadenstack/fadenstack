@@ -231,7 +231,7 @@ def test_uninstall_reminds_to_remove_the_machine_in_the_console(
     agent_main.cmd_uninstall()
     out = capsys.readouterr().out
     assert "credential are deleted" in out
-    assert "Remove this machine from Fadenstack" in out
+    assert "Remove this machine from Fadenstack too: Machines → the machine → Delete machine." in out
 
 
 def test_uninstall_is_mac_only() -> None:
