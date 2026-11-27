@@ -53,6 +53,8 @@ import FoundVllmCard from "~/pages/admin/nodes/FoundVllmCard";
 
 import GaugeCard from "~/components/GaugeCard";
 import { DrainPlanDialog } from "../clusters/DrainPlanDialog";
+import { MacServeSection } from "~/components/macs/MacServeSection";
+import { isNativeNode } from "~/lib/driverCaps";
 
 /* ── helpers ────────────────────────────────────────────────────────────── */
 
@@ -154,6 +156,10 @@ interface Inventory {
     processor?: string;
     docker_available?: boolean;
     gpu_count?: number;
+    native_runtime?: number;
+    native_sandbox?: boolean;
+    metal?: Record<string, unknown>;
+    mac_status?: Record<string, unknown>;
   };
 }
 
@@ -524,6 +530,11 @@ export default function NodeDetailPage() {
       </Stack>
 
       {error && <Alert severity="error">{error}</Alert>}
+
+      {/* ── A Mac that can serve on its own ─────────────────────── */}
+      {isNativeNode({ ...(node.capabilities ?? {}), ...caps }) && (
+        <MacServeSection nodeId={node.id} capabilities={{ ...(node.capabilities ?? {}), ...caps }} />
+      )}
 
       {/* ── Controls ─────────────────────────────────────────────── */}
       <Stack

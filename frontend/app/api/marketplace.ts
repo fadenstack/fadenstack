@@ -13,8 +13,22 @@ export type FitStatus = "fits" | "too_large" | "unknown" | "no_accelerators";
 export type ModelTask = "chat" | "embedding" | "vision" | "images" | "other";
 export type MarketSort = "trending" | "downloads" | "likes" | "recent";
 
+/** A Mac's memory plan (CONTRACTS § C3), present when the cluster is one Mac. */
+export interface MetalPlan {
+  working_set_bytes: number;
+  unified_bytes?: number;
+  estimated: boolean;
+  reserve_bytes?: number;
+  ceiling_bytes?: number;
+  budget_bytes?: number;
+  kv_bytes?: number;
+  profile?: string;
+}
+
 export interface Fit {
   status: FitStatus;
+  max_num_seqs?: number | null;
+  metal?: MetalPlan | null;
   /** Accelerators one copy spans, or a fraction of one when it shares a card. */
   gpus_per_copy: number | null;
   tensor_parallel: number | null;
@@ -102,6 +116,8 @@ export interface MarketCluster {
   gpu_count: number;
   gpu_bytes: number | null;
   accelerator: string | null;
+  /** Set for a standalone (Mac) cluster. */
+  metal?: Partial<MetalPlan> | null;
 }
 
 export interface MarketList {
