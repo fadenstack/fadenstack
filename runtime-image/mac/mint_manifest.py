@@ -58,6 +58,8 @@ def mint(build: Path, *, status: str, channel: str) -> dict:
             "layer_digest": digests["layer_digest"],
             "rootfs_digest": rootfs_digest([digests["layer_digest"]]),
             "size_bytes": digests["size_bytes"],
+            # The decompressed layer tar (oci_pack.py): the agent's decompression cap.
+            "unpacked_size_bytes": digests["unpacked_size_bytes"],
             "interpreter": runtime["interpreter"],
             "venv": runtime.get("venv", "venv"),
             "entrypoint": runtime["entrypoint"],

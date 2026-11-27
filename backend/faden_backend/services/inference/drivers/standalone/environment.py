@@ -99,6 +99,9 @@ class StandaloneEnvironmentManager:
                 "size_bytes": spec.size_bytes,
                 "pyvenv_home_rewrite": spec.pyvenv_home_rewrite,
                 "interpreter_path": spec.interpreter.path,
+                # Only when the manifest records it: a payload for an older
+                # manifest is exactly what it was.
+                **({"unpacked_size_bytes": spec.unpacked_size_bytes} if spec.unpacked_size_bytes else {}),
             },
             timeout_sec=STAGE_TIMEOUT_SEC,
         )

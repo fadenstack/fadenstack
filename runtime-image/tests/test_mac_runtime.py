@@ -222,3 +222,27 @@ def test_the_build_installs_with_require_hashes_and_no_other_index() -> None:
     assert "--index-url https://pypi.org/simple" in script
     for banned in ("extra-index-url", "unsafe-best-match", "download.pytorch.org", "git+"):
         assert banned not in script, banned
+
+
+
+def test_the_minted_entry_records_the_unpacked_size(tmp_path: Path) -> None:
+    minter = _load("mint_manifest")
+    (tmp_path / "digests.json").write_text(json.dumps({
+        "image": "ghcr.io/fadenstack/mac-runtime-arm64:t", "manifest_digest": "sha256:" + "1" * 64,
+        "config_digest": "sha256:" + "2" * 64, "layer_digest": "sha256:" + "3" * 64,
+        "size_bytes": 10, "unpacked_size_bytes": 40,
+    }))
+    (tmp_path / "RUNTIME-MANIFEST.json").write_text(json.dumps({
+        "interpreter": {"version": "3.12.12", "abi": "cp312", "path": "python/x/bin/python3.12"},
+        "entrypoint": ["venv/bin/python"], "engines": {"vllm": "0.34.0+cpu", "vllm_metal": "0.34.0"},
+        "stack": {"python": "3.12.12"}, "patches": {"mlx_lm_fd_cap_raise_only": True},
+    }))
+    (tmp_path / "smoke.json").write_text(json.dumps({
+        "metal_available": True, "rlimit_nofile_before": [256, 1024], "rlimit_nofile_after": [256, 1024],
+    }))
+    assert minter.mint(tmp_path, status="uncertified", channel="stable")["native"]["unpacked_size_bytes"] == 40
+
+
+def test_the_shipped_entry_records_the_unpacked_size() -> None:
+    entry = json.loads((MAC.parent / "runtime-manifest-darwin-arm64-vllm-metal0.34.0.json").read_text())
+    assert entry["native"]["unpacked_size_bytes"] == 2_158_704_640

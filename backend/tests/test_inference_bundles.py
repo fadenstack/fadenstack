@@ -77,6 +77,7 @@ def test_certified_bundle_identity_matches_the_deployed_image() -> None:
             assert bundle.native.layer_digest == native["layer_digest"]
             assert bundle.native.rootfs_digest == compute_rootfs_digest([native["layer_digest"]])
             assert bundle.native.patches.mlx_lm_fd_cap_raise_only
+            assert bundle.native.unpacked_size_bytes == native.get("unpacked_size_bytes")
             assert bundle.compatibility_matrix.vllm_version == manifest["stack_components"]["vllm"]
             assert bundle.driver == "standalone"
             continue

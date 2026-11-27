@@ -11,6 +11,7 @@
     "layer_digest": "sha256:3ec621d251a5fa13ee147c7f4bab02aad94c4d9ce8bc01c9356711bfed66af10",
     "rootfs_digest": "sha256:ec889e68956f1957834152dac38e7e9548fe1370dd374e3ad07280d88ca1c1de",
     "size_bytes": 591633190,
+    "unpacked_size_bytes": 2158704640,
     "interpreter": {
       "abi": "cp312",
       "implementation": "cpython",

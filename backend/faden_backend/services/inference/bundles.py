@@ -330,6 +330,10 @@ class NativeRuntimeSpec(BaseModel):
     #: under Docker's classic and containerd stores, whose ``Id`` differ.
     rootfs_digest: str
     size_bytes: int = 0
+    #: Size of the decompressed layer tar. Optional: a manifest minted before
+    #: it existed has none. When known, the agent caps decompression at it
+    #: (plus a margin) instead of a multiple of the compressed size.
+    unpacked_size_bytes: int | None = Field(default=None, gt=0)
     interpreter: NativeInterpreter
     venv: str = "venv"
     entrypoint: list[str] = Field(default_factory=lambda: ["venv/bin/python", "-m", "vllm.entrypoints.openai.api_server"])
