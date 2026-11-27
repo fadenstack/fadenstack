@@ -447,6 +447,50 @@ class EnvironmentService:
                 environment_id=environment_id, node=node, member=member
             )
 
+    async def create_standalone(
+        self, node_id: uuid.UUID, name: str | None = None,
+    ) -> tuple[InferenceEnvironment, bool]:
+        """The standalone environment for one Mac: made if it is not there, ``(environment, created)``.
+
+        One environment per Mac, idempotent per node: asking again returns the
+        one it has. Finds or makes the ``standalone`` control plane, creates
+        the environment and adds the machine, refusing with a sentence a
+        machine whose agent cannot serve natively.
+        """
+        from faden_backend.db.dao.node_control_dao import NodeControlDAO  # noqa: PLC0415
+        from faden_backend.services.inference.drivers.standalone.admission import node_refusal  # noqa: PLC0415
+
+        node = await NodeControlDAO(self.session).get_node_by_id(node_id)
+        if node is None:
+            raise NotFoundError("node", node_id)
+        problem = node_refusal(node)
+        if problem:
+            raise ConflictError(problem)
+        planes = {cp.id: cp for cp in await self.control_plane_dao.list_all()}
+        for membership in await self.node_dao.list_for_node(node_id):
+            env = await self.dao.get(membership.environment_id)
+            plane = planes.get(env.control_plane_id) if env else None
+            if env is not None and plane is not None and plane.driver == "standalone":
+                return env, False
+            if env is not None:
+                raise ConflictError(
+                    f"This machine is already a member of {env.name}. Remove it from there first: "
+                    "a Mac serves either on its own or in a cluster, not both."
+                )
+        plane = next((cp for cp in planes.values() if cp.driver == "standalone" and cp.enabled), None)
+        if plane is None:
+            plane = await ControlPlaneService(self.session).create(
+                name="standalone", driver="standalone",
+                description="Each machine serves on its own: no cluster, no Ray.",
+            )
+        label = getattr(node, "agent_id", None) or getattr(node, "host", None) or str(node_id)[:8]
+        environment = await self.create(
+            control_plane_id=plane.id, name=(name or f"mac-{label}")[:128],
+            description=f"Serving on {label}.",
+        )
+        await self.add_node(environment.id, node_id, "head")
+        return environment, True
+
     async def _require_standalone_member(self, environment: InferenceEnvironment, node_id: uuid.UUID) -> None:
         """Refuse a second machine, or one whose agent cannot serve natively, in a standalone environment."""
         from faden_backend.db.dao.node_control_dao import NodeControlDAO  # noqa: PLC0415
