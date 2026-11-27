@@ -96,6 +96,16 @@ PLATFORMS = {
 #: The oldest macOS the agent is certified on (Apple Silicon, macOS 26 and 27).
 MIN_MACOS_MAJOR = 26
 
+#: A Mac release signed with a Developer ID also carries the binary in a
+#: notarized flat pkg (agent/macos-package.sh), pinned as ``macos-arm64-pkg``.
+#: The pkg only stages the binary, root's, at :data:`MAC_PKG_STAGED`; the
+#: install script verifies it against the binary's own pin, joins with it and
+#: removes it. Without that pin the Mac installs the bare binary, as before.
+MAC_PKG_BUILD = "macos-arm64"
+MAC_PKG_PIN = "macos-arm64-pkg"
+MAC_PKG_ID = "com.fadenstack.agent.pkg"
+MAC_PKG_STAGING = "/Library/Fadenstack/staging/"
+
 
 def _source_checkout_binary_dir() -> Path | None:
     """The agent's own build output, when this backend runs from a checkout.
@@ -427,7 +437,8 @@ if [ "$OS" = darwin ]; then
   # no per-user variant to fall back to.
   if [ "$(id -u)" -ne 0 ]; then
     echo "ERROR: on a Mac the agent installs as a system service. Run this with sudo:" >&2
-    echo "       sudo sh faden-agent.sh --join $BACKEND" >&2
+    # With the CA the console's line fetched: dropped, the rerun cannot reach an HTTPS backend.
+    echo "       sudo sh faden-agent.sh --join $BACKEND${{CA_FILE:+ --ca-file $CA_FILE}}" >&2
     exit 1
   fi
   if [ "$FORCE_USER" = 1 ] || [ "$INSTALL_PATH_SET" = 1 ]; then
@@ -475,6 +486,11 @@ PLAN=$(printf '%s' "$PLAN" | sed 's|\\\\/|/|g')
 URL=$(printf '%s' "$PLAN" | sed -n 's/.*"url"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p')
 FALLBACK=$(printf '%s' "$PLAN" | sed -n 's/.*"fallback_url"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p')
 SHA=$(printf '%s' "$PLAN" | sed -n 's/.*"sha256"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p')
+# A Mac's notarized pkg, when the release has one (each key is preceded by "_",
+# so the three patterns above never match these).
+PKG_URL=$(printf '%s' "$PLAN" | sed -n 's/.*"package_url"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p')
+PKG_SHA=$(printf '%s' "$PLAN" | sed -n 's/.*"package_sha256"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p')
+PKG_BIN=$(printf '%s' "$PLAN" | sed -n 's/.*"package_binary"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p')
 
 if [ -z "$URL" ]; then
   echo "ERROR: this backend publishes no agent build for $PLATFORM_KEY." >&2
@@ -561,6 +577,50 @@ echo "  Verified."
 # the same build. Run as root (checked above), straight from the download.
 if [ "$OS" = darwin ]; then
   chmod 0755 "$TMP/faden-agent"
+  AGENT="$TMP/faden-agent"
+  # A release signed with a Developer ID also offers the agent as a notarized
+  # pkg. Installer checks it and stages the binary, root's; the staged copy
+  # must be the very build verified above, and it is what joins. The pkg runs
+  # no scripts. When the pkg cannot be fetched, the verified download is used.
+  if [ -n "$PKG_URL" ]; then
+    case "$PKG_SHA" in
+      *[!0-9a-f]*|"")
+        echo "ERROR: this backend offers a package without a valid SHA-256. Refusing to install." >&2
+        exit 1 ;;
+    esac
+    case "${{PKG_BIN#{MAC_PKG_STAGING}}}" in
+      "$PKG_BIN"|""|*/*|*..*)
+        echo "ERROR: this backend's package stages the agent outside {MAC_PKG_STAGING}." >&2
+        echo "       Refusing to install." >&2
+        exit 1 ;;
+    esac
+    echo "  Downloading the signed package..."
+    if fetch "$TMP/agent.pkg" "$PKG_URL"; then
+      if ! PKG_HASHED=$($HASH "$TMP/agent.pkg") || [ "${{PKG_HASHED%% *}}" != "$PKG_SHA" ]; then
+        echo "ERROR: the downloaded package does not match the expected SHA-256; nothing was installed." >&2
+        exit 1
+      fi
+      # From here on, the staged copy and the package receipt go when this script does.
+      cleanup_pkg() {{
+        rm -rf "$TMP"; rm -f "$PKG_BIN"
+        rmdir {MAC_PKG_STAGING} 2>/dev/null || true
+        pkgutil --forget {MAC_PKG_ID} >/dev/null 2>&1 || true
+      }}
+      trap cleanup_pkg EXIT
+      if ! installer -pkg "$TMP/agent.pkg" -target / >/dev/null; then
+        echo "ERROR: macOS Installer refused the agent package; nothing was joined." >&2
+        exit 1
+      fi
+      if ! STAGED=$($HASH "$PKG_BIN") || [ "${{STAGED%% *}}" != "$ACTUAL" ]; then
+        echo "ERROR: the package staged another build than the one verified. Refusing to install." >&2
+        exit 1
+      fi
+      AGENT="$PKG_BIN"
+      echo "  Package verified and installed."
+    else
+      echo "  Could not reach $PKG_URL; installing the verified agent itself."
+    fi
+  fi
   set --
   if [ -n "$CA_FILE" ]; then
     set -- --ca-file "$CA_FILE"
@@ -568,9 +628,9 @@ if [ "$OS" = darwin ]; then
   if [ "$MODE" = "token" ]; then
     FADEN_NODE_AGENT_BACKEND_URL="$BACKEND" \\
     FADEN_NODE_AGENT_ENROLLMENT_TOKEN="$TOKEN" \\
-      "$TMP/faden-agent" start "$@"
+      "$AGENT" start "$@"
   else
-    "$TMP/faden-agent" join "$@" "$BACKEND"
+    "$AGENT" join "$@" "$BACKEND"
   fi
   exit 0
 fi
@@ -701,6 +761,7 @@ async def install_plan(request: Request, platform: str = "linux-x86_64") -> dict
             "fallback_url": None,
             "sha256": pinned,
             "source": "release",
+            **_mac_package(build),
         }
 
     # Both are available, and the node picks by trying: whether there is
@@ -714,6 +775,26 @@ async def install_plan(request: Request, platform: str = "linux-x86_64") -> dict
         "fallback_url": fallback_url,
         "sha256": pinned,
         "source": "release+backend",
+        **_mac_package(build),
+    }
+
+
+def _mac_package(build: str) -> dict[str, str]:
+    """The notarized pkg's fields for a Mac plan, when this core pins one; else none.
+
+    Only beside the release: a checkout's own build has no pkg, and the pkg is
+    fetched from the release alone -- a Mac that cannot reach it installs the
+    verified binary instead, as the script says.
+    """
+    if build != MAC_PKG_BUILD:
+        return {}
+    digest = pinned_digest(MAC_PKG_PIN)
+    if digest is None:
+        return {}
+    return {
+        "package_url": RELEASE_URL.format(version=AGENT_VERSION, platform=f"{build}.pkg"),
+        "package_sha256": digest,
+        "package_binary": f"{MAC_PKG_STAGING}faden-agent-{AGENT_VERSION}",
     }
 
 
