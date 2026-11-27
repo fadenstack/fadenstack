@@ -42,8 +42,9 @@ async def _get(client: AsyncClient, ref: str) -> int:
 
 @pytest.mark.anyio()
 async def test_a_catalogue_image_is_served(client: AsyncClient, served: MagicMock) -> None:
-    bundle = default_bundle_registry.list_bundles()[0]
-    assert await _get(client, bundle.container.image) == 200
+    # Every runtime of the catalogue, a Mac runtime's carrier image included.
+    for bundle in default_bundle_registry.list_bundles():
+        assert await _get(client, bundle.artifact_ref) == 200, bundle.bundle_id
 
 
 @pytest.mark.anyio()

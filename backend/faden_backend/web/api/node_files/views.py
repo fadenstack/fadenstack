@@ -630,7 +630,9 @@ async def _images_a_node_may_fetch(session: AsyncSession) -> set[str]:
     in the console. The model-TLS proxy image is matched by its repository
     (:data:`_MODEL_TLS_IMAGE_REPO`).
     """
-    refs = {b.container.image for b in default_bundle_registry.list_bundles()}
+    # A native runtime's carrier image counts too: the agent fetches it here
+    # and extracts it rather than running it (bundles.NativeRuntimeSpec).
+    refs = {b.artifact_ref for b in default_bundle_registry.list_bundles()}
     refs.update((
         settings.default_vllm_image,
         settings.default_vllm_rocm_image,

@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from faden_backend.db.models.node_control import InfraNode
 
@@ -84,6 +84,8 @@ class AcceleratorSpec(BaseModel):
     #: Lowest host driver version this bundle runs on, in the vendor's own
     #: numbering (NVIDIA display driver, ROCm, Level Zero...).
     min_driver_version: str | None = None
+    #: Accelerator features the runtime needs beyond the vendor (``metal``).
+    capabilities: list[str] = Field(default_factory=list)
 
 
 class TargetArchitecture(BaseModel):
@@ -91,9 +93,13 @@ class TargetArchitecture(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    cpu: str = "aarch64"  # or "x86_64"
+    cpu: str = "aarch64"  # or "x86_64", "arm64"
+    #: ``linux`` or ``darwin``. A darwin bundle must say so explicitly, and a
+    #: machine is matched against it only when it reports darwin itself.
     os: str = "linux"
     accelerator: AcceleratorSpec = Field(default_factory=AcceleratorSpec)
+    #: Lowest OS version the runtime runs on (``"26.0"`` for macOS 26); None: any.
+    min_os_version: str | None = None
 
 
 class ContainerMount(BaseModel):
@@ -225,9 +231,11 @@ class CompatibilityMatrix(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    ray_version: str
+    #: Required for a Ray bundle (``validate_bundle``); empty for a native one.
+    ray_version: str = ""
     vllm_version: str
-    cuda_version: str
+    #: Required for a Ray bundle; empty where there is no CUDA (Metal).
+    cuda_version: str = ""
     python_version: str | None = None
     torch_version: str | None = None
     nccl_version: str | None = None
@@ -263,6 +271,93 @@ class CertificationEvidence(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
+class NativeInterpreter(BaseModel):
+    """The Python a native runtime carries, relative to the extracted runtime root."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    implementation: str = "cpython"
+    version: str
+    abi: str
+    path: str
+
+
+class NativeEngines(BaseModel):
+    """Engine versions inside a native runtime, read off the built tree."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    vllm: str
+    vllm_metal: str | None = None
+    mlx: str | None = None
+    mlx_lm: str | None = None
+
+
+class NativePatches(BaseModel):
+    """Changes the runtime carries on top of upstream packages."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    #: ``mlx_lm/utils.py`` no longer lowers RLIMIT_NOFILE at import
+    #: (ml-explore/mlx-lm#1589): without it every vLLM-Metal process is capped
+    #: at 2048 open files. A runtime without it is not certified.
+    mlx_lm_fd_cap_raise_only: bool = False
+
+
+class NativeRuntimeSpec(BaseModel):
+    """A runtime run natively on the machine, carried in an OCI image.
+
+    The image is FROM scratch with one layer holding ``runtime/`` and no
+    entrypoint. It is fetched through the backend's ``/images/save`` and
+    extracted by the agent; nothing runs it as a container. Its config says
+    ``linux/arm64`` because Docker's classic store refuses ``os=darwin``
+    (measured 27 Nov 2026), so it is matched to a machine only through this
+    spec and its bundle's explicit darwin target, never as a container image.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: str = "python-venv"
+    #: ``name:tag`` of the carrier image.
+    oci_image: str
+    #: Registry manifest digest (what ``crane digest`` prints); the pin.
+    digest: str
+    #: Config digest: Docker's image ``Id`` under the classic store.
+    config_digest: str
+    #: Uncompressed layer diff_id: what the agent verifies after the fetch.
+    layer_digest: str
+    #: sha256 over the ordered diff_ids (``compute_rootfs_digest``): the same
+    #: under Docker's classic and containerd stores, whose ``Id`` differ.
+    rootfs_digest: str
+    size_bytes: int = 0
+    interpreter: NativeInterpreter
+    venv: str = "venv"
+    entrypoint: list[str] = Field(default_factory=lambda: ["venv/bin/python", "-m", "vllm.entrypoints.openai.api_server"])
+    engines: NativeEngines
+    patches: NativePatches = Field(default_factory=NativePatches)
+    #: ``pyvenv.cfg`` names its interpreter by absolute path; rewrite it after extracting.
+    pyvenv_home_rewrite: bool = True
+    sbom_ref: str | None = None
+
+    @field_validator("digest", "config_digest", "layer_digest", "rootfs_digest")
+    @classmethod
+    def _validate_digest(cls, value: str) -> str:
+        if not _DIGEST_RE.match(value):
+            raise ValueError(
+                f"{value!r} is not a sha256 OCI digest (expected 'sha256:' + 64 hex chars)"
+            )
+        return value
+
+    @property
+    def repository(self) -> str:
+        return self.oci_image.rsplit(":", 1)[0] if ":" in self.oci_image.rsplit("/", 1)[-1] else self.oci_image
+
+    @property
+    def tag(self) -> str:
+        last = self.oci_image.rsplit("/", 1)[-1]
+        return last.rsplit(":", 1)[1] if ":" in last else "latest"
+
+
 class RuntimeBundleManifest(BaseModel):
     """Top-level immutable runtime bundle manifest document."""
 
@@ -280,10 +375,44 @@ class RuntimeBundleManifest(BaseModel):
     #: resolved by the same rule instead of by a second mechanism.
     driver: str = "ray"
     target_architecture: TargetArchitecture = Field(default_factory=TargetArchitecture)
-    container: ContainerSpec
+    #: The image a container runtime runs (Ray bundles). Exactly one of
+    #: ``container`` and ``native`` is set.
+    container: ContainerSpec | None = None
+    #: A runtime the agent runs natively, carried in an OCI image (Mac).
+    native: NativeRuntimeSpec | None = None
     platform_tuning: PlatformTuning = Field(default_factory=PlatformTuning)
     compatibility_matrix: CompatibilityMatrix
     certification: CertificationEvidence = Field(default_factory=CertificationEvidence)
+
+    @model_validator(mode="after")
+    def _one_artifact(self) -> "RuntimeBundleManifest":
+        if (self.container is None) == (self.native is None):
+            raise ValueError(f"bundle {self.bundle_id}: exactly one of container and native is required")
+        if self.native is not None:
+            target = self.target_architecture
+            explicit = target.model_fields_set
+            accel = target.accelerator
+            if "os" not in explicit or "accelerator" not in explicit or "vendor" not in accel.model_fields_set:
+                raise ValueError(
+                    f"bundle {self.bundle_id}: a native runtime must state its target os and accelerator vendor"
+                )
+        return self
+
+    @property
+    def artifact_ref(self) -> str:
+        """The image a machine fetches for this runtime: the container, or the native carrier."""
+        if self.native is not None:
+            return self.native.oci_image
+        assert self.container is not None
+        return self.container.image
+
+    @property
+    def artifact_digest(self) -> str:
+        """The digest Docker's classic store reports as the image ``Id``."""
+        if self.native is not None:
+            return self.native.config_digest
+        assert self.container is not None
+        return self.container.digest
 
     @classmethod
     def from_runtime_manifest(
@@ -369,6 +498,64 @@ class RuntimeBundleManifest(BaseModel):
                 notes=notes,
             ),
         )
+
+
+def native_bundle_from_manifest(
+    manifest: dict[str, Any],
+    *,
+    bundle_id: str,
+    display_name: str,
+    description: str = "",
+    driver: str,
+    target_architecture: TargetArchitecture,
+    report_ref: str | None = None,
+) -> RuntimeBundleManifest:
+    """Build a native runtime's bundle entry from its minted manifest (``runtime-image/mac``)."""
+    native = manifest.get("native")
+    if not isinstance(native, dict):
+        raise BundleValidationError(f"runtime manifest {bundle_id} has no native section")
+    stack = manifest.get("stack_components") or {}
+    cert = manifest.get("certification") or {}
+    checks = cert.get("checks") or []
+    passed = sum(1 for c in checks if str(c.get("status", "")).upper() == "PASS")
+    status = str(cert.get("overall_status", "uncertified")).lower()
+    if checks and passed < len(checks) and status == "passed":
+        status = "partial"
+    spec = NativeRuntimeSpec.model_validate(native)
+    if not spec.patches.mlx_lm_fd_cap_raise_only and status == "passed":
+        # Without the patch every engine is capped at 2048 open files.
+        status = "partial"
+    return RuntimeBundleManifest(
+        bundle_id=bundle_id,
+        display_name=display_name,
+        description=description,
+        driver=driver,
+        target_architecture=target_architecture,
+        native=spec,
+        compatibility_matrix=CompatibilityMatrix(
+            vllm_version=str(stack.get("vllm") or spec.engines.vllm),
+            python_version=_opt(stack.get("python")) or spec.interpreter.version,
+            torch_version=_opt(stack.get("torch")),
+            transformers_version=_opt(stack.get("transformers")),
+            supported_fabrics=[],
+            supported_model_types=[str(t) for t in manifest.get("supported_model_types") or []],
+            supported_architectures=[str(a) for a in manifest.get("supported_architectures") or []],
+        ),
+        certification=CertificationEvidence(
+            status=status,
+            channel=str(cert.get("channel") or "stable").lower(),
+            hardware_target=_opt(cert.get("hardware_target")),
+            timestamp=_opt(cert.get("timestamp")),
+            checks_passed=passed,
+            checks_total=len(checks) or int(cert.get("checks_total", 0) or 0),
+            report_ref=report_ref,
+            notes=[
+                f"{c.get('name') or 'check'}: {c.get('status')} - {c.get('detail')}"
+                for c in checks
+                if str(c.get("status", "")).upper() != "PASS"
+            ],
+        ),
+    )
 
 
 def _opt(value: Any) -> str | None:
@@ -513,6 +700,22 @@ _FLAVORS: dict[str, dict[str, Any]] = {
             ),
         ),
     },
+    # Apple Silicon Macs: vLLM-Metal run natively by the agent, no container and
+    # no Ray (driver ``standalone``). One runtime covers every M-series GPU:
+    # MLX compiles its Metal kernels at run time. Built by
+    # runtime-image/mac/build_mac_runtime.sh; macOS 26 is the certified floor.
+    "darwin-arm64": {
+        "native": True,
+        "display_name": "Fadenstack runtime for Apple Silicon Macs (vLLM-Metal)",
+        "what": "vLLM with the Metal backend, run natively on an Apple Silicon Mac",
+        "driver": "standalone",
+        "target_architecture": TargetArchitecture(
+            cpu="arm64",
+            os="darwin",
+            min_os_version="26.0",
+            accelerator=AcceleratorSpec(vendor="apple", families=["apple-m"], capabilities=["metal"]),
+        ),
+    },
 }
 
 
@@ -533,6 +736,16 @@ def _catalogue() -> dict[str, RuntimeBundleManifest]:
             )
         if runtime_id in runtimes:
             raise BundleValidationError(f"{path.name}: runtime {runtime_id} is minted twice")
+        if flavor.get("native"):
+            flavor.pop("native")
+            runtimes[runtime_id] = native_bundle_from_manifest(
+                manifest,
+                bundle_id=runtime_id,
+                description=flavor.pop("what"),
+                report_ref=f"runtime-image/{path.name}",
+                **flavor,
+            )
+            continue
         runtimes[runtime_id] = RuntimeBundleManifest.from_runtime_manifest(
             manifest,
             bundle_id=runtime_id,
@@ -675,6 +888,34 @@ _NODE_MOUNT_POINTS: tuple[tuple[str, str, str], ...] = (
 )
 
 
+def node_os_name(caps: dict[str, Any]) -> str | None:
+    """``darwin``/``linux``/``windows`` from what the agent reported, or ``None``.
+
+    The agent reports ``platform.platform()`` as ``os``: ``macOS-26.1-arm64-arm-64bit``,
+    ``Linux-6.8.0-...``, ``Windows-11-...``.
+    """
+    text = str(caps.get("os") or "").strip().lower()
+    if text.startswith(("macos", "darwin")):
+        return "darwin"
+    if text.startswith("linux"):
+        return "linux"
+    if text.startswith("windows"):
+        return "windows"
+    return None
+
+
+def node_os_version(caps: dict[str, Any]) -> str | None:
+    """The OS version from the reported ``os`` (``macOS-26.1-arm64...`` -> ``26.1``)."""
+    parts = str(caps.get("os") or "").split("-")
+    if len(parts) >= 2 and re.match(r"^\d+(\.\d+)*$", parts[1]):
+        return parts[1]
+    return None
+
+
+def _version_tuple(text: str) -> tuple[int, ...]:
+    return tuple(int(p) for p in re.findall(r"\d+", text)[:3]) or (0,)
+
+
 class RuntimeBundleRegistry:
     """In-memory and file-backed registry for certified runtime bundles."""
 
@@ -694,18 +935,16 @@ class RuntimeBundleRegistry:
         bundle whose image reference or stack identity is empty, which would
         otherwise register as an authoritative-looking entry nothing can honour.
         """
-        if not bundle.container.image.strip():
-            raise BundleValidationError(f"bundle {bundle.bundle_id}: container.image is empty")
+        if not bundle.artifact_ref.strip():
+            what = "native.oci_image" if bundle.native is not None else "container.image"
+            raise BundleValidationError(f"bundle {bundle.bundle_id}: {what} is empty")
         matrix = bundle.compatibility_matrix
-        missing = [
-            name
-            for name, value in (
-                ("ray_version", matrix.ray_version),
-                ("vllm_version", matrix.vllm_version),
-                ("cuda_version", matrix.cuda_version),
-            )
-            if not str(value).strip()
-        ]
+        required = (
+            (("ray_version", matrix.ray_version), ("vllm_version", matrix.vllm_version), ("cuda_version", matrix.cuda_version))
+            if bundle.native is None
+            else (("vllm_version", matrix.vllm_version),)
+        )
+        missing = [name for name, value in required if not str(value).strip()]
         if missing:
             raise BundleValidationError(
                 f"bundle {bundle.bundle_id}: compatibility_matrix.{', '.join(missing)} is empty"
@@ -842,8 +1081,32 @@ class RuntimeBundleRegistry:
         gpu_info = caps.get("gpu") or {}
         gpus = gpu_info.get("devices") or []
 
-        # Check GPU vendor
-        vendor = (gpu_info.get("vendor") or caps.get("gpu_vendor") or "nvidia").lower()
+        # Operating system. Only darwin is compared: a Linux bundle has always
+        # run wherever the machine's Docker runs Linux containers, and a node
+        # that reports no OS keeps matching it as before. A darwin runtime is
+        # native, so it needs a machine that says it is darwin, and a darwin
+        # machine never gets a Linux container runtime.
+        node_os = node_os_name(caps)
+        bundle_os = bundle.target_architecture.os.lower()
+        if bundle_os == "darwin" and node_os != "darwin":
+            return False, f"Incompatible OS: bundle targets darwin, node reports {node_os or 'no OS'}"
+        if node_os == "darwin" and bundle_os != "darwin":
+            return False, f"Incompatible OS: bundle targets {bundle_os}, node is darwin"
+        minimum = bundle.target_architecture.min_os_version
+        if minimum:
+            have = node_os_version(caps)
+            if have is None or _version_tuple(have) < _version_tuple(minimum):
+                return False, (
+                    f"OS version too old: bundle needs {bundle_os} {minimum} or later, "
+                    f"node reports {have or 'no version'}"
+                )
+
+        # Check GPU vendor. A darwin bundle takes only a vendor the machine
+        # reported; the nvidia fallback is for Linux machines that predate it.
+        reported_vendor = gpu_info.get("vendor") or caps.get("gpu_vendor")
+        if bundle_os == "darwin" and not reported_vendor:
+            return False, "Incompatible GPU vendor: the machine has not reported its GPU vendor"
+        vendor = (reported_vendor or "nvidia").lower()
         if vendor != bundle.target_architecture.accelerator.vendor.lower():
             return False, (
                 f"Incompatible GPU vendor: expected "
@@ -854,7 +1117,7 @@ class RuntimeBundleRegistry:
         machine = str(caps.get("machine") or "").lower()
         expected_cpu = bundle.target_architecture.cpu.lower()
         if machine and expected_cpu:
-            aliases = {"aarch64": {"aarch64", "arm64"}, "x86_64": {"x86_64", "amd64"}}
+            aliases = {"aarch64": {"aarch64", "arm64"}, "arm64": {"aarch64", "arm64"}, "x86_64": {"x86_64", "amd64"}}
             accepted = aliases.get(expected_cpu, {expected_cpu})
             if machine not in accepted:
                 return False, (
@@ -872,6 +1135,12 @@ class RuntimeBundleRegistry:
                 return False, (
                     f"Compute capability mismatch: required {required_caps}, found {node_caps}"
                 )
+
+        # Accelerator features. Metal is every Apple GPU's API: the vendor and
+        # OS checks above already require an Apple GPU on darwin.
+        needed = {c.lower() for c in bundle.target_architecture.accelerator.capabilities}
+        if "metal" in needed and vendor != "apple":
+            return False, "Incompatible accelerator: the runtime needs Metal"
 
         return True, "Node is fully compatible with runtime bundle"
 

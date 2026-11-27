@@ -68,6 +68,19 @@ def test_certified_bundle_identity_matches_the_deployed_image() -> None:
         bundle = default_bundle_registry.get_bundle(manifest["runtime_id"])
         assert bundle is not None, manifest["runtime_id"]
 
+        if manifest.get("native"):
+            # A Mac runtime: pinned by its carrier image's identities, no Ray.
+            native = manifest["native"]
+            assert bundle.native is not None and bundle.container is None
+            assert bundle.native.oci_image == native["oci_image"]
+            assert bundle.native.digest == native["digest"]
+            assert bundle.native.layer_digest == native["layer_digest"]
+            assert bundle.native.rootfs_digest == compute_rootfs_digest([native["layer_digest"]])
+            assert bundle.native.patches.mlx_lm_fd_cap_raise_only
+            assert bundle.compatibility_matrix.vllm_version == manifest["stack_components"]["vllm"]
+            assert bundle.driver == "standalone"
+            continue
+
         assert bundle.container.image == manifest["release_tag"]
         assert bundle.container.digest == manifest["image_id"]
         if manifest.get("rootfs_layers"):
