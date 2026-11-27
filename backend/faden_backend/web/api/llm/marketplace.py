@@ -457,9 +457,15 @@ async def _check_for_mac(session: AsyncSession, body: HostBody) -> dict[str, Any
         detail = await (await _hub(session)).detail(body.repo_id.strip())
     except (HubNotFound, HubUnavailable):
         return config  # size unknown: the machine's own admission has the last word
-    chosen = fit_mod.plan(_needs(detail), cluster, context=config.get("max_model_len"))
+    asked_len = config.get("max_model_len")
+    asked_seqs = config.get("max_num_seqs")
+    needs = _needs(detail)
+    chosen = fit_mod.plan_metal(
+        needs, cluster.metal, context=int(asked_len) if asked_len else None,
+        sequences=int(asked_seqs) if asked_seqs else None,
+    )
+    info = chosen.metal or {}
     if chosen.status == "too_large":
-        info = chosen.metal or {}
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=(
@@ -468,11 +474,29 @@ async def _check_for_mac(session: AsyncSession, body: HostBody) -> dict[str, Any
                 f"{' (estimated)' if info.get('estimated') else ''}."
             ),
         )
-    if chosen.status == "fits":
-        config.setdefault("gpu_memory_utilization", chosen.suggested_gpu_memory_utilization)
-        config.setdefault("max_num_seqs", chosen.max_num_seqs)
-        if chosen.context:
-            config.setdefault("max_model_len", chosen.context)
+    if chosen.status != "fits":
+        return config
+    if asked_len and chosen.context is not None and int(asked_len) != chosen.context:
+        if needs.max_context and int(asked_len) > needs.max_context:
+            config["max_model_len"] = chosen.context  # the model's own limit: a start with more would fail
+        else:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=f"A context of {int(asked_len)} tokens does not fit this Mac; {chosen.context} does.",
+            )
+    asked_share = config.get("gpu_memory_utilization")
+    working_set = int(info.get("working_set_bytes") or 0)
+    if asked_share and working_set and float(asked_share) * working_set < (chosen.needed_bytes_per_gpu or 0):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=(
+                f"A memory share of {float(asked_share):.0%} is too little: the model needs about "
+                f"{(chosen.needed_bytes_per_gpu or 0) / 2**30:.1f} GiB of {working_set / 2**30:.1f} GiB."
+            ),
+        )
+    config.setdefault("gpu_memory_utilization", chosen.suggested_gpu_memory_utilization)
+    config.setdefault("max_num_seqs", chosen.max_num_seqs)
+    config.setdefault("max_model_len", chosen.context)
     return config
 
 

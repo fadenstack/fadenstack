@@ -109,3 +109,23 @@ def apply_fit(suggestion: dict[str, Any], fit: Any) -> dict[str, Any]:
         config["max_model_len"] = fit.context
         reasons["max_model_len"] = "memory" if "context_reduced" in (fit.notes or []) else "default_cap"
     return suggestion
+
+
+#: Flags the backend sets from the plan and the allowlist; an extension's ``extra_args`` may not repeat them.
+_POLICY_FLAGS = frozenset({
+    "--gpu-memory-utilization", "--max-model-len", "--max-num-seqs", "--max-num-batched-tokens", "--dtype",
+    "--seed", "--generation-config", "--enable-prefix-caching", "--no-enable-prefix-caching",
+    "--tool-call-parser", "--reasoning-parser", "--enable-auto-tool-choice", "--kv-cache-dtype", "--quantization",
+})
+
+
+def check_extra_args(args: Any) -> str | None:
+    """A sentence when *args* (an extension's ``extra_args``) repeats a flag the plan or the allowlist owns."""
+    for arg in args or []:
+        flag = str(arg).split("=", 1)[0]
+        if flag in _POLICY_FLAGS:
+            return (
+                f"extra_args: {flag} is set from the memory plan and the Mac allowlist; "
+                "change it in the engine settings instead."
+            )
+    return None

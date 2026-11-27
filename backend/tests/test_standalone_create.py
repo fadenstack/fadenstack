@@ -7,7 +7,10 @@ from typing import Any
 import pytest
 from httpx import AsyncClient
 from fastapi import FastAPI
-from sqlalchemy.ext.asyncio import AsyncSession
+import asyncio
+
+from sqlalchemy import delete, select
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from faden_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
 from faden_backend.services.inference.service import ConflictError, DeploymentService, EnvironmentService
@@ -91,3 +94,55 @@ async def test_a_mac_runs_one_model_at_a_time(dbsession: AsyncSession) -> None:
     await service.create(environment_id=env.id, model_id=model.id, name="first", spec=_spec())
     with pytest.raises(ConflictError, match="one model at a time"):
         await service.create(environment_id=env.id, model_id=model.id, name="second", spec=_spec())
+
+
+async def test_the_downgraded_agent_still_opens_its_environment(dbsession: AsyncSession) -> None:
+    service = EnvironmentService(dbsession)
+    mac = await _node(dbsession, MAC)
+    env, _ = await service.create_standalone(mac.id)
+    mac.capabilities_json = {k: v for k, v in MAC.items() if k != "native_runtime"}
+    await dbsession.flush()
+    again, created = await service.create_standalone(mac.id, name="another")
+    assert again.id == env.id and created is False
+
+
+async def test_two_concurrent_requests_get_the_same_environment(_engine: AsyncEngine) -> None:
+    """Real connections: the second request waits for the first and returns its environment."""
+    from faden_backend.db.models.inference import (
+        InferenceControlPlane,
+        InferenceEnvironment,
+        InferenceEnvironmentNode,
+    )
+    from faden_backend.db.models.node_control import InfraNode
+
+    maker = async_sessionmaker(_engine, expire_on_commit=False)
+    async with maker() as setup:
+        node = InfraNode(agent_id="race-mac", host="10.9.9.9", status="healthy", capabilities_json=dict(MAC))
+        setup.add(node)
+        await setup.commit()
+        node_id = node.id
+
+    async def request(name: str) -> tuple[Any, bool]:
+        async with maker() as session:
+            result = await EnvironmentService(session).create_standalone(node_id, name)
+            await session.commit()
+            return result
+
+    try:
+        (a, made_a), (b, made_b) = await asyncio.gather(request("first"), request("second"))
+        assert a.id == b.id
+        assert sorted([made_a, made_b]) == [False, True]
+        async with maker() as check:
+            envs = (await check.execute(select(InferenceEnvironmentNode).where(InferenceEnvironmentNode.node_id == node_id))).scalars().all()
+            assert len(envs) == 1
+    finally:
+        async with maker() as cleanup:
+            member_envs = [m.environment_id for m in (await cleanup.execute(
+                select(InferenceEnvironmentNode).where(InferenceEnvironmentNode.node_id == node_id))).scalars()]
+            planes = [e.control_plane_id for e in (await cleanup.execute(
+                select(InferenceEnvironment).where(InferenceEnvironment.id.in_(member_envs)))).scalars()]
+            await cleanup.execute(delete(InferenceEnvironmentNode).where(InferenceEnvironmentNode.node_id == node_id))
+            await cleanup.execute(delete(InferenceEnvironment).where(InferenceEnvironment.id.in_(member_envs)))
+            await cleanup.execute(delete(InferenceControlPlane).where(InferenceControlPlane.id.in_(planes)))
+            await cleanup.execute(delete(InfraNode).where(InfraNode.id == node_id))
+            await cleanup.commit()

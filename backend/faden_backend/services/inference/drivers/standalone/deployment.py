@@ -137,7 +137,9 @@ class StandaloneDeploymentManager:
         spec = dict(deployment.spec_json or {})
         try:
             engine = dict((spec.get("engine") or {}).get("config") or {})
-            refused = metal_policy.check(engine)
+            refused = metal_policy.check(engine) or metal_policy.check_extra_args(
+                ((spec.get("extensions") or {}).get("standalone") or {}).get("extra_args"),
+            )
             if refused:
                 raise ValueError(refused)
             fields = metal_policy.start_fields(engine)

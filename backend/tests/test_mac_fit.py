@@ -34,7 +34,7 @@ def test_the_reserve_follows_the_ram_band() -> None:
 def test_the_ceiling_is_the_lower_of_95_percent_and_what_the_reserve_leaves(unified: int, max_share: float) -> None:
     m = metal(unified)
     share = fit_mod.metal_ceiling(m["working_set_bytes"], m["unified_bytes"]) / m["working_set_bytes"]
-    assert share <= 0.95 and share == pytest.approx(min(0.95, 1 - fit_mod.metal_reserve_bytes(unified * GiB) / m["working_set_bytes"]))
+    assert share <= 0.95 and share == pytest.approx(min(0.95, 1 - fit_mod.metal_reserve_bytes(unified * GiB) / m["working_set_bytes"]), abs=1.5e-4)
     assert share <= max_share + 0.02
 
 
@@ -150,3 +150,54 @@ def test_the_default_share_stays_within_the_ceiling() -> None:
 
 def test_a_named_share_within_the_ceiling_is_kept() -> None:
     assert admission.memory_budget(node(), None, 0.5)["gpu_memory_utilization"] == 0.5
+
+
+# --- plan and admission agree --------------------------------------------------------------------
+
+def test_every_plan_that_fits_is_admitted_and_never_eats_the_reserve() -> None:
+    import itertools
+
+    checked = 0
+    for unified, weights_gib, kv, ctx, seqs in itertools.product(
+        (36, 48, 64, 96, 128, 192), (0.5, 1.2, 5, 14, 20, 30, 45), (50_000, 114_688, 147_456, 400_000),
+        (None, 4096, 16384, 32768), (None, 1, 4, 8),
+    ):
+        m = metal(unified, working_set=R64 if unified == 64 else None)
+        needs = fit_mod.ModelNeeds(weights_bytes=int(weights_gib * GiB), kv_bytes_per_token=kv, max_context=131072)
+        fit = fit_mod.plan_metal(needs, m, context=ctx, sequences=seqs)
+        if fit.status != "fits":
+            continue
+        checked += 1
+        node = SimpleNamespace(capabilities_json={"metal": {
+            "unified_memory_bytes": unified * GiB,
+            **({"recommended_max_working_set_bytes": R64} if unified == 64 else {}),
+        }})
+        share = fit.suggested_gpu_memory_utilization
+        admitted = admission.memory_budget(node, None, share)["gpu_memory_utilization"]
+        assert admitted == pytest.approx(share)
+        assert share * m["working_set_bytes"] <= m["working_set_bytes"] - fit_mod.metal_reserve_bytes(unified * GiB) + 1
+        # at least what vLLM needs to start: the weights, the overhead and one full-length sequence
+        start = needs.weights_bytes + fit_mod.OVERHEAD_BYTES + kv * fit.context
+        assert share * m["working_set_bytes"] >= start - 0.0001 * m["working_set_bytes"]
+        assert share <= 0.95
+    assert checked > 100
+
+
+def test_the_64_gib_ceiling_is_one_number_for_plan_and_admission() -> None:
+    share = fit_mod.metal_ceiling_share(R64, 64 * GiB)
+    assert share == pytest.approx(0.9228, abs=1e-4)
+    fit = fit_mod.plan_metal(fit_mod.ModelNeeds(weights_bytes=40 * GiB, kv_bytes_per_token=100_000, max_context=8192), metal(64, working_set=R64))
+    assert fit.status == "fits" and fit.suggested_gpu_memory_utilization <= share
+
+
+def test_a_context_above_the_models_own_is_planned_at_its_own() -> None:
+    needs = fit_mod.ModelNeeds(weights_bytes=GiB, kv_bytes_per_token=100_000, max_context=8192)
+    fit = fit_mod.plan_metal(needs, metal(64), context=999_999)
+    assert fit.status == "fits" and fit.context == 8192 and "context_over_model_max" in fit.notes
+
+
+def test_extension_extra_args_cannot_override_the_plan() -> None:
+    assert "set from the memory plan" in (metal_policy.check_extra_args(["--gpu-memory-utilization", "0.99"]) or "")
+    assert metal_policy.check_extra_args(["--no-enable-prefix-caching"]) is not None
+    assert metal_policy.check_extra_args(["--max-model-len=999"]) is not None
+    assert metal_policy.check_extra_args(["--some-other-flag"]) is None

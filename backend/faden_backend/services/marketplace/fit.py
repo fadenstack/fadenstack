@@ -329,13 +329,27 @@ def metal_reserve_bytes(unified_bytes: int) -> int:
     return METAL_RESERVE_BYTES[128]
 
 
+def metal_ceiling_share(working_set: int, unified_bytes: int) -> float:
+    """The most of R an engine may be given, as a fraction of R: ``min(0.95, 1 - reserve / R)``.
+
+    Floored to four decimals, the precision the share is sent with, so a plan
+    that uses it never takes more than the ceiling and so never eats the
+    reserve. Plan and admission both ask this one function.
+    """
+    if working_set <= 0:
+        return 0.0
+    unified = unified_bytes or int(working_set / 0.81)
+    share = min(METAL_MAX_UTILIZATION, 1 - metal_reserve_bytes(unified) / working_set)
+    return math.floor(max(share, 0.0) * 10_000 + 1e-9) / 10_000
+
+
 def metal_ceiling(working_set: int, unified_bytes: int) -> int:
-    """The most of R an engine may be given: ``min(0.95 R, R - reserve)``."""
-    return int(min(METAL_MAX_UTILIZATION * working_set, working_set - metal_reserve_bytes(unified_bytes)))
+    """The most of R an engine may be given, in bytes (``metal_ceiling_share x R``)."""
+    return int(metal_ceiling_share(working_set, unified_bytes) * working_set)
 
 
 def plan_metal(needs: ModelNeeds, metal: dict[str, Any], *, context: int | None = None,
-               kv_dtype_bytes: int = 2) -> Fit:
+               kv_dtype_bytes: int = 2, sequences: int | None = None) -> Fit:
     """How *needs* runs on one Mac, or why it does not (one copy, one machine).
 
     *metal* is ``{working_set_bytes, unified_bytes, estimated}``. The memory
@@ -364,8 +378,12 @@ def plan_metal(needs: ModelNeeds, metal: dict[str, Any], *, context: int | None 
     weights = int(needs.weights_bytes)
     wanted_ctx = context or min(needs.max_context or METAL_DEFAULT_CONTEXT, METAL_DEFAULT_CONTEXT)
     if needs.max_context and wanted_ctx > needs.max_context:
+        # A start with more context than the model has fails; plan for what it can do.
+        wanted_ctx = needs.max_context
         notes.append("context_over_model_max")
     seq_options = (RECURRENT_SEQUENCES,) if needs.recurrent else METAL_SEQUENCES
+    if sequences and not needs.recurrent:
+        seq_options = (int(sequences),)
 
     def need(ctx: int, seqs: int) -> int:
         state = (needs.state_bytes_per_sequence or 0) * (seqs if needs.recurrent else 0)
@@ -412,7 +430,9 @@ def plan_metal(needs: ModelNeeds, metal: dict[str, Any], *, context: int | None 
     ctx, seqs = chosen
     needed = need(ctx, seqs)
     budget = min(ceiling, math.ceil(needed * 1.1))
-    utilization = min(METAL_MAX_UTILIZATION, math.ceil(budget / working_set * 100 - 1e-9) / 100)
+    # Rounded up to four decimals but never past the ceiling (itself a multiple of 0.0001),
+    # so the share is admitted and the reserve stays whole.
+    utilization = min(math.ceil(budget / working_set * 10_000 - 1e-9) / 10_000, metal_ceiling_share(working_set, unified))
     utilization = max(utilization, MIN_UTILIZATION)
     max_context = None
     if kv_per_token:

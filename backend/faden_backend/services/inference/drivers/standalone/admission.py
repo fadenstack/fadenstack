@@ -86,16 +86,19 @@ DEFAULT_GPU_MEMORY_UTILIZATION = 0.8
 
 
 def memory_ceiling(node: Any) -> tuple[int | None, float | None]:
-    """``(bytes, fraction of R)`` an engine may use on *node*, or ``(None, None)`` before it reports."""
-    from faden_backend.services.marketplace.fit import metal_ceiling  # noqa: PLC0415
+    """``(bytes, fraction of R)`` an engine may use on *node*, or ``(None, None)`` before it reports.
+
+    The same function the plan uses (``fit.metal_ceiling_share``), so a plan
+    that says it fits is never refused here.
+    """
+    from faden_backend.services.marketplace.fit import metal_ceiling, metal_ceiling_share  # noqa: PLC0415
 
     working_set, _ = working_set_bytes(node)
     if not working_set:
         return None, None
     metal = (getattr(node, "capabilities_json", None) or {}).get("metal") or {}
     unified = int(metal.get("unified_memory_bytes") or 0) if isinstance(metal, dict) else 0
-    ceiling = metal_ceiling(working_set, unified or int(working_set / ESTIMATED_WORKING_SET_FRACTION))
-    return ceiling, ceiling / working_set
+    return metal_ceiling(working_set, unified), metal_ceiling_share(working_set, unified)
 
 
 def memory_budget(node: Any, memory: str | None, utilization: Any = None) -> dict[str, Any]:
@@ -115,7 +118,7 @@ def memory_budget(node: Any, memory: str | None, utilization: Any = None) -> dic
     requested = parse_bytes(memory)
     if utilization is None and requested is None:
         default = DEFAULT_GPU_MEMORY_UTILIZATION if ceiling_fraction is None else min(
-            DEFAULT_GPU_MEMORY_UTILIZATION, round(ceiling_fraction, 2),
+            DEFAULT_GPU_MEMORY_UTILIZATION, ceiling_fraction,
         )
         return {"gpu_memory_utilization": default, **base}
     if not working_set:
@@ -126,7 +129,7 @@ def memory_budget(node: Any, memory: str | None, utilization: Any = None) -> dic
     fraction = float(utilization) if utilization is not None else requested / working_set
     if fraction <= 0:
         raise ValueError("The memory share must be more than zero.")
-    if ceiling_fraction is not None and fraction > ceiling_fraction + 1e-6:
+    if ceiling_fraction is not None and fraction > ceiling_fraction + 1e-9:
         asked = fraction * working_set
         raise ValueError(
             f"The model asks for {asked / 2**30:.1f} GiB but this Mac's GPU can give an engine at most about "

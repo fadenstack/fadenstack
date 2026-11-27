@@ -452,20 +452,24 @@ class EnvironmentService:
     ) -> tuple[InferenceEnvironment, bool]:
         """The standalone environment for one Mac: made if it is not there, ``(environment, created)``.
 
-        One environment per Mac, idempotent per node: asking again returns the
-        one it has. Finds or makes the ``standalone`` control plane, creates
-        the environment and adds the machine, refusing with a sentence a
-        machine whose agent cannot serve natively.
+        One environment per Mac, idempotent and safe under concurrent
+        requests: they queue on a transaction-scoped advisory lock per node
+        (and one for the shared control plane), so the second finds what the
+        first made and gets the same environment whatever *name* it gave. The
+        existing environment is returned before the agent is judged, so a Mac
+        whose agent was later downgraded still opens its environment.
         """
+        from sqlalchemy import text  # noqa: PLC0415
+
         from faden_backend.db.dao.node_control_dao import NodeControlDAO  # noqa: PLC0415
         from faden_backend.services.inference.drivers.standalone.admission import node_refusal  # noqa: PLC0415
 
+        await self.session.execute(
+            text("SELECT pg_advisory_xact_lock(hashtext(:key))"), {"key": f"standalone-env:{node_id}"},
+        )
         node = await NodeControlDAO(self.session).get_node_by_id(node_id)
         if node is None:
             raise NotFoundError("node", node_id)
-        problem = node_refusal(node)
-        if problem:
-            raise ConflictError(problem)
         planes = {cp.id: cp for cp in await self.control_plane_dao.list_all()}
         for membership in await self.node_dao.list_for_node(node_id):
             env = await self.dao.get(membership.environment_id)
@@ -477,7 +481,14 @@ class EnvironmentService:
                     f"This machine is already a member of {env.name}. Remove it from there first: "
                     "a Mac serves either on its own or in a cluster, not both."
                 )
-        plane = next((cp for cp in planes.values() if cp.driver == "standalone" and cp.enabled), None)
+        problem = node_refusal(node)
+        if problem:
+            raise ConflictError(problem)
+        # The control plane is shared: its name is unique, so first-time creators take turns.
+        await self.session.execute(text("SELECT pg_advisory_xact_lock(hashtext('standalone-plane'))"))
+        plane = next(
+            (cp for cp in await self.control_plane_dao.list_all() if cp.driver == "standalone" and cp.enabled), None,
+        )
         if plane is None:
             plane = await ControlPlaneService(self.session).create(
                 name="standalone", driver="standalone",
@@ -914,7 +925,9 @@ class DeploymentService:
         engine = (spec.get("engine") or {}).get("config") or {}
         from faden_backend.services.inference.drivers.standalone import metal_policy  # noqa: PLC0415
 
-        refused = metal_policy.check(engine)
+        refused = metal_policy.check(engine) or metal_policy.check_extra_args(
+            ((spec.get("extensions") or {}).get("standalone") or {}).get("extra_args"),
+        )
         if refused:
             raise ConflictError(f"{node.agent_id or node.host} cannot run this: {refused}")
         try:
