@@ -10,7 +10,9 @@ need (``allow default``) and then takes away, by path:
   the runtime and the model store (read) and the worker's own home and tmp
   (read/write); metadata stays visible so path lookups work;
 - writing anywhere but its home, its tmp, the per-user cache under
-  ``/private/var/folders`` (Metal's shader cache) and ``/dev``.
+  ``/private/var/folders`` (Metal's shader cache) and ``/dev``;
+- signalling, inspecting or reading the arguments of any process outside
+  its own sandbox (the agent runs as the same user).
 
 The log is a file descriptor the agent opened, so it needs no path rule.
 """
@@ -41,6 +43,18 @@ def profile(
     # The last matching rule wins: general rules first, the agent's state
     # denied after them, the worker's own paths inside it allowed last.
     lines = ["(version 1)", "(allow default)"]
+    # Other processes -- the agent above all, which runs as the same user --
+    # can be neither signalled, inspected (task ports, pid info) nor have
+    # their arguments and environment read. The worker's own processes,
+    # which inherit this sandbox, can.
+    lines += [
+        "(deny signal)",
+        "(allow signal (target same-sandbox))",
+        "(deny mach-priv-task-port)",
+        "(deny process-info*)",
+        "(allow process-info* (target same-sandbox))",
+        '(deny sysctl-read (sysctl-name-prefix "kern.procargs"))',
+    ]
     lines.append("(deny file-write*)")
     lines.append('(allow file-write* (subpath "/private/var/folders") (subpath "/dev"))')
     for path in denied:

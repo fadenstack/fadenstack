@@ -910,6 +910,18 @@ def stop_native_workers(
             say(f"  The model worker {shown} still runs (pids {survivors}).")
         elif leader is not None:
             say(f"  Stopped the model worker {shown}.")
+    # Whatever a record did not name (a corrupt or missing record, a helper that
+    # detached): every process of the service user carrying a worker marker.
+    try:
+        rest = native_proc.marked(uid=uid, any_marker=True)
+        if rest:
+            survivors = native_proc.stop_processes(rest, grace_s=grace_s, uid=uid)
+            say(f"  Stopped {len(rest) - len(survivors)} more model worker process(es) found by their marker.")
+            if survivors:
+                left.append("marker")
+                say(f"  Model worker processes still run (pids {survivors}).")
+    except Exception as exc:  # noqa: BLE001 - stop and uninstall go on
+        say(f"  Could not look for unrecorded model worker processes: {exc}")
     return left
 
 

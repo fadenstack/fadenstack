@@ -16,6 +16,10 @@ number read from a file:
   creation time, refreshed by the agent), each only while it is still that
   same process -- so a helper that called ``setsid`` and outlived the
   leader is still found;
+- processes carrying the worker's environment marker
+  (``FADEN_NATIVE_WORKER=<deployment>:<generation>``, inherited by every
+  descendant), of the same user and created no earlier than the worker --
+  which finds a helper that detached between two watcher passes;
 - and the descendants of any of these.
 
 Never the agent itself nor anything in the agent's own process group.
@@ -40,6 +44,8 @@ CREATE_TOLERANCE_S = 1.0
 FAMILY_TOLERANCE_S = 0.05
 MAX_FAMILY = 512
 _HASH = re.compile(r"^sha256:[0-9a-f]{64}$")
+_MARKER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}:[A-Za-z0-9._-]{1,128}$")
+MARKER_ENV = "FADEN_NATIVE_WORKER"
 
 
 class BadRecord(ValueError):
@@ -102,6 +108,10 @@ def validate(record: Any) -> dict[str, Any]:
     family = record.get("family") or []
     if not isinstance(family, list) or len(family) > MAX_FAMILY:
         raise BadRecord("family is not a short list")
+    mark = record.get("marker")
+    if mark is not None and (not isinstance(mark, str) or not _MARKER.fullmatch(mark)):
+        raise BadRecord("marker is not <deployment>:<generation>")
+    out["marker"] = mark
     out["family"] = [
         {"pid": _int(e.get("pid") if isinstance(e, dict) else None, "family pid", 2, 1 << 31),
          "ct": _float(e.get("ct") if isinstance(e, dict) else None, "family ct")}
@@ -180,12 +190,51 @@ def family_of(leader: psutil.Process) -> list[dict[str, Any]]:
         kids = leader.children(recursive=True)
     except psutil.Error:
         return out
-    for kid in kids[:MAX_FAMILY]:
+    for kid in kids:
         try:
             out.append({"pid": kid.pid, "ct": kid.create_time()})
         except psutil.Error:
             continue
-    return sorted(out, key=lambda e: e["pid"])
+    return trim_family(out)
+
+
+def trim_family(entries: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+    """One entry per pid (the newest), at most :data:`MAX_FAMILY`, keeping the newest processes."""
+    by_pid: dict[int, dict[str, Any]] = {}
+    for entry in entries:
+        old = by_pid.get(entry["pid"])
+        if old is None or entry["ct"] >= old["ct"]:
+            by_pid[entry["pid"]] = entry
+    return sorted(by_pid.values(), key=lambda e: e["ct"])[-MAX_FAMILY:]
+
+
+def marked(
+    *, uid: int, marker: str | None = None, prefix: str | None = None, any_marker: bool = False,
+    not_before: float | None = None,
+) -> list[psutil.Process]:
+    """Processes of *uid* whose environment carries the worker marker.
+
+    The environment a process started with is readable for the same user (and
+    root) -- not for Apple's platform binaries, which a worker's Python is not.
+    """
+    me, own_group = os.getpid(), os.getpgrp()
+    out = []
+    for proc in psutil.process_iter():
+        try:
+            if proc.pid in (me, 0, 1) or _pgid(proc.pid) == own_group or proc.uids().real != uid:
+                continue
+            value = proc.environ().get(MARKER_ENV)
+            if value is None:
+                continue
+            if not (any_marker or value == marker or (prefix is not None and value.startswith(prefix))):
+                continue
+            if not_before is not None and proc.create_time() + CREATE_TOLERANCE_S < not_before:
+                continue
+        except (psutil.Error, OSError):
+            continue
+        if alive(proc):
+            out.append(proc)
+    return out
 
 
 def _pgid(pid: int) -> int | None:
@@ -225,6 +274,10 @@ def collect(record: dict[str, Any], leader: psutil.Process | None, *, uid: int |
             for proc in psutil.process_iter():
                 if proc.pid not in found and _pgid(proc.pid) == leader.pid:
                     add(proc)
+    if rec["marker"]:
+        for proc in marked(uid=os.getuid() if uid is None else uid, marker=rec["marker"],
+                           not_before=rec["started_at"]):
+            add(proc)
     for entry in rec["family"]:
         proc = _proc(entry["pid"])
         if proc is None:
@@ -248,7 +301,19 @@ def stop_worker(
     sleep: Callable[[float], None] = time.sleep,
 ) -> list[int]:
     """SIGTERM, wait *grace_s*, SIGKILL; returns the pids still alive afterwards (``[]`` = gone)."""
-    procs = collect(record, leader, uid=uid)
+    return stop_processes(collect(record, leader, uid=uid), grace_s=grace_s, uid=uid, reap=reap, sleep=sleep)
+
+
+def stop_processes(
+    procs: list[psutil.Process],
+    *,
+    grace_s: float,
+    uid: int | None = None,
+    reap: Callable[[], None] | None = None,
+    sleep: Callable[[float], None] = time.sleep,
+) -> list[int]:
+    """End verified *procs* and the children they have meanwhile; never the agent or its group."""
+    procs = list(procs)
     me, own_group = os.getpid(), os.getpgrp()
 
     def signal_all(sig: int) -> None:

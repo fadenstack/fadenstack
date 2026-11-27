@@ -45,6 +45,11 @@ FAKE_VLLM = textwrap.dedent(
         probe["write"] = "written"
     except OSError as exc:
         probe["write"] = f"denied: {exc.strerror}"
+    try:  # the agent, our parent, runs as the same user
+        os.kill(os.getppid(), 0)
+        probe["signal_agent"] = "ok"
+    except OSError as exc:
+        probe["signal_agent"] = f"denied: {exc.strerror}"
     with open(os.path.join(home, f"probe-{port}.json"), "w") as fh:
         json.dump(probe, fh)
     print("INFO fake vllm starting", flush=True)
@@ -60,6 +65,17 @@ FAKE_VLLM = textwrap.dedent(
         # A helper in a session of its own: neither in the group nor, once
         # the leader dies, a descendant.
         kids.append(subprocess.Popen([sys.executable, "-c", "import time; time.sleep(600)"], start_new_session=True))
+    if os.environ.get("VLLM_FAKE_SETSID") == "late":
+        # Waits for the leader to die, then detaches a helper into a session of its own
+        # and exits: the helper was never a descendant any watcher pass could see.
+        late = os.path.join(home, f"late-{port}.txt")
+        kids.append(subprocess.Popen([sys.executable, "-c", (
+            "import os, subprocess, sys, time\\n"
+            "parent = os.getppid()\\n"
+            "while os.getppid() == parent: time.sleep(0.02)\\n"
+            "h = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(600)'], start_new_session=True)\\n"
+            f"open({late!r}, 'w').write(str(h.pid))\\n"
+        )]))
     with open(os.path.join(home, f"kids-{port}.txt"), "w") as fh:
         fh.write(" ".join(str(k.pid) for k in kids))
     if mode == "never":

@@ -230,9 +230,18 @@ def environment(spec: WorkerSpec, paths: NativePaths, venv: Path) -> dict[str, s
         "DO_NOT_TRACK": "1",
         "PYTHONUNBUFFERED": "1",
         "PYTHONNOUSERSITE": "1",
+        # Inherited by every descendant, detached or not: how a stop finds them.
+        MARKER_ENV: marker(spec.deployment_id, spec.generation),
     }
     env.update(spec.env)
     return env
+
+
+MARKER_ENV = "FADEN_NATIVE_WORKER"
+
+
+def marker(deployment_id: str, generation: int | str) -> str:
+    return f"{deployment_id}:{generation}"
 
 
 def probe_env(paths: NativePaths, venv: Path) -> dict[str, str]:

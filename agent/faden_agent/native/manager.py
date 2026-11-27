@@ -93,11 +93,17 @@ class NativeRuntimeManager:
         self._probe_metal = probe_metal
         #: Run the worker under sandbox-exec (native/sandbox.py), denying it the
         #: agent's state (credential, env file, model-TLS key). On by default.
-        self._sandbox = sandbox and sandboxing.available()
+        #: Wanted unless the operator said FADEN_NODE_AGENT_NATIVE_SANDBOX=0; a
+        #: missing sandbox-exec then refuses starts (fails closed) instead of
+        #: quietly running an unsandboxed worker.
+        self._sandbox_wanted = bool(sandbox)
+        self._sandbox_available = sandboxing.available()
+        self._sandbox = self._sandbox_wanted and self._sandbox_available
         self._sandbox_deny = list(sandbox_deny) if sandbox_deny is not None else [
             paths.root.parent, Path("/Library/Fadenstack"),
         ]
         self._handles: dict[str, _Handle] = {}
+        self._last_found = 0
         self._lock = asyncio.Lock()
         self._stage_locks: dict[str, asyncio.Lock] = {}
         self._metal: dict[str, Any] = {"unified_memory_bytes": psutil.virtual_memory().total, "source": "sysctl"}
@@ -113,20 +119,34 @@ class NativeRuntimeManager:
         write_json_durable(self.paths.worker_record(record["deployment_id"]), record)
 
     def _records(self) -> list[dict[str, Any]]:
-        out = []
+        return self._scan()[0]
+
+    def _scan(self) -> tuple[list[dict[str, Any]], list[Path]]:
+        """Valid records, and the paths of the ones that are not (reported, never ignored)."""
+        good: list[dict[str, Any]] = []
+        bad: list[Path] = []
         for path in sorted(self.paths.workers.glob("*.json")):
             record = read_json_nofollow(path)
-            if record and record.get("deployment_id") == path.stem:
-                out.append(record)
-            else:
+            try:
+                if not record or record.get("deployment_id") != path.stem:
+                    raise procs.BadRecord("unreadable or not this deployment's")
+                procs.validate(record)
+            except procs.BadRecord as exc:
                 # Written atomically, so this is not a crash mid-write: say so loudly.
-                log.error("Native worker record %s is unreadable or not this deployment's; ignoring it", path)
-        return out
+                log.error("Native worker record %s is corrupt (%s); its processes are found by their marker", path, exc)
+                bad.append(path)
+                continue
+            good.append(record)
+        return good, bad
+
+    def sandbox_state(self) -> dict[str, bool]:
+        return {"wanted": self._sandbox_wanted, "available": self._sandbox_available, "active": self._sandbox}
 
     # ── capabilities ──────────────────────────────────────────────
 
     def capabilities(self) -> dict[str, Any]:
-        return {"native_runtime": 1, "metal": dict(self._metal)}
+        # native_sandbox false: workers would run (or are refused) without the sandbox.
+        return {"native_runtime": 1, "native_sandbox": self._sandbox, "metal": dict(self._metal)}
 
     async def refresh_metal(self) -> None:
         """``recommended_max_working_set_bytes`` from the staged runtime's mlx; absent before staging."""
@@ -252,11 +272,14 @@ class NativeRuntimeManager:
                 "layer_digest": layer_digest, "fetched": True}
 
     async def native_runtime_status(self, _payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        good, bad = self._scan()
         return {
             "ok": True,
             "staged": [{k: s[k] for k in ("bundle_id", "layer_digest", "runtime_root")} for s in self._staged()],
-            "workers": [self._public(r) for r in self._records()],
+            "workers": [self._public(r) for r in good]
+            + [{"deployment_id": p.stem, "state": "unknown_record", "path": str(p)} for p in bad],
             "max_workers": self._max_workers,
+            "sandbox": self.sandbox_state(),
         }
 
     # ── workers ───────────────────────────────────────────────────
@@ -269,6 +292,13 @@ class NativeRuntimeManager:
 
     async def start_native_worker(self, payload: dict[str, Any]) -> dict[str, Any]:
         spec = workers.parse_spec(payload, model_root=self._model_root)
+        if self._sandbox_wanted and not self._sandbox_available:
+            raise NativeError(
+                f"{sandboxing.SANDBOX_EXEC} is missing, so the worker cannot be sandboxed away from the "
+                "agent's credential; refusing to start it. Set FADEN_NODE_AGENT_NATIVE_SANDBOX=0 to run "
+                "unsandboxed deliberately.",
+                code="sandbox_unavailable",
+            )
         async with self._lock:
             current = self._record(spec.deployment_id)
             if current and current.get("state") in LIVE and self._leader(current) is not None:
@@ -342,6 +372,7 @@ class NativeRuntimeManager:
                 "started_at": created,
                 "argv": argv,
                 "sandboxed": self._sandbox,
+                "marker": workers.marker(spec.deployment_id, spec.generation),
                 "cmd_sha256": procs.cmd_hash(argv),
                 "env_sha256": _env_hash(spec.env),
                 "port": spec.port,
@@ -410,9 +441,7 @@ class NativeRuntimeManager:
             family = procs.family_of(leader) if leader is not None else []
             if family and family != record.get("family"):
                 # Kept so a descendant that leaves the group (setsid) is still stopped.
-                known = {e["pid"]: e for e in record.get("family") or []}
-                known.update({e["pid"]: e for e in family})
-                record["family"] = sorted(known.values(), key=lambda e: e["pid"])[-procs.MAX_FAMILY:]
+                record["family"] = procs.trim_family([*(record.get("family") or []), *family])
                 self._save(record)
             if record["state"] == "starting":
                 if await self._probe_ready(int(record["port"]), record["served_model_name"]):
@@ -454,9 +483,11 @@ class NativeRuntimeManager:
         popen = handle.popen if handle is not None and handle.popen is not None and handle.popen.pid == record.get("pid") else None
         leader = self._leader(record)
         if leader is not None:
-            record["family"] = procs.family_of(leader) + list(record.get("family") or [])
+            record["family"] = procs.trim_family([*(record.get("family") or []), *procs.family_of(leader)])
+        found = await asyncio.to_thread(procs.collect, record, leader)
+        self._last_found = len(found)
         return await asyncio.to_thread(
-            procs.stop_worker, record, leader, grace_s=grace_s,
+            procs.stop_processes, found, grace_s=grace_s,
             reap=(lambda: popen.poll()) if popen is not None else None,
         )
 
@@ -466,9 +497,29 @@ class NativeRuntimeManager:
         grace = min(max(grace, 0.0), 600.0)
         async with self._lock:
             record = self._record(deployment_id)
+            try:
+                if record is not None:
+                    procs.validate(record)
+            except procs.BadRecord:
+                record = None
             if record is None:
-                return {"ok": True, "stopped": True, "exit_code": None, "known": False}
+                # No readable record: anything still carrying its marker goes.
+                found = await asyncio.to_thread(procs.marked, uid=os.getuid(), prefix=f"{deployment_id}:")
+                left = await self._stop_unrecorded(deployment_id, grace_s=grace) if found else []
+                if left:
+                    raise NativeError(f"processes {left} of {deployment_id} survived SIGKILL", code="stop_incomplete")
+                corrupt = self.paths.worker_record(deployment_id)
+                if corrupt.exists() or corrupt.is_symlink():
+                    corrupt.rename(corrupt.with_name(f"{corrupt.name}.corrupt-{int(time.time())}"))
+                if not found:
+                    # Idempotent (C1): the force-delete cleanup stops what may be long gone.
+                    return {"ok": True, "stopped": False, "reason": "not running", "exit_code": None}
+                return {"ok": True, "stopped": True, "exit_code": None}
+            was_live = record.get("state") in LIVE
             code = await self._stop_locked(deployment_id, record, grace_s=grace)
+            ran = was_live or self._last_found > 0
+        if not ran:
+            return {"ok": True, "stopped": False, "reason": "not running", "exit_code": code}
         return {"ok": True, "stopped": True, "exit_code": code}
 
     async def _stop_locked(self, deployment_id: str, record: dict[str, Any], *, grace_s: float) -> int | None:
@@ -497,11 +548,22 @@ class NativeRuntimeManager:
 
     # ── agent start and stop ──────────────────────────────────────
 
+    async def _stop_unrecorded(self, deployment_id: str, *, grace_s: float) -> list[int]:
+        found = await asyncio.to_thread(procs.marked, uid=os.getuid(), prefix=f"{deployment_id}:")
+        if found:
+            log.warning("Stopping %d process(es) of %s found by their marker, not by a record", len(found), deployment_id)
+        return await asyncio.to_thread(procs.stop_processes, found, grace_s=grace_s)
+
     async def reconcile(self) -> dict[str, list[str]]:
         """Adopt workers that outlived the agent; fail and clean up the rest."""
         adopted: list[str] = []
         failed: list[str] = []
-        for record in self._records():
+        good, bad = self._scan()
+        for path in bad:
+            # Cannot be adopted without a record: no ownerless vLLM either.
+            await self._stop_unrecorded(path.stem, grace_s=self.cleanup_grace_s)
+            failed.append(path.stem)
+        for record in good:
             if record.get("state") not in LIVE:
                 continue
             deployment_id = record["deployment_id"]
