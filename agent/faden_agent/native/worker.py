@@ -32,8 +32,18 @@ _EXTRA: dict[str, re.Pattern[str] | None] = {
     "--no-enable-prefix-caching": None,
     "--enable-auto-tool-choice": None,
 }
-_ENV_KEY = re.compile(r"^(VLLM|MLX|METAL)_[A-Z0-9_]{1,64}$")
-_ENV_DENY = ("TOKEN", "KEY", "SECRET", "PASSWORD", "CREDENTIAL", "AUTH")
+#: Tuning knobs only: no key that names a path, a plugin, a cache or a peer.
+ENV_ALLOWED = frozenset({
+    "VLLM_LOGGING_LEVEL", "VLLM_LOG_STATS_INTERVAL", "VLLM_ENGINE_ITERATION_TIMEOUT_S",
+    "VLLM_HTTP_TIMEOUT_KEEP_ALIVE", "VLLM_ALLOW_LONG_MAX_MODEL_LEN",
+    "MLX_MAX_MB_PER_BUFFER", "MLX_MAX_OPS_PER_BUFFER",
+    "VLLM_METAL_BACKEND", "VLLM_METAL_COMPILED_MLP", "VLLM_METAL_DECODE_PIPELINE",
+    "VLLM_METAL_DISABLE_GQA_DECODE", "VLLM_METAL_DISABLE_NAX", "VLLM_METAL_GDN_LAZY_KERNELS",
+    "VLLM_METAL_MLA_KERNEL", "VLLM_METAL_MULTIMODAL_MODE", "VLLM_METAL_NATIVE_SAMPLING",
+    "VLLM_METAL_NAX_GQA_PREFILL", "VLLM_METAL_PARTITION_SIZE", "VLLM_METAL_PA_WINDOW_MAX_HEAD",
+    "VLLM_METAL_PA_WINDOW_ROWS", "VLLM_METAL_TQ_PREFILL", "VLLM_METAL_TQ_PREFILL_MAX_MIB",
+})
+_ENV_VALUE = re.compile(r"^[A-Za-z0-9._,:+-]{0,64}$")
 _SERVED = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/:@-]{0,255}$")
 
 
@@ -104,11 +114,11 @@ def check_env(env: Any) -> dict[str, str]:
         raise NativeError("env must be an object")
     out: dict[str, str] = {}
     for key, value in env.items():
-        if not isinstance(key, str) or not _ENV_KEY.fullmatch(key) or any(d in key for d in _ENV_DENY):
-            raise NativeError(f"env: {str(key)[:64]!r} is not allowed (VLLM_*, MLX_*, METAL_* only, no secrets)")
+        if not isinstance(key, str) or key not in ENV_ALLOWED:
+            raise NativeError(f"env: {str(key)[:64]!r} is not allowed (allowed: {', '.join(sorted(ENV_ALLOWED))})")
         text = str(value)
-        if len(text) > 4096 or "\x00" in text:
-            raise NativeError(f"env: the value of {key} is too long or invalid")
+        if not _ENV_VALUE.fullmatch(text):
+            raise NativeError(f"env: the value of {key} is not allowed (no paths, 64 plain characters at most)")
         out[key] = text
     return out
 

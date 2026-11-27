@@ -160,7 +160,9 @@ def _layer_stream(outer: tarfile.TarFile, member: tarfile.TarInfo, limit: int) -
 
 def unpacked_limit(member: tarfile.TarInfo, size_bytes: int, unpacked_size_bytes: int | None) -> int:
     if unpacked_size_bytes:
-        return min(int(unpacked_size_bytes), MAX_UNPACKED)
+        # C1's figure is the layer tar's size; 1 % plus 1 MiB of slack in case
+        # it is ever the files' sum (headers and padding add ~512 B a member).
+        return min(int(unpacked_size_bytes) * 101 // 100 + (1 << 20), MAX_UNPACKED)
     return min(max(max(member.size, int(size_bytes)) * MAX_RATIO, MIN_LIMIT), MAX_UNPACKED)
 
 
@@ -215,6 +217,7 @@ def extract_layer(stream: IO[bytes], dest: Path, *, limit: int) -> int:
     if not hasattr(tarfile, "data_filter"):
         raise NativeError("this Python has no tarfile data filter; refusing to extract", code="unsupported")
     files: set[str] = set()
+    links: list[str] = []
     total = 0
     count = 0
     with tarfile.open(fileobj=stream, mode="r|") as layer:
@@ -232,7 +235,21 @@ def extract_layer(stream: IO[bytes], dest: Path, *, limit: int) -> int:
                 raise _unsafe(f"refused {member.name!r}: {exc}") from exc
             if member.isreg():
                 files.add(norm)
+            elif member.issym():
+                links.append(norm)
+                _check_link(dest, norm)
+    # A chain of links made later may change where an earlier one leads.
+    for norm in links:
+        _check_link(dest, norm)
     return count
+
+
+def _check_link(dest: Path, norm: str) -> None:
+    """Resolved on disk, through every link before it, a symlink stays under ``runtime/``."""
+    root = os.path.realpath(dest / "runtime")
+    real = os.path.realpath(dest / norm)
+    if real != root and not real.startswith(root + os.sep):
+        raise _unsafe(f"symlink {norm!r} resolves to {real}, outside runtime/")
 
 
 # ── the runtime tree ──────────────────────────────────────────────

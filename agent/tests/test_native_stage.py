@@ -165,7 +165,7 @@ def test_hostile_layers_are_refused(tmp_path: Path, paths: NativePaths, name: st
 
 
 def test_more_than_declared_is_refused(tmp_path: Path, paths: NativePaths) -> None:
-    c = carrier(tmp_path / "img.tar", layer_from_members([file_member("runtime/big", b"0" * 200_000)]))
+    c = carrier(tmp_path / "img.tar", layer_from_members([file_member("runtime/big", b"0" * 3_000_000)]))
     with pytest.raises(NativeError) as err:
         _stage(paths, c, unpacked_size_bytes=100_000)
     assert err.value.error_code == "unsafe_archive"
@@ -193,3 +193,36 @@ def test_in_tree_links_are_fine() -> None:
     files = {"runtime/python/bin/python3.12"}
     assert st.check_member(link_member("runtime/venv/bin/python", "../../python/bin/python3.12")[0], files)
     assert st.check_member(link_member("runtime/venv/bin/py2", "runtime/python/bin/python3.12", hard=True)[0], files)
+
+
+def test_a_symlink_chain_ends_inside_runtime(tmp_path: Path) -> None:
+    # Lexically every hop stays inside runtime/; on disk c -> b/.. would be the
+    # staging dir itself. The data filter normalises it; the realpath check is
+    # the second layer.
+    import io
+    import os
+
+    members = [file_member("runtime/x"), link_member("runtime/b", "."), link_member("runtime/c", "b/..")]
+    assert st.check_member(members[2][0], set())  # the lexical check alone lets it through
+    dest = tmp_path / "dest"
+    dest.mkdir()
+    st.extract_layer(io.BytesIO(layer_from_members(members)), dest, limit=1 << 20)
+    root = os.path.realpath(dest / "runtime")
+    for name in ("b", "c"):
+        assert os.path.realpath(dest / "runtime" / name).startswith(root)
+
+
+def test_the_realpath_check_refuses_a_link_out_of_runtime(tmp_path: Path) -> None:
+    (tmp_path / "runtime").mkdir()
+    (tmp_path / "runtime" / "up").symlink_to("..")
+    with pytest.raises(NativeError) as err:
+        st._check_link(tmp_path, "runtime/up")
+    assert err.value.error_code == "unsafe_archive"
+
+
+def test_an_exact_unpacked_size_passes(tmp_path: Path, paths: NativePaths) -> None:
+    src = tmp_path / "src"
+    build_runtime(src)
+    total = sum(p.stat().st_size for p in (src / "runtime").rglob("*") if p.is_file() and not p.is_symlink())
+    c = carrier(tmp_path / "img.tar", layer_from_dir(src))
+    assert _stage(paths, c, unpacked_size_bytes=total)

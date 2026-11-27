@@ -80,6 +80,23 @@ def _detect_routable_ip(backend_url: str) -> str | None:
         return None
 
 
+def _env_count(name: str, default: int, *, lo: int = 1, hi: int = 64) -> int:
+    """A small positive count from the environment; a typo warns and keeps *default*."""
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        value = None
+    if value is None or not lo <= value <= hi:
+        logging.getLogger(__name__).warning(
+            "%s=%r is not a whole number from %d to %d; using %d", name, raw, lo, hi, default
+        )
+        return default
+    return value
+
+
 def _env_bool(name: str, default: bool) -> bool:
     raw = os.getenv(name)
     if raw is None:
@@ -129,6 +146,9 @@ class AgentConfig:
     #: How many native (vLLM-Metal) workers a Mac runs at once; 0.7.3's
     #: platform profile is one managed chat deployment per Mac.
     native_max_workers: int = 1
+    #: Run native workers under sandbox-exec, denied the agent's state
+    #: (credential, env file, model-TLS key). Off only to diagnose Metal.
+    native_sandbox: bool = True
     #: Built from the fields above plus the backend's authority the agent
     #: learnt (server_trust.build_context); shared by every connection to the
     #: backend. ``None`` while verification is off.
@@ -205,7 +225,8 @@ class AgentConfig:
             ),
             container_runtime=os.getenv("FADEN_NODE_AGENT_CONTAINER_RUNTIME", "auto").strip().lower() or "auto",
             image_download_dir=os.getenv("FADEN_NODE_AGENT_IMAGE_DOWNLOAD_DIR", ""),
-            native_max_workers=int(os.getenv("FADEN_NODE_AGENT_NATIVE_MAX_WORKERS", "1")),
+            native_max_workers=_env_count("FADEN_NODE_AGENT_NATIVE_MAX_WORKERS", 1),
+            native_sandbox=_env_bool("FADEN_NODE_AGENT_NATIVE_SANDBOX", True),
             require_signed_commands=(
                 os.getenv("FADEN_NODE_AGENT_REQUIRE_SIGNED_COMMANDS", "auto").strip().lower() or "auto"
             ),
