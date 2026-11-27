@@ -489,6 +489,7 @@ class NodeAgentService:
                 fetch_tar=_fetch_tar,
                 max_workers=self._config.native_max_workers,
                 sandbox=self._config.native_sandbox,
+                sandbox_config_error=self._config.native_sandbox_error,
                 sandbox_deny=[
                     Path(self._config.state_path).parent,
                     *([Path(self._config.model_tls_dir)] if self._config.model_tls_dir else []),

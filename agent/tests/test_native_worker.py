@@ -676,7 +676,9 @@ async def test_without_sandbox_exec_starts_are_refused_unless_disabled(env, monk
     monkeypatch.setattr(sandbox, "available", lambda: False)
     manager = _manager(paths, models)
     assert manager.capabilities()["native_sandbox"] is False
-    assert (await manager.native_runtime_status({}))["sandbox"] == {"wanted": True, "available": False, "active": False}
+    assert (await manager.native_runtime_status({}))["sandbox"] == {
+        "wanted": True, "available": False, "active": False, "config_error": None,
+    }
     with pytest.raises(NativeError) as err:
         await manager.start_native_worker(_payload(snap, _free_port()))
     assert err.value.error_code == "sandbox_unavailable" and "FADEN_NODE_AGENT_NATIVE_SANDBOX=0" in str(err.value)
@@ -688,3 +690,17 @@ async def test_without_sandbox_exec_starts_are_refused_unless_disabled(env, monk
     assert json.loads(paths.worker_record("dep-1").read_text())["sandboxed"] is False
     await deliberate.stop_native_worker({"deployment_id": "dep-1", "grace_s": 1})
     await deliberate.close()
+
+
+@pytest.mark.asyncio
+async def test_an_unknown_sandbox_setting_refuses_starts(env) -> None:
+    paths, models, snap = env
+    manager = _manager(paths, models, sandbox_config_error="FADEN_NODE_AGENT_NATIVE_SANDBOX='' is not ...")
+    assert manager.capabilities()["native_sandbox"] is False
+    state = (await manager.native_runtime_status({}))["sandbox"]
+    assert state["active"] is False and "NATIVE_SANDBOX" in state["config_error"]
+    with pytest.raises(NativeError) as err:
+        await manager.start_native_worker(_payload(snap, _free_port()))
+    assert err.value.error_code == "sandbox_config_invalid"
+    assert not list(paths.workers.glob("*.json"))  # nothing started
+    await manager.close()

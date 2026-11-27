@@ -83,6 +83,7 @@ class NativeRuntimeManager:
         probe_metal: bool = True,
         sandbox: bool = True,
         sandbox_deny: list[Path] | None = None,
+        sandbox_config_error: str | None = None,
     ) -> None:
         self.paths = paths
         self._fetch_tar = fetch_tar
@@ -98,7 +99,11 @@ class NativeRuntimeManager:
         #: quietly running an unsandboxed worker.
         self._sandbox_wanted = bool(sandbox)
         self._sandbox_available = sandboxing.available()
-        self._sandbox = self._sandbox_wanted and self._sandbox_available
+        #: FADEN_NODE_AGENT_NATIVE_SANDBOX held something unknown: refuse every start.
+        self._sandbox_config_error = sandbox_config_error
+        self._sandbox = self._sandbox_wanted and self._sandbox_available and not sandbox_config_error
+        if sandbox_config_error:
+            log.error("Native workers are refused: %s", sandbox_config_error)
         self._sandbox_deny = list(sandbox_deny) if sandbox_deny is not None else [
             paths.root.parent, Path("/Library/Fadenstack"),
         ]
@@ -139,8 +144,9 @@ class NativeRuntimeManager:
             good.append(record)
         return good, bad
 
-    def sandbox_state(self) -> dict[str, bool]:
-        return {"wanted": self._sandbox_wanted, "available": self._sandbox_available, "active": self._sandbox}
+    def sandbox_state(self) -> dict[str, Any]:
+        return {"wanted": self._sandbox_wanted, "available": self._sandbox_available, "active": self._sandbox,
+                "config_error": self._sandbox_config_error}
 
     # ── capabilities ──────────────────────────────────────────────
 
@@ -292,6 +298,8 @@ class NativeRuntimeManager:
 
     async def start_native_worker(self, payload: dict[str, Any]) -> dict[str, Any]:
         spec = workers.parse_spec(payload, model_root=self._model_root)
+        if self._sandbox_config_error:
+            raise NativeError(self._sandbox_config_error, code="sandbox_config_invalid")
         if self._sandbox_wanted and not self._sandbox_available:
             raise NativeError(
                 f"{sandboxing.SANDBOX_EXEC} is missing, so the worker cannot be sandboxed away from the "

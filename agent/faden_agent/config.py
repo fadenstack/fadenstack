@@ -97,6 +97,27 @@ def _env_count(name: str, default: int, *, lo: int = 1, hi: int = 64) -> int:
     return value
 
 
+def _env_strict_switch(name: str, default: bool) -> tuple[bool, str | None]:
+    """A security switch: unset is *default*; only an explicit word turns it either way.
+
+    ``_env_bool`` reads anything unknown (an empty value, a typo) as off,
+    which for the native sandbox would quietly run workers unsandboxed.
+    Here an unknown value is an error the caller refuses to act on.
+    """
+    raw = os.getenv(name)
+    if raw is None:
+        return default, None
+    word = raw.strip().lower()
+    if word in {"1", "true", "yes", "on"}:
+        return True, None
+    if word in {"0", "false", "no", "off"}:
+        return False, None
+    return default, (
+        f"{name}={raw!r} is not one of 1/true/yes/on or 0/false/no/off; "
+        "native workers are refused until it is fixed or unset"
+    )
+
+
 def _env_bool(name: str, default: bool) -> bool:
     raw = os.getenv(name)
     if raw is None:
@@ -149,6 +170,8 @@ class AgentConfig:
     #: Run native workers under sandbox-exec, denied the agent's state
     #: (credential, env file, model-TLS key). Off only to diagnose Metal.
     native_sandbox: bool = True
+    #: Set when FADEN_NODE_AGENT_NATIVE_SANDBOX holds an unknown value: no worker starts.
+    native_sandbox_error: str | None = None
     #: Built from the fields above plus the backend's authority the agent
     #: learnt (server_trust.build_context); shared by every connection to the
     #: backend. ``None`` while verification is off.
@@ -226,7 +249,8 @@ class AgentConfig:
             container_runtime=os.getenv("FADEN_NODE_AGENT_CONTAINER_RUNTIME", "auto").strip().lower() or "auto",
             image_download_dir=os.getenv("FADEN_NODE_AGENT_IMAGE_DOWNLOAD_DIR", ""),
             native_max_workers=_env_count("FADEN_NODE_AGENT_NATIVE_MAX_WORKERS", 1),
-            native_sandbox=_env_bool("FADEN_NODE_AGENT_NATIVE_SANDBOX", True),
+            native_sandbox=_env_strict_switch("FADEN_NODE_AGENT_NATIVE_SANDBOX", True)[0],
+            native_sandbox_error=_env_strict_switch("FADEN_NODE_AGENT_NATIVE_SANDBOX", True)[1],
             require_signed_commands=(
                 os.getenv("FADEN_NODE_AGENT_REQUIRE_SIGNED_COMMANDS", "auto").strip().lower() or "auto"
             ),
