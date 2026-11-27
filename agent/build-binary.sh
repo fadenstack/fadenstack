@@ -20,9 +20,19 @@
 #   sh build-binary.sh macos-arm64                 # on an Apple Silicon Mac
 #
 # A Mac build runs natively (no container can produce Mach-O) in a throwaway
-# venv from the same hash-checked lock, unpacked (no UPX) and ad-hoc signed,
-# which is what Apple Silicon needs to run it at all. It is a development
-# build: a signed, notarized release is the release workflow's.
+# venv from the same hash-checked lock, unpacked (no UPX) and signed, which is
+# what Apple Silicon needs to run it at all. FADEN_MAC_SIGNING picks how:
+#
+#   adhoc           (default) an ad-hoc signature: development builds, and
+#                   the curl install, which sets no quarantine flag
+#   hardened-adhoc  ad hoc under the hardened runtime with the release
+#                   entitlements plus the library-validation exception ad hoc
+#                   needs (macos/entitlements-hardened-adhoc.plist): proves
+#                   the rest is enough, without an Apple account
+#   developer-id    the release signature: FADEN_MAC_CODESIGN_IDENTITY names
+#                   a "Developer ID Application: ... (TEAMID)" identity in the
+#                   keychain; refused without one. macos-package.sh then makes
+#                   the notarized pkg.
 #
 # The result lands in dist/, named the way /api/install/plan expects, with
 # the licences of the third-party software bundled in it beside it:
@@ -46,7 +56,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --remote) REMOTE="${2:-}"; shift ;;
     --ssh-key) SSH_KEY="${2:-}"; shift ;;
-    -h|--help) sed -n '2,38p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,47p' "$0"; exit 0 ;;
     -*) echo "Unknown option: $1" >&2; exit 2 ;;
     *) PLATFORM="$1" ;;
   esac
@@ -86,13 +96,34 @@ if [ "$PLATFORM" = macos-arm64 ]; then
     exit 2
   fi
   command -v uv >/dev/null 2>&1 || { echo "ERROR: the Mac build needs uv (https://docs.astral.sh/uv/)." >&2; exit 1; }
+  SIGNING="${FADEN_MAC_SIGNING:-adhoc}"
+  case "$SIGNING" in
+    adhoc)
+      unset FADEN_MAC_CODESIGN_IDENTITY FADEN_MAC_ENTITLEMENTS ;;
+    hardened-adhoc)
+      FADEN_MAC_CODESIGN_IDENTITY="-"
+      FADEN_MAC_ENTITLEMENTS="$SRC/macos/entitlements-hardened-adhoc.plist" ;;
+    developer-id)
+      case "${FADEN_MAC_CODESIGN_IDENTITY:-}" in
+        "Developer ID Application: "*) ;;
+        *) echo "ERROR: FADEN_MAC_SIGNING=developer-id needs FADEN_MAC_CODESIGN_IDENTITY=\"Developer ID Application: <name> (<team>)\"." >&2
+           exit 1 ;;
+      esac
+      security find-identity -v -p codesigning | grep -qF "\"$FADEN_MAC_CODESIGN_IDENTITY\"" || {
+        echo "ERROR: no valid signing identity \"$FADEN_MAC_CODESIGN_IDENTITY\" in the keychain search list." >&2; exit 1; }
+      FADEN_MAC_ENTITLEMENTS="$SRC/macos/entitlements.plist" ;;
+    *) echo "ERROR: FADEN_MAC_SIGNING is adhoc, hardened-adhoc or developer-id, not $SIGNING." >&2; exit 2 ;;
+  esac
+  [ "$SIGNING" = adhoc ] || export FADEN_MAC_CODESIGN_IDENTITY FADEN_MAC_ENTITLEMENTS
   TOOLS=$(mktemp -d -t faden-build-XXXXXX)
   trap 'rm -rf "$TOOLS"' EXIT
   cd "$SRC"
   # The same steps as the container's, with the tools outside the source tree.
-  uv venv --quiet --python 3.12 "$TOOLS/tools"
+  # uv's own Python (python-build-standalone) and nothing else: a system or
+  # Homebrew 3.12 links other libraries than the notices name.
+  uv venv --quiet --managed-python --python 3.12 "$TOOLS/tools"
   uv pip install --quiet --no-config --python "$TOOLS/tools/bin/python" pip-licenses==5.5.5
-  uv venv --quiet --python 3.12 "$TOOLS/build"
+  uv venv --quiet --managed-python --python 3.12 "$TOOLS/build"
   uv export --quiet --frozen --no-dev --no-emit-project --extra build -o "$TOOLS/build-requirements.txt"
   uv export --quiet --frozen --no-dev --no-emit-project --no-hashes -o "$TOOLS/requirements.txt"
   # --no-config: uv would otherwise add this project's [tool.uv] constraints, unpinned.
@@ -109,9 +140,24 @@ if [ "$PLATFORM" = macos-arm64 ]; then
     echo "ERROR: dist/$ARTIFACT is not an arm64 Mach-O executable." >&2; exit 1; }
   codesign --verify --strict "dist/$ARTIFACT" || {
     echo "ERROR: dist/$ARTIFACT carries no valid signature." >&2; exit 1; }
+  if [ "$SIGNING" != adhoc ]; then
+    codesign --display --verbose=2 "dist/$ARTIFACT" 2>&1 | grep -q 'flags=.*runtime' || {
+      echo "ERROR: dist/$ARTIFACT is not signed with the hardened runtime." >&2; exit 1; }
+  fi
+  if [ "$SIGNING" = developer-id ]; then
+    # The Developer ID and team it claims, not merely a valid signature.
+    sh "$SRC/macos-package.sh" verify "dist/$ARTIFACT"
+  fi
+  # Starting it unpacks and loads every bundled library: under the hardened
+  # runtime, this is where a missing entitlement shows.
   "dist/$ARTIFACT" --version
+  "dist/$ARTIFACT" license >/dev/null
   echo
-  echo "Built: $SRC/dist/$ARTIFACT (development build, ad-hoc signed)"
+  case "$SIGNING" in
+    developer-id) echo "Built: $SRC/dist/$ARTIFACT (signed: $FADEN_MAC_CODESIGN_IDENTITY, hardened runtime)" ;;
+    hardened-adhoc) echo "Built: $SRC/dist/$ARTIFACT (development build, ad-hoc signed, hardened runtime)" ;;
+    *) echo "Built: $SRC/dist/$ARTIFACT (development build, ad-hoc signed)" ;;
+  esac
   shasum -a 256 "$SRC/dist/$ARTIFACT"
   exit 0
 fi

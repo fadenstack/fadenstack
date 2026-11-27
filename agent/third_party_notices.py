@@ -26,10 +26,14 @@ them, and only those packages are listed: PyInstaller, uv and pip-licenses
 build the binary but are not in it. pip-licenses runs from a venv of its own
 and reads this interpreter's packages, so its own dependencies stay out too.
 
-Linux (Debian): the system libraries come from dpkg's database. A macOS
-build (a development build until the release workflow builds one) has no such
-database: its notices say the system libraries are not listed yet, and
-``check`` names the dylibs it carries without failing on them.
+Linux (Debian): the system libraries come from dpkg's database. macOS has no
+such database. There, the Python is python-build-standalone's (uv's), whose
+extension modules -- and the libraries they need: OpenSSL, SQLite, xz, bzip2,
+libffi, expat, libmpdec -- are linked statically into libpython. Their texts
+come from release/licenses/ (the CLI's binaries use the same ones), chosen by
+which of those modules this interpreter has built in. The rest it links --
+libz, libncurses, libedit, the frameworks -- is macOS's own and not
+distributed. ``check`` fails on any other dylib the binary carries.
 """
 
 from __future__ import annotations
@@ -43,6 +47,23 @@ import sys
 import sysconfig
 from importlib import metadata
 from pathlib import Path
+
+#: The texts for libraries linked into a macOS libpython, shared with the CLI's
+#: binaries (release/binary_notices.py).
+LICENCE_TEXTS = Path(__file__).resolve().parents[1] / "release" / "licenses"
+
+# python-build-standalone builds these modules into libpython, each with the
+# library it needs linked statically. {module: licence text in LICENCE_TEXTS}.
+MAC_STATIC = {
+    "_ssl": "openssl",
+    "_hashlib": "openssl",
+    "_sqlite3": "sqlite",
+    "_lzma": "xz",
+    "_bz2": "bzip2",
+    "_ctypes": "libffi",
+    "pyexpat": "expat",
+    "_decimal": "libmpdec",
+}
 
 # The Debian packages whose libraries the binary carries. `check` keeps this
 # honest: a library from any other package fails the build.
@@ -154,10 +175,7 @@ def write(requirements: Path, out: Path, pip_licenses: str) -> None:
 
     parts.append(_heading("3. System libraries"))
     if sys.platform == "darwin":
-        parts.append(
-            "Not listed yet for macOS builds. This is a development build; the\n"
-            "dynamic libraries it carries come from the Python build it was made with.\n"
-        )
+        parts.extend(_mac_libraries())
     else:
         parts.append(
             "Shared libraries from the Debian build environment, which Python's\n"
@@ -190,6 +208,41 @@ def write(requirements: Path, out: Path, pip_licenses: str) -> None:
     print(f"Wrote {out} ({len(names)} packages)")
 
 
+def _mac_libraries() -> list[str]:
+    """Part 3 on macOS: what libpython links in statically, and what it only links to."""
+    builtin = set(sys.builtin_module_names)
+    licences: dict[str, list[str]] = {}
+    for module, licence in MAC_STATIC.items():
+        if module in builtin:
+            licences.setdefault(licence, []).append(module)
+    parts = [
+        "Python's native code comes from python-build-standalone, which links the\n"
+        "libraries below statically into libpython, the one library this binary\n"
+        "carries. Their licences follow.\n"
+    ]
+    for licence, modules in sorted(licences.items()):
+        text = LICENCE_TEXTS / f"{licence}.txt"
+        if not text.is_file():
+            sys.exit(f"No licence text {text} for {', '.join(modules)}: build from a full checkout")
+        parts.append(f"\n--- {licence} (in {', '.join(sorted(modules))}) ---\n\n")
+        parts.append(_read(text))
+    libpython = Path(sysconfig.get_config_var("LIBDIR") or "") / str(sysconfig.get_config_var("LDLIBRARY") or "")
+    linked = _system_links(libpython) if libpython.is_file() else []
+    if linked:
+        parts.append(
+            "\nLinked from macOS itself and not distributed with this binary:\n"
+            + "".join(f"  {path}\n" for path in linked)
+        )
+    return parts
+
+
+def _system_links(library: Path) -> list[str]:
+    """The macOS libraries and frameworks *library* loads from the system."""
+    listing = subprocess.run(["otool", "-L", str(library)], check=True, capture_output=True, encoding="utf-8")
+    paths = [line.strip().split(" (")[0] for line in listing.stdout.splitlines()[1:]]
+    return sorted(p for p in paths if p.startswith(("/usr/lib/", "/System/")))
+
+
 def _debian_package(library: str) -> str | None:
     found = subprocess.run(
         ["dpkg", "--search", f"*/{library}"], capture_output=True, encoding="utf-8"
@@ -213,9 +266,13 @@ def check(binary: Path, requirements: Path) -> None:
 
     # System libraries sit at the top level; extension modules and what
     # wheels vendor sit under their package, covered by its licence.
-    dylibs = sorted(n for n in archive.toc if "/" not in n and n.endswith(".dylib") and not n.startswith("libpython"))
-    if dylibs:
-        print(f"macOS libraries carried, not yet in the notices: {', '.join(dylibs)}")
+    # A Mac build carries libpython only (MAC_STATIC covers what is linked into
+    # it); any other dylib is a library the notices do not name.
+    uncovered.extend(
+        f"{name} (a macOS library the notices do not cover)"
+        for name in sorted(archive.toc)
+        if "/" not in name and name.endswith(".dylib") and not name.startswith("libpython")
+    )
     for name in sorted(archive.toc):
         if "/" in name or not re.match(r"lib.+\.so(\.|$)", name):
             continue

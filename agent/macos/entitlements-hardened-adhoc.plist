@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  FADEN_MAC_SIGNING=hardened-adhoc only, never a release: entitlements.plist
+  plus the one exception an ad-hoc signature needs. Ad hoc carries no Team ID,
+  so library validation refuses the libraries the onefile unpacks ("mapping
+  process and mapped file (non-platform) have different Team IDs"); under a
+  Developer ID they share the executable's team and pass. Everything else the
+  hardened runtime restricts stays restricted, which is what this build tests.
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+</dict>
+</plist>

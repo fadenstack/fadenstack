@@ -2,7 +2,7 @@
 #
 # The backend's install plan points machines at
 #   https://github.com/fadenstack/fadenstack/releases/download/node-agent-v<version>/faden-agent-<platform>
-# for <platform> linux-x86_64 and linux-aarch64 (see
+# for <platform> linux-x86_64, linux-aarch64 and macos-arm64 (see
 # backend/faden_backend/web/api/install/__init__.py, RELEASE_URL and AGENT_VERSION).
 # This workflow makes exactly those files.
 #
@@ -16,11 +16,33 @@
 # runner of its own architecture: built on a newer distro, the agent links a
 # newer glibc and fails on older nodes (the DGX Sparks run glibc 2.39; many
 # servers run older).
+#
+# The Mac build runs natively on macos-26 (Apple Silicon), the oldest macOS
+# the agent supports (MIN_MACOS_MAJOR in the backend), unpacked (no UPX).
+# Its signature (build-binary.sh, FADEN_MAC_SIGNING):
+#   - developer-id when the Apple secrets are set: Developer ID with the
+#     hardened runtime, plus a notarized, stapled faden-agent-macos-arm64.pkg
+#     (macos-package.sh). The release pins both.
+#   - adhoc, only when chosen: on a tag, with no Apple secrets, the job fails
+#     unless the repository variable FADEN_MAC_SIGNING is "adhoc". The curl
+#     install runs it as it is (curl sets no quarantine flag); the release
+#     pins the binary only and says "ad-hoc signed (not notarized)".
+#   A partial or misnamed set of Apple secrets always fails the job.
+# The secrets are environment secrets of apple-signing (repository settings:
+# deployment policy node-agent-v* tags). workflow_dispatch can force a mode,
+# hardened-adhoc included, to try the release entitlements without an Apple
+# account; hardened-adhoc is never released.
 
 name: Release Node Agent
 
 on:
   workflow_dispatch:
+    inputs:
+      mac_signing:
+        description: "Mac signing: auto (developer-id when the Apple secrets exist, else adhoc), adhoc, hardened-adhoc, developer-id"
+        type: choice
+        options: [auto, adhoc, hardened-adhoc, developer-id]
+        default: auto
   push:
     tags:
       - "node-agent-v*"
@@ -36,6 +58,10 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.check.outputs.version }}
+      # Whether this agent version has a Mac build: from FIRST_MAC_AGENT_VERSION
+      # on, by pin_agent.py's own comparison. A hotfix below it (0.2.13) is
+      # released for Linux alone, and no Mac failure can hold it back.
+      mac: ${{ steps.mac.outputs.mac }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: The tag, the agent and the backend agree on the version
@@ -56,6 +82,14 @@ jobs:
             exit 1
           fi
           echo "version=$PYPROJECT" >> "$GITHUB_OUTPUT"
+      - name: Does this version have a Mac build
+        id: mac
+        env:
+          VERSION: ${{ steps.check.outputs.version }}
+        run: |
+          mac=$(python3 -c 'import sys; sys.path.insert(0, "release"); import pin_agent; print("true" if "macos-arm64" in pin_agent.builds_for(sys.argv[1]) else "false")' "$VERSION")
+          echo "Agent $VERSION has a Mac build: $mac"
+          echo "mac=$mac" >> "$GITHUB_OUTPUT"
 
   build:
     needs: version
@@ -108,10 +142,156 @@ jobs:
             ${{ env.AGENT_DIR }}/dist/faden-agent-${{ matrix.platform }}.THIRD-PARTY-NOTICES.txt
           retention-days: 30
 
+  build-macos:
+    # The Mac build: its own job, for the environment that holds the Apple
+    # secrets. apple-signing's deployment policy (repository settings) admits
+    # node-agent-v* tags; a dispatch from elsewhere waits for that policy.
+    needs: version
+    # From the first Mac agent on; a dispatch builds it whatever the version, to test.
+    if: needs.version.outputs.mac == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: macos-26
+    environment: apple-signing
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # release/licenses: the texts for what a Mac libpython links in.
+          sparse-checkout: |
+            agent
+            release/licenses
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+
+      - name: Mac signing mode
+        id: mac
+        shell: bash
+        env:
+          REQUESTED: ${{ inputs.mac_signing || 'auto' }}
+          # The explicit opt-in to an ad-hoc release when no Apple secrets exist.
+          ADHOC_OPT_IN: ${{ vars.FADEN_MAC_SIGNING }}
+          IS_TAG: ${{ startsWith(github.ref, 'refs/tags/node-agent-v') }}
+          FADEN_MAC_CODESIGN_IDENTITY: ${{ secrets.FADEN_MAC_CODESIGN_IDENTITY }}
+          FADEN_MAC_INSTALLER_IDENTITY: ${{ secrets.FADEN_MAC_INSTALLER_IDENTITY }}
+          APPLE_CERTIFICATES_P12_BASE64: ${{ secrets.APPLE_CERTIFICATES_P12_BASE64 }}
+          APPLE_CERTIFICATES_P12_PASSWORD: ${{ secrets.APPLE_CERTIFICATES_P12_PASSWORD }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+          APPLE_NOTARY_KEY_P8_BASE64: ${{ secrets.APPLE_NOTARY_KEY_P8_BASE64 }}
+        working-directory: ${{ env.AGENT_DIR }}
+        run: |
+          set -euo pipefail
+          rc=0; sh macos-package.sh secrets || rc=$?
+          case "$rc" in
+            0) complete=1 ;;
+            1) complete=0 ;;
+            *) echo "::error::The Apple signing secrets are incomplete or misnamed (above). Fix them; a release is never built ad hoc by accident."
+               exit 1 ;;
+          esac
+          mode="$REQUESTED"
+          if [ "$mode" = auto ]; then
+            if [ "$complete" = 1 ]; then
+              mode=developer-id
+            elif [ "$IS_TAG" = true ] && [ "$ADHOC_OPT_IN" != adhoc ]; then
+              echo "::error::No Apple signing secrets. To release the Mac build ad hoc (not notarized), set the repository variable FADEN_MAC_SIGNING=adhoc."
+              exit 1
+            else
+              mode=adhoc
+            fi
+          fi
+          if [ "$mode" = developer-id ] && [ "$complete" = 0 ]; then
+            echo "::error::developer-id was asked for, but no Apple signing secrets are set."
+            exit 1
+          fi
+          if [ "$mode" = hardened-adhoc ] && [ "$IS_TAG" = true ]; then
+            echo "::error::hardened-adhoc is a test build; it is never released."
+            exit 1
+          fi
+          case "$mode" in
+            developer-id) line="Mac build: signed with a Developer ID and notarized (faden-agent-macos-arm64.pkg)." ;;
+            *) line="Mac build: ad-hoc signed (not notarized)." ;;
+          esac
+          [ "$mode" = developer-id ] || echo "::warning::$line"
+          echo "$line" >> "$GITHUB_STEP_SUMMARY"
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "line=$line" >> "$GITHUB_OUTPUT"
+
+      - name: Signing keychain
+        if: steps.mac.outputs.mode == 'developer-id'
+        working-directory: ${{ env.AGENT_DIR }}
+        env:
+          FADEN_MAC_CODESIGN_IDENTITY: ${{ secrets.FADEN_MAC_CODESIGN_IDENTITY }}
+          FADEN_MAC_INSTALLER_IDENTITY: ${{ secrets.FADEN_MAC_INSTALLER_IDENTITY }}
+          APPLE_CERTIFICATES_P12_BASE64: ${{ secrets.APPLE_CERTIFICATES_P12_BASE64 }}
+          APPLE_CERTIFICATES_P12_PASSWORD: ${{ secrets.APPLE_CERTIFICATES_P12_PASSWORD }}
+        run: sh macos-package.sh keychain
+
+      - name: Build
+        working-directory: ${{ env.AGENT_DIR }}
+        env:
+          FADEN_MAC_SIGNING: ${{ steps.mac.outputs.mode }}
+          FADEN_MAC_CODESIGN_IDENTITY: ${{ steps.mac.outputs.mode == 'developer-id' && secrets.FADEN_MAC_CODESIGN_IDENTITY || '' }}
+        run: sh build-binary.sh macos-arm64
+
+      - name: Smoke test
+        working-directory: ${{ env.AGENT_DIR }}
+        shell: bash
+        env:
+          SIGNING_LINE: ${{ steps.mac.outputs.line }}
+        run: |
+          set -euo pipefail
+          BIN="dist/faden-agent-macos-arm64"
+          file "$BIN" | grep -q 'Mach-O 64-bit executable arm64'
+          codesign --verify --strict --verbose=2 "$BIN"
+          # Starting it unpacks and loads every bundled library, under the
+          # signature it ships with.
+          "$BIN" license > "$RUNNER_TEMP/agent-license.txt"
+          grep -q 'Apache License' "$RUNNER_TEMP/agent-license.txt"
+          "$BIN" license --third-party > "$RUNNER_TEMP/agent-third-party.txt"
+          for text in 'Mozilla Public License' 'The interpreter and its standard library' 'Bootloader Exception' '--- openssl'; do
+            grep -q -- "$text" "$RUNNER_TEMP/agent-third-party.txt" || { echo "::error::Third-party notices lack: $text"; exit 1; }
+          done
+          test -s "$BIN.THIRD-PARTY-NOTICES.txt"
+          shasum -a 256 "$BIN" | awk '{print $1}' > "$BIN.sha256"
+          printf '%s\n' "$SIGNING_LINE" > "$BIN.SIGNING.txt"
+
+      - name: Package and notarize
+        if: steps.mac.outputs.mode == 'developer-id'
+        working-directory: ${{ env.AGENT_DIR }}
+        env:
+          FADEN_MAC_INSTALLER_IDENTITY: ${{ secrets.FADEN_MAC_INSTALLER_IDENTITY }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+          APPLE_NOTARY_KEY_P8_BASE64: ${{ secrets.APPLE_NOTARY_KEY_P8_BASE64 }}
+        run: |
+          sh macos-package.sh pkg
+          sh macos-package.sh notarize
+
+      - name: Remove the signing keychain and the notary key
+        if: always()
+        working-directory: ${{ env.AGENT_DIR }}
+        run: sh macos-package.sh cleanup
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: faden-agent-macos-arm64
+          path: |
+            ${{ env.AGENT_DIR }}/dist/faden-agent-macos-arm64
+            ${{ env.AGENT_DIR }}/dist/faden-agent-macos-arm64.sha256
+            ${{ env.AGENT_DIR }}/dist/faden-agent-macos-arm64.THIRD-PARTY-NOTICES.txt
+            ${{ env.AGENT_DIR }}/dist/faden-agent-macos-arm64.SIGNING.txt
+            ${{ env.AGENT_DIR }}/dist/faden-agent-macos-arm64.pkg
+            ${{ env.AGENT_DIR }}/dist/faden-agent-macos-arm64.pkg.sha256
+          retention-days: 30
+
   release:
-    needs: [version, build]
+    needs: [version, build, build-macos]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/node-agent-v')
+    # build-macos is skipped below the first Mac agent: the release goes ahead
+    # without it then, and needs it from that version on.
+    if: >-
+      always() && startsWith(github.ref, 'refs/tags/node-agent-v')
+      && needs.version.result == 'success' && needs.build.result == 'success'
+      && (needs.build-macos.result == 'success'
+          || (needs.build-macos.result == 'skipped' && needs.version.outputs.mac != 'true'))
     permissions:
       contents: write  # creates the release
     steps:
@@ -119,6 +299,15 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true
+
+      - name: How the Mac build is signed
+        id: mac
+        run: |
+          if [ -f artifacts/faden-agent-macos-arm64.SIGNING.txt ]; then
+            echo "line=$(cat artifacts/faden-agent-macos-arm64.SIGNING.txt)" >> "$GITHUB_OUTPUT"
+          else
+            echo "line=No Mac build in this release: the first is agent 0.3.0." >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Create release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
@@ -132,11 +321,16 @@ jobs:
             `.THIRD-PARTY-NOTICES.txt` carries their texts, and
             `faden-agent license --third-party` prints the same.
 
-            Standalone agent binaries for Linux, no Python needed. Machines normally
-            get them through the install line on the Fadenstack **Machines → Add a
-            machine** page, which checks the SHA-256 against the server's own copy.
+            Standalone agent binaries for Linux and for Macs with Apple Silicon, no
+            Python needed. Machines normally get them through the install line on
+            the Fadenstack **Machines → Add a machine** page, which checks the
+            SHA-256 against the server's own copy.
 
-            Built in Debian bookworm (glibc 2.36), so they run on that and newer.
+            Linux builds are made in Debian bookworm (glibc 2.36), so they run on that
+            and newer. The Mac build (`faden-agent-macos-arm64`, and a notarized
+            `.pkg` when the release carries one) runs on macOS 26 and newer.
+
+            ${{ steps.mac.outputs.line }}
           files: artifacts/*
 
   pypi:
@@ -145,7 +339,8 @@ jobs:
     # in the `pypi` environment, which only release tags may use.
     needs: [version, release]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/node-agent-v')
+    # always(): a skipped build-macos upstream must not skip this once release succeeded.
+    if: always() && needs.release.result == 'success' && startsWith(github.ref, 'refs/tags/node-agent-v')
     environment: pypi
     permissions:
       contents: read
@@ -171,7 +366,7 @@ jobs:
 
   sbom:
     needs: [version, release]
-    if: startsWith(github.ref, 'refs/tags/node-agent-v')
+    if: always() && needs.release.result == 'success' && startsWith(github.ref, 'refs/tags/node-agent-v')
     permissions:
       contents: write
       packages: read

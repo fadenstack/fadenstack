@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The agent's entitlements under the hardened runtime: none. A frozen Python
+  needs no JIT and no unsigned executable memory, and every library it unpacks
+  is signed with the executable's own identity. Add an exception only for a
+  failure seen in a hardened build (FADEN_MAC_SIGNING=hardened-adhoc shows it
+  without an Apple account), and say which library needed it.
+-->
+<plist version="1.0">
+<dict>
+</dict>
+</plist>

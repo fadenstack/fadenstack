@@ -132,6 +132,35 @@ async def test_plan_carries_the_pinned_digest_with_no_local_copy(
 
 
 @pytest.mark.anyio()
+async def test_a_mac_plan_offers_the_notarized_package_when_it_is_pinned(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pin = {"macos-arm64": "a" * 64, "macos-arm64-pkg": "b" * 64, "linux-aarch64": "c" * 64}
+    monkeypatch.setattr(install_api, "pinned_digest", pin.get)
+    monkeypatch.setattr(install_api, "local_binary", lambda _build: None)
+    body = await _plan(client, "darwin-arm64")
+    assert body["sha256"] == "a" * 64
+    assert body["package_sha256"] == "b" * 64
+    assert str(body["package_url"]).endswith(
+        f"/node-agent-v{install_api.AGENT_VERSION}/faden-agent-macos-arm64.pkg"
+    )
+    assert body["package_binary"] == f"/Library/Fadenstack/staging/faden-agent-{install_api.AGENT_VERSION}"
+    # Linux never gets one, whatever the pin holds.
+    assert "package_url" not in await _plan(client, "linux-aarch64")
+
+
+@pytest.mark.anyio()
+async def test_a_mac_plan_without_a_pinned_package_is_the_bare_binary(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(install_api, "pinned_digest", {"macos-arm64": "a" * 64}.get)
+    monkeypatch.setattr(install_api, "local_binary", lambda _build: None)
+    body = await _plan(client, "darwin-arm64")
+    assert body["sha256"] == "a" * 64
+    assert not any(key.startswith("package_") for key in body)
+
+
+@pytest.mark.anyio()
 async def test_plan_offers_no_build_it_cannot_verify(
     client: AsyncClient, fastapi_app: FastAPI, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -324,23 +353,37 @@ class TestInstallerOnAMac:
         plan_sha: str | None = None,
         hashers: dict[str, str] | None = None,
         isolated_path: bool = False,
+        package: dict[str, str] | None = None,
+        package_bytes: bytes | None = None,
+        installer: str = "exit 0",
+        stat: str = 'echo "0 755"',
     ) -> subprocess.CompletedProcess[str]:
         served = self.AGENT if served is None else served
         plan_sha = hashlib.sha256(self.AGENT).hexdigest() if plan_sha is None else plan_sha
         bin_dir = tmp_path / "bin"
         bin_dir.mkdir()
         (tmp_path / "served").write_bytes(served)
+        extra = "".join(f', "{key}": "{value}"' for key, value in (package or {}).items())
         (tmp_path / "plan.json").write_text(
             f'{{"platform": "macos-arm64", "url": "{ORIGIN}/api/install/binary/macos-arm64", '
-            f'"sha256": "{plan_sha}", "source": "checkout"}}',
+            f'"sha256": "{plan_sha}", "source": "checkout"{extra}}}',
             encoding="utf-8", newline="\n",
         )
+        if package_bytes is not None:
+            (tmp_path / "served.pkg").write_bytes(package_bytes)
         _stub(bin_dir, "curl",
               'out=""; url=""\n'
               'while [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift ;; -*) ;; *) url="$1" ;; esac; shift; done\n'
               f'echo "$url" >> "{tmp_path.as_posix()}/requests"\n'
+              'case "$url" in *.pkg)\n'
+              f'  [ -f "{tmp_path.as_posix()}/served.pkg" ] || exit 22\n'
+              f'  cat "{tmp_path.as_posix()}/served.pkg" > "$out"; exit 0 ;;\n'
+              'esac\n'
               f'if [ -n "$out" ]; then cat "{tmp_path.as_posix()}/served" > "$out"; '
               f'else cat "{tmp_path.as_posix()}/plan.json"; fi')
+        _stub(bin_dir, "installer", f'echo "$@" >> "{tmp_path.as_posix()}/installer"\n{installer}')
+        _stub(bin_dir, "pkgutil", f'echo "$@" >> "{tmp_path.as_posix()}/pkgutil"')
+        _stub(bin_dir, "stat", stat)
         _stub(bin_dir, "uname", f'case "$1" in -s) echo Darwin ;; -m) echo {arch} ;; esac')
         _stub(bin_dir, "sysctl", f"echo {translated}")
         _stub(bin_dir, "sw_vers", f"echo {macos}")
@@ -357,7 +400,9 @@ class TestInstallerOnAMac:
         else:
             path = f"{path}{os.pathsep}{os.environ['PATH']}"
         script = tmp_path / "install.sh"
-        script.write_text(_script(), encoding="utf-8", newline="\n")
+        # The pkg's /Library/Fadenstack, relocated under tmp_path: no test touches the real one.
+        script.write_text(_script().replace(install_api.MAC_PKG_LIBRARY, self._library(tmp_path)),
+                          encoding="utf-8", newline="\n")
         return subprocess.run(
             ["sh", str(script), *args], capture_output=True, text=True, timeout=60,
             env={"PATH": path, "HOME": str(tmp_path), "AGENT_ARGS": str(tmp_path / "agent-args")},
@@ -395,6 +440,27 @@ class TestInstallerOnAMac:
         assert f"sudo sh faden-agent.sh --join {ORIGIN}" in result.stderr
         assert "sudo must not be used" not in result.stderr
         assert not self._fetched(tmp_path)
+
+    def test_the_sudo_hint_keeps_the_ca_file(self, tmp_path: Path) -> None:
+        (tmp_path / "server-ca.crt").write_text("ca", encoding="utf-8")
+        result = self._run(tmp_path, uid=501, args=("--join", ORIGIN, "--ca-file", str(tmp_path / "server-ca.crt")))
+        assert result.returncode == 1
+        ca = f"{tmp_path.resolve()}/server-ca.crt"
+        assert f"sudo sh faden-agent.sh --join {ORIGIN} --ca-file '{ca}'" in result.stderr
+
+    def test_the_sudo_hint_quotes_a_ca_path_with_a_quote_in_it(self, tmp_path: Path) -> None:
+        folder = tmp_path / "it's here"
+        folder.mkdir()
+        (folder / "server-ca.crt").write_text("ca", encoding="utf-8")
+        result = self._run(tmp_path, uid=501, args=("--join", ORIGIN, "--ca-file", str(folder / "server-ca.crt")))
+        assert result.returncode == 1
+        hint = next(line for line in result.stderr.splitlines() if "sudo sh faden-agent.sh" in line)
+        # What a shell makes of the pasted hint: the path comes back whole.
+        words = subprocess.run(
+            ["sh", "-c", 'eval "set -- $1"; printf "%s\\n" "$@"', "_", hint.split("sudo ", 1)[1]],
+            capture_output=True, text=True, timeout=30, check=True,
+        ).stdout.splitlines()
+        assert words[-2:] == ["--ca-file", f"{folder.resolve()}/server-ca.crt"]
 
     def test_user_scope_is_refused(self, tmp_path: Path) -> None:
         result = self._run(tmp_path, args=("--user", "--join", ORIGIN))
@@ -437,11 +503,173 @@ class TestInstallerOnAMac:
         assert result.returncode == 1
         assert "gave no SHA-256" in result.stderr
 
+    # ── the notarized pkg, when the release has one ──────────────────────────
+
+    PKG = b"xar! a flat package"
+    STAGED_NAME = "faden-agent-0.0.0-test"
+
+    @staticmethod
+    def _library(tmp_path: Path) -> str:
+        return f"{tmp_path.as_posix()}/Library/Fadenstack"
+
+    def _staged(self, tmp_path: Path) -> Path:
+        return Path(self._library(tmp_path)) / "staging" / self.STAGED_NAME
+
+    def _package(self, tmp_path: Path, **overrides: str) -> dict[str, str]:
+        return {
+            "package_url": "https://github.com/x/faden-agent-macos-arm64.pkg",
+            "package_sha256": hashlib.sha256(self.PKG).hexdigest(),
+            "package_binary": self._staged(tmp_path).as_posix(),
+        } | overrides
+
+    def _stages(self, tmp_path: Path, content: bytes | None = None, *, link: bool = False) -> str:
+        """An Installer stand-in that stages *content* (the served agent) as the pkg would."""
+        source = tmp_path / "to-stage"
+        source.write_bytes(self.AGENT if content is None else content)
+        staged = self._staged(tmp_path).as_posix()
+        put = f'ln -s "{source.as_posix()}" "{staged}"' if link else f'cp "{source.as_posix()}" "{staged}"'
+        return f'mkdir -p "$(dirname "{staged}")"\n{put}'
+
+    def test_a_package_is_installed_and_its_verified_copy_joins(self, tmp_path: Path) -> None:
+        result = self._run(tmp_path, package=self._package(tmp_path), package_bytes=self.PKG,
+                           installer=self._stages(tmp_path))
+        assert result.returncode == 0, result.stderr
+        assert "Package verified and installed." in result.stdout
+        assert "-pkg" in (tmp_path / "installer").read_text()
+        assert (tmp_path / "agent-args").read_text().split() == ["join", ORIGIN]
+        # Cleaned up: the staged copy, the staging directory and the receipt.
+        assert not self._staged(tmp_path).exists()
+        assert not self._staged(tmp_path).parent.exists()
+        assert "--forget com.fadenstack.agent.pkg" in (tmp_path / "pkgutil").read_text()
+
+    def test_the_agent_runs_from_its_own_copy_not_from_staging(self, tmp_path: Path) -> None:
+        # The stand-in agent records where it ran from.
+        agent = b'#!/bin/sh\necho "$0" > "$AGENT_ARGS"\n'
+        result = self._run(tmp_path, served=agent, plan_sha=hashlib.sha256(agent).hexdigest(),
+                           package=self._package(tmp_path), package_bytes=self.PKG,
+                           installer=self._stages(tmp_path, agent))
+        assert result.returncode == 0, result.stderr
+        ran_from = (tmp_path / "agent-args").read_text().strip()
+        assert ran_from.endswith("/faden-agent-pkg")
+        assert "/staging/" not in ran_from
+
+    def test_without_a_package_nothing_is_installed_with_installer(self, tmp_path: Path) -> None:
+        result = self._run(tmp_path)
+        assert result.returncode == 0, result.stderr
+        assert not (tmp_path / "installer").exists()
+
+    def test_an_unreachable_package_falls_back_to_the_verified_agent(self, tmp_path: Path) -> None:
+        result = self._run(tmp_path, package=self._package(tmp_path))
+        assert result.returncode == 0, result.stderr
+        assert "installing the verified agent itself" in result.stdout
+        assert not (tmp_path / "installer").exists()
+        assert (tmp_path / "agent-args").read_text().split() == ["join", ORIGIN]
+
+    def test_a_package_that_does_not_match_is_never_installed(self, tmp_path: Path) -> None:
+        result = self._run(tmp_path, package=self._package(tmp_path), package_bytes=b"something else")
+        assert result.returncode == 1
+        assert "package does not match the expected SHA-256" in result.stderr
+        assert not (tmp_path / "installer").exists()
+        assert not (tmp_path / "agent-args").exists()
+
+    def test_a_package_without_a_valid_digest_is_refused(self, tmp_path: Path) -> None:
+        result = self._run(tmp_path, package=self._package(tmp_path, package_sha256="nope"),
+                           package_bytes=self.PKG)
+        assert result.returncode == 1
+        assert "without a valid SHA-256" in result.stderr
+        assert not (tmp_path / "installer").exists()
+
+    @pytest.mark.parametrize("staged", ["/usr/local/bin/faden-agent", "", "../x", "a/b"])
+    def test_a_package_staged_elsewhere_is_refused(self, tmp_path: Path, staged: str) -> None:
+        # The script removes the staged copy afterwards: it must name nothing else.
+        where = staged if staged.startswith("/") else f"{self._library(tmp_path)}/staging/{staged}"
+        result = self._run(tmp_path, package=self._package(tmp_path, package_binary=where),
+                           package_bytes=self.PKG)
+        assert result.returncode == 1
+        assert "stages the agent outside" in result.stderr
+        assert not (tmp_path / "installer").exists()
+
+    @pytest.mark.parametrize("owner_mode", ["501 755", "0 775", "0 757", "0 777"])
+    def test_a_staging_directory_not_roots_alone_is_refused_before_installer(
+        self, tmp_path: Path, owner_mode: str
+    ) -> None:
+        (tmp_path / "Library" / "Fadenstack").mkdir(parents=True)
+        result = self._run(tmp_path, package=self._package(tmp_path), package_bytes=self.PKG,
+                           installer=self._stages(tmp_path), stat=f'echo "{owner_mode}"')
+        assert result.returncode == 1
+        assert "is not root's alone" in result.stderr
+        assert not (tmp_path / "installer").exists()
+        assert not (tmp_path / "agent-args").exists()
+
+    def test_a_staging_directory_that_is_a_symlink_is_refused(self, tmp_path: Path) -> None:
+        (tmp_path / "Library").mkdir()
+        (tmp_path / "elsewhere").mkdir()
+        (tmp_path / "Library" / "Fadenstack").symlink_to(tmp_path / "elsewhere")
+        result = self._run(tmp_path, package=self._package(tmp_path), package_bytes=self.PKG,
+                           installer=self._stages(tmp_path))
+        assert result.returncode == 1
+        assert "is not root's alone" in result.stderr
+        assert not (tmp_path / "installer").exists()
+
+    def test_a_staged_symlink_is_not_run(self, tmp_path: Path) -> None:
+        result = self._run(tmp_path, package=self._package(tmp_path), package_bytes=self.PKG,
+                           installer=self._stages(tmp_path, link=True))
+        assert result.returncode == 1
+        assert "staged no plain file" in result.stderr
+        assert not (tmp_path / "agent-args").exists()
+        assert not self._staged(tmp_path).is_symlink()  # cleaned up all the same
+
+    def test_a_package_installer_refuses_is_not_joined(self, tmp_path: Path) -> None:
+        result = self._run(tmp_path, package=self._package(tmp_path), package_bytes=self.PKG,
+                           installer="exit 1")
+        assert result.returncode == 1
+        assert "Installer refused" in result.stderr
+        assert "-target /" in (tmp_path / "installer").read_text()
+        assert not (tmp_path / "agent-args").exists()
+        # ...and the receipt is forgotten on the way out.
+        assert "--forget com.fadenstack.agent.pkg" in (tmp_path / "pkgutil").read_text()
+
+    def test_a_package_that_staged_another_build_is_not_joined(self, tmp_path: Path) -> None:
+        result = self._run(tmp_path, package=self._package(tmp_path), package_bytes=self.PKG,
+                           installer=self._stages(tmp_path, b"#!/bin/sh\necho other build\n"))
+        assert result.returncode == 1
+        assert "staged another build" in result.stderr
+        assert not (tmp_path / "agent-args").exists()
+        assert not self._staged(tmp_path).exists()
+
     def test_no_hash_tool_at_all_is_a_refusal(self, tmp_path: Path) -> None:
         result = self._run(tmp_path, isolated_path=True)
         assert result.returncode == 1, result.stdout + result.stderr
         assert "neither sha256sum nor shasum" in result.stderr
         assert not (tmp_path / "agent-args").exists()
+
+
+def _outside_darwin(script: str) -> str:
+    """The script as Linux runs it: without its top-level ``if [ "$OS" = darwin ]`` blocks."""
+    kept: list[str] = []
+    skipping = False
+    for line in script.splitlines(keepends=True):
+        if not skipping and line.startswith('if [ "$OS" = darwin ]; then'):
+            skipping = True
+        elif skipping:
+            skipping = line.rstrip("\n") != "fi"
+        else:
+            kept.append(line)
+    return "".join(kept)
+
+
+#: The Linux part of the script as rendered for https://x.example by the core the
+#: Mac work started from (054b177b). The Mac changes must leave it byte for byte;
+#: a deliberate change to the Linux installer updates this digest with it.
+LINUX_SCRIPT_SHA256 = "c561b8d5dc0cfbc38dc040c5902f290c0fe4e52008eda1403d1a83ab77b81cb3"
+
+
+def test_the_linux_script_is_unchanged_by_the_mac_work() -> None:
+    script = install_api.render_installer("https://x.example")
+    assert script.count('if [ "$OS" = darwin ]; then') == 2
+    linux = _outside_darwin(script)
+    assert "PKG_" not in linux and "installer -pkg" not in linux
+    assert hashlib.sha256(linux.encode()).hexdigest() == LINUX_SCRIPT_SHA256
 
 
 @pytest.mark.skipif(shutil.which("sh") is None, reason="no POSIX sh available")
