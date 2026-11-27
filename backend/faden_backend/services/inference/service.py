@@ -421,7 +421,12 @@ class EnvironmentService:
         """
         environment = await self.get(environment_id)
         node_role = _enum(role, EnvironmentNodeRole, what="role")
-        await self._require_ray_tls_member(environment, node_id)
+        control_plane = await self.control_plane_dao.get(environment.control_plane_id)
+        driver = getattr(control_plane, "driver", None) or "ray"
+        if driver == "ray":
+            await self._require_ray_tls_member(environment, node_id)
+        elif driver == "standalone":
+            await self._require_standalone_member(environment, node_id)
         try:
             member = await self.node_dao.add_node(environment_id, node_id, node_role)
         except IntegrityError as exc:
@@ -437,6 +442,27 @@ class EnvironmentService:
             await ComputePoolCoordinator(self.session).assign(
                 environment_id=environment_id, node=node, member=member
             )
+
+    async def _require_standalone_member(self, environment: InferenceEnvironment, node_id: uuid.UUID) -> None:
+        """Refuse a second machine, or one whose agent cannot serve natively, in a standalone environment."""
+        from faden_backend.db.dao.node_control_dao import NodeControlDAO  # noqa: PLC0415
+        from faden_backend.services.inference.drivers.standalone.admission import (  # noqa: PLC0415
+            node_refusal,
+        )
+
+        members = await self.node_dao.list_for_environment(environment.id)
+        others = [m for m in members if m.node_id != node_id]
+        if others:
+            raise ConflictError(
+                "A standalone environment runs on exactly one machine, and this one already has it. "
+                "Make another environment for the other machine."
+            )
+        node = await NodeControlDAO(self.session).get_node_by_id(node_id)
+        if node is None:
+            return  # the membership insert reports the unknown node
+        problem = node_refusal(node)
+        if problem:
+            raise ConflictError(problem)
 
     async def _require_ray_tls_member(self, environment: InferenceEnvironment, node_id: uuid.UUID) -> None:
         """Refuse a machine that cannot apply the Ray TLS its cluster has switched on."""
@@ -751,7 +777,8 @@ class DeploymentService:
         says so, so a new code path is safe by default.
         """
         wake_reconciler_after_commit(self.session)  # act now, not at the next tick
-        if not await self.environment_dao.get(environment_id):
+        environment = await self.environment_dao.get(environment_id)
+        if not environment:
             raise NotFoundError("environment", environment_id)
         if not await self.model_dao.get(model_id):
             raise NotFoundError("model", model_id)
@@ -760,6 +787,7 @@ class DeploymentService:
         self.validate_spec(spec)
         refuse_new_pictures(spec)
         self._guard_spec(spec, previous=None, allow_guarded=allow_guarded)
+        await self._admit_standalone(environment, spec)
         try:
             return await self.dao.create(
                 environment_id=environment_id,
@@ -771,6 +799,40 @@ class DeploymentService:
             )
         except IntegrityError as exc:
             raise ConflictError(f"deployment name already exists: {name}") from exc
+
+    async def _admit_standalone(self, environment: InferenceEnvironment, spec: dict[str, Any]) -> None:
+        """Refuse, with a sentence, a standalone deployment its machine cannot serve.
+
+        Asked here so the operator hears it when they deploy, instead of
+        watching a deployment wait for something that will not come. The
+        reconciler asks again on every pass (the agent can change under it).
+        """
+        from faden_backend.services.inference.driver_key import driver_key_for  # noqa: PLC0415
+
+        if await driver_key_for(self.session, environment) != "standalone":
+            return
+        from faden_backend.services.inference.drivers.standalone.admission import (  # noqa: PLC0415
+            memory_budget,
+            node_refusal,
+        )
+
+        machines = await EnvironmentNodeDAO(self.session).machines(environment.id)
+        if not machines:
+            raise ConflictError(
+                f"{environment.name} has no machine yet. Add the Mac it should run on, then deploy."
+            )
+        node = machines[0]
+        problem = node_refusal(node)
+        if problem:
+            raise ConflictError(problem)
+        replicas = ((spec.get("scale") or {}).get("replicas")) or 1
+        if replicas != 1 or (spec.get("scale") or {}).get("autoscale"):
+            raise ConflictError("A standalone environment runs one copy of a model; set scale.replicas to 1.")
+        memory = (((spec.get("resources") or {}).get("replica") or {}).get("memory"))
+        try:
+            memory_budget(node, memory)
+        except ValueError as exc:
+            raise ConflictError(str(exc)) from exc
 
     def validate_spec(self, spec: dict[str, Any]) -> InferenceDeploymentSpecV1Alpha1:
         """Validate a spec without persisting.

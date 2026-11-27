@@ -67,3 +67,7 @@ registry = DriverRegistry()
 # Register the Ray driver
 from faden_backend.services.inference.drivers.ray.driver import RayDriver
 registry.register(RayDriver.key, RayDriver)
+
+# Register the standalone driver: one machine, a native engine per deployment (a Mac).
+from faden_backend.services.inference.drivers.standalone.driver import StandaloneDriver  # noqa: E402
+registry.register(StandaloneDriver.key, StandaloneDriver)
