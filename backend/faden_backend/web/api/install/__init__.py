@@ -441,7 +441,10 @@ if [ "$OS" = darwin ]; then
     echo "ERROR: on a Mac the agent installs as a system service. Run this with sudo:" >&2
     # With the CA the console's line fetched: dropped, the rerun cannot reach an HTTPS backend.
     HINT_CA=""
-    if [ -n "$CA_FILE" ]; then HINT_CA=" --ca-file '$CA_FILE'"; fi
+    if [ -n "$CA_FILE" ]; then
+      # Single-quoted for the shell it is pasted into; a ' in the path becomes '\\''.
+      HINT_CA=" --ca-file '$(printf '%s' "$CA_FILE" | sed "s/'/'\\\\\\\\''/g")'"
+    fi
     echo "       sudo sh faden-agent.sh --join $BACKEND$HINT_CA" >&2
     exit 1
   fi

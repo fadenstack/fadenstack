@@ -448,6 +448,20 @@ class TestInstallerOnAMac:
         ca = f"{tmp_path.resolve()}/server-ca.crt"
         assert f"sudo sh faden-agent.sh --join {ORIGIN} --ca-file '{ca}'" in result.stderr
 
+    def test_the_sudo_hint_quotes_a_ca_path_with_a_quote_in_it(self, tmp_path: Path) -> None:
+        folder = tmp_path / "it's here"
+        folder.mkdir()
+        (folder / "server-ca.crt").write_text("ca", encoding="utf-8")
+        result = self._run(tmp_path, uid=501, args=("--join", ORIGIN, "--ca-file", str(folder / "server-ca.crt")))
+        assert result.returncode == 1
+        hint = next(line for line in result.stderr.splitlines() if "sudo sh faden-agent.sh" in line)
+        # What a shell makes of the pasted hint: the path comes back whole.
+        words = subprocess.run(
+            ["sh", "-c", 'eval "set -- $1"; printf "%s\\n" "$@"', "_", hint.split("sudo ", 1)[1]],
+            capture_output=True, text=True, timeout=30, check=True,
+        ).stdout.splitlines()
+        assert words[-2:] == ["--ca-file", f"{folder.resolve()}/server-ca.crt"]
+
     def test_user_scope_is_refused(self, tmp_path: Path) -> None:
         result = self._run(tmp_path, args=("--user", "--join", ORIGIN))
         assert result.returncode == 2

@@ -58,6 +58,10 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.check.outputs.version }}
+      # Whether this agent version has a Mac build: from FIRST_MAC_AGENT_VERSION
+      # on, by pin_agent.py's own comparison. A hotfix below it (0.2.13) is
+      # released for Linux alone, and no Mac failure can hold it back.
+      mac: ${{ steps.mac.outputs.mac }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: The tag, the agent and the backend agree on the version
@@ -78,6 +82,14 @@ jobs:
             exit 1
           fi
           echo "version=$PYPROJECT" >> "$GITHUB_OUTPUT"
+      - name: Does this version have a Mac build
+        id: mac
+        env:
+          VERSION: ${{ steps.check.outputs.version }}
+        run: |
+          mac=$(python3 -c 'import sys; sys.path.insert(0, "release"); import pin_agent; print("true" if "macos-arm64" in pin_agent.builds_for(sys.argv[1]) else "false")' "$VERSION")
+          echo "Agent $VERSION has a Mac build: $mac"
+          echo "mac=$mac" >> "$GITHUB_OUTPUT"
 
   build:
     needs: version
@@ -135,6 +147,8 @@ jobs:
     # secrets. apple-signing's deployment policy (repository settings) admits
     # node-agent-v* tags; a dispatch from elsewhere waits for that policy.
     needs: version
+    # From the first Mac agent on; a dispatch builds it whatever the version, to test.
+    if: needs.version.outputs.mac == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: macos-26
     environment: apple-signing
     steps:
@@ -271,7 +285,13 @@ jobs:
   release:
     needs: [version, build, build-macos]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/node-agent-v')
+    # build-macos is skipped below the first Mac agent: the release goes ahead
+    # without it then, and needs it from that version on.
+    if: >-
+      always() && startsWith(github.ref, 'refs/tags/node-agent-v')
+      && needs.version.result == 'success' && needs.build.result == 'success'
+      && (needs.build-macos.result == 'success'
+          || (needs.build-macos.result == 'skipped' && needs.version.outputs.mac != 'true'))
     permissions:
       contents: write  # creates the release
     steps:
@@ -282,7 +302,12 @@ jobs:
 
       - name: How the Mac build is signed
         id: mac
-        run: echo "line=$(cat artifacts/faden-agent-macos-arm64.SIGNING.txt)" >> "$GITHUB_OUTPUT"
+        run: |
+          if [ -f artifacts/faden-agent-macos-arm64.SIGNING.txt ]; then
+            echo "line=$(cat artifacts/faden-agent-macos-arm64.SIGNING.txt)" >> "$GITHUB_OUTPUT"
+          else
+            echo "line=No Mac build in this release: the first is agent 0.3.0." >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Create release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
@@ -314,7 +339,8 @@ jobs:
     # in the `pypi` environment, which only release tags may use.
     needs: [version, release]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/node-agent-v')
+    # always(): a skipped build-macos upstream must not skip this once release succeeded.
+    if: always() && needs.release.result == 'success' && startsWith(github.ref, 'refs/tags/node-agent-v')
     environment: pypi
     permissions:
       contents: read
@@ -340,7 +366,7 @@ jobs:
 
   sbom:
     needs: [version, release]
-    if: startsWith(github.ref, 'refs/tags/node-agent-v')
+    if: always() && needs.release.result == 'success' && startsWith(github.ref, 'refs/tags/node-agent-v')
     permissions:
       contents: write
       packages: read
