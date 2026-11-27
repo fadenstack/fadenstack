@@ -391,6 +391,8 @@ class TestInstallerOnAMac:
         result = self._run(tmp_path, uid=501)
         assert result.returncode == 1
         assert "Run this with sudo" in result.stderr
+        # the file's name, not $0 -- which is "sh" when the script came through a pipe
+        assert f"sudo sh faden-agent.sh --join {ORIGIN}" in result.stderr
         assert "sudo must not be used" not in result.stderr
         assert not self._fetched(tmp_path)
 

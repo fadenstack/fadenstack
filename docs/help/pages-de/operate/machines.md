@@ -234,6 +234,7 @@ erneut auf ihr aus; sie stellt dann wie beim ersten Mal eine Beitrittsanfrage.
 | Das Installationsprogramm fragt nach einem `sudo`-Passwort, das Sie nicht haben | Lassen Sie `sudo` in der Zeile weg (siehe [Ohne sudo](#without-sudo)). |
 | **`ERROR: this backend publishes no agent build for linux-…`** | Für diese Maschine gibt es keinen Agent-Build: Unter Linux läuft der Agent nur auf x86_64 und aarch64. |
 | **`ERROR: the download does not match the expected digest.`** | Der Download ist nicht der Build, den der Server erwartet, meist weil die Kopie in `~/fadenstack/agent-binaries/` aus einem älteren Release stammt. Ersetzen Sie sie durch die Builds des aktuellen Releases. |
+| **`ERROR: this backend publishes no agent build for darwin-arm64.`** | Dieser Server hält noch keinen Mac-Build des Agents bereit (siehe den Vorschau-Hinweis unter [Ein Mac](#a-mac)). |
 | **`ERROR: this is an Intel Mac.`** oder **`… needs macOS 26 or newer.`** | Der Agent läuft nur auf Macs mit Apple Silicon unter macOS 26 oder neuer. |
 | **`ERROR: on a Mac the agent installs as a system service. Run this with sudo`** | Führen Sie die Zeile so aus, wie die Konsole sie anzeigt, mit `sudo`, als Benutzer, der `sudo` verwenden darf. |
 | **`… _fadenagent … Refusing to continue`** auf einem Mac | Es gibt ein Konto dieses Namens, das Fadenstack nicht angelegt hat oder das sich seitdem verändert hat. Es wurde nichts geändert; fragen Sie, wer den Mac verwaltet. |

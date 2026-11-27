@@ -427,7 +427,7 @@ if [ "$OS" = darwin ]; then
   # no per-user variant to fall back to.
   if [ "$(id -u)" -ne 0 ]; then
     echo "ERROR: on a Mac the agent installs as a system service. Run this with sudo:" >&2
-    echo "       sudo sh $0 ..." >&2
+    echo "       sudo sh faden-agent.sh --join $BACKEND" >&2
     exit 1
   fi
   if [ "$FORCE_USER" = 1 ] || [ "$INSTALL_PATH_SET" = 1 ]; then

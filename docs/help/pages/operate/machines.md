@@ -217,6 +217,7 @@ it did the first time.
 | The installer asks for a `sudo` password you do not have | Leave `sudo` out of the line (see [Without sudo](#without-sudo)). |
 | **`ERROR: this backend publishes no agent build for linux-…`** | There is no agent build for this machine: on Linux, the agent runs on x86_64 and aarch64 only. |
 | **`ERROR: the download does not match the expected digest.`** | The download is not the build the server expects, usually because the copy in `~/fadenstack/agent-binaries/` is from an older release. Replace it with the current release's builds. |
+| **`ERROR: this backend publishes no agent build for darwin-arm64.`** | This server carries no Mac build of the agent yet (see the preview note under [A Mac](#a-mac)). |
 | **`ERROR: this is an Intel Mac.`** or **`… needs macOS 26 or newer.`** | The agent runs on Macs with Apple Silicon on macOS 26 or newer only. |
 | **`ERROR: on a Mac the agent installs as a system service. Run this with sudo`** | Run the line as the console gives it, with `sudo`, as a user who may use `sudo`. |
 | **`… _fadenagent … Refusing to continue`** on a Mac | An account of that name exists that Fadenstack did not create, or that changed since. Nothing was changed; ask whoever manages the Mac. |
