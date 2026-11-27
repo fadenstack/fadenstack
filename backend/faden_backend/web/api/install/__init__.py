@@ -104,7 +104,9 @@ MIN_MACOS_MAJOR = 26
 MAC_PKG_BUILD = "macos-arm64"
 MAC_PKG_PIN = "macos-arm64-pkg"
 MAC_PKG_ID = "com.fadenstack.agent.pkg"
-MAC_PKG_STAGING = "/Library/Fadenstack/staging/"
+MAC_PKG_LIBRARY = "/Library/Fadenstack"
+MAC_PKG_STAGING_DIR = f"{MAC_PKG_LIBRARY}/staging"
+MAC_PKG_STAGING = f"{MAC_PKG_STAGING_DIR}/"
 
 
 def _source_checkout_binary_dir() -> Path | None:
@@ -438,7 +440,9 @@ if [ "$OS" = darwin ]; then
   if [ "$(id -u)" -ne 0 ]; then
     echo "ERROR: on a Mac the agent installs as a system service. Run this with sudo:" >&2
     # With the CA the console's line fetched: dropped, the rerun cannot reach an HTTPS backend.
-    echo "       sudo sh faden-agent.sh --join $BACKEND${{CA_FILE:+ --ca-file $CA_FILE}}" >&2
+    HINT_CA=""
+    if [ -n "$CA_FILE" ]; then HINT_CA=" --ca-file '$CA_FILE'"; fi
+    echo "       sudo sh faden-agent.sh --join $BACKEND$HINT_CA" >&2
     exit 1
   fi
   if [ "$FORCE_USER" = 1 ] || [ "$INSTALL_PATH_SET" = 1 ]; then
@@ -486,11 +490,6 @@ PLAN=$(printf '%s' "$PLAN" | sed 's|\\\\/|/|g')
 URL=$(printf '%s' "$PLAN" | sed -n 's/.*"url"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p')
 FALLBACK=$(printf '%s' "$PLAN" | sed -n 's/.*"fallback_url"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p')
 SHA=$(printf '%s' "$PLAN" | sed -n 's/.*"sha256"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p')
-# A Mac's notarized pkg, when the release has one (each key is preceded by "_",
-# so the three patterns above never match these).
-PKG_URL=$(printf '%s' "$PLAN" | sed -n 's/.*"package_url"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p')
-PKG_SHA=$(printf '%s' "$PLAN" | sed -n 's/.*"package_sha256"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p')
-PKG_BIN=$(printf '%s' "$PLAN" | sed -n 's/.*"package_binary"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p')
 
 if [ -z "$URL" ]; then
   echo "ERROR: this backend publishes no agent build for $PLATFORM_KEY." >&2
@@ -582,6 +581,19 @@ if [ "$OS" = darwin ]; then
   # pkg. Installer checks it and stages the binary, root's; the staged copy
   # must be the very build verified above, and it is what joins. The pkg runs
   # no scripts. When the pkg cannot be fetched, the verified download is used.
+  # (Each key is preceded by "_", so the url and sha256 patterns above never match these.)
+  PKG_URL=$(printf '%s' "$PLAN" | sed -n 's/.*"package_url"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p')
+  PKG_SHA=$(printf '%s' "$PLAN" | sed -n 's/.*"package_sha256"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p')
+  PKG_BIN=$(printf '%s' "$PLAN" | sed -n 's/.*"package_binary"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p')
+  # A directory root runs from must be root's: owned by root, a real directory,
+  # writable by no one else. Absent is fine (Installer makes it, root's).
+  root_only_dir() {{
+    [ -e "$1" ] || [ -L "$1" ] || return 0
+    [ -d "$1" ] && [ ! -L "$1" ] || return 1
+    OWNER_MODE=$(stat -f '%u %Lp' "$1") || return 1
+    [ "${{OWNER_MODE%% *}}" = 0 ] || return 1
+    [ $((0${{OWNER_MODE#* }} & 022)) -eq 0 ]
+  }}
   if [ -n "$PKG_URL" ]; then
     case "$PKG_SHA" in
       *[!0-9a-f]*|"")
@@ -600,10 +612,17 @@ if [ "$OS" = darwin ]; then
         echo "ERROR: the downloaded package does not match the expected SHA-256; nothing was installed." >&2
         exit 1
       fi
+      for dir in {MAC_PKG_LIBRARY} {MAC_PKG_STAGING_DIR}; do
+        root_only_dir "$dir" || {{
+          echo "ERROR: $dir is not root's alone (owner root, writable by no one else)." >&2
+          echo "       Refusing to install." >&2
+          exit 1
+        }}
+      done
       # From here on, the staged copy and the package receipt go when this script does.
       cleanup_pkg() {{
         rm -rf "$TMP"; rm -f "$PKG_BIN"
-        rmdir {MAC_PKG_STAGING} 2>/dev/null || true
+        rmdir {MAC_PKG_STAGING_DIR} 2>/dev/null || true
         pkgutil --forget {MAC_PKG_ID} >/dev/null 2>&1 || true
       }}
       trap cleanup_pkg EXIT
@@ -611,11 +630,19 @@ if [ "$OS" = darwin ]; then
         echo "ERROR: macOS Installer refused the agent package; nothing was joined." >&2
         exit 1
       fi
-      if ! STAGED=$($HASH "$PKG_BIN") || [ "${{STAGED%% *}}" != "$ACTUAL" ]; then
+      # Run nothing from the staging directory: copy the staged binary into this
+      # script's own directory (mktemp -d, root's, 0700), and check and run that copy.
+      if ! root_only_dir {MAC_PKG_LIBRARY} || ! root_only_dir {MAC_PKG_STAGING_DIR} \
+          || [ -L "$PKG_BIN" ] || [ ! -f "$PKG_BIN" ] || ! cp "$PKG_BIN" "$TMP/faden-agent-pkg"; then
+        echo "ERROR: the package staged no plain file in a root-only directory. Refusing to install." >&2
+        exit 1
+      fi
+      if ! STAGED=$($HASH "$TMP/faden-agent-pkg") || [ "${{STAGED%% *}}" != "$ACTUAL" ]; then
         echo "ERROR: the package staged another build than the one verified. Refusing to install." >&2
         exit 1
       fi
-      AGENT="$PKG_BIN"
+      chmod 0755 "$TMP/faden-agent-pkg"
+      AGENT="$TMP/faden-agent-pkg"
       echo "  Package verified and installed."
     else
       echo "  Could not reach $PKG_URL; installing the verified agent itself."
