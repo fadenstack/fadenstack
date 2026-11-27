@@ -631,6 +631,15 @@ def backend_dev_env_for(shared_env_path: Path) -> dict[str, str]:
     loaded (RabbitMQ reports ``ACCESS_REFUSED``).
     """
     env = dict(BACKEND_DEV_ENV)
+    # Host-local folders for what an install keeps under its /data/faden
+    # volume: on a Mac that path does not exist (and cannot be made), and on
+    # Linux only root may make it. The audit trail's file copy failed on every
+    # audited request, and RAG Lite could store no file. Absolute: the backend
+    # does not expand "~" in these settings. (The gateway's chat files moved
+    # the same way: GATEWAY_DEV_ENV.)
+    dev_data = Path.home() / ".faden-dev"
+    env["FADEN_BACKEND_AUDIT_DIR"] = str(dev_data / "audit")
+    env["FADEN_BACKEND_RAG_LITE_FILE_STORE_ROOT"] = str(dev_data / "rag-lite")
     shared = _read_env_values(shared_env_path)
     # The gateway's tables (usage, chats for the admin pages) are read with the
     # shared Postgres login, as in an install. The backend's default was
