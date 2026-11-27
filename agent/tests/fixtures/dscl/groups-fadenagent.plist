@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>dsAttrTypeNative:record_daemon_version</key>
+	<array>
+		<string>10070000</string>
+	</array>
+	<key>dsAttrTypeStandard:AppleMetaNodeLocation</key>
+	<array>
+		<string>/Local/Default</string>
+	</array>
+	<key>dsAttrTypeStandard:GeneratedUID</key>
+	<array>
+		<string>00000000-0000-0000-0000-000000001450</string>
+	</array>
+	<key>dsAttrTypeStandard:Password</key>
+	<array>
+		<string>*</string>
+	</array>
+	<key>dsAttrTypeStandard:PrimaryGroupID</key>
+	<array>
+		<string>450</string>
+	</array>
+	<key>dsAttrTypeStandard:RealName</key>
+	<array>
+		<string>Fadenstack Node Agent</string>
+	</array>
+	<key>dsAttrTypeStandard:RecordName</key>
+	<array>
+		<string>_fadenagent</string>
+	</array>
+	<key>dsAttrTypeStandard:RecordType</key>
+	<array>
+		<string>dsRecTypeStandard:Groups</string>
+	</array>
+</dict>
+</plist>

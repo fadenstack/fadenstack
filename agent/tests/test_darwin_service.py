@@ -72,15 +72,25 @@ class FakeMac:
         return Result(0)
 
     def _dscl(self, args: list[str]) -> Result:
+        as_plist = args[0] == "-plist"
+        if as_plist:
+            args = args[1:]
         node, verb = args[0], args[1]
         if verb == "-read":
             collection, name = args[2].strip("/").split("/")
             table = self.users if collection == "Users" else self.groups
             if name not in table:
-                return Result(56, "", "Data source (/Search) is not valid.")
-            attr = args[3]
-            value = name if attr == "RecordName" else table[name].get(attr)
-            return Result(0, f"{attr}: {value}\n" if value is not None else "")
+                return Result(56, "", "<dscl_cmd> DS Error: -14136 (eDSRecordNotFound)")
+            record = {"RecordName": name, **table[name]}
+            wanted = args[3:] or list(record)
+            if not as_plist:  # only the existence check reads text
+                return Result(0, "".join(f"{a}: {record[a]}\n" for a in wanted if a in record))
+            # As real dscl writes it: IsHidden is a native attribute, the rest standard.
+            out = {
+                ("dsAttrTypeNative:" if a == "IsHidden" else "dsAttrTypeStandard:") + a: [record[a]]
+                for a in wanted if a in record
+            }
+            return Result(0, plistlib.dumps(out).decode())
         if verb == "-search":
             if self.search_fails:
                 return Result(70, "", "eDSNodeNotFound")
@@ -164,7 +174,8 @@ def layout(mac: FakeMac) -> Layout:
 def _install_account(mac: FakeMac, layout: Layout, number: int = 452) -> None:
     mac.users[ds.SERVICE_USER] = {
         "UniqueID": str(number), "PrimaryGroupID": str(number), "UserShell": "/usr/bin/false",
-        "IsHidden": "1", "NFSHomeDirectory": layout.real(layout.state_dir),
+        "IsHidden": "1", "NFSHomeDirectory": layout.real(layout.state_dir), "Password": "*",
+        "RealName": "Fadenstack Node Agent",
     }
     mac.groups[ds.SERVICE_USER] = {"PrimaryGroupID": str(number)}
     layout.marker.parent.mkdir(parents=True, exist_ok=True)
@@ -801,3 +812,134 @@ class TestStopAndUninstall:
         layout.cli_link.symlink_to("/opt/homebrew/bin/faden-agent")
         ds.uninstall(mac, layout, say=lambda _m: None, sleep=lambda _s: None)
         assert layout.cli_link.is_symlink()
+
+
+# ── real dscl output (tests/fixtures/dscl, captured on macOS 27.2.1) ─────────
+
+FIXTURES = Path(__file__).parent / "fixtures" / "dscl"
+
+
+class RealDscl:
+    """Answers dscl reads and searches with the captured output, as the Mac did."""
+
+    def __init__(self, reads: dict[str, str], searches: dict[tuple[str, str, str], str] | None = None) -> None:
+        self.reads = {path: (FIXTURES / name).read_text() for path, name in reads.items()}
+        self.searches = {k: (FIXTURES / v).read_text() for k, v in (searches or {}).items()}
+        self.calls: list[list[str]] = []
+
+    def run(self, argv, *, uid=None, gid=None) -> Result:  # noqa: ANN001
+        argv = [str(a) for a in argv]
+        self.calls.append(argv)
+        if argv[:4] == [ds.DSCL, "-plist", "/Search", "-read"]:
+            text = self.reads.get(argv[4])
+            if text is None:
+                return Result(56, "", "<dscl_cmd> DS Error: -14136 (eDSRecordNotFound)")
+            wanted = argv[5:]
+            if wanted:  # dscl returns the asked attributes only; the fixture holds them all
+                full = plistlib.loads(text.encode())
+                text = plistlib.dumps({k: v for k, v in full.items() if k.rsplit(":", 1)[-1] in wanted}).decode()
+            return Result(0, text)
+        if argv[:3] == [ds.DSCL, "/Search", "-read"]:
+            return Result(0 if argv[3] in self.reads else 56)
+        if argv[:3] == [ds.DSCL, "/Search", "-search"]:
+            return Result(0, self.searches.get((argv[3], argv[4], argv[5]), ""))
+        if argv[0] == ds.DSEDITGROUP:
+            return Result(67, f"no {argv[4]} is NOT a member of {argv[5]}\n")
+        if argv[0] == ds.ID:
+            return Result(0, "_fadenagent everyone localaccounts com.apple.sharepoint.group.1 _lpoperator\n")
+        return Result(0)
+
+
+def test_the_text_form_is_why_attributes_are_read_as_a_plist() -> None:
+    """The failure on the first live Mac: the text form says ``dsAttrTypeNative:IsHidden: 1``."""
+    text = (FIXTURES / "users-fadenagent.txt").read_text()
+    assert "dsAttrTypeNative:IsHidden: 1" in text
+    assert "\nIsHidden:" not in text
+    assert "RealName:\n Fadenstack Node Agent" in text
+
+
+def test_attributes_are_read_from_the_real_plist(layout: Layout) -> None:
+    mac = RealDscl({"/Users/_fadenagent": "users-fadenagent.plist", "/Users/_oahd": "users-oahd.plist"})
+    read = ds._read_attr
+    assert read(mac, "Users", "_fadenagent", "IsHidden") == "1"  # native attribute
+    assert read(mac, "Users", "_fadenagent", "UniqueID") == "450"
+    assert read(mac, "Users", "_fadenagent", "RealName") == "Fadenstack Node Agent"  # multi-word
+    assert read(mac, "Users", "_fadenagent", "Password") == "*"
+    assert read(mac, "Users", "_oahd", "IsHidden") == ""  # the record lacks it
+    assert read(mac, "Users", "_nobody", "UniqueID") is None  # no record
+    assert mac.calls[0][:2] == [ds.DSCL, "-plist"]
+
+
+def test_the_real_subset_and_missing_attribute_outputs_parse() -> None:
+    subset = plistlib.loads((FIXTURES / "search-read-subset.plist").read_bytes())
+    missing = plistlib.loads((FIXTURES / "oahd-missing-attr.plist").read_bytes())
+    assert "dsAttrTypeNative:IsHidden" in subset and "dsAttrTypeStandard:UniqueID" in subset
+    assert list(missing) == ["dsAttrTypeStandard:UniqueID"]
+
+
+def test_searches_parse_the_real_output() -> None:
+    mac = RealDscl({}, {
+        ("/Users", "UniqueID", "450"): "search-users-uniqueid-450.txt",
+        ("/Groups", "PrimaryGroupID", "450"): "search-groups-pgid-450.txt",
+        ("/Users", "UniqueID", "451"): "search-users-uniqueid-451-none.txt",
+    })
+    assert ds._holders(mac, "Users", "UniqueID", 450) == ["_fadenagent"]
+    assert ds._holders(mac, "Groups", "PrimaryGroupID", 450) == ["_fadenagent"]
+    assert ds._holders(mac, "Users", "UniqueID", 451) == []
+
+
+def test_the_account_the_installer_made_on_a_real_mac_is_reused(layout: Layout) -> None:
+    """Regression: the live join refused its own account ("IsHidden '', expected '1'")."""
+    mac = RealDscl(
+        {"/Users/_fadenagent": "users-fadenagent.plist", "/Groups/_fadenagent": "groups-fadenagent.plist"},
+        {
+            ("/Users", "UniqueID", "450"): "search-users-uniqueid-450.txt",
+            ("/Groups", "PrimaryGroupID", "450"): "search-groups-pgid-450.txt",
+        },
+    )
+    layout.marker.parent.mkdir(parents=True)
+    layout.marker.write_text("name=_fadenagent\nid=450\ncreated=2026-11-27T19:58:31+0100\nversion=0.2.12\n")
+    identity = ds.ensure_account(mac, layout, VERSION, environ={})
+    assert (identity.uid, identity.gid) == (450, 450)
+    assert not any("-create" in c or "-delete" in c for c in mac.calls)
+
+
+class TestResumingAnInterruptedInstall:
+    """The state the live Mac was left in: account, marker, directories, logs, rotation, a staged
+    build -- and no plist, no job, no ``current`` and no command link."""
+
+    def _left_behind(self, mac: FakeMac, layout: Layout, tmp_path: Path) -> str:
+        _install_account(mac, layout, 450)
+        ds.prepare_files(mac, layout, _svc())
+        old = ds.stage_binary(mac, layout, _binary(tmp_path, b"the build that stopped"), VERSION)
+        assert not layout.plist.exists() and ds.current_build(layout) is None and not layout.cli_link.exists()
+        mac.calls.clear()
+        return old
+
+    def test_running_the_same_join_again_reuses_everything_and_starts(
+        self, mac: FakeMac, layout: Layout, tmp_path: Path
+    ) -> None:
+        old = self._left_behind(mac, layout, tmp_path)
+        identity = ds.ensure_account(mac, layout, VERSION, environ={})
+        ds.prepare_files(mac, layout, _svc())
+        ds.probe_state_dir(mac, layout, _svc())
+        assert identity.uid == 450
+        assert not any("-create" in c or "-delete" in c for c in mac.calls), "the account is reused"
+        assert not any(c[0] == ds.CHOWN and str(layout.state_dir) in c for c in mac.calls)
+        clock = Clock()
+        ds.activate(mac, layout, _svc(), _binary(tmp_path, b"the fixed build"), VERSION,
+                    say=lambda _m: None, sleep=clock.sleep, clock=clock)
+        new = ds.current_build(layout)
+        assert new != old and mac.loaded
+        assert mac.verbs(ds.LAUNCHCTL).count("bootstrap") == 1
+        assert os.readlink(layout.cli_link) == "/Library/Fadenstack/agent/current/faden-agent"
+        # the build left by the interrupted run is pruned once the new one runs
+        assert sorted(p.name for p in layout.builds.iterdir()) == sorted(["current", new])
+
+    def test_the_marker_written_by_the_interrupted_run_is_kept(
+        self, mac: FakeMac, layout: Layout, tmp_path: Path
+    ) -> None:
+        self._left_behind(mac, layout, tmp_path)
+        before = layout.marker.read_text()
+        ds.ensure_account(mac, layout, VERSION, environ={})
+        assert layout.marker.read_text() == before

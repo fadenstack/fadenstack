@@ -1,0 +1,11 @@
+AppleMetaNodeLocation: /Local/Default
+GeneratedUID: FFFFEEEE-DDDD-CCCC-BBBB-AAAA000001B9
+NFSHomeDirectory: /var/empty
+Password: *
+PrimaryGroupID: 441
+RealName:
+ OAH Daemon
+RecordName: _oahd
+RecordType: dsRecTypeStandard:Users
+UniqueID: 441
+UserShell: /usr/bin/false

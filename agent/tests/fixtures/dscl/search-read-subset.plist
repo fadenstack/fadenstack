@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>dsAttrTypeNative:IsHidden</key>
+	<array>
+		<string>1</string>
+	</array>
+	<key>dsAttrTypeStandard:UniqueID</key>
+	<array>
+		<string>450</string>
+	</array>
+	<key>dsAttrTypeStandard:UserShell</key>
+	<array>
+		<string>/usr/bin/false</string>
+	</array>
+</dict>
+</plist>

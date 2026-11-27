@@ -1,0 +1,9 @@
+dsAttrTypeNative:record_daemon_version: 10070000
+AppleMetaNodeLocation: /Local/Default
+GeneratedUID: 00000000-0000-0000-0000-000000001450
+Password: *
+PrimaryGroupID: 450
+RealName:
+ Fadenstack Node Agent
+RecordName: _fadenagent
+RecordType: dsRecTypeStandard:Groups

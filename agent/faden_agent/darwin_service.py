@@ -226,17 +226,43 @@ def id_range(environ: dict[str, str] | None = None) -> tuple[int, int]:
     return lo, hi
 
 
-def _read_attr(runner: Runner, collection: str, name: str, attr: str) -> str | None:
-    """One attribute of a record anywhere on the search path, or None when there is no record."""
-    result = runner.run([DSCL, "/Search", "-read", f"/{collection}/{name}", attr])
+def _read_record(
+    runner: Runner, collection: str, name: str, attrs: Sequence[str] = ()
+) -> dict[str, list[str]] | None:
+    """A record's attributes (all, or *attrs*), by their bare names; None when there is no record.
+
+    Read as a plist: dscl's text form names some attributes with a prefix
+    (``dsAttrTypeNative:IsHidden: 1``) and puts a multi-word value on the next
+    line (``RealName:`` then `` Fadenstack Node Agent``). In the plist every
+    key is ``dsAttrTypeStandard:X`` or ``dsAttrTypeNative:X`` and every value
+    an array of strings. An attribute the record lacks is simply absent.
+    """
+    result = runner.run([DSCL, "-plist", "/Search", "-read", f"/{collection}/{name}", *attrs])
     if result.returncode != 0:
         return None
-    for line in result.stdout.splitlines():
-        key, _, value = line.partition(":")
-        if key.strip() == attr:
-            value = value.strip()
-            return value if value else None
-    return ""
+    try:
+        data = plistlib.loads(result.stdout.encode("utf-8"))
+    except Exception as exc:  # noqa: BLE001 - any parse failure is the same refusal
+        raise DarwinServiceError(f"Could not read the directory record /{collection}/{name}: {exc}") from exc
+    if not isinstance(data, dict):
+        raise DarwinServiceError(f"Could not read the directory record /{collection}/{name}: not a dictionary")
+    record: dict[str, list[str]] = {}
+    for key, value in data.items():
+        values = value if isinstance(value, list) else [value]
+        record[str(key).rsplit(":", 1)[-1]] = [str(v) for v in values]
+    return record
+
+
+def _read_attr(runner: Runner, collection: str, name: str, attr: str) -> str | None:
+    """One attribute of a record anywhere on the search path.
+
+    None when there is no record, "" when the record lacks the attribute.
+    """
+    record = _read_record(runner, collection, name, [attr])
+    if record is None:
+        return None
+    values = record.get(attr) or [""]
+    return values[0]
 
 
 def _record_exists(runner: Runner, collection: str, name: str) -> bool:
@@ -292,8 +318,10 @@ def allocate_id(runner: Runner, lo: int, hi: int) -> int:
 def _verify_existing(runner: Runner, layout: Layout) -> Identity:
     """An account that already exists is reused only if this installer made it and it still matches."""
     marker = read_marker(layout)
-    uid = _read_attr(runner, "Users", SERVICE_USER, "UniqueID")
-    gid = _read_attr(runner, "Groups", SERVICE_USER, "PrimaryGroupID")
+    user = _read_record(runner, "Users", SERVICE_USER) or {}
+    group = _read_record(runner, "Groups", SERVICE_USER) or {}
+    uid = (user.get("UniqueID") or [None])[0]
+    gid = (group.get("PrimaryGroupID") or [None])[0]
     if not marker.get("id"):
         raise DarwinServiceError(
             f"An account or group named {SERVICE_USER} exists, but Fadenstack did not create it "
@@ -315,13 +343,14 @@ def _verify_existing(runner: Runner, layout: Layout) -> Identity:
             "Uninstall (sudo faden-agent uninstall) and install again to get a new ID."
         )
     expected = {
+        "Password": "*",
         "UserShell": "/usr/bin/false",
         "IsHidden": "1",
         "PrimaryGroupID": want,
         "NFSHomeDirectory": layout.real(layout.state_dir),
     }
     for attr, value in expected.items():
-        found = _read_attr(runner, "Users", SERVICE_USER, attr)
+        found = (user.get(attr) or [""])[0]
         if found != value:
             raise DarwinServiceError(f"{SERVICE_USER} has {attr} {found!r}, expected {value!r}. Refusing to continue.")
     return Identity(SERVICE_USER, number, number)
