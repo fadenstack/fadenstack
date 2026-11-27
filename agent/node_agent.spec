@@ -9,6 +9,7 @@ Output:
     dist/faden-agent.exe   (Windows)
 """
 
+import os
 import sys
 from pathlib import Path
 
@@ -159,9 +160,8 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=sys.platform != "win32",  # strip symbols on Linux/macOS
     # UPX rewrites a Mach-O after it is signed, and Apple Silicon runs no
-    # unsigned code: a packed Mac build is killed at launch. The ad-hoc
-    # signature PyInstaller applies (codesign_identity=None) stays valid only
-    # unpacked. A release identity is A2's.
+    # unsigned code: a packed Mac build is killed at launch. The signature
+    # PyInstaller applies stays valid only unpacked.
     upx=sys.platform != "darwin",
     upx_exclude=[],
     runtime_tmpdir=None,
@@ -169,7 +169,13 @@ exe = EXE(
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
+    # A Mac build's signature, chosen by build-binary.sh (FADEN_MAC_SIGNING):
+    # unset is ad hoc. Given an identity -- a Developer ID, or "-" to try the
+    # hardened runtime ad hoc -- PyInstaller signs every bundled library and
+    # the executable with it, with the hardened runtime and a timestamp: the
+    # libraries unpacked at start must carry the executable's team, or library
+    # validation refuses them.
+    codesign_identity=os.environ.get("FADEN_MAC_CODESIGN_IDENTITY") or None,
+    entitlements_file=os.environ.get("FADEN_MAC_ENTITLEMENTS") or None,
     version=version_info,
 )
