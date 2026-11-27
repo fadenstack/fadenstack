@@ -85,6 +85,9 @@ class ClusterHardware:
     vllm_version: str | None = None
     #: What the runtime can load (``compat.RuntimeSupport``); not sent to the console.
     runtime: Any = field(default=None, repr=False)
+    #: A Mac: ``{"working_set_bytes", "unified_bytes", "estimated"}`` from the node's ``metal``
+    #: capability. Its memory is one pool, so it is planned by :func:`plan_metal`, not per GPU.
+    metal: dict[str, Any] | None = None
 
     @property
     def gpus(self) -> list[Gpu]:
@@ -152,6 +155,8 @@ class Fit:
     max_num_seqs: int | None = None
     #: Machine-readable reasons, for the interface to put into words.
     notes: list[str] = field(default_factory=list)
+    #: A Mac (see :func:`plan_metal`): the numbers behind the share, for the console to show.
+    metal: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -174,6 +179,8 @@ def per_gpu_bytes(needs: ModelNeeds, *, tp: int, context: int, kv_bytes_per_toke
 def plan(needs: ModelNeeds, hardware: ClusterHardware, *, context: int | None = None,
          kv_dtype_bytes: int = 2, allow_sharing: bool = True) -> Fit:
     """The smallest shape that runs *needs* on *hardware*, or why none does."""
+    if hardware.metal:
+        return plan_metal(needs, hardware.metal, context=context, kv_dtype_bytes=kv_dtype_bytes)
     gpus = hardware.gpus
     if not gpus:
         return Fit(status="no_accelerators", notes=["no_accelerators"])
@@ -286,4 +293,141 @@ def quick_needs(weights: int | None, *, single_device: bool = False) -> ModelNee
     """Needs from the weights alone, for a list where no config has been read."""
     return ModelNeeds(
         weights_bytes=weights, kv_bytes_per_token=None, max_context=None, single_device=single_device,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Apple silicon: one pool of unified memory, the Metal working set R.
+# ---------------------------------------------------------------------------
+
+#: Version of the constants below; bump it when measured margins change.
+METAL_PROFILE = "metal-v1"
+
+#: Most of R one engine is told to use (``--gpu-memory-utilization`` is a fraction of R).
+METAL_MAX_UTILIZATION = 0.95
+
+#: Parallel sequences planned for, tried in this order until the cache fits.
+METAL_SEQUENCES = (8, 4, 2, 1)
+
+#: The context the plan starts from and the least it will shrink to.
+METAL_DEFAULT_CONTEXT = 32768
+METAL_MIN_CONTEXT = 4096
+
+#: Slack inside R kept for foreign GPU use and MLX buffers, by RAM band (the ~19 % outside R
+#: already holds the OS, the agent, the proxy and the engine's Python process).
+METAL_RESERVE_BYTES = {36: 3 * GIB, 64: 4 * GIB, 128: 6 * GIB}
+#: The least unified memory worth planning on.
+METAL_MIN_UNIFIED_BYTES = 24 * GIB
+
+
+def metal_reserve_bytes(unified_bytes: int) -> int:
+    """The slack kept inside R for a Mac with *unified_bytes* of memory."""
+    if unified_bytes < 48 * GIB:
+        return METAL_RESERVE_BYTES[36]
+    if unified_bytes < 96 * GIB:
+        return METAL_RESERVE_BYTES[64]
+    return METAL_RESERVE_BYTES[128]
+
+
+def metal_ceiling(working_set: int, unified_bytes: int) -> int:
+    """The most of R an engine may be given: ``min(0.95 R, R - reserve)``."""
+    return int(min(METAL_MAX_UTILIZATION * working_set, working_set - metal_reserve_bytes(unified_bytes)))
+
+
+def plan_metal(needs: ModelNeeds, metal: dict[str, Any], *, context: int | None = None,
+               kv_dtype_bytes: int = 2) -> Fit:
+    """How *needs* runs on one Mac, or why it does not (one copy, one machine).
+
+    *metal* is ``{working_set_bytes, unified_bytes, estimated}``. The memory
+    share vLLM-Metal is given covers weights, KV cache and workspace, so the
+    budget is what the model needs plus a tenth, within the ceiling.
+    """
+    working_set = int(metal.get("working_set_bytes") or 0)
+    unified = int(metal.get("unified_bytes") or 0) or int(working_set / 0.81)
+    estimated = bool(metal.get("estimated"))
+    if not working_set:
+        return Fit(status="no_accelerators", notes=["no_accelerators"])
+    if unified < METAL_MIN_UNIFIED_BYTES:
+        return Fit(status="too_large", gpu_bytes=working_set, notes=["too_little_memory"],
+                   metal={"working_set_bytes": working_set, "estimated": estimated, "profile": METAL_PROFILE})
+    if not needs.weights_bytes:
+        return Fit(status="unknown", notes=["size_unknown"])
+
+    notes: list[str] = []
+    kv_per_token = needs.kv_bytes_per_token
+    if kv_per_token is not None and kv_dtype_bytes != 2:
+        kv_per_token = kv_per_token * kv_dtype_bytes // 2
+    if kv_per_token is None:
+        notes.append("kv_estimated")
+    reserve = metal_reserve_bytes(unified)
+    ceiling = metal_ceiling(working_set, unified)
+    weights = int(needs.weights_bytes)
+    wanted_ctx = context or min(needs.max_context or METAL_DEFAULT_CONTEXT, METAL_DEFAULT_CONTEXT)
+    if needs.max_context and wanted_ctx > needs.max_context:
+        notes.append("context_over_model_max")
+    seq_options = (RECURRENT_SEQUENCES,) if needs.recurrent else METAL_SEQUENCES
+
+    def need(ctx: int, seqs: int) -> int:
+        state = (needs.state_bytes_per_sequence or 0) * (seqs if needs.recurrent else 0)
+        if kv_per_token is None:
+            return math.ceil(weights * 1.2 + state) + OVERHEAD_BYTES
+        return weights + state + OVERHEAD_BYTES + kv_per_token * ctx * (seqs if not needs.recurrent else 1)
+
+    def minimum(ctx: int, seqs: int) -> int:
+        # vLLM starts when one full-length sequence's cache fits.
+        state = (needs.state_bytes_per_sequence or 0) * (seqs if needs.recurrent else 0)
+        if kv_per_token is None:
+            return need(ctx, seqs)
+        return weights + state + OVERHEAD_BYTES + kv_per_token * ctx
+
+    chosen: tuple[int, int] | None = None
+    ctx = wanted_ctx
+    while chosen is None:
+        for seqs in seq_options:
+            if need(ctx, seqs) <= ceiling:
+                chosen = (ctx, seqs)
+                break
+        if chosen is not None:
+            break
+        if ctx <= METAL_MIN_CONTEXT:
+            break
+        ctx = max(METAL_MIN_CONTEXT, ctx // 2)
+    if chosen is None:
+        # Not even the smallest shape: the minimum start condition at the floor decides what to say.
+        floor_ctx = min(wanted_ctx, METAL_MIN_CONTEXT)
+        seqs = seq_options[-1]
+        if minimum(floor_ctx, seqs) <= ceiling:
+            chosen = (floor_ctx, seqs)
+    metal_info = {
+        "working_set_bytes": working_set, "unified_bytes": unified, "estimated": estimated,
+        "reserve_bytes": reserve, "ceiling_bytes": ceiling, "profile": METAL_PROFILE,
+    }
+    if chosen is None:
+        return Fit(
+            status="too_large", needed_bytes_per_gpu=minimum(min(wanted_ctx, METAL_MIN_CONTEXT), seq_options[-1]),
+            gpu_bytes=ceiling, weights_bytes=weights, kv_bytes_per_token=kv_per_token,
+            context=wanted_ctx, notes=[*notes, "too_large"], metal=metal_info,
+        )
+
+    ctx, seqs = chosen
+    needed = need(ctx, seqs)
+    budget = min(ceiling, math.ceil(needed * 1.1))
+    utilization = min(METAL_MAX_UTILIZATION, math.ceil(budget / working_set * 100 - 1e-9) / 100)
+    utilization = max(utilization, MIN_UTILIZATION)
+    max_context = None
+    if kv_per_token:
+        room = ceiling - weights - OVERHEAD_BYTES
+        max_context = max(0, int(room // kv_per_token))
+        if needs.max_context:
+            max_context = min(max_context, needs.max_context)
+    if ctx < wanted_ctx:
+        notes.append("context_reduced")
+    if seqs < seq_options[0]:
+        notes.append("sequences_reduced")
+    metal_info.update({"budget_bytes": budget, "kv_bytes": max(0, needed - weights - OVERHEAD_BYTES)})
+    return Fit(
+        status="fits", gpus_per_copy=1.0, tensor_parallel=1, copies=1, copies_now=1, context=ctx,
+        max_context=max_context, needed_bytes_per_gpu=needed, gpu_bytes=working_set, weights_bytes=weights,
+        kv_bytes_per_token=kv_per_token, suggested_gpu_memory_utilization=utilization, shareable=False,
+        max_num_seqs=seqs, notes=notes, metal=metal_info,
     )

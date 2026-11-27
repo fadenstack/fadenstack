@@ -867,10 +867,21 @@ class DeploymentService:
         if replicas != 1 or (spec.get("scale") or {}).get("autoscale"):
             raise ConflictError("A standalone environment runs one copy of a model; set scale.replicas to 1.")
         memory = (((spec.get("resources") or {}).get("replica") or {}).get("memory"))
+        engine = (spec.get("engine") or {}).get("config") or {}
+        from faden_backend.services.inference.drivers.standalone import metal_policy  # noqa: PLC0415
+
+        refused = metal_policy.check(engine)
+        if refused:
+            raise ConflictError(f"{node.agent_id or node.host} cannot run this: {refused}")
         try:
-            memory_budget(node, memory)
+            memory_budget(node, memory, engine.get("gpu_memory_utilization"))
         except ValueError as exc:
             raise ConflictError(str(exc)) from exc
+        if await self.dao.list_all(environment_id=environment.id):
+            raise ConflictError(
+                f"{environment.name} already serves a model. A Mac runs one model at a time: "
+                "delete that deployment first."
+            )
 
     def validate_spec(self, spec: dict[str, Any]) -> InferenceDeploymentSpecV1Alpha1:
         """Validate a spec without persisting.

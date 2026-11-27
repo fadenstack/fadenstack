@@ -35,6 +35,7 @@ from faden_backend.db.models.llm import LLMModel
 from faden_backend.db.models.node_control import NodeCommandType
 from faden_backend.services import machine_tls
 from faden_backend.services.inference.bundles import default_bundle_registry
+from faden_backend.services.inference.drivers.standalone import metal_policy
 from faden_backend.services.inference.drivers.standalone.admission import memory_budget, node_refusal
 from faden_backend.services.inference.drivers.standalone.commands import NativeCommands
 
@@ -58,6 +59,12 @@ FORCE_DELETE_AFTER_SEC = 300
 START_TIMEOUT_SEC = 600
 STOP_TIMEOUT_SEC = 120
 ROUTE_TIMEOUT_SEC = 180
+
+
+def start_timeout_s(model_bytes: int | None) -> int:
+    """How long an engine may take to be ready: the agent's formula, ``max(300, 180 + 120 s/GiB)``, capped at an hour."""
+    gib = (model_bytes or 0) / 2**30
+    return int(min(3600, max(300, 180 + 120 * gib)))
 
 
 def _native(deployment: InferenceDeployment) -> dict[str, Any]:
@@ -129,7 +136,15 @@ class StandaloneDeploymentManager:
             return
         spec = dict(deployment.spec_json or {})
         try:
-            budget = memory_budget(node, (((spec.get("resources") or {}).get("replica") or {}).get("memory")))
+            engine = dict((spec.get("engine") or {}).get("config") or {})
+            refused = metal_policy.check(engine)
+            if refused:
+                raise ValueError(refused)
+            fields = metal_policy.start_fields(engine)
+            budget = memory_budget(
+                node, (((spec.get("resources") or {}).get("replica") or {}).get("memory")),
+                fields["gpu_memory_utilization"],
+            )
         except ValueError as exc:
             self._fail(deployment, str(exc))
             return
@@ -198,8 +213,13 @@ class StandaloneDeploymentManager:
             "host": "127.0.0.1",
             "port": internal_port,
             "gpu_memory_utilization": budget["gpu_memory_utilization"],
-            "max_model_len": ((spec.get("engine") or {}).get("max_model_len")),
-            "extra_args": list(((spec.get("extensions") or {}).get("standalone") or {}).get("extra_args") or []),
+            "max_model_len": fields["max_model_len"],
+            "extra_args": [
+                *fields["extra_args"],
+                *(((spec.get("extensions") or {}).get("standalone") or {}).get("extra_args") or []),
+            ],
+            # Optional: an older agent ignores it and keeps its own formula.
+            "start_timeout_s": start_timeout_s(getattr(model, "size_bytes", None)),
             "env": dict(((spec.get("extensions") or {}).get("standalone") or {}).get("env") or {}),
         }
         native["memory"] = budget
