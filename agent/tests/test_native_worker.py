@@ -7,8 +7,10 @@ import json
 import os
 import signal
 import socket
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -51,7 +53,9 @@ def _fake_env_keys(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture()
 def env(tmp_path: Path):
-    paths = NativePaths(tmp_path / "state" / "native")
+    # A short root: pytest's tmp_path alone would overflow the 103-byte unix socket limit.
+    short = Path(tempfile.mkdtemp(prefix="fn-", dir="/tmp"))
+    paths = NativePaths(short / "native")
     build_runtime(tmp_path / "src")
     c = carrier(tmp_path / "img.tar", layer_from_dir(tmp_path / "src"))
     st.stage_from_tar(c.tar, paths=paths, bundle_id=BUNDLE, config_digest=c.config_digest,
@@ -74,6 +78,7 @@ def env(tmp_path: Path):
             procs.stop_worker(record, leader, grace_s=0.5)
         except procs.BadRecord:
             pass
+    shutil.rmtree(short, ignore_errors=True)
 
 
 def _manager(paths: NativePaths, models: Path, **kw) -> NativeRuntimeManager:
@@ -199,7 +204,8 @@ async def test_the_worker_sees_none_of_the_agents_secrets(env, monkeypatch: pyte
     assert [k for k in seen if k.startswith("FADEN_")] == [workers.MARKER_ENV]
     assert seen[workers.MARKER_ENV] == f"{DEP}:1"  # the marker, nothing of the agent's
     assert seen["HF_HUB_OFFLINE"] == "1" and seen["HOME"] == str(paths.home)
-    assert seen["TMPDIR"].startswith(str(paths.root / "tmp" / DEP))
+    assert seen["TMPDIR"] == str(paths.tmp(DEP)) + "/"
+    assert seen["VLLM_RPC_BASE_PATH"] == str(paths.tmp(DEP))
     assert seen["VLLM_LOGGING_LEVEL"] == "DEBUG"
     await manager.stop_native_worker({"deployment_id": DEP, "grace_s": 1})
     await manager.close()
@@ -396,7 +402,7 @@ BAD_RECORDS = {
 @pytest.mark.asyncio
 async def test_root_stop_ends_verified_workers_and_skips_every_forged_record(tmp_path: Path, env) -> None:
     _paths, models, snap = env
-    layout = ds.Layout(tmp_path / "root")
+    layout = ds.Layout(_paths.root.parent)
     paths = NativePaths(layout.state_dir / "native")
     build_runtime(tmp_path / "src2")
     c = carrier(tmp_path / "img2.tar", layer_from_dir(tmp_path / "src2"))
@@ -587,7 +593,7 @@ def test_a_program_from_the_runtime_alone_is_not_the_worker() -> None:
 @pytest.mark.asyncio
 async def test_a_corrupt_record_hides_nothing(tmp_path: Path, env) -> None:
     _paths, models, snap = env
-    layout = ds.Layout(tmp_path / "root")
+    layout = ds.Layout(_paths.root.parent)
     paths = NativePaths(layout.state_dir / "native")
     build_runtime(tmp_path / "src3")
     c = carrier(tmp_path / "img3.tar", layer_from_dir(tmp_path / "src3"))
@@ -771,3 +777,33 @@ async def test_a_bad_readiness_deadline_is_refused(env, bad) -> None:
         await manager.start_native_worker(payload)
     assert err.value.error_code == "invalid_payload" and "start_timeout_s" in str(err.value)
     await manager.close()
+
+
+def test_the_ipc_path_of_a_real_deployment_fits_a_unix_socket_under_the_default_root() -> None:
+    real = "c045b4b0-f746-4244-a8b2-e26f8e04d71d"
+    paths = NativePaths.for_state_path("/var/db/fadenstack/agent/state.json")
+    assert str(paths.root) == "/var/db/fadenstack/agent/native"
+    socket_path = f"{paths.tmp(real)}/eef3317d-0000-4000-8000-000000000000"
+    assert len(socket_path) <= 103 and paths.ipc_path_length(real) == len(socket_path)
+    assert paths.tmp(real) != paths.tmp(DEP)  # distinct per deployment
+
+
+@pytest.mark.asyncio
+async def test_start_refuses_a_state_dir_whose_ipc_path_is_too_long(env, monkeypatch: pytest.MonkeyPatch) -> None:
+    paths, models, snap = env
+    long_paths = NativePaths(paths.root.parent / "native")  # the staged one, but pretend the limit is tight
+    monkeypatch.setattr("faden_agent.native.manager.IPC_PATH_MAX", paths.ipc_path_length(DEP) - 1)
+    manager = _manager(long_paths, models)
+    with pytest.raises(NativeError, match="too long") as err:
+        await manager.start_native_worker(_payload(snap, _free_port()))
+    assert err.value.error_code == "state_dir_too_long"
+    assert not long_paths.tmp(DEP).exists()
+
+
+def test_the_sandbox_profile_allows_exactly_the_short_tmp_dir(tmp_path: Path) -> None:
+    from faden_agent.native import sandbox as sandboxing
+
+    paths = NativePaths(tmp_path / "native")
+    text = sandboxing.profile(denied=[paths.root], readable=[], writable=[paths.home, paths.tmp(DEP)])
+    assert f'(subpath "{paths.tmp(DEP)}")' in text.replace("(allow file-write* ", "(").replace("\n", "")
+    assert str(paths.root / "tmp") not in text

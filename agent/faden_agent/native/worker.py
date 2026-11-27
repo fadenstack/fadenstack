@@ -241,6 +241,8 @@ def environment(spec: WorkerSpec, paths: NativePaths, venv: Path) -> dict[str, s
         "PATH": f"{venv / 'bin'}:/usr/bin:/bin:/usr/sbin:/sbin",
         "HOME": str(home),
         "TMPDIR": str(paths.tmp(spec.deployment_id)) + "/",
+        # vLLM's ZMQ sockets: <VLLM_RPC_BASE_PATH>/<uuid4>, which must fit in sun_path.
+        "VLLM_RPC_BASE_PATH": str(paths.tmp(spec.deployment_id)),
         "LANG": "en_US.UTF-8",
         "LC_ALL": "en_US.UTF-8",
         "HF_HUB_OFFLINE": "1",
