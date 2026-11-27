@@ -17,6 +17,13 @@ from faden_agent import darwin_service as ds
 from faden_agent.darwin_service import Layout, Result
 
 VERSION = "0.2.12"
+#: The tests cannot chown, so "root" and the service account are this user: what is
+#: checked is that root's code never reaches into the service's directory.
+ME, MY_GROUP = os.getuid(), os.getgid()
+
+
+def _svc() -> ds.Identity:
+    return ds.Identity(ds.SERVICE_USER, ME, MY_GROUP)
 
 
 class FakeMac:
@@ -38,6 +45,8 @@ class FakeMac:
         self.runs = 0
         self.last_exit: int | None = None
         self.version_out = f"faden-agent {VERSION}"
+        self.bootstrap_fails_for: set[str] = set()
+        self.search_fails = False
 
     # what darwin_service sees
     def run(self, argv, *, uid=None, gid=None) -> Result:  # noqa: ANN001
@@ -73,6 +82,8 @@ class FakeMac:
             value = name if attr == "RecordName" else table[name].get(attr)
             return Result(0, f"{attr}: {value}\n" if value is not None else "")
         if verb == "-search":
+            if self.search_fails:
+                return Result(70, "", "eDSNodeNotFound")
             collection, attr, value = args[2].strip("/"), args[3], args[4]
             if attr == "RecordName":
                 return Result(0, f"{value}\t\tRecordName = (\n    {value}\n)\n" if value in self.directory_names else "")
@@ -113,6 +124,8 @@ class FakeMac:
             return Result(0, f"system/{ds.LABEL} = {{\n\tpid = {self.pid}\n\truns = {self.runs}\n"
                              f"\tlast exit code = {exit_text}\n}}\n")
         if verb == "bootstrap":
+            if self._build_now() in self.bootstrap_fails_for:
+                return Result(5, "", "Bootstrap failed: 5: Input/output error")
             self.loaded, self.pid, self.runs, self.last_exit = True, 1000, 1, None
             return Result(0)
         if verb == "bootout":
@@ -138,7 +151,7 @@ class Clock:
 @pytest.fixture()
 def mac(tmp_path: Path) -> FakeMac:
     fake = FakeMac()
-    fake.layout = Layout(tmp_path / "root")
+    fake.layout = Layout(tmp_path / "root", root_uid=ME)
     return fake
 
 
@@ -272,39 +285,162 @@ class TestTheAccount:
 # ── files and the job definition ──────────────────────────────────
 
 
+def _chowns(mac: FakeMac) -> list[list[str]]:
+    return [c for c in mac.calls if c[0] == ds.CHOWN]
+
+
 class TestFiles:
-    def test_state_is_private_to_the_service_and_the_rest_is_roots(self, mac: FakeMac, layout: Layout) -> None:
-        identity = ds.Identity(ds.SERVICE_USER, 452, 452)
-        ds.prepare_files(mac, layout, identity)
+    def test_a_fresh_state_dir_is_private_to_the_service_and_the_rest_is_roots(
+        self, mac: FakeMac, layout: Layout
+    ) -> None:
+        ds.prepare_files(mac, layout, _svc())
         assert oct(layout.state_dir.stat().st_mode & 0o777) == "0o700"
         assert oct(layout.models.stat().st_mode & 0o777) == "0o700"
         assert oct(layout.library.stat().st_mode & 0o777) == "0o755"
         assert oct(layout.log_file.stat().st_mode & 0o777) == "0o640"
-        chowns = [c for c in mac.calls if c[0] == ds.CHOWN]
-        assert [ds.CHOWN, "-R", "452:452", str(layout.state_dir)] in chowns
-        assert any(str(layout.log_file) in c and "452:452" in c for c in chowns)
-        # nothing of root's is handed to the service
+        owner = f"{ME}:{MY_GROUP}"
+        chowns = _chowns(mac)
+        # the two directories themselves, the models one first, and nothing recursive
+        assert chowns.index([ds.CHOWN, "-h", owner, str(layout.models)]) < chowns.index(
+            [ds.CHOWN, "-h", owner, str(layout.state_dir)]
+        )
+        assert all(c[1] == "-h" and "-R" not in c for c in chowns)
         assert not any(str(layout.library) in " ".join(c) for c in chowns)
 
+    def test_an_existing_state_dir_is_only_checked(self, mac: FakeMac, layout: Layout) -> None:
+        ds.prepare_files(mac, layout, _svc())
+        (layout.state_dir / "state.json").write_text("{}")
+        mac.calls.clear()
+        ds.prepare_files(mac, layout, _svc())
+        assert not any(str(layout.state_dir) in " ".join(c) for c in _chowns(mac))
+
+    def test_a_hardlink_planted_in_the_state_dir_is_never_touched(self, mac: FakeMac, layout: Layout,
+                                                                  tmp_path: Path) -> None:
+        """macOS lets any user hardlink a root-owned file; a recursive chown would hand it over."""
+        identity = _svc()
+        ds.prepare_files(mac, layout, identity)
+        clock = Clock()
+        _install_account(mac, layout, 452)
+        ds.activate(mac, layout, identity, _binary(tmp_path, b"build"), VERSION,
+                    say=lambda _m: None, sleep=clock.sleep, clock=clock)
+        binary = layout.builds / ds.current_build(layout) / "faden-agent"  # type: ignore[operator]
+        os.link(binary, layout.state_dir / "x")
+        os.link(layout.plist, layout.state_dir / "y")
+        planted = (layout.state_dir / "x", layout.state_dir / "y")
+        before = [(os.lstat(p).st_mode, os.lstat(p).st_uid) for p in planted]
+        mac.calls.clear()
+        ds.prepare_files(mac, layout, identity)
+        ds.activate(mac, layout, identity, _binary(tmp_path, b"build"), VERSION,
+                    say=lambda _m: None, sleep=clock.sleep, clock=clock)
+        touched = " ".join(" ".join(c) for c in _chowns(mac))
+        assert str(layout.state_dir) not in touched
+        # the planted inodes keep their owner and mode (root's binary and plist, on a Mac)
+        assert [(os.lstat(p).st_mode, os.lstat(p).st_uid) for p in planted] == before
+        # and the files root uses now are not the planted inodes: rewrites replace, never write through
+        assert os.lstat(layout.plist).st_ino != os.lstat(planted[1]).st_ino
+
+    def test_a_state_dir_replaced_by_a_symlink_is_refused_and_not_followed(
+        self, mac: FakeMac, layout: Layout, tmp_path: Path
+    ) -> None:
+        target = tmp_path / "elsewhere"
+        target.mkdir(mode=0o755)
+        os.chmod(target, 0o755)
+        layout.state_dir.parent.mkdir(parents=True)
+        layout.state_dir.symlink_to(target)
+        with pytest.raises(ds.DarwinServiceError, match="private directory"):
+            ds.prepare_files(mac, layout, _svc())
+        assert oct(target.stat().st_mode & 0o777) == "0o755"
+        assert not any(str(layout.state_dir) in " ".join(c) for c in _chowns(mac))
+
+    def test_a_models_symlink_inside_an_existing_state_dir_is_not_followed(
+        self, mac: FakeMac, layout: Layout, tmp_path: Path
+    ) -> None:
+        ds.prepare_files(mac, layout, _svc())
+        target = tmp_path / "root-dir"
+        target.mkdir()
+        os.chmod(target, 0o755)
+        layout.models.rmdir()
+        layout.models.symlink_to(target)
+        ds.prepare_files(mac, layout, _svc())
+        assert oct(target.stat().st_mode & 0o777) == "0o755"
+
+    def test_a_state_dir_open_to_others_is_refused(self, mac: FakeMac, layout: Layout) -> None:
+        ds.prepare_files(mac, layout, _svc())
+        os.chmod(layout.state_dir, 0o755)
+        with pytest.raises(ds.DarwinServiceError, match="private directory"):
+            ds.prepare_files(mac, layout, _svc())
+
+    @pytest.mark.parametrize("plant", ["symlink", "hardlink"])
+    def test_a_planted_log_file_is_refused(self, mac: FakeMac, layout: Layout, tmp_path: Path, plant: str) -> None:
+        victim = tmp_path / "victim"
+        victim.write_text("root's")
+        layout.log_dir.mkdir(parents=True)
+        os.chmod(layout.log_dir, 0o755)
+        if plant == "symlink":
+            layout.log_file.symlink_to(victim)
+        else:
+            os.link(victim, layout.log_file)
+        with pytest.raises(ds.DarwinServiceError, match="plain log file"):
+            ds.prepare_files(mac, layout, _svc())
+        assert not any(str(layout.log_file) in " ".join(c) for c in _chowns(mac))
+
+    def test_a_root_directory_others_can_write_is_refused(self, mac: FakeMac, layout: Layout) -> None:
+        layout.library.mkdir(parents=True)
+        os.chmod(layout.library, 0o775)
+        with pytest.raises(ds.DarwinServiceError, match="owned by root and writable only by it"):
+            ds.prepare_files(mac, layout, _svc())
+
+    def test_a_root_directory_that_is_a_symlink_is_refused(self, mac: FakeMac, layout: Layout, tmp_path: Path) -> None:
+        (tmp_path / "real").mkdir()
+        layout.library.parent.mkdir(parents=True)
+        layout.library.symlink_to(tmp_path / "real")
+        with pytest.raises(ds.DarwinServiceError, match="not a directory owned by root"):
+            ds.prepare_files(mac, layout, _svc())
+
     def test_the_logs_are_rotated(self, mac: FakeMac, layout: Layout) -> None:
-        ds.prepare_files(mac, layout, ds.Identity(ds.SERVICE_USER, 452, 452))
+        ds.prepare_files(mac, layout, _svc())
         conf = layout.newsyslog.read_text()
         assert "/var/log/fadenstack/agent.log  _fadenagent:_fadenagent  640" in conf
         assert oct(layout.newsyslog.stat().st_mode & 0o777) == "0o644"
 
+    def test_the_probe_is_made_and_removed_by_the_service(self, mac: FakeMac, layout: Layout) -> None:
+        ds.prepare_files(mac, layout, _svc())
+        mac.calls.clear()
+        ds.probe_state_dir(mac, layout, _svc())
+        assert [c[0] for c in mac.calls] == [ds.TOUCH, ds.TEST, ds.RM]
+
     def test_a_state_dir_the_service_cannot_write_stops_the_join(self, mac: FakeMac, layout: Layout) -> None:
-        ds.prepare_files(mac, layout, ds.Identity(ds.SERVICE_USER, 452, 452))
+        ds.prepare_files(mac, layout, _svc())
         mac.unwritable = True
         with pytest.raises(ds.DarwinServiceError, match="Nothing was filed"):
-            ds.probe_state_dir(mac, layout, ds.Identity(ds.SERVICE_USER, 452, 452))
-        probes = [c for c in mac.calls if c[0] == ds.TOUCH]
-        assert probes, "the probe runs as the service account"
+            ds.probe_state_dir(mac, layout, _svc())
 
-    def test_the_config_is_roots_and_readable_by_the_service_group(self, mac: FakeMac, layout: Layout) -> None:
+    def test_the_config_is_never_readable_by_others(
+        self, mac: FakeMac, layout: Layout, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """It can hold an enrollment token: 0600 from creation, 0640 only once it is the service's group."""
         _install_account(mac, layout, 452)
-        ds.write_env_file(mac, layout, "FADEN_NODE_AGENT_BACKEND_URL=http://x\n")
+        ds.prepare_files(mac, layout, _svc())
+        modes: list[int] = []
+        real_open, real_chmod = ds.os.open, ds.os.chmod
+
+        def opening(path, flags, mode=0o777, *a, **k):  # noqa: ANN001, ANN002, ANN003, ANN202
+            if "agent.env" in str(path):
+                modes.append(mode)
+            return real_open(path, flags, mode, *a, **k)
+
+        def chmodding(path, mode, *a, **k):  # noqa: ANN001, ANN002, ANN003, ANN202
+            if "agent.env" in str(path):
+                assert [ds.CHOWN, "-h", "0:452"] == [c for c in _chowns(mac) if "agent.env" in c[-1]][-1][:3]
+                modes.append(mode)
+            return real_chmod(path, mode, *a, **k)
+
+        monkeypatch.setattr(ds.os, "open", opening)
+        monkeypatch.setattr(ds.os, "chmod", chmodding)
+        ds.write_env_file(mac, layout, "FADEN_NODE_AGENT_ENROLLMENT_TOKEN=tok\n")
+        assert modes == [0o600, 0o640]
         assert oct(layout.env_file.stat().st_mode & 0o777) == "0o640"
-        assert [ds.CHOWN, "0:452", str(layout.env_file)] in mac.calls
+        assert all(m & 0o007 == 0 for m in modes)
 
 
 class TestThePlist:
@@ -323,11 +459,22 @@ class TestThePlist:
         assert "SoftResourceLimits" not in job and "HardResourceLimits" not in job
 
 
+class TestDirectorySearch:
+    def test_a_failing_search_is_an_error_not_a_free_id(self, mac: FakeMac, layout: Layout) -> None:
+        mac.search_fails = True
+        with pytest.raises(ds.DarwinServiceError, match="Could not search"):
+            ds.allocate_id(mac, 450, 499)
+
+    def test_a_users_primary_group_number_is_not_free(self, mac: FakeMac) -> None:
+        mac.users["someone"] = {"UniqueID": "600", "PrimaryGroupID": "450"}
+        assert ds.allocate_id(mac, 450, 499) == 451
+
+
 # ── activation, upgrade and rollback ──────────────────────────────
 
 
 def _binary(tmp_path: Path, content: bytes) -> Path:
-    path = tmp_path / f"src-{len(content)}" / "faden-agent"
+    path = tmp_path / f"src-{len(content)}-{content[:4].hex()}" / "faden-agent"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(content)
     return path
@@ -335,7 +482,7 @@ def _binary(tmp_path: Path, content: bytes) -> Path:
 
 def _ready(mac: FakeMac, layout: Layout) -> ds.Identity:
     _install_account(mac, layout, 452)
-    identity = ds.Identity(ds.SERVICE_USER, 452, 452)
+    identity = _svc()
     ds.prepare_files(mac, layout, identity)
     return identity
 
@@ -363,28 +510,26 @@ class TestActivation:
                     say=lambda _m: None, sleep=clock.sleep, clock=clock)
         assert layout.cli_link.is_symlink()
 
-    def test_a_build_that_does_not_run_as_this_version_is_not_started(
+    def test_a_build_that_does_not_run_as_this_version_is_not_started_nor_kept(
         self, mac: FakeMac, layout: Layout, tmp_path: Path
     ) -> None:
         identity = _ready(mac, layout)
         mac.version_out = "faden-agent 0.0.1"
+        source = _binary(tmp_path, b"b")
         with pytest.raises(ds.DarwinServiceError, match="does not run as agent"):
-            ds.activate(mac, layout, identity, _binary(tmp_path, b"b"), VERSION, say=lambda _m: None)
+            ds.activate(mac, layout, identity, source, VERSION, say=lambda _m: None)
         assert "bootstrap" not in mac.verbs(ds.LAUNCHCTL)
+        assert [p.name for p in layout.builds.iterdir()] == []
+        # a retry checks again rather than trusting what is there
+        with pytest.raises(ds.DarwinServiceError, match="does not run as agent"):
+            ds.stage_binary(mac, layout, source, VERSION)
 
-    def test_the_state_is_handed_to_the_service_before_the_job_starts(
-        self, mac: FakeMac, layout: Layout, tmp_path: Path
-    ) -> None:
-        identity = _ready(mac, layout)
-        layout.state_file.write_text("{}")
-        mac.calls.clear()
-        clock = Clock()
-        ds.activate(mac, layout, identity, _binary(tmp_path, b"b"), VERSION,
-                    say=lambda _m: None, sleep=clock.sleep, clock=clock)
-        flat = [" ".join(c) for c in mac.calls]
-        chown = flat.index(f"{ds.CHOWN} -R 452:452 {layout.state_dir}")
-        boot = next(i for i, c in enumerate(flat) if "bootstrap" in c)
-        assert chown < boot
+    def test_a_staged_build_is_checked_again_on_every_use(self, mac: FakeMac, layout: Layout, tmp_path: Path) -> None:
+        _ready(mac, layout)
+        source = _binary(tmp_path, b"b")
+        ds.stage_binary(mac, layout, source, VERSION)
+        ds.stage_binary(mac, layout, source, VERSION)
+        assert sum(1 for c in mac.calls if c[1:] == ["--version"]) == 2
 
     def test_an_upgrade_that_crash_loops_is_rolled_back(self, mac: FakeMac, layout: Layout, tmp_path: Path) -> None:
         identity = _ready(mac, layout)
@@ -395,6 +540,20 @@ class TestActivation:
         mac.healthy_builds = {good}
         with pytest.raises(ds.DarwinServiceError, match=f"Rolled back to {good}, which is running again"):
             ds.activate(mac, layout, identity, _binary(tmp_path, b"bad build"), VERSION, **quiet)
+        assert ds.current_build(layout) == good
+        assert mac.loaded
+
+    def test_an_upgrade_launchd_will_not_load_is_rolled_back(self, mac: FakeMac, layout: Layout, tmp_path: Path) -> None:
+        identity = _ready(mac, layout)
+        clock = Clock()
+        quiet = {"say": lambda _m: None, "sleep": clock.sleep, "clock": clock}
+        ds.activate(mac, layout, identity, _binary(tmp_path, b"good"), VERSION, **quiet)
+        good = ds.current_build(layout)
+        bad_source = _binary(tmp_path, b"unloadable")
+        bad = f"{VERSION}-{ds._sha256(bad_source)[:12]}"
+        mac.bootstrap_fails_for = {bad}
+        with pytest.raises(ds.DarwinServiceError, match=f"could not be loaded.*Rolled back to {good}, which is running again"):
+            ds.activate(mac, layout, identity, bad_source, VERSION, **quiet)
         assert ds.current_build(layout) == good
         assert mac.loaded
 
@@ -456,6 +615,10 @@ class TestHealth:
 # ── stop and uninstall ────────────────────────────────────────────
 
 
+def _kills(mac: FakeMac) -> list[list[str]]:
+    return [c for c in mac.calls if c[0] in (ds.PKILL, ds.PGREP)]
+
+
 class TestStopAndUninstall:
     def test_stop_unloads_the_job_and_removes_its_definition(self, mac: FakeMac, layout: Layout, tmp_path: Path) -> None:
         identity = _ready(mac, layout)
@@ -475,7 +638,7 @@ class TestStopAndUninstall:
         ds.activate(mac, layout, identity, _binary(tmp_path, b"b"), VERSION,
                     say=lambda _m: None, sleep=clock.sleep, clock=clock)
         mac.calls.clear()
-        ds.uninstall(mac, layout, say=lambda _m: None, sleep=clock.sleep)
+        assert ds.uninstall(mac, layout, say=lambda _m: None, sleep=clock.sleep) is True
         flat = [" ".join(c) for c in mac.calls]
         bootout = next(i for i, c in enumerate(flat) if "bootout" in c)
         pkill = flat.index(f"{ds.PKILL} -TERM -U 452")
@@ -486,21 +649,55 @@ class TestStopAndUninstall:
                      layout.marker, layout.cli_link):
             assert not gone.exists() and not gone.is_symlink(), gone
 
-    def test_uninstall_never_deletes_an_account_it_did_not_create(self, mac: FakeMac, layout: Layout) -> None:
+    def test_uninstall_never_touches_an_account_it_did_not_create(self, mac: FakeMac, layout: Layout) -> None:
         mac.users[ds.SERVICE_USER] = {"UniqueID": "470", "PrimaryGroupID": "470"}
         mac.groups[ds.SERVICE_USER] = {"PrimaryGroupID": "470"}
         said: list[str] = []
         ds.uninstall(mac, layout, say=said.append, sleep=lambda _s: None)
         assert ds.SERVICE_USER in mac.users
         assert not any("-delete" in c for c in mac.calls)
+        assert _kills(mac) == []
         assert any("did not create it" in s for s in said)
 
-    def test_uninstall_never_deletes_an_account_whose_id_changed(self, mac: FakeMac, layout: Layout) -> None:
+    @pytest.mark.parametrize("changed", ["Users", "Groups"])
+    def test_uninstall_never_kills_or_deletes_when_the_id_changed(
+        self, mac: FakeMac, layout: Layout, changed: str
+    ) -> None:
+        """The marker's number may now be someone else's: killing by it would kill their processes."""
         _install_account(mac, layout, 452)
-        mac.users[ds.SERVICE_USER]["UniqueID"] = "460"
-        ds.uninstall(mac, layout, say=lambda _m: None, sleep=lambda _s: None)
+        table = mac.users if changed == "Users" else mac.groups
+        table[ds.SERVICE_USER]["UniqueID" if changed == "Users" else "PrimaryGroupID"] = "460"
+        said: list[str] = []
+        ds.uninstall(mac, layout, say=said.append, sleep=lambda _s: None)
+        assert _kills(mac) == []
+        assert not any("-delete" in c for c in mac.calls)
         assert ds.SERVICE_USER in mac.users
         assert layout.marker.exists(), "the marker stays while the account does"
+        assert any("not the 452 Fadenstack created" in s for s in said)
+
+    def test_uninstall_after_the_account_is_gone_kills_nothing(self, mac: FakeMac, layout: Layout) -> None:
+        layout.marker.parent.mkdir(parents=True)
+        layout.marker.write_text("name=_fadenagent\nid=441\n")  # _oahd's number, say
+        assert ds.uninstall(mac, layout, say=lambda _m: None, sleep=lambda _s: None) is True
+        assert _kills(mac) == []
+        assert not layout.marker.exists()
+
+    def test_what_uninstall_cannot_remove_is_reported_and_the_marker_kept(
+        self, mac: FakeMac, layout: Layout, tmp_path: Path
+    ) -> None:
+        identity = _ready(mac, layout)
+        stuck = layout.state_dir / "stuck"
+        stuck.mkdir()
+        (stuck / "file").write_text("x")
+        os.chmod(stuck, 0o500)
+        said: list[str] = []
+        try:
+            assert ds.uninstall(mac, layout, say=said.append, sleep=lambda _s: None) is False
+        finally:
+            os.chmod(stuck, 0o700)
+        assert any("Could not remove" in s and "stuck" in s for s in said)
+        assert layout.marker.exists()
+        assert identity
 
     def test_a_cli_link_elsewhere_is_left_alone(self, mac: FakeMac, layout: Layout) -> None:
         layout.cli_link.parent.mkdir(parents=True)

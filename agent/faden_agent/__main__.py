@@ -1203,11 +1203,13 @@ def cmd_join(backend_url: str | None, user: bool | None = None, ca_file: str | N
     ``ca_file`` is the backend's authority, for a backend on HTTPS with a
     certificate of its own making (the installer's ``--ca-file``).
     """
+    if _IS_DARWIN and os.environ.get(_DARWIN_JOIN_CHILD) == "1":
+        sys.exit(_darwin_join_child())
     _banner()
-    if _IS_DARWIN:
-        # Before the config is built and the join is filed: the pending request
-        # and the credential must land where the service will read them.
-        _darwin_prepare(user)
+    # On a Mac: the account and its directories before anything is filed. The
+    # join itself then runs as that account (_darwin_join), so the pending
+    # request and the credential are the service's own files from the start.
+    identity = _darwin_prepare(user) if _IS_DARWIN else None
     if ca_file:
         _install_ca_file(ca_file)
 
@@ -1241,6 +1243,9 @@ def cmd_join(backend_url: str | None, user: bool | None = None, ca_file: str | N
     os.environ[f"{_ENV_PREFIX}BACKEND_URL"] = backend
     os.environ[f"{_ENV_PREFIX}AGENT_ID"] = agent_id
     os.environ[f"{_ENV_PREFIX}HOST"] = host
+    if identity is not None:
+        _darwin_join(identity, user, backend, agent_id, host)
+        return
     config = AgentConfig.from_env()
 
     # Already a member? Then this is an upgrade, not a join. Running the same
@@ -1375,6 +1380,77 @@ def _darwin_prepare(user: bool | None) -> darwin_service.Identity:
     return identity
 
 
+#: Set for the join the root run starts as the service account. Not FADEN_NODE_AGENT_*:
+#: it must never be saved into the configuration.
+_DARWIN_JOIN_CHILD = "FADEN_AGENT_DARWIN_JOIN_AS_SERVICE"
+#: The join child's exit status for "already a member": start, nothing to approve.
+_DARWIN_JOIN_MEMBER = 3
+
+
+def _darwin_join(
+    identity: darwin_service.Identity, user: bool | None, backend: str, agent_id: str, host: str
+) -> None:
+    """Root's part of a Mac join: stage the build, run the join as the service, then start it.
+
+    Root never writes into the service's directory, so it does not run the
+    join: the staged, root-owned build does, as _fadenagent, with the
+    terminal attached so the code shows and the wait can be interrupted.
+    """
+    source = darwin_service.running_binary()
+    if source is None:
+        _err("A Mac service runs the built agent (faden-agent-macos-arm64), not a source install.")
+        sys.exit(1)
+    runner, layout = darwin_service.Runner(), darwin_service.Layout()
+    try:
+        name = darwin_service.stage_binary(runner, layout, source, _AGENT_VERSION)
+    except darwin_service.DarwinServiceError as exc:
+        _err(str(exc))
+        sys.exit(1)
+    env = {key: value for key, value in os.environ.items() if key.startswith(_ENV_PREFIX)}
+    env.update({
+        _DARWIN_JOIN_CHILD: "1",
+        "HOME": str(layout.state_dir),
+        "USER": identity.name,
+        "LOGNAME": identity.name,
+        "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+        # root's TMPDIR (if sudo kept one) is not the service's to use
+        "TMPDIR": "/private/tmp",
+    })
+    for key in ("LANG", "LC_ALL", "TERM", "NO_COLOR"):
+        if key in os.environ:
+            env[key] = os.environ[key]
+    rc = runner.call(
+        [str(darwin_service.staged_binary(layout, name)), "join"],
+        uid=identity.uid, gid=identity.gid, env=env, cwd=str(layout.state_dir),
+    )
+    if rc not in (0, _DARWIN_JOIN_MEMBER):
+        sys.exit(rc or 1)
+
+    env_file = _load_env_file()
+    env_file[f"{_ENV_PREFIX}BACKEND_URL"] = backend
+    env_file[f"{_ENV_PREFIX}AGENT_ID"] = agent_id
+    env_file[f"{_ENV_PREFIX}HOST"] = host
+    env_file.pop(f"{_ENV_PREFIX}ENROLLMENT_TOKEN", None)
+    _save_env_file(env_file)
+    os.environ.pop(f"{_ENV_PREFIX}ENROLLMENT_TOKEN", None)
+    _section("Starting the agent")
+    _cmd_start_darwin(user, None)
+
+
+def _darwin_join_child() -> int:
+    """The join, run as the service account: membership check, request, wait, credential."""
+    if os.geteuid() == 0:
+        _err("This step runs as the service account, not as root.")
+        return 2
+    config = AgentConfig.from_env()
+    member = asyncio.run(_existing_membership(config))
+    if member is not None:
+        _section("Already a member")
+        _ok(f"This machine is '{member.get('agent_id')}' on {config.backend_url}; nothing to approve.")
+        return _DARWIN_JOIN_MEMBER
+    return 0 if asyncio.run(_join_flow(config)) else 1
+
+
 def _cmd_start_darwin(user: bool | None, ca_file: str | None) -> None:
     identity = _darwin_prepare(user)
     if ca_file:
@@ -1442,9 +1518,12 @@ def cmd_uninstall() -> None:
         sys.exit(2)
     _require_darwin_root()
     try:
-        darwin_service.uninstall(darwin_service.Runner(), darwin_service.Layout(), say=print)
+        complete = darwin_service.uninstall(darwin_service.Runner(), darwin_service.Layout(), say=print)
     except darwin_service.DarwinServiceError as exc:
         _err(str(exc))
+        sys.exit(1)
+    if not complete:
+        _err("Uninstall is not complete: see above. Remove what is left, then run it again.")
         sys.exit(1)
     print(f"{SERVICE_NAME} is uninstalled; its state and enrollment credential are deleted.")
     print("  Remove this machine from Fadenstack too: Machines, the machine, Remove.")

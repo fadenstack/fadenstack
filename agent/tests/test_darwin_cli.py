@@ -15,6 +15,27 @@ from faden_agent import __main__ as agent_main
 from faden_agent import darwin_service as ds
 
 
+class FakeRunner:
+    """Stands in for the join run as the service account."""
+
+    def __init__(self, events: list[str]) -> None:
+        self.events = events
+        self.rc = 0
+        self.calls: list[dict[str, Any]] = []
+
+    def call(self, argv: list[str], *, uid: int, gid: int, env: dict[str, str], cwd: str) -> int:
+        self.events.append("join-as-service")
+        self.calls.append({"argv": argv, "uid": uid, "gid": gid, "env": env, "cwd": cwd})
+        return self.rc
+
+
+@pytest.fixture()
+def runner(on_a_mac: list[str], monkeypatch: pytest.MonkeyPatch) -> FakeRunner:
+    fake = FakeRunner(on_a_mac)
+    monkeypatch.setattr(ds, "Runner", lambda: fake)
+    return fake
+
+
 @pytest.fixture()
 def on_a_mac(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> list[str]:
     """A Mac run as root, with every machine-changing step recorded instead of done."""
@@ -23,7 +44,9 @@ def on_a_mac(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> list[str]:
     monkeypatch.setattr(agent_main, "_IS_DARWIN", True)
     monkeypatch.setattr(agent_main.os, "geteuid", lambda: 0)
     monkeypatch.setattr(ds, "Layout", lambda: layout)
-    monkeypatch.setattr(ds, "Runner", lambda: object())
+    monkeypatch.setattr(ds, "Runner", lambda: FakeRunner(events))
+    monkeypatch.setattr(ds, "stage_binary", lambda *_a, **_k: (events.append("stage"), "0.2.12-abc")[1])
+    monkeypatch.delenv(agent_main._DARWIN_JOIN_CHILD, raising=False)
     identity = ds.Identity(ds.SERVICE_USER, 452, 452)
 
     def ensure(*_a: Any, **_k: Any) -> ds.Identity:
@@ -41,55 +64,109 @@ def on_a_mac(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> list[str]:
     return events
 
 
-def test_the_join_is_filed_only_once_the_service_paths_are_proven(
-    on_a_mac: list[str], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+def _no_join_as_root(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def never(_config: Any) -> Any:
+        raise AssertionError("root ran the join or read the state itself")
+
+    monkeypatch.setattr(agent_main, "_existing_membership", never)
+    monkeypatch.setattr(agent_main, "_join_flow", never)
+
+
+def test_root_prepares_then_runs_the_join_as_the_service_then_activates(
+    on_a_mac: list[str], runner: FakeRunner, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    seen: dict[str, str] = {}
-
-    async def not_member(_config: Any) -> None:
-        return None
-
-    async def join(config: Any) -> bool:
-        on_a_mac.append("join")
-        seen["state"] = str(config.state_path)
-        return True
-
-    monkeypatch.setattr(agent_main, "_existing_membership", not_member)
-    monkeypatch.setattr(agent_main, "_join_flow", join)
+    _no_join_as_root(monkeypatch)
+    saved: dict[str, str] = {}
+    monkeypatch.setattr(agent_main, "_save_env_file", lambda env: (saved.update(env), Path("/dev/null"))[1])
+    monkeypatch.setenv("FADEN_NODE_AGENT_ENROLLMENT_TOKEN", "stale")
     agent_main.cmd_join("http://192.0.2.220:8000")
-    assert on_a_mac.index("probe") < on_a_mac.index("join") < on_a_mac.index("activate")
-    assert seen["state"] == str(tmp_path / "root/var/db/fadenstack/agent/state.json")
+    assert on_a_mac.index("probe") < on_a_mac.index("stage") < on_a_mac.index("join-as-service")
+    assert on_a_mac.index("join-as-service") < on_a_mac.index("activate")
+    call = runner.calls[0]
+    assert (call["uid"], call["gid"]) == (452, 452)
+    assert call["argv"] == [str(tmp_path / "root/Library/Fadenstack/agent/0.2.12-abc/faden-agent"), "join"]
+    state_dir = str(tmp_path / "root/var/db/fadenstack/agent")
+    assert call["cwd"] == call["env"]["HOME"] == state_dir
+    assert call["env"]["FADEN_NODE_AGENT_STATE_PATH"] == f"{state_dir}/state.json"
+    assert call["env"]["FADEN_NODE_AGENT_BACKEND_URL"] == "http://192.0.2.220:8000"
+    assert call["env"][agent_main._DARWIN_JOIN_CHILD] == "1"
+    assert "SUDO_USER" not in call["env"]
+    assert "FADEN_NODE_AGENT_ENROLLMENT_TOKEN" not in saved
 
 
 def test_a_refused_or_timed_out_join_never_loads_the_job(
-    on_a_mac: list[str], monkeypatch: pytest.MonkeyPatch
+    on_a_mac: list[str], runner: FakeRunner, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    async def not_member(_config: Any) -> None:
-        return None
-
-    async def refused(_config: Any) -> bool:
-        return False
-
-    monkeypatch.setattr(agent_main, "_existing_membership", not_member)
-    monkeypatch.setattr(agent_main, "_join_flow", refused)
+    _no_join_as_root(monkeypatch)
+    runner.rc = 1
     with pytest.raises(SystemExit):
         agent_main.cmd_join("http://192.0.2.220:8000")
     assert "activate" not in on_a_mac
 
 
 def test_a_member_running_the_line_again_is_upgraded_without_a_join(
-    on_a_mac: list[str], monkeypatch: pytest.MonkeyPatch
+    on_a_mac: list[str], runner: FakeRunner, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    async def member(_config: Any) -> dict:
-        return {"agent_id": "mac-01"}
-
-    async def must_not_join(_config: Any) -> bool:
-        raise AssertionError("a member filed a join")
-
-    monkeypatch.setattr(agent_main, "_existing_membership", member)
-    monkeypatch.setattr(agent_main, "_join_flow", must_not_join)
+    _no_join_as_root(monkeypatch)
+    monkeypatch.setattr(agent_main, "_save_env_file", lambda env: Path("/dev/null"))
+    runner.rc = agent_main._DARWIN_JOIN_MEMBER
     agent_main.cmd_join("http://192.0.2.220:8000")
     assert on_a_mac[-1] == "activate"
+
+
+class TestTheJoinAsTheService:
+    """The child: what the staged build does when root runs it as _fadenagent."""
+
+    @pytest.fixture(autouse=True)
+    def _child(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        monkeypatch.setattr(agent_main, "_IS_DARWIN", True)
+        monkeypatch.setattr(agent_main.os, "geteuid", lambda: 452)
+        monkeypatch.setenv(agent_main._DARWIN_JOIN_CHILD, "1")
+        monkeypatch.setenv("FADEN_NODE_AGENT_BACKEND_URL", "http://192.0.2.220:8000")
+        monkeypatch.setenv("FADEN_NODE_AGENT_STATE_PATH", str(tmp_path / "state.json"))
+
+    def _exit(self) -> int | str | None:
+        with pytest.raises(SystemExit) as exc:
+            agent_main.cmd_join(None)
+        return exc.value.code
+
+    def test_files_the_join_with_the_service_state_path(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        seen: dict[str, str] = {}
+
+        async def not_member(_config: Any) -> None:
+            return None
+
+        async def join(config: Any) -> bool:
+            seen["state"] = str(config.state_path)
+            return True
+
+        monkeypatch.setattr(agent_main, "_existing_membership", not_member)
+        monkeypatch.setattr(agent_main, "_join_flow", join)
+        assert self._exit() == 0
+        assert seen["state"] == str(tmp_path / "state.json")
+
+    def test_a_member_says_so_with_its_own_status(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        async def member(_config: Any) -> dict:
+            return {"agent_id": "mac-01"}
+
+        monkeypatch.setattr(agent_main, "_existing_membership", member)
+        assert self._exit() == agent_main._DARWIN_JOIN_MEMBER
+
+    def test_a_failed_join_fails(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        async def not_member(_config: Any) -> None:
+            return None
+
+        async def refused(_config: Any) -> bool:
+            return False
+
+        monkeypatch.setattr(agent_main, "_existing_membership", not_member)
+        monkeypatch.setattr(agent_main, "_join_flow", refused)
+        assert self._exit() == 1
+
+    def test_it_never_runs_as_root(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(agent_main.os, "geteuid", lambda: 0)
+        _no_join_as_root(monkeypatch)
+        assert self._exit() == 2
 
 
 def test_start_with_a_token_saves_it_for_the_service_and_activates(
@@ -150,7 +227,7 @@ def test_a_source_install_is_not_made_a_service(
 def test_uninstall_reminds_to_remove_the_machine_in_the_console(
     on_a_mac: list[str], monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    monkeypatch.setattr(ds, "uninstall", lambda *_a, **_k: on_a_mac.append("uninstall"))
+    monkeypatch.setattr(ds, "uninstall", lambda *_a, **_k: (on_a_mac.append("uninstall"), True)[1])
     agent_main.cmd_uninstall()
     out = capsys.readouterr().out
     assert "credential are deleted" in out
@@ -188,3 +265,13 @@ def test_version_flag(capsys: pytest.CaptureFixture[str], monkeypatch: pytest.Mo
         agent_main.main()
     assert exc.value.code == 0
     assert capsys.readouterr().out.strip() == f"faden-agent {agent_main._AGENT_VERSION}"
+
+
+def test_an_incomplete_uninstall_fails(
+    on_a_mac: list[str], monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(ds, "uninstall", lambda *_a, **_k: False)
+    with pytest.raises(SystemExit) as exc:
+        agent_main.cmd_uninstall()
+    assert exc.value.code == 1
+    assert "not complete" in capsys.readouterr().out
