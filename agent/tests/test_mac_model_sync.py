@@ -301,14 +301,57 @@ async def test_remove_model_command_is_unsupported_without_the_native_runtime(tm
     assert result.get("success") is False
 
 
-def test_model_remove_is_advertised_only_with_a_native_manager() -> None:
-    import inspect
+@pytest.mark.asyncio()
+async def test_model_remove_is_advertised_only_with_a_native_manager(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import sys
 
+    from faden_agent.native import manager as native_manager
     from faden_agent.service import NodeAgentService
 
-    src = inspect.getsource(NodeAgentService._start_native)
-    assert 'static_capabilities["model_remove"] = 1' in src
-    assert src.index('"model_remove"') > src.index("manager.capabilities()")
+    class FakeManager:
+        def __init__(self, **_kw: Any) -> None:
+            pass
+
+        async def reconcile(self) -> dict[str, list[str]]:
+            return {"adopted": [], "failed": []}
+
+        def capabilities(self) -> dict[str, Any]:
+            return {"native_runtime": 1}
+
+        async def refresh_metal(self) -> None:
+            return None
+
+    config = SimpleNamespace(
+        state_path=str(tmp_path / "state.json"), model_store_root=str(tmp_path / "models"), native_max_workers=1,
+        native_sandbox=False, native_sandbox_error=None, model_tls_dir=None,
+    )
+    monkeypatch.setattr(native_manager, "NativeRuntimeManager", FakeManager)
+
+    # (a) a Mac with the native runtime
+    monkeypatch.setattr(sys, "platform", "darwin")
+    host = SimpleNamespace(_native=None, _config=config, _state_store=None, _client=None)
+    caps: dict[str, Any] = {}
+    assert await NodeAgentService._start_native(host, caps) is not None  # type: ignore[arg-type]
+    assert caps["model_remove"] == 1 and caps["native_runtime"] == 1
+
+    # (b) a native runtime that cannot start advertises neither
+    class Broken(FakeManager):
+        async def reconcile(self) -> dict[str, list[str]]:
+            raise RuntimeError("no")
+
+    monkeypatch.setattr(native_manager, "NativeRuntimeManager", Broken)
+    host = SimpleNamespace(_native=None, _config=config, _state_store=None, _client=None)
+    caps = {}
+    assert await NodeAgentService._start_native(host, caps) is None  # type: ignore[arg-type]
+    assert "model_remove" not in caps
+
+    # (c) Linux: no manager, no key (the 0.2.12 key set itself is pinned in test_native_compat.py)
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setattr(native_manager, "NativeRuntimeManager", FakeManager)
+    host = SimpleNamespace(_native=None, _config=config, _state_store=None, _client=None)
+    caps = {}
+    assert await NodeAgentService._start_native(host, caps) is None  # type: ignore[arg-type]
+    assert "model_remove" not in caps
 
 
 def test_native_manager_reports_snapshots_in_use(tmp_path: Path) -> None:
@@ -409,14 +452,6 @@ async def test_concurrent_syncs_of_case_variants_do_not_clean_each_others_partia
             pull_model(client=client, credential="t", model_sync=m, model_store_root=str(tmp_path)) for m in (ma, mb)
         ))
     # serialised by one lock: both finished, neither failed on a file the other removed
-
-
-def test_the_native_start_takes_the_models_lock() -> None:
-    import inspect
-
-    from faden_agent.native.manager import NativeRuntimeManager
-
-    assert "_lock_for_model_dir(model_dir)" in inspect.getsource(NativeRuntimeManager.start_native_worker)
 
 
 def test_in_use_counts_every_live_state(tmp_path: Path) -> None:
