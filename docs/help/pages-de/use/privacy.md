@@ -8,12 +8,14 @@ Auf dem Server Ihrer Organisation:
 
 - Ihr Konto;
 - Ihre Chats: die Nachrichten, die Antworten und ihre Titel;
-- Ihre Projekte mit ihren Einstellungen;
+- Ihre Projekte mit ihren Einstellungen und Dateien;
 - die Dateien, die Sie anhängen, und der Text, der daraus gelesen wurde;
+- Zusammenfassungen langer Chats, von einer KI geschrieben, wenn Ihr Administrator sie eingeschaltet hat;
 - Ihre Skills;
+- Ihre Einstellungen im Chat, etwa die Denkstufe pro Modell;
 - Nutzungsdaten: wann Sie welches Modell genutzt haben, wie viel Text hinein- und herausging und welche Tools liefen. Sie enthalten nicht, was gesagt wurde.
 
-Die Nachrichten, die Antworten, die Chat-Titel, Projektnamen, -beschreibungen und -anweisungen, Dateinamen, die angehängten Dateien und der aus ihnen gelesene Text werden verschlüsselt gespeichert. Ohne den Schlüssel, mit dem sie verschlüsselt sind, startet der Server nicht. Chats aus der Zeit vor dem Upgrade Ihrer Organisation auf diese Version verschlüsselt das Upgrade. Das Nachdenken eines Modells wird gar nicht gespeichert.
+Die Nachrichten, die Antworten, die Zusammenfassungen langer Chats, die Chat-Titel, Projektnamen, -beschreibungen und -anweisungen, Dateinamen, die angehängten Dateien und der aus ihnen gelesene Text werden verschlüsselt gespeichert. Ohne den Schlüssel, mit dem sie verschlüsselt sind, startet der Server nicht. Chats aus der Zeit vor dem Upgrade Ihrer Organisation auf diese Version verschlüsselt das Upgrade. Das Nachdenken eines Modells wird gar nicht gespeichert.
 
 Auf Ihrem eigenen Computer:
 
@@ -49,7 +51,7 @@ Wenn es aktiv ist, werden personenbezogene Daten auf eine von zwei Arten maskier
     Wenn die Prüfung nicht laufen kann, entscheidet die Richtlinie: Ihre Nachricht wird nicht gesendet, sie wird trotzdem gesendet, oder sie geht stattdessen an eines der eigenen Modelle Ihrer Organisation.
 
 !!! note "Die Erkennung ist nicht immer richtig"
-    Personenbezogene Daten werden automatisch erkannt. Wie gut das gelingt, hängt von der Sprache und vom Aufbau des Textes ab: Tabellen, Listen, Code und kurze Fragmente sind schwieriger als ganze Sätze. In englischem Text findet die Erkennung die meisten personenbezogenen Daten, aber nicht alle; in deutschem oder anderssprachigem Text übersieht sie oft Namen und Orte. Sie kann auch Wörter maskieren, die keine personenbezogenen Daten sind. Fügen Sie nichts ein, was Sie nicht weitergeben dürfen.
+    Personenbezogene Daten werden automatisch erkannt. Wie gut das gelingt, hängt von der Sprache und vom Aufbau des Textes ab: Tabellen, Listen, Code und kurze Fragmente sind schwieriger als ganze Sätze. In englischem Text findet die Erkennung die meisten personenbezogenen Daten, aber nicht alle; in deutschem oder anderssprachigem Text übersieht sie oft Namen und Orte. Sie kann auch Wörter maskieren, die keine personenbezogenen Daten sind. Geprüft wird nur Text: Ein Bild geht unverändert an das Modell, auch mit den personenbezogenen Daten, die es zeigt, und der Chat weist unter der Antwort darauf hin. Ihre Organisation kann Bilder stattdessen ablehnen lassen; dann wird die Nachricht nicht gesendet, und der Chat sagt, warum. Fügen Sie nichts ein, was Sie nicht weitergeben dürfen.
 
 ### Für einen Chat ansehen und verschärfen {#see-and-tighten-it-for-one-chat}
 
@@ -76,7 +78,7 @@ Sie können den Schutz nur strenger machen als die Richtlinie Ihrer Organisation
 
 ## Modelle bei externen Providern {#models-at-outside-providers}
 
-Ihr Administrator kann neben den eigenen Modellen Ihrer Organisation auch Modelle anbieten, die bei einem externen Provider laufen, etwa bei OpenAI oder Azure. Wenn Sie eines davon wählen, geht alles, was das Modell für die Antwort braucht, an diesen Provider: Ihre Nachricht, die früheren Nachrichten des Chats, der Text Ihrer angehängten Dateien, Projekt- und Skill-Anweisungen, Tool-Ergebnisse und Abschnitte aus der Wissensdatenbank. Personenbezogene Daten werden vorher maskiert, wenn die Richtlinie das vorsieht. Es gelten dann die eigenen Bedingungen des Providers.
+Ihr Administrator kann neben den eigenen Modellen Ihrer Organisation auch Modelle anbieten, die bei einem externen Provider laufen, etwa bei OpenAI oder Azure. Wenn Sie eines davon wählen, geht alles, was das Modell für die Antwort braucht, an diesen Provider: Ihre Nachricht und ihre Bilder, die früheren Nachrichten des Chats, so viele hineinpassen, oder ihre Zusammenfassung, der Text Ihrer angehängten Dateien und der Dateien des Projekts, Projekt- und Skill-Anweisungen, Tool-Ergebnisse und Abschnitte aus der Wissensdatenbank. Personenbezogene Daten im Text werden vorher maskiert, wenn die Richtlinie das vorsieht; Bilder gehen unverändert. Es gelten dann die eigenen Bedingungen des Providers.
 
 Die Modellliste zeigt nicht immer, wo ein Modell läuft. Wenn das für das, was Sie schreiben, wichtig ist, fragen Sie Ihren Administrator, oder wählen Sie ein Modell, von dem Sie wissen, dass es innerhalb Ihrer Organisation läuft. Siehe [Externe Provider](../administer/providers.md).
 
@@ -95,14 +97,15 @@ Hält ein Limit eine Anfrage an, nennt die Meldung das Limit, etwa das Tageslimi
 ## Tools und die Wissensdatenbank {#tools-and-the-knowledge-base}
 
 - Ein Tool, das Ihr Administrator angebunden hat, erhält, was das Modell ihm übergibt, oft einen Suchbegriff oder Text aus Ihrer Unterhaltung. Ihr Administrator legt pro Dienst fest, wie personenbezogene Daten in diesen Aufrufen behandelt werden. Siehe [Tools im Chat](tools.md).
-- Alles in der Wissensdatenbank der Organisation kann im Chat jeder Person auftauchen. Ihre angehängten Dateien kommen nicht hinein. Siehe [Wissen](knowledge.md).
+- Alles in der Wissensdatenbank der Organisation kann im Chat jeder Person auftauchen. Ihre angehängten Dateien und die Dateien Ihrer Projekte kommen nicht hinein. Siehe [Wissen](knowledge.md).
 
 ## Löschen {#deleting}
 
 | Sie löschen | Was geschieht |
 |---|---|
-| **Einen Chat** | Er verschwindet sofort aus Ihrer Liste und lässt sich nicht zurückholen. Der Server behält ihn so lange, wie Ihre Organisation es eingestellt hat (30 Tage, wenn sie nichts anderes gewählt hat), und löscht ihn dann endgültig, mit seinen Dateien und dem, was sich der Assistent daraus gemerkt hat. |
-| **Ein Projekt** | Es wird sofort endgültig gelöscht, mit allen seinen Chats und deren Dateien. |
+| **Einen Chat** | Er verschwindet sofort aus Ihrer Liste und lässt sich nicht zurückholen. Der Server behält ihn so lange, wie Ihre Organisation es eingestellt hat (30 Tage, wenn sie nichts anderes gewählt hat), und löscht ihn dann endgültig, mit seinen Dateien, seiner Zusammenfassung und dem, was sich der Assistent daraus gemerkt hat. |
+| **Ein Projekt** | Es wird sofort endgültig gelöscht, mit seinen Dateien und allen seinen Chats und deren Dateien. |
+| **Eine Datei unter Dateien eines Projekts** (**Entfernen**) | Sie wird sofort endgültig gelöscht. |
 | **Ihr Konto** (ein Administrator löscht es) | Ihre Chats, Projekte, Dateien und das, was sich der Assistent gemerkt hat, werden mit ihm gelöscht, ebenso das, was Ihre Apps an den Server gemeldet haben: welche Tools wann liefen, und die Meldungen Ihrer Geräte. |
 | Einen Chat im **Chatverlauf**, im Browser-Agenten | Er wird aus Ihrem Browser entfernt. |
 | **Meine Daten entfernen…**, unter **Ihre Daten in diesem Browser** in den Einstellungen des Browser-Agenten | Die Chats, gespeicherten Prompts, Entscheidungen **Immer zulassen** und das Protokoll der Tool-Aufrufe, die für Sie in diesem Browser gespeichert sind, werden samt Schlüssel gelöscht, und Ihre Verbindung endet. **Alle meine Fadenstack-Daten in diesem Browser entfernen…** tut dasselbe für jede Fadenstack-App dort. **Meine Daten exportieren** speichert sie vorher als Datei. |
@@ -129,6 +132,9 @@ die Versionshinweise unter **Updates**): **Einstellungen → Erscheinungsbild �
 |---|---|
 | **A PII policy is set for this workspace, but the PII module is not running.** | Die Richtlinie Ihrer Organisation verlangt die Prüfung auf personenbezogene Daten, und das Modul dafür ist ausgeschaltet. Es wurde nichts gesendet. Wenden Sie sich an Ihren Administrator. |
 | **PII service unavailable and fail_action=block.** | Die Prüfung auf personenbezogene Daten konnte nicht laufen, und die Richtlinie Ihrer Organisation sieht vor, ohne sie keine Nachrichten zu senden. Versuchen Sie es später erneut; wenn es immer wieder passiert, wenden Sie sich an Ihren Administrator. |
+| **The PII check took longer than its limit for this request …** | Der Text war zu lang, um ihn rechtzeitig zu prüfen; es wurde nichts gesendet. Senden Sie einen kürzeren Text, oder wenden Sie sich an Ihren Administrator, der die Prüfung schneller machen kann. |
+| **The request is too large for the PII check …** | Der Verlauf oder das, was ein Tool zurückgab, ist mehr, als die Prüfung auf einmal liest; es wurde nichts gesendet. Beginnen Sie einen neuen Chat oder senden Sie weniger. |
+| **Bilder werden nicht auf personenbezogene Daten geprüft, und Ihre Organisation sendet sie nicht ungeprüft.** | Die Richtlinie Ihrer Organisation lehnt Bilder ab, solange personenbezogene Daten geprüft werden. Es wurde nichts gesendet. Entfernen Sie das Bild (in einem Projekt auch unter **Dateien**) und senden Sie erneut, oder wenden Sie sich an Ihren Administrator. |
 | Eine Antwort zeigt `<PERSON>` oder `[PERSON_1]`, wo ein Name stehen sollte | Der Name wurde maskiert, bevor er das Modell erreichte. Bei **Schwärzen** ist das so vorgesehen. Bei **Tokenisierung (reversibel)** sollte der Name wieder erscheinen; wenn nicht, wenden Sie sich an Ihren Administrator. |
 | **Ihr Administrator hat nicht erlaubt, den PII-Modus für diesen Chat zu ändern.** | Ihre Organisation legt den Modus fest. Die anderen Einstellungen unter **Datenschutz** können Sie möglicherweise trotzdem ändern. |
 | **… wird nicht angewendet. Wählen Sie den Modus erneut, um ihn anzuwenden.** | Der Modus, den Sie zuvor gewählt haben, wurde nicht wirksam. Wählen Sie ihn unter **Modus** erneut. |

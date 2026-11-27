@@ -5,8 +5,10 @@
  * button, or ``$`` followed by a skill's name; ``/skill`` opens the dialog
  * that makes a skill from the conversation.
  *
- * On a phone the text gets the whole first row and the actions sit under it
- * (the model picker beside the text had left it a word wide); the text is
+ * The text gets the whole first row, on a desktop as on a phone (the model
+ * picker beside the text had left it a word wide); the actions sit under it:
+ * tools, skills and attach on the left, the model and thinking pills and Send
+ * on the right. On a phone the text is
  * 16 px so iOS does not zoom in on focus; and the navigation button floats
  * above the composer, out of the way while the keyboard is up.
  */
@@ -54,7 +56,10 @@ import { filterSkills, mentionAt, type SkillSummary } from "~/api/skills";
 import { MobileNavButton } from "~/components/MobileNavButton";
 import { CHAT_NAV_ID, useChatShell } from "../ChatShellContext";
 import { useChatSkills } from "../hooks/useChatSkills";
+import { useChatThinking } from "../hooks/useChatThinking";
+import { effectiveLevel, hasThinkingChoice, offeredLevels, reasoningEffort } from "../thinking";
 import ModelSelector from "./ModelSelector";
+import ThinkingPill from "./ThinkingPill";
 
 interface Props {
   onSend: (text: string, files: File[]) => void;
@@ -69,6 +74,11 @@ interface Props {
   toolsOpen?: boolean;
   /** Text to put back in the box ("edit and resend"); a new ``nonce`` puts it again. */
   draft?: { text: string; nonce: number } | null;
+  /**
+   * The ``reasoning_effort`` the thinking pill stands for now (``undefined``: Auto, send nothing),
+   * told whenever it changes; a message sent after it carries it.
+   */
+  onReasoningChange?: (effort: string | undefined) => void;
 }
 
 /** ``/skill`` or ``/skills``, alone or followed by what the skill should do. */
@@ -87,6 +97,7 @@ export default function ChatInput({
   onToolsToggle,
   toolsOpen = false,
   draft = null,
+  onReasoningChange,
 }: Props) {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -103,6 +114,13 @@ export default function ChatInput({
   // marked before sending (the gateway leaves it out and says so on the reply).
   const [model, setModel] = useState<ModelAlias | null>(null);
   const unseen = (file: File) => model?.vision === false && isPictureFile(file.name);
+  // How much the model thinks: kept per person and model; a level the model does not offer is Auto.
+  const { kept, choose } = useChatThinking();
+  const thinking = effectiveLevel(model, kept[selectedModel]);
+  const effort = reasoningEffort(thinking);
+  useEffect(() => {
+    onReasoningChange?.(effort);
+  }, [effort, onReasoningChange]);
   const pictureHintId = useId();
   const [focused, setFocused] = useState(false);
   const [mention, setMention] = useState<{ start: number; query: string } | null>(null);
@@ -303,8 +321,16 @@ export default function ChatInput({
       value={selectedModel}
       onChange={onModelChange}
       size="small"
-      compact={isPhone}
+      compact
       onSelected={setModel}
+    />
+  );
+
+  const thinkingPill = hasThinkingChoice(model) && (
+    <ThinkingPill
+      levels={offeredLevels(model)}
+      value={thinking}
+      onChange={(level) => choose(selectedModel, level)}
     />
   );
 
@@ -427,33 +453,41 @@ export default function ChatInput({
       )}
 
       {/* Input bar */}
-      {isPhone ? (
-        <Box
-          ref={barRef}
-          sx={{ ...barSx, display: "flex", flexDirection: "column", gap: 0.5, px: 1, pt: 1, pb: 0.5 }}
-        >
-          {textField}
-          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-            {toolsButton}
-            {skillsButton}
-            {attachButton}
-            <Box sx={{ flex: 1, minWidth: 0, display: "flex" }}>{modelSelector}</Box>
-            {sendButton}
-          </Box>
-        </Box>
-      ) : (
-        <Box
-          ref={barRef}
-          sx={{ ...barSx, display: "flex", alignItems: "flex-end", gap: 1, px: 1.5, py: 0.75 }}
-        >
+      {/* The text on its own row; under it tools, skills and attach on the left, the model and
+          thinking pills and Send on the right (a phone and a desktop alike). */}
+      <Box
+        ref={barRef}
+        sx={{
+          ...barSx,
+          display: "flex",
+          flexDirection: "column",
+          gap: 0.5,
+          px: isPhone ? 1 : 1.5,
+          pt: isPhone ? 1 : 0.75,
+          pb: isPhone ? 0.5 : 0.75,
+        }}
+      >
+        {textField}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
           {toolsButton}
           {skillsButton}
           {attachButton}
-          {textField}
-          {modelSelector}
-          {sendButton}
+          <Box
+            sx={{
+              flex: 1,
+              minWidth: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "flex-end",
+              gap: 0.75,
+            }}
+          >
+            {modelSelector}
+            {thinkingPill}
+            {sendButton}
+          </Box>
         </Box>
-      )}
+      </Box>
 
       {/* That the answers come from an AI (EU AI Act Art. 50(1)), as the SDKs' panels say it */}
       <Typography

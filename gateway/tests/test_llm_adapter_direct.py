@@ -208,12 +208,22 @@ async def test_a_stream_that_ends_without_done_is_closed_once() -> None:
 
 @pytest.mark.anyio
 async def test_an_engine_that_refuses_becomes_an_error_event() -> None:
-    async with _engine([b'{"error": "context length exceeded"}'], [], status=400) as http:
+    async with _engine([b'{"error": "tool_choice is not supported"}'], [], status=400) as http:
         out = await _stream(LLMAdapter(http_client=http))
     assert out[-1] == b"data: [DONE]\n\n"
     error = json.loads(out[0][len(b"data: "):])["error"]
     assert error["type"] == "server_error"
-    assert "upstream 400" in error["message"] and "context length exceeded" in error["message"]
+    assert "upstream 400" in error["message"] and "tool_choice is not supported" in error["message"]
+
+
+@pytest.mark.anyio
+async def test_an_engine_that_finds_the_request_too_long_says_it_with_the_one_code() -> None:
+    """0.7.2 K: whoever says it, a request longer than the window is ``context_length_exceeded``."""
+    async with _engine([b'{"error": "context length exceeded"}'], [], status=400) as http:
+        out = await _stream(LLMAdapter(http_client=http))
+    assert out[-1] == b"data: [DONE]\n\n"
+    error = json.loads(out[0][len(b"data: "):])["error"]
+    assert (error["type"], error["code"]) == ("invalid_request_error", "context_length_exceeded")
 
 
 @pytest.mark.anyio

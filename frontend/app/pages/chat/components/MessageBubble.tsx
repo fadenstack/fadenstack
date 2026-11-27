@@ -17,8 +17,10 @@ import AgentAvatar from "~/components/AgentAvatar";
 import Markdown, { markdownSx } from "~/components/markdown/Markdown";
 import { useTranslation } from "react-i18next";
 
-import type { TokenUsage, TurnStatus } from "~/api/chatTypes";
+import type { ContextUse, TokenUsage, TurnStatus } from "~/api/chatTypes";
+import type { MessagePicture } from "../messagePictures";
 import ThinkingBlock from "./ThinkingBlock";
+import ContextFigure from "./ContextFigure";
 import TokenUsageBadge from "./TokenUsageBadge";
 
 interface Props {
@@ -46,6 +48,10 @@ interface Props {
   stopped?: boolean;
   /** Tries the reply again (the chat's last one, stopped). */
   onRetry?: () => void;
+  /** Pictures sent with this message, shown as thumbnails above its text. */
+  pictures?: MessagePicture[];
+  /** What the turn said about its context (the chat's latest reply only). */
+  context?: ContextUse | null;
 }
 
 export default function MessageBubble({
@@ -66,6 +72,8 @@ export default function MessageBubble({
   notes,
   stopped = false,
   onRetry,
+  pictures,
+  context = null,
 }: Props) {
   const theme = useTheme();
   const { t } = useTranslation();
@@ -139,6 +147,30 @@ export default function MessageBubble({
           }}
         >
           {reasoning && !isUser && <ThinkingBlock text={reasoning} ms={reasoningMs} />}
+          {pictures && pictures.length > 0 && !blocked && (
+            <Box data-testid="message-pictures" sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, mb: content ? 1 : 0 }}>
+              {pictures.map((picture, i) => (
+                <Box
+                  key={i}
+                  component="img"
+                  src={picture.url}
+                  alt={
+                    picture.name
+                      ? t("chat.picture_attached", { name: picture.name })
+                      : t("chat.picture_attached_unnamed")
+                  }
+                  sx={{
+                    maxWidth: 160,
+                    maxHeight: 160,
+                    borderRadius: 1,
+                    objectFit: "cover",
+                    display: "block",
+                    bgcolor: "background.paper",
+                  }}
+                />
+              ))}
+            </Box>
+          )}
           {blocked ? (
             <Box data-message-status={status} sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
               <InfoOutlinedIcon sx={{ fontSize: 18, mt: 0.25, color: "info.main" }} />
@@ -241,6 +273,7 @@ export default function MessageBubble({
                   : `${responseMs}ms`}
               </Typography>
             )}
+            {context && <ContextFigure context={context} />}
             {usage ? (
               <TokenUsageBadge usage={usage} />
             ) : (

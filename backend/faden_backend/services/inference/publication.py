@@ -23,7 +23,12 @@ from faden_backend.db.models.inference import (
     InferenceEndpoint,
 )
 from faden_backend.db.models.llm import LLMProvider, ProviderTarget, ProviderType
-from faden_backend.services.llm.kinds import IMAGES, deployment_calls_tools, deployment_kind
+from faden_backend.services.llm.kinds import (
+    IMAGES,
+    deployment_calls_tools,
+    deployment_context_length,
+    deployment_kind,
+)
 
 #: Marks a provider row as owned by a deployment.  The same string the
 #: gateway stamps on ``llm_provider_instance``, so ownership reads the same
@@ -196,6 +201,8 @@ class InferencePublicationCoordinator:
                 # scores for a pooling model, chat otherwise.
                 task=deployment_kind(deployment.spec_json),
                 tools=deployment_calls_tools(deployment.spec_json),
+                # How many tokens it takes (vLLM's max_model_len), for the gateway's chat context.
+                context_length=deployment_context_length(deployment.spec_json),
                 # Whether the model sees pictures: said on the deployment (the marketplace
                 # fills it in from the model's facts), unknown otherwise.
                 vision=spec_service.get("vision") if isinstance(spec_service.get("vision"), bool) else None,

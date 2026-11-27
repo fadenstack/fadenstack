@@ -594,6 +594,30 @@ async def test_the_profile_says_whether_the_agents_model_sees_pictures(
 
 
 @pytest.mark.anyio
+async def test_the_profile_and_the_agents_model_list_say_the_models_context_length(
+    client: AsyncClient, db_session: AsyncSession, backend: _Backend,
+) -> None:
+    """0.7.2 K: the SDK sizes its context to the agent's model, as the agent sees it."""
+    first = await _seed(db_session, provider=ProviderType.VLLM, pii=None)
+    backend.put(_profile())
+
+    async def windows() -> tuple[Any, Any]:
+        profile = await client.get("/v1/agents/eplan-assistant/profile", headers=_headers())
+        models = await client.get("/v1/agents/eplan-assistant/models", headers=_headers())
+        assert profile.status_code == 200 and models.status_code == 200
+        [entry] = models.json()["data"]
+        assert entry["id"] == profile.json()["model"]
+        return profile.json()["context_length"], entry["context_length"]
+
+    assert await windows() == (None, None), "nobody said"
+    instance = await db_session.get(LLMProviderInstance, first)
+    assert instance is not None
+    instance.node_metadata = {"task": "chat", "context_length": 32768}  # as the backend publishes it
+    await db_session.commit()
+    assert await windows() == (32768, 32768)
+
+
+@pytest.mark.anyio
 @pytest.mark.parametrize(("task", "images"), [("images", True), ("chat", False)])
 async def test_the_profile_says_whether_the_agents_tools_can_make_pictures(
     task: str, images: bool, client: AsyncClient, db_session: AsyncSession, backend: _Backend,
@@ -1530,7 +1554,10 @@ async def test_a_language_that_cannot_be_kept_says_so(client: AsyncClient, backe
 async def test_the_models_are_the_agents_model(client: AsyncClient, backend: _Backend) -> None:
     r = await client.get("/v1/agents/eplan-assistant/models", headers=_headers())
     assert r.status_code == 200
-    assert r.json() == {"object": "list", "data": [{"id": ALIAS, "object": "model", "created": 0, "owned_by": "faden"}]}
+    assert r.json() == {"object": "list", "data": [{
+        "id": ALIAS, "object": "model", "created": 0, "owned_by": "faden", "vision": None, "context_length": None,
+        "reasoning_levels": None,
+    }]}
 
 
 # -- events and features ------------------------------------------------------------------------

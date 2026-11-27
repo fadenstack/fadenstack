@@ -41,7 +41,9 @@ Führen Sie nach der Installation des Werkzeugs `faden doctor` aus, um zuerst de
     legt den ersten Administrator an. Grafana, RabbitMQ
     und Langfuse behalten je ein eigenes, zufälliges Passwort in der `.env`: Keines davon ist das Konsolen-Passwort
     des Administrators. Der erste Benutzer von Langfuse ist die E-Mail-Adresse des Administrators mit
-    `LANGFUSE_INIT_USER_PASSWORD`; eine vor diesem Release angelegte Installation hat an diesen drei Stellen das
+    `LANGFUSE_INIT_USER_PASSWORD` (`LANGFUSE_INIT_USER_EMAIL` in der `.env`: Langfuse nimmt keine Adresse ohne eine
+    Domain wie example.com, daher bekommt eine Adresse wie `admin@localhost` ein `.local` angehängt, auch bei
+    `faden upgrade`); eine vor diesem Release angelegte Installation hat an diesen drei Stellen das
     Konsolen-Passwort, mit dem sie eingerichtet wurde, und die `.env` enthält, womit jeder Dienst läuft.
 
 ### Was der Befehl fragt {#what-it-asks}
@@ -233,7 +235,7 @@ Zufallswert (`openssl rand -base64 48`):
 | `FADEN_GATEWAY_PII_SERVICE_TOKEN`, `FADEN_BACKEND_PII_SERVICE_TOKEN`, `FADEN_MCP_PII_SERVICE_TOKEN`, `FADEN_PII_SERVICE_TOKEN` | Aufrufe des PII-Dienstes, der jeden Aufruf ohne ihn ablehnt (nur sein Health-Check ist offen). Ein Wert für alle vier |
 | `LANGFUSE_SALT`, `LANGFUSE_ENCRYPTION_KEY` (64 Hex-Zeichen: `openssl rand -hex 32`), `LANGFUSE_NEXTAUTH_SECRET` | Die API-Schlüssel, gespeicherten Schlüssel und Anmeldungen von Langfuse |
 | `REDIS_AUTH`, `MINIO_ROOT_PASSWORD`, `CLICKHOUSE_PASSWORD`, `GRAFANA_ADMIN_PASSWORD` | Die Speicher und Grafana. Grafana liest sein Passwort beim ersten Start; eine spätere Änderung in der `.env` ändert es in Grafana nicht |
-| `LANGFUSE_INIT_USER_PASSWORD` | Das Passwort des ersten Benutzers von Langfuse (die E-Mail-Adresse des Administrators). Langfuse liest es nur einmal, wenn es den Benutzer anlegt: Ändern Sie es danach in Langfuse und tragen Sie das neue in die `.env` ein |
+| `LANGFUSE_INIT_USER_PASSWORD` | Das Passwort des ersten Benutzers von Langfuse (`LANGFUSE_INIT_USER_EMAIL`, meist die E-Mail-Adresse des Administrators). Langfuse liest es nur einmal, wenn es den Benutzer anlegt: Ändern Sie es danach in Langfuse und tragen Sie das neue in die `.env` ein |
 | `RABBITMQ_ADMIN_PASS`, `RABBITMQ_BACKEND_PASS`, `RABBITMQ_API_PASS`, `RABBITMQ_PII_PASS` | Den Message-Broker. Seine Benutzer stammen aus `rabbitmq/definitions.json`, die `faden deploy` daraus schreibt |
 
 Außerhalb der Entwicklung starten das Backend, das Gateway sowie der MCP- und der Skills-Dienst nicht mit den
@@ -305,15 +307,18 @@ Chat-Texte werden lokal verarbeitet. Die CPU-Verarbeitung ist langsamer, besonde
 oder langen Dokumenten.
 
 !!! note "Ein langer Text auf einem Server ohne GPU"
-    Die Prüfung hat für jede Anfrage höchstens 8 Sekunden. Auf einem Server ohne GPU kann eine Anfrage mit einem
-    langen Text (einige tausend Zeichen, etwa ein Dokument, das ein Agent mitschickt) länger brauchen. Wo die
-    PII-Richtlinie blockiert, was sie nicht prüfen kann (voreingestellt für Anfragen an Cloud-Anbieter, und für
+    Die Prüfung hat für jede Anfrage 8 Sekunden und für jeden Abschnitt eines langen Textes, den sie liest (je einige
+    hundert Zeichen), eine halbe Sekunde mehr, höchstens 30 Sekunden. Auf einem Server ohne GPU kann eine Anfrage mit
+    einem langen Text (mehrere tausend Zeichen, etwa ein Dokument, das ein Agent mitschickt) trotzdem länger brauchen.
+    Wo die PII-Richtlinie blockiert, was sie nicht prüfen kann (voreingestellt für Anfragen an Cloud-Anbieter, und für
     Anfragen an lokale Modelle, wenn **Anfragen an lokale Modelle schützen** eingeschaltet ist), wird eine solche
-    Anfrage dann abgelehnt, und die Meldung lautet „PII service unavailable“. Was Administratoren tun können: die
-    Prüfung auf einer GPU ausführen (`gliner2-multi-v1` mit `gpu-shared` oder `gpu-dedicated`, siehe unten); für
-    Anfragen an lokale Modelle **Anfragen an lokale Modelle schützen** in der
-    [Richtlinie für personenbezogene Daten](../administer/policies.md#personal-data) ausgeschaltet lassen, wie es
-    voreingestellt ist; kürzere Texte senden.
+    Anfrage dann mit `pii_deadline_exceeded` abgelehnt („The PII check took longer than its limit for this request
+    …“). Was Administratoren tun können: die Prüfung auf einer GPU ausführen (`gliner2-multi-v1` mit `gpu-shared` oder
+    `gpu-dedicated`, siehe unten); einer virtuellen Maschine den CPU-Typ des Hosts geben (Host-Passthrough), denn ohne
+    die AVX2-Befehle des Hosts läuft die Prüfung etwa dreimal langsamer (siehe
+    [Die CPU und die PII-Prüfung](requirements.md#the-cpu-and-the-pii-check)); für Anfragen an lokale Modelle **Anfragen an
+    lokale Modelle schützen** in der [Richtlinie für personenbezogene Daten](../administer/policies.md#personal-data)
+    ausgeschaltet lassen, wie es voreingestellt ist; kürzere Texte senden.
 
 ![Die Auswahl von PII-Sprachpaket, Erkennung und Ausführungsmodus](../images/operate/pii-mode-choice.png)
 
@@ -368,11 +373,12 @@ oder langen Dokumenten.
     `gpu-shared` ist für eine GPU vorgesehen, die auch andere Software nutzt. `gpu-dedicated` ist für eine GPU,
     die Sie für PII freihalten. Die Auswahl sperrt andere Software nicht aus.
 
-    Automatisch wird ein Viertel der verfügbaren CPU-Threads verwendet, höchstens acht bei CPU- und zwei bei
-    GPU-Ausführung. `--pii-cpu-threads 2` setzt eine ausdrückliche Anzahl. Beim Start gelten auch CPU-Limits
-    des Containers. `--pii-gpu-memory-mib 4096` begrenzt die Speicherzuteilung; andere Software erhält keine Reservierungssperre.
-    Für den PII-Container gilt zusätzlich ein Host-RAM-Limit von 4 GiB. `FADEN_PII_MEMORY_LIMIT` in `.env`
-    ändert dieses Limit; führen Sie danach `faden up` aus. Host-RAM und GPU-Speicher sind getrennte Budgets.
+    Automatisch wird bei CPU-Ausführung die Hälfte der verfügbaren CPU-Threads verwendet, höchstens acht, bei
+    GPU-Ausführung ein Viertel, höchstens zwei. `--pii-cpu-threads 2` setzt eine ausdrückliche Anzahl. Beim Start gelten
+    auch CPU-Limits des Containers. `--pii-gpu-memory-mib 4096` begrenzt die Speicherzuteilung; andere Software erhält
+    keine Reservierungssperre. Für den PII-Container gilt zusätzlich ein Host-RAM-Limit von 4 GiB.
+    `FADEN_PII_MEMORY_LIMIT` in `.env` ändert dieses Limit; führen Sie danach `faden up` aus. Host-RAM und GPU-Speicher
+    sind getrennte Budgets.
 
 ### Erweiterte PII-Felder {#extended-pii-fields}
 

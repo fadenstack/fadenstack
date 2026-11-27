@@ -573,6 +573,13 @@ class GatewayChatClient:
         resp.raise_for_status()
         return resp.json()
 
+    async def get_session_summary(self, session_id: str, jwt: str) -> Any:
+        """The chat's summary of its earlier messages, written by a model (0.7.2 K)."""
+        client = self._ensure_client()
+        resp = await client.get(f"/v1/sessions/{session_id}/summary", headers=self._headers(jwt))
+        resp.raise_for_status()
+        return resp.json()
+
     # -- attachments --------------------------------------------------------
 
     async def upload_attachment(
@@ -605,6 +612,45 @@ class GatewayChatClient:
         client = self._ensure_client()
         resp = await client.delete(
             f"/v1/sessions/{attachment_id}/attachments/{attachment_id}",
+            headers=self._headers(jwt),
+        )
+        resp.raise_for_status()
+
+    # A project's own files: they go with every chat of the project (0.7.2 J).
+
+    async def upload_project_attachment(
+        self,
+        project_id: str,
+        file_bytes: bytes,
+        filename: str,
+        content_type: str,
+        jwt: str,
+    ) -> Any:
+        """Add a file to the project's Files."""
+        client = self._ensure_client()
+        resp = await client.post(
+            f"/v1/sessions/projects/{project_id}/attachments",
+            files={"file": (filename, file_bytes, content_type)},
+            headers=self._headers(jwt),
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    async def list_project_attachments(self, project_id: str, jwt: str) -> Any:
+        """The project's Files."""
+        client = self._ensure_client()
+        resp = await client.get(
+            f"/v1/sessions/projects/{project_id}/attachments",
+            headers=self._headers(jwt),
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    async def delete_project_attachment(self, project_id: str, attachment_id: str, jwt: str) -> None:
+        """Remove a file from the project's Files; the gateway erases it at once."""
+        client = self._ensure_client()
+        resp = await client.delete(
+            f"/v1/sessions/projects/{project_id}/attachments/{attachment_id}",
             headers=self._headers(jwt),
         )
         resp.raise_for_status()

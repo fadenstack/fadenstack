@@ -57,6 +57,8 @@ export interface UserPreferences {
    * every agent of theirs; null forgets it.
    */
   language?: string | null;
+  /** The chat's thinking level the person kept, per model alias (a level name; null removes it). */
+  chat_thinking?: Record<string, "auto" | "off" | "low" | "medium" | "high" | null> | null;
 }
 
 export interface UserPreferencesResponse {

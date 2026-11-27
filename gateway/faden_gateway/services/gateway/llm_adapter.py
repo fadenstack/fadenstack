@@ -185,6 +185,10 @@ def _internal_error_result(exc: Exception) -> CompletionResult:
 
     Any other is the model's side failing; the caller is told so, the cause goes to the log.
     """
+    if (said := engine_overflow(str(exc))) is not None:
+        # vLLM behind Ray Serve: an overflow answered as a 500, its sentence after the traceback.
+        logger.warning("The model's server refused a prompt longer than its window: %s", said)
+        return CompletionResult(status_code=400, payload=_overflow(said))
     if not _TEMPLATE_REFUSAL.search(str(exc)):
         logger.error("LiteLLM completion failed: %s", type(exc).__name__, exc_info=exc)
         return CompletionResult(status_code=502, payload=_error_payload("server_error", _UPSTREAM_FAILED))
@@ -560,6 +564,55 @@ _PROVIDER_REFUSED_MESSAGE = (
 )
 
 
+#: The one code for a request longer than the model's context window, whoever said it (0.7.2 K): an SDK and
+#: the chat page retry on it with a smaller context, so it must not depend on an engine's own words.
+CONTEXT_OVERFLOW = "context_length_exceeded"
+_OVERFLOW_MESSAGE = (
+    "The conversation is longer than the model's context window. "
+    "Try again with less of it, or start a new chat."
+)
+#: How engines and providers say it: vLLM ("maximum context length", "longer than the maximum model length"),
+#: Ollama ("the input length exceeds the context length"), OpenAI-style providers' own code and wording.
+_OVERFLOW_WORDS = re.compile(
+    r"context[ _]length|context window|maximum model length|maximum context"
+    r"|prompt is too long|too many tokens|input (?:length|tokens?) .{0,40}exceed",
+    re.IGNORECASE,
+)
+
+
+#: vLLM's own sentence for a prompt longer than the model's window. Behind Ray Serve it comes as a 500, the last line
+#: of a traceback (the release server's DGX cluster, 21 Nov: ``VLLMValidationError: This model's maximum context
+#: length is 32768 tokens. However, ...``), so a 5xx counts as an overflow only on exactly this sentence, and only the
+#: sentence is passed on: the traceback stays in the log.
+_ENGINE_OVERFLOW = re.compile(
+    r"This model's maximum context length is \d+ tokens\.[^\n]{0,400}"
+    r"|[^\n]{0,200}is longer than the maximum model length of \d+[^\n]{0,200}",
+)
+
+
+def engine_overflow(text: str) -> str | None:
+    """vLLM's overflow sentence in a model server's failure (*text*), stripped; None when it does not say it."""
+    found = _ENGINE_OVERFLOW.search(text)
+    return found.group(0).strip()[:500] if found else None
+
+
+def is_context_overflow(exc_or_text: BaseException | str) -> bool:
+    """Whether an upstream refusal says the request is longer than the model's context window."""
+    if isinstance(exc_or_text, litellm.exceptions.ContextWindowExceededError):
+        return True
+    return bool(_OVERFLOW_WORDS.search(str(exc_or_text)))
+
+
+def _overflow(said: object = "") -> dict[str, Any]:
+    """The error for a request longer than the model's context window: 400 ``context_length_exceeded``.
+
+    The model's server's own words follow, as for any refusal of the request: they give the numbers.
+    """
+    words = str(said).strip()[:500]
+    message = f"{_OVERFLOW_MESSAGE} The model's server said: {words}" if words else _OVERFLOW_MESSAGE
+    return _error_payload("invalid_request_error", message, code=CONTEXT_OVERFLOW)
+
+
 def _provider_refused() -> dict[str, Any]:
     """The error for a provider that refused the gateway's credentials."""
     return _error_payload("server_error", _PROVIDER_REFUSED_MESSAGE, code="upstream_authentication_failed")
@@ -575,13 +628,24 @@ def _failure(exc: BaseException) -> dict[str, Any]:
     """The error a stream's caller is told of *exc*: an upstream 4xx in its own words, anything else not."""
     if isinstance(exc, _PROVIDER_REFUSED):
         return _provider_refused()
+    if isinstance(exc, litellm.exceptions.BadRequestError) and is_context_overflow(exc):
+        return _overflow(exc)
+    if (said := engine_overflow(str(exc))) is not None:
+        return _overflow(said)
     return _error_payload("server_error", str(exc) if isinstance(exc, _SAID_AS_IS) else _UPSTREAM_FAILED)
 
 
-def _engine_refusal(status: int, detail: str) -> dict[str, Any]:
-    """The error event for an engine that refused a streamed chat with *status* and *detail*."""
+def _engine_refusal(status: int, detail: str, body: str | None = None) -> dict[str, Any]:
+    """The error event for an engine that refused a streamed chat with *status* and *detail*.
+
+    *body*: the whole refusal as read, where a 5xx's overflow sentence comes after the traceback (Ray Serve).
+    """
     if status in _PROVIDER_REFUSED_STATUSES:
         return _provider_refused()
+    if 400 <= status < 500 and is_context_overflow(detail):
+        return _overflow(detail)
+    if status >= 500 and (said := engine_overflow(body or detail)) is not None:
+        return _overflow(said)
     # A 4xx is about the request (too long for the context, a parameter vLLM does not take),
     # which the caller reads; a 5xx's body is the engine's own, for the log.
     said = detail if status < 500 else _UPSTREAM_FAILED
@@ -881,7 +945,7 @@ class LLMAdapter:
                             body, tries = again, tries + 1
                             continue
                         logger.warning("vLLM refused a streamed chat: %s %s", response.status_code, detail)
-                        yield _sse(_engine_refusal(response.status_code, detail))
+                        yield _sse(_engine_refusal(response.status_code, detail, refusal))
                         yield _DONE
                         return
                     events = await stack.enter_async_context(aclosing(_whole_events(response)))
@@ -960,7 +1024,10 @@ class LLMAdapter:
         except litellm.exceptions.BadRequestError as exc:
             return CompletionResult(
                 status_code=400,
-                payload=_error_payload("invalid_request_error", str(exc)),
+                payload=(
+                    _overflow(exc) if is_context_overflow(exc)
+                    else _error_payload("invalid_request_error", str(exc))
+                ),
             )
         except litellm.exceptions.InternalServerError as exc:
             return _internal_error_result(exc)

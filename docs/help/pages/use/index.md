@@ -34,7 +34,7 @@ You land in the chat.
 
 ## Where things are in the chat
 
-![The message box: the wrench, the puzzle piece and the paper clip on the left, the Model picker and the send button on the right](../images/use/chat-composer.png)
+![The message box: the text on top; under it the wrench, the puzzle piece and the paper clip on the left, the model, the thinking level and the send button on the right](../images/use/chat-composer.png)
 
 | Where | What is there |
 |---|---|

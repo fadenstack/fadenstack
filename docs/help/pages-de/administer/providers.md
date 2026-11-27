@@ -58,7 +58,7 @@ für jedes einen eigenen Eintrag an, mit demselben Schlüssel.
 
 | In der Zeile des Providers | Was es tut |
 |---|---|
-| **Bearbeiten** | Ändert **Name**, **Endpunkt-URL**, **API-Schlüssel** und **Modell** sowie die Schalter **Tools des Gateways anbieten** und **Bilder aus dem Chat an dieses Modell senden**. |
+| **Bearbeiten** | Ändert **Name**, **Endpunkt-URL**, **API-Schlüssel**, **Modell** und **Kontextlänge (Tokens)** sowie die Schalter **Tools des Gateways anbieten** und **Bilder aus dem Chat an dieses Modell senden**. |
 | **Stopp** | Beendet das Senden von Anfragen an ihn, ohne ihn zu entfernen; **Start** sendet sie wieder. |
 | **Löschen** | Entfernt einen gestoppten Provider. Das lässt sich nicht rückgängig machen. |
 
@@ -71,6 +71,13 @@ für jedes einen eigenen Eintrag an, mit demselben Schlüssel.
     **Bilder aus dem Chat an dieses Modell senden** gilt ebenso für Bilder, die im Chat angehängt werden.
     Schalten Sie ihn für ein Modell aus, das keine Bilder lesen kann: Der Chat lässt sie dann weg und sagt es
     unter der Antwort, statt dass die Antwort fehlschlägt.
+
+??? info "Mehr zur Kontextlänge"
+    **Kontextlänge (Tokens)** legt fest, wie viel von einem Chat an das Modell geht: Der Chat passt die älteren
+    Nachrichten hinein. Bleibt das Feld leer, gilt, was der Server des Modells meldet. Tragen Sie sie für ein Modell
+    bei einem externen Provider ein, dessen Server dazu nichts sagt.
+
+    ![Provider bearbeiten: Name, Endpunkt-URL, API-Schlüssel, Modell, die beiden Schalter und zuletzt Kontextlänge (Tokens)](../images/administer/provider-edit.png)
 
 ![Der Preisdialog des Modells eines Providers: „Eingabepreis“ und „Ausgabepreis“ in USD pro 1 Mio. Tokens, mit „Speichern“](../images/administer/provider-set-price.png)
 

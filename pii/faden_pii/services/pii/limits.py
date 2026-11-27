@@ -57,10 +57,13 @@ class IngressLimits:
         try:
             if int(headers.get(b"content-length", b"0")) > self.settings.pii_body_bytes:
                 return await refuse(413, "pii_input_too_large")
-            milliseconds = min(
+            # The caller's budget (at most the cap) is the latest deadline; the
+            # request starts with the base, and its windows add time (runtime.py).
+            caller = min(
                 float(headers.get(b"x-pii-budget-ms", b"8000")),
-                self.settings.pii_work_timeout_seconds * 1000,
+                self.settings.pii_work_timeout_cap_seconds * 1000,
             )
+            milliseconds = min(caller, self.settings.pii_work_timeout_seconds * 1000)
             if not math.isfinite(milliseconds) or not 0 < milliseconds <= 10_000:
                 return await refuse(422, "pii_invalid_deadline")
         except ValueError:
@@ -69,10 +72,13 @@ class IngressLimits:
             return await refuse(422, "pii_invalid_deadline")
         self.requests += 1
         size = 0
+        now = time.monotonic()
         token = request_budget.set(
             RequestBudget(
-                time.monotonic() + milliseconds / 1000,
+                now + milliseconds / 1000,
                 headers.get(b"x-pii-scope", b"").decode("latin1")[:128],
+                started=now,
+                limit=now + caller / 1000,
             )
         )
         try:
@@ -119,7 +125,7 @@ class IngressLimits:
             try:
                 # Include response backpressure in retained-request accounting.
                 async with asyncio.timeout(
-                    max(0, request_budget.get().deadline + 2 - time.monotonic())
+                    max(0, request_budget.get().limit + 2 - time.monotonic())
                 ):
                     await self.app(scope, replay, bounded_send)
             except TimeoutError:

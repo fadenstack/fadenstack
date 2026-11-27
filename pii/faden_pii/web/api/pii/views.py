@@ -339,6 +339,7 @@ async def sanitize_payload(
         token_mapping=result.token_mapping,
         profile_fingerprint=svc.profile.fingerprint,
         duration_ms=duration_ms,
+        pictures_unchecked=result.pictures_unchecked,
     )
 
 

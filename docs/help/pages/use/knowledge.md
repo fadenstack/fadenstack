@@ -12,13 +12,13 @@ A model knows what it learned in training, not your organisation's documents. Th
 
 ## Attach a file
 
-![The message box: the paper clip beside the wrench and the puzzle piece, the Model picker and the send button on the right](../images/use/chat-composer.png)
+![The message box: the paper clip beside the wrench and the puzzle piece, under the text; the model, the thinking level and the send button on the right](../images/use/chat-composer.png)
 
 1. In the chat, select the paper clip beside the message box.
 2. Pick one or more files. Each shows as a chip above the box; the × removes it.
 3. Type your question and send.
 
-The model gets the text of the file along with your question. The file stays with the chat: you can go on asking about it in later messages without attaching it again.
+The model gets the text of the file along with your question. The file stays with the chat: you can go on asking about it in later messages without attaching it again. A file in a project's **Files** goes with every message in each of the project's chats.
 
 ??? info "Which files you can attach, and the limits"
     You can attach these file types, unless your administrator changed the list:

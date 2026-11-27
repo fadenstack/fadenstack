@@ -84,6 +84,7 @@ async def test_reconcile_publication_published_endpoint(mock_session, mock_gatew
         machine_tls=False,  # published plain: no machine_tls in the endpoint
         watermark=None,  # the endpoint names no watermark
         text_marking=None,  # the provider has none set
+        context_length=None,  # no max_model_len set: vLLM takes the model's own
     )
 
 
@@ -152,6 +153,7 @@ async def test_reconcile_publication_degraded_deployment_with_ready_replica(mock
         machine_tls=False,  # published plain: no machine_tls in the endpoint
         watermark=None,  # the endpoint names no watermark
         text_marking=None,  # the provider has none set
+        context_length=None,  # no max_model_len set: vLLM takes the model's own
     )
 
 
@@ -283,3 +285,34 @@ async def test_reconcile_publication_unhealthy_endpoint_zero_replicas(mock_sessi
         enabled=False,
     )
 
+
+@pytest.mark.anyio
+async def test_a_deployment_with_max_model_len_tells_the_gateway_its_context_length(mock_session, mock_gateway_sync):
+    """0.7.2 K: the gateway sizes a chat's context to the model's window."""
+    dep_id = uuid.uuid4()
+    deployment = InferenceDeployment(
+        id=dep_id, name="qwen", desired_state=DeploymentDesiredState.ACTIVE, phase=DeploymentPhase.RUNNING,
+        ready_replicas=1, total_replicas=1,
+        spec_json={"service": {"alias": "qwen", "path": "/v1"}, "engine": {"name": "vllm", "config": {"max-model-len": 32768}}},
+    )
+    endpoint = InferenceEndpoint(
+        id=uuid.uuid4(), deployment_id=dep_id, name="openai", address="http://192.0.2.49:8000/faden-q", path="/v1",
+        status=EndpointStatus.PUBLISHED, published_json={"model": "Qwen/Qwen3-8B"},
+    )
+    coordinator = InferencePublicationCoordinator(mock_session, gateway_sync=mock_gateway_sync)
+    coordinator.endpoint_dao.list_for_deployment = AsyncMock(return_value=[endpoint])
+
+    await coordinator.reconcile_deployment_publication(deployment)
+
+    assert mock_gateway_sync.publish_inference_endpoint.await_args.kwargs["context_length"] == 32768
+
+
+@pytest.mark.parametrize(("config", "length"), [
+    ({"max_model_len": 32768}, 32768), ({"--max-model-len": "16384"}, 16384), ({"max-model-len": 0}, None),
+    ({"max_model_len": True}, None), ({"max_model_len": "lots"}, None), ({}, None),
+])
+def test_the_context_length_is_read_from_the_engine_config(config: dict, length: int | None) -> None:
+    from faden_backend.services.llm.kinds import deployment_context_length
+
+    assert deployment_context_length({"engine": {"name": "vllm", "config": config}}) == length
+    assert deployment_context_length(None) is None

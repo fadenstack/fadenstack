@@ -209,6 +209,9 @@ SDK_READ_SKILL_RESOURCE = "read_skill_resource"
 SDK_RUN_SKILL_SCRIPT = "run_skill_script"
 #: A web search from the device (sdk/51 F06): read, and open-world, since the query leaves the organisation.
 SDK_WEB_SEARCH = "web_search"
+#: An earlier tool result of the same conversation, read back from the device's transcript where the history
+#: now carries only a preview of it (SDK 0.3.1-rc.4's compaction): read, reaching nothing outside the device.
+SDK_READ_RESULT = "read_result"
 
 #: The SDKs' own tools, with the class and open-world mark the gateway gives each (sdk/52 §10.5, the owner, 14 Nov
 #: 2026). The SDKs keep these names (0.3.0): an app cannot give one to a tool of its own, so the word reaches no other
@@ -219,6 +222,7 @@ SDK_TOOLS: Mapping[str, tuple[ToolClass, bool]] = MappingProxyType({
     SDK_LOAD_SKILL: (ToolClass.READ, False),
     SDK_READ_SKILL_RESOURCE: (ToolClass.READ, False),
     SDK_WEB_SEARCH: (ToolClass.READ, True),
+    SDK_READ_RESULT: (ToolClass.READ, False),
 })
 #: Every name the SDKs keep for their own tools.
 SDK_TOOL_NAMES = frozenset({*SDK_TOOLS, SDK_RUN_SKILL_SCRIPT})
@@ -227,12 +231,14 @@ SDK_TOOL_NAMES = frozenset({*SDK_TOOLS, SDK_RUN_SKILL_SCRIPT})
 def sdk_tools_allowed(*, local_mcp: bool, local_skills: bool) -> frozenset[str]:
     """The SDKs' tools the agent's profile lets reach the model; the others are held back, whatever the contract says.
 
-    ``find_tool`` always; the skill tools where the person's own skills may run (*local_skills*: the profile's
-    ``local_skills``, or developer mode); ``web_search`` where the device may attach local MCP servers (*local_mcp*),
-    until core has a switch of its own for it; ``run_skill_script`` never (fail closed). The server holds them back,
-    not only the SDK, so a forged request gains nothing (ASVS 5.0 V8.3.1).
+    ``find_tool`` and ``read_result`` always (the one switches the client's own tools on, the other reads back
+    what this conversation's own tool calls returned); the skill tools where the person's own skills may run
+    (*local_skills*: the profile's ``local_skills``, or developer mode); ``web_search`` where the device may
+    attach local MCP servers (*local_mcp*), until core has a switch of its own for it; ``run_skill_script`` never
+    (fail closed). The server holds them back, not only the SDK, so a forged request gains nothing (ASVS 5.0
+    V8.3.1).
     """
-    allowed = {SDK_TOOL_SEARCH}
+    allowed = {SDK_TOOL_SEARCH, SDK_READ_RESULT}
     if local_skills:
         allowed |= {SDK_LOAD_SKILL, SDK_READ_SKILL_RESOURCE}
     if local_mcp:

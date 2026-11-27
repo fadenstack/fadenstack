@@ -15,12 +15,16 @@ OpenAI stream: an OpenAI SDK would not know what to do with a named event.
 - ``CUSTOM`` ``faden.citations``: the sources a knowledge search returned --
   document, chunk, score; not the text.
 - ``CUSTOM`` ``faden.pii``: what the PII scan found -- types and counts only.
+- ``CUSTOM`` ``faden.pii_pictures_unchecked``: the PII scan ran and passed the
+  request's pictures on unchecked (it reads text only) -- their count.
+- ``CUSTOM`` ``faden.context``: a chat turn's context -- its tokens, the budget
+  and the model's window, and how many earlier messages no longer go.
 - ``CUSTOM`` ``faden.gateway_round``: the round as the model saw it (its
   tool-calling turn and the tools' answers, with PII values put back), for
   the SDK to keep and send back as history. The gateway accepts it back.
 - ``CUSTOM`` ``faden.attachment_left_out``: a file of the chat that was not
   sent to the model, and why (``no_vision``: a picture, and the model does not
-  take pictures).
+  take pictures; ``unreadable``: a file whose text could not be read).
 - ``CUSTOM`` ``faden.provenance``: the answer's signed receipt from the
   provenance engine, after its last token and before ``[DONE]``, or that it
   is unsigned (``text_receipts``).
@@ -111,6 +115,41 @@ def pii_notice(types: dict[str, int], mode: str | None) -> dict[str, Any] | None
     return {"type": "CUSTOM", "name": "faden.pii", "value": value}
 
 
+def pictures_unchecked(count: int) -> dict[str, Any] | None:
+    """The PII scan passed *count* pictures on unchecked: it reads text only; ``None`` for none.
+
+    The chat says so under the reply, and an agent's panel can: the limit shows, where a picture
+    used to have the whole message refused (0.7.2 G). The message is the gateway's own words, for a
+    client that does not word it itself.
+    """
+    if count <= 0:
+        return None
+    went = (
+        "the picture went to the model as it is" if count == 1
+        else f"{count} pictures went to the model as they are"
+    )
+    return {"type": "CUSTOM", "name": "faden.pii_pictures_unchecked", "value": {
+        "count": count,
+        "message": f"Pictures are not checked for personal data, so {went}.",
+    }}
+
+
+def context_usage(
+    *, tokens: int, budget: int, window: int | None, dropped: int, summary: bool = False, summarised: bool = False,
+) -> dict[str, Any]:
+    """How much of the chat's context budget this turn used (0.7.2 K), as Open WebUI's ``context_usage`` says it.
+
+    *tokens*: the context as sent, estimated; *budget*: what it was fitted to; *window*: the model's context length
+    (null: not known); *dropped*: how many of the chat's earlier messages no longer go to the model; *summary*: the
+    chat's summary went in their place (written by a model); *summarised*: it was written this turn. Said only in
+    the response: nothing of it is kept.
+    """
+    return {"type": "CUSTOM", "name": "faden.context", "value": {
+        "tokens": tokens, "budget": budget, "window": window, "dropped": dropped,
+        "summary": summary, "summarised": summarised,
+    }}
+
+
 def picture_left_out(attachment_id: str, filename: str, model: str) -> dict[str, Any]:
     """A picture of the chat not sent: *model* does not take pictures."""
     return {"type": "CUSTOM", "name": "faden.attachment_left_out", "value": {
@@ -119,6 +158,17 @@ def picture_left_out(attachment_id: str, filename: str, model: str) -> dict[str,
         "model": model,
         "reason": "no_vision",
         "message": f"{filename} was not sent: {model} does not take pictures. Choose a model that does.",
+    }}
+
+
+def file_unreadable(attachment_id: str, filename: str) -> dict[str, Any]:
+    """A file of the chat not sent: its text could not be read (0.7.2 H.3)."""
+    return {"type": "CUSTOM", "name": "faden.attachment_left_out", "value": {
+        "attachmentId": attachment_id,
+        "filename": filename,
+        "model": "",
+        "reason": "unreadable",
+        "message": f"{filename} was not sent: its text could not be read.",
     }}
 
 

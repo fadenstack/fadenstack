@@ -47,6 +47,9 @@ class PIIEgressPolicy:
     enabled_for_local: bool = False
     mode: str = "redact"  # redact | tokenize_reversible
     fail_action: str = "block"  # block | allow | fallback_to_local
+    #: Refuse a request with a picture where the scan runs: the check reads text only, and by default a
+    #: picture goes on unchecked with a note (0.7.2 G). The organisation's choice: a chat cannot change it.
+    refuse_pictures: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,6 +122,7 @@ def parse_pii_policy(raw: dict[str, Any] | None) -> PIIPolicy | None:
         enabled_for_local=bool(egr_raw.get("enabled_for_local", False)),
         mode=raw_mode,
         fail_action=raw_fail,
+        refuse_pictures=egr_raw.get("refuse_pictures") is True,
     )
 
     raw_threshold = float(pre_raw.get("threshold", 0.6))
@@ -245,6 +249,7 @@ def clamp_and_merge(
                 if override.egress_fail_action in VALID_FAIL_ACTIONS
                 else floor.egress.fail_action
             ),
+            refuse_pictures=floor.egress.refuse_pictures,  # NOT overridable
         )
 
         telemetry = PIITelemetryPolicy(
@@ -278,6 +283,7 @@ def clamp_and_merge(
             enabled_for_local=floor.egress.enabled_for_local or bool(override.egress_enabled_for_local),
             mode=effective_mode,
             fail_action=max_protective_action(floor.egress.fail_action, override.egress_fail_action),
+            refuse_pictures=floor.egress.refuse_pictures,  # NOT overridable
         )
 
         telemetry = PIITelemetryPolicy(

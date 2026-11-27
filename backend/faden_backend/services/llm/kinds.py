@@ -113,6 +113,21 @@ def deployment_kind(spec: dict[str, Any] | None) -> str:
     return CHAT
 
 
+def deployment_context_length(spec: dict[str, Any] | None) -> int | None:
+    """A cluster deployment's context length in tokens: vLLM's ``max_model_len`` (``engine.config``).
+
+    None when the deployment does not set it (vLLM then takes the model's own, which is not known here).
+    """
+    engine = (spec or {}).get("engine") or {}
+    config = {str(k).lstrip("-").replace("-", "_"): v for k, v in (engine.get("config") or {}).items()}
+    value = config.get("max_model_len")
+    try:
+        length = int(value) if value is not None and not isinstance(value, bool) else None
+    except (TypeError, ValueError):
+        return None
+    return length if length and length > 0 else None
+
+
 def deployment_calls_tools(spec: dict[str, Any] | None) -> bool:
     """Whether a cluster deployment has tool calls on (``engine.config``)."""
     engine = (spec or {}).get("engine") or {}

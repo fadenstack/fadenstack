@@ -70,6 +70,7 @@ import { DRAWER_WIDTH_CLOSED, linkButtonSx, navActiveSx } from "~/lib/adminConst
 import BrandMark from "~/components/BrandMark";
 import type { NavHand } from "~/lib/useNavHand";
 import { CHAT_NAV_ID } from "../ChatShellContext";
+import { ConfirmDialog } from "~/components/ConfirmDialog";
 import ProjectSettingsDialog from "./ProjectSettingsDialog";
 
 /** Chats rendered at first, and added per step as the list scrolls. With every
@@ -113,6 +114,7 @@ interface Props {
       name?: string;
       description?: string;
       system_instructions?: string;
+      model_alias?: string | null;
     },
   ) => Promise<void>;
   onMoveSession: (sessionId: string, projectId: string | null) => void;
@@ -155,6 +157,8 @@ export default function ChatSidebar({
   const focusSearchOnOpen = useRef(false);
   // A chat's actions on a touch screen
   const [moreAnchor, setMoreAnchor] = useState<{ el: HTMLElement; sessionId: string } | null>(null);
+  /** A chat or a project waiting for the person to confirm its deletion. */
+  const [confirmDelete, setConfirmDelete] = useState<{ kind: "session" | "project"; id: string } | null>(null);
   // Move-to-project menu state
   const [moveAnchor, setMoveAnchor] = useState<{ el: HTMLElement; sessionId: string } | null>(null);
   // Project settings dialog state
@@ -163,6 +167,17 @@ export default function ChatSidebar({
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const activeDragSession = activeDragId ? sessions.find((s) => s.id === activeDragId) : null;
+
+  // The rail's new-project button opens the sidebar with the name field ready;
+  // the field takes focus as it appears (autoFocus), and again here once open.
+  const projectNameRef = useRef<HTMLInputElement>(null);
+  const focusProjectOnOpen = useRef(false);
+  useEffect(() => {
+    if (open && focusProjectOnOpen.current) {
+      focusProjectOnOpen.current = false;
+      setTimeout(() => projectNameRef.current?.focus(), 0);
+    }
+  }, [open]);
 
   // The rail's search button opens the sidebar with the search focused.
   useEffect(() => {
@@ -245,7 +260,7 @@ export default function ChatSidebar({
       secondary={secondary}
       active={s.id === activeSessionId}
       onSelect={onSelectSession}
-      onDelete={onDeleteSession}
+      onDelete={(id) => setConfirmDelete({ kind: "session", id })}
       onMoveClick={(el) => setMoveAnchor({ el, sessionId: s.id })}
       // No dragging while searching: the folders are not shown to drop on.
       touch={touch || Boolean(q)}
@@ -274,6 +289,18 @@ export default function ChatSidebar({
           <Tooltip title={t("chat.new_chat", { defaultValue: "New chat" })} placement="right" arrow>
             <IconButton onClick={onNewChat} aria-label={t("chat.new_chat", { defaultValue: "New chat" })}>
               <AddIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title={t("chat.new_project", { defaultValue: "New project" })} placement="right" arrow>
+            <IconButton
+              onClick={() => {
+                focusProjectOnOpen.current = true;
+                setCreatingProject(true);
+                onToggle();
+              }}
+              aria-label={t("chat.new_project", { defaultValue: "New project" })}
+            >
+              <CreateNewFolderIcon />
             </IconButton>
           </Tooltip>
           <Tooltip title={t("chat.search_placeholder")} placement="right" arrow>
@@ -358,9 +385,11 @@ export default function ChatSidebar({
         <Box sx={{ px: 1.5, pb: 1 }}>
           <TextField
             autoFocus
+            inputRef={projectNameRef}
             fullWidth
             size="small"
             placeholder={t("chat.project_name", { defaultValue: "Project name" })}
+            slotProps={{ htmlInput: { "aria-label": t("chat.project_name", { defaultValue: "Project name" }) } }}
             value={newProjectName}
             onChange={(e) => setNewProjectName(e.target.value)}
             onKeyDown={(e) => {
@@ -463,7 +492,7 @@ export default function ChatSidebar({
                           size="small"
                           onClick={(e) => {
                             e.stopPropagation();
-                            onDeleteProject(proj.id);
+                            setConfirmDelete({ kind: "project", id: proj.id });
                           }}
                           sx={touchButton}
                         >
@@ -582,7 +611,7 @@ export default function ChatSidebar({
         <MenuItem
           sx={{ minHeight: 44 }}
           onClick={() => {
-            if (moreAnchor) onDeleteSession(moreAnchor.sessionId);
+            if (moreAnchor) setConfirmDelete({ kind: "session", id: moreAnchor.sessionId });
             setMoreAnchor(null);
           }}
         >
@@ -622,6 +651,35 @@ export default function ChatSidebar({
           </MenuItem>
         ))}
       </Menu>
+
+      {/* One click no longer deletes: a chat, or a project with all its chats, is asked about first. */}
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        title={
+          confirmDelete?.kind === "project"
+            ? t("chat.delete_project_title", { defaultValue: "Delete this project?" })
+            : t("chat.delete_chat_title", { defaultValue: "Delete this chat?" })
+        }
+        message={
+          confirmDelete?.kind === "project"
+            ? t("chat.delete_project_body", {
+                defaultValue: "The project \"{{name}}\" and all its chats will be deleted. This cannot be undone.",
+                name: projects.find((p) => p.id === confirmDelete.id)?.name ?? "",
+              })
+            : t("chat.delete_chat_body", {
+                defaultValue: "The chat \"{{name}}\" will be deleted. This cannot be undone.",
+                name: sessions.find((x) => x.id === confirmDelete?.id)?.title ?? "",
+              })
+        }
+        confirmLabel={t("common.delete", { defaultValue: "Delete" })}
+        cancelLabel={t("common.cancel", { defaultValue: "Cancel" })}
+        onConfirm={() => {
+          if (confirmDelete?.kind === "project") onDeleteProject(confirmDelete.id);
+          else if (confirmDelete) onDeleteSession(confirmDelete.id);
+          setConfirmDelete(null);
+        }}
+        onClose={() => setConfirmDelete(null)}
+      />
 
       {/* Project settings dialog */}
       <ProjectSettingsDialog

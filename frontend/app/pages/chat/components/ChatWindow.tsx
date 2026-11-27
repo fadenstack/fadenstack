@@ -13,6 +13,7 @@ import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import { useTranslation } from "react-i18next";
 import { useLocation } from "react-router";
 
+import { chatApi } from "~/api/chatClient";
 import type { ChatSession } from "~/api/chatTypes";
 import type { UiLanguage } from "~/api/i18n";
 import { budgetRefusalKey } from "~/components/budgets/budgetFormat";
@@ -22,11 +23,23 @@ import { useChatSkills } from "../hooks/useChatSkills";
 import { useChatStream } from "../hooks/useChatStream";
 import FailedReply from "./FailedReply";
 import MessageBubble from "./MessageBubble";
+import OlderMessagesNote from "./OlderMessagesNote";
+import SummaryDialog from "./SummaryDialog";
 import ThinkingBlock from "./ThinkingBlock";
 import MessageDebugPanel from "./MessageDebugPanel";
 import ChatInput from "./ChatInput";
 import ChatTopbar from "./ChatTopbar";
 import { followScroll, type Follower } from "../followScroll";
+import { picturesOf } from "../messagePictures";
+
+/** The arguments of a tool call as the card shows them: indented when they are JSON, as sent otherwise. */
+function formatArguments(raw: string): string {
+  try {
+    return JSON.stringify(JSON.parse(raw), null, 2);
+  } catch {
+    return raw;
+  }
+}
 
 interface Props {
   sessionId: string;
@@ -77,6 +90,11 @@ export default function ChatWindow({
   const location = useLocation();
   const initialSentRef = useRef(false);
   const skills = useChatSkills();
+  // What the thinking pill stands for (nothing for Auto), as the composer tells it.
+  // Whether the chat has a summary of its older messages, and whether its dialog is open.
+  const [hasSummary, setHasSummary] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  const [reasoningEffort, setReasoningEffort] = useState<string | undefined>(undefined);
 
   const {
     messages,
@@ -93,6 +111,8 @@ export default function ChatWindow({
     streamingNotes,
     getReplyNotes,
     getResponseMs,
+    context,
+    olderNote,
     send,
     retry,
     stop,
@@ -123,6 +143,7 @@ export default function ChatWindow({
           state.initialModel,
           state.initialFiles,
           state.initialSkills,
+          state.initialReasoning,
         );
         // Clear navigation state so a page refresh won't re-send the message.
         // Preserve React Router's internal history keys while removing user state.
@@ -137,6 +158,25 @@ export default function ChatWindow({
     loadHistory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
+
+  // The chat's menu offers the summary when there is one: asked when the chat opens, and again
+  // only when a turn says one was written for it, or that one stands for its older messages and
+  // this page has not seen it (the gateway writes it before the turn, so its event comes first).
+  const summaryNews = context?.summarised === true || (context?.summary === true && !hasSummary);
+  const [summaryAsked, setSummaryAsked] = useState(0);
+  useEffect(() => {
+    if (summaryNews) setSummaryAsked((n) => n + 1);
+  }, [summaryNews, context]);
+  useEffect(() => {
+    let alive = true;
+    chatApi
+      .getSummary(sessionId)
+      .then((found) => alive && setHasSummary(found !== null))
+      .catch(() => alive && setHasSummary(false));
+    return () => {
+      alive = false;
+    };
+  }, [sessionId, summaryAsked]);
 
   // The sidebar marks the chat while its reply is written; it goes on when
   // the user moves to another chat.
@@ -193,8 +233,10 @@ export default function ChatWindow({
 
   const handleSend = (text: string, files: File[]) => {
     jumpToLatest();
-    send(text, selectedModel, files, skills.selected);
+    send(text, selectedModel, files, skills.selected, reasoningEffort);
   };
+
+  const lastReplyId = [...messages].reverse().find((m) => m.role === "assistant")?.id;
 
   const handleRetry = () => {
     jumpToLatest();
@@ -220,6 +262,7 @@ export default function ChatWindow({
         onLanguageChange={onLanguageChange}
         isSuperuser={isSuperuser}
         divider
+        onShowSummary={hasSummary ? () => setSummaryOpen(true) : undefined}
       />
 
       {/* Messages area */}
@@ -254,9 +297,12 @@ export default function ChatWindow({
             // The chat's last reply, once it failed or stopped, is tried again from here.
             const onRetry = i === messages.length - 1 && !isStreaming ? handleRetry : undefined;
             const failed = msg.status === "failed" || msg.status === "interrupted";
+            // The latest reply of this page shows what its turn said about the context.
+            const lastReply = Boolean(context) && msg.id === lastReplyId;
             const bubble = (!failed || msg.content) && (
               <MessageBubble
                 key={msg.id}
+                context={lastReply ? context : null}
                 role={msg.role}
                 content={msg.content}
                 modelAlias={msg.model_alias}
@@ -276,11 +322,21 @@ export default function ChatWindow({
                 notes={msg.role === "assistant" ? getReplyNotes(msg.id) : undefined}
                 stopped={msg.status === "stopped"}
                 onRetry={msg.status === "stopped" ? onRetry : undefined}
+                pictures={msg.role === "user" ? picturesOf(msg.content_parts) : undefined}
               />
             );
-            if (!failed) return bubble;
+            // Where older messages stopped going to the model: said once, above the message the turn answered.
+            const older = olderNote && olderNote.index === i && (
+              <OlderMessagesNote
+                key={`older-${msg.id}`}
+                summary={olderNote.summary}
+                onShowSummary={() => setSummaryOpen(true)}
+              />
+            );
+            if (!failed) return older ? <Fragment key={msg.id}>{older}{bubble}</Fragment> : bubble;
             return (
               <Fragment key={msg.id}>
+                {older}
                 {bubble}
                 <FailedReply
                   message={
@@ -346,6 +402,41 @@ export default function ChatWindow({
               <Typography variant="body2" sx={{ mb: 1 }}>
                 {pendingApproval.message}
               </Typography>
+              {pendingApproval.arguments && (
+                <Box sx={{ mb: 1 }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+                    {t("approval_arguments", { ns: "chat", defaultValue: "Arguments" })}
+                  </Typography>
+                  <Box
+                    component="pre"
+                    data-testid="tool-approval-arguments"
+                    tabIndex={0}
+                    sx={{
+                      m: 0,
+                      p: 1,
+                      maxHeight: 200,
+                      overflow: "auto",
+                      fontFamily: "monospace",
+                      fontSize: "0.8rem",
+                      whiteSpace: "pre-wrap",
+                      overflowWrap: "anywhere",
+                      borderRadius: 1,
+                      border: `1px solid ${theme.palette.divider}`,
+                      bgcolor: theme.palette.action.hover,
+                    }}
+                  >
+                    {formatArguments(pendingApproval.arguments)}
+                  </Box>
+                  {pendingApproval.argumentsTruncated && (
+                    <Typography variant="caption" color="warning.main" sx={{ display: "block", mt: 0.5 }}>
+                      {t("approval_arguments_truncated", {
+                        ns: "chat",
+                        defaultValue: "Cut off: only the first part of the arguments is shown.",
+                      })}
+                    </Typography>
+                  )}
+                </Box>
+              )}
               <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
                 <Button size="small" variant="outlined" onClick={() => void answerApproval(false)} sx={{ textTransform: "none" }}>
                   {t("approval_decline", { ns: "chat", defaultValue: "Decline" })}
@@ -382,6 +473,24 @@ export default function ChatWindow({
                       defaultValue: "Try again in {{seconds}} s.",
                       seconds: errorInfo.retryAfter,
                     })}`
+                  : errorInfo?.kind === "pictures_refused"
+                    ? [
+                        t("pictures_refused_lead", {
+                          ns: "chat",
+                          defaultValue:
+                            "Pictures are not checked for personal data, and your organisation does not send them unchecked.",
+                        }),
+                        errorInfo.files?.[0]
+                          ? t("pictures_refused_file", {
+                              ns: "chat",
+                              defaultValue: "Remove {{file}} from the project's Files to use this project's chats.",
+                              file: errorInfo.files[0],
+                            })
+                          : t("pictures_refused_picture", {
+                              ns: "chat",
+                              defaultValue: "Remove the picture and send again.",
+                            }),
+                      ].join(" ")
                   : errorInfo?.kind === "budget"
                     ? [
                         // Worded here from the kind of budget, in the reader's language.
@@ -488,7 +597,10 @@ export default function ChatWindow({
         onToolsToggle={onToolsToggle}
         toolsOpen={toolsOpen}
         draft={draft}
+        onReasoningChange={setReasoningEffort}
       />
+
+      <SummaryDialog open={summaryOpen} sessionId={sessionId} onClose={() => setSummaryOpen(false)} />
 
       {/* Debug panel — only rendered when RBAC allows */}
       {canDebug && debugTraceId && (

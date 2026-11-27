@@ -47,6 +47,7 @@ import { ChatShellContext, type ChatShell } from "./ChatShellContext";
 import { useNavHand } from "~/lib/useNavHand";
 import { ChatSkillsProvider, useChatSkillsState } from "./hooks/useChatSkills";
 import { mergeSessions, withSession, withWriting } from "./sessionList";
+import { projectModelOf } from "./projectModel";
 import ProfilePage from "../admin/ProfilePage";
 
 const SIDEBAR_WIDTH = 260;
@@ -246,6 +247,7 @@ export default function ChatPage() {
         name?: string;
         description?: string;
         system_instructions?: string;
+        model_alias?: string | null;
       },
     ) => {
       await chatApi.updateProject(id, updates);
@@ -308,6 +310,20 @@ export default function ChatPage() {
   // opens the sidebar.
   const barSidebarOpen = isMobile ? sidebarOpen : true;
   const activeSession = sessionId ? sessions.find((s) => s.id === sessionId) : undefined;
+
+  // A chat in a project that has a default model starts with it: once, when the
+  // chat opens (and its project is known); the picker still changes it after.
+  const projectModel = projectModelOf(activeSession, projects);
+  const modelAppliedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!sessionId) {
+      modelAppliedFor.current = null;
+      return;
+    }
+    if (!activeSession || modelAppliedFor.current === sessionId) return;
+    modelAppliedFor.current = sessionId;
+    if (projectModel) setSelectedModel(projectModel);
+  }, [sessionId, activeSession, projectModel]);
 
   const shell = useMemo<ChatShell>(
     () => ({

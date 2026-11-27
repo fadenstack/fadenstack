@@ -99,6 +99,12 @@ Maschinen des Clusters: ein direktes Kabel, ein eigener Switch oder ein VLAN. GP
 verschlüsseln, und der eigene Verkehr von Ray ist erst verschlüsselt, wenn der Schalter
 **Verkehr zwischen den Maschinen** des Clusters an ist.
 
+Ray lauscht auf allen Adressen einer Maschine, nicht nur im Netzwerk des Clusters, und antwortet nur Aufrufern mit
+dem Token des Clusters. Sperren Sie die Ports von Ray trotzdem mit der eigenen Firewall der Maschine in jedem anderen
+Netzwerk, in dem die Maschine ist (das Büronetz, ein VPN wie Tailscale): Lassen Sie dort nur den Server zu den Ports
+durch, die die Tabelle oben für ihn nennt (den Serving-Port, den Port eines gerouteten vLLM, die Metrik-Ports von
+Ray), und ssh für die, die die Maschine verwalten.
+
 Eine Maschine, die zu einem laufenden Cluster hinzugefügt wird, wird zuerst geprüft: Sie muss den Head im Netzwerk
 des Clusters erreichen (siehe [Cluster](clusters.md#add-machines-to-a-running-cluster)).
 

@@ -148,6 +148,10 @@ class SummaryDTO(BaseModel):
     last_message_id: uuid.UUID
     token_estimate: int
     created_at: datetime
+    #: The model that wrote it, and the provenance engine's record of it as AI-written (``summarised``;
+    #: none with the module off). 0.7.2 K.
+    model_alias: str | None = None
+    record_id: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

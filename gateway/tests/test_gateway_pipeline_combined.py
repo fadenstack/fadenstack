@@ -249,7 +249,7 @@ async def test_the_model_sees_the_newest_turns_when_history_is_over_budget(
     _model_answers(monkeypatch, "ok", sent)
     sid = await _session(db_session)
     start = datetime.now(timezone.utc) - timedelta(hours=1)
-    for i in range(6):  # ~25 tokens each: only two fit
+    for i in range(6):  # ~25 tokens each: only two fit, but the newest three always go (KEEP_NEWEST)
         db_session.add(ChatMessage(session_id=sid, role="user", content=f"turn {i} " + "x" * 90,
                                    created_at=start + timedelta(minutes=i)))
     await db_session.flush()
@@ -259,7 +259,7 @@ async def test_the_model_sees_the_newest_turns_when_history_is_over_budget(
     })
     # Consecutive user messages reach the model as one (strict chat templates).
     said = "\n".join(m["content"] for m in sent[0]["messages"] if m["role"] == "user")
-    assert re.findall(r"turn (\d)", said) == ["4", "5"]
+    assert re.findall(r"turn (\d)", said) == ["3", "4", "5"]
 
 
 # ── What a slot is held for ───────────────────────────────────────

@@ -139,3 +139,57 @@ async def test_an_unknown_chat_or_project_is_not_found(
     _as(fastapi_app, "u1")
     for url in (f"/v1/sessions/{uuid.uuid4()}/attachments", f"/v1/sessions/projects/{uuid.uuid4()}/attachments"):
         assert (await client.get(url)).status_code == 404
+
+
+# ── 0.7.2 J: removing a file from a project's Files ───────────────────────────────────────────────────
+
+
+async def _count(db: AsyncSession, attachment: ChatAttachment) -> int:
+    return (await db.execute(select(func.count()).select_from(ChatAttachment).where(
+        ChatAttachment.id == attachment.id,
+    ))).scalar_one()
+
+
+async def test_the_owner_removes_a_projects_file_and_it_is_erased_at_once(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, store: _Store,
+) -> None:
+    _, project, _, in_project = await _theirs(db_session)
+    _as(fastapi_app, "u2")
+
+    r = await client.delete(f"/v1/sessions/projects/{project.id}/attachments/{in_project.id}")
+
+    assert r.status_code == 204, r.text
+    assert store.deleted == ["t1/project/plan.txt"]
+    assert await _count(db_session, in_project) == 0
+    listed = await client.get(f"/v1/sessions/projects/{project.id}/attachments")
+    assert listed.json()["data"] == []
+
+
+async def test_someone_elses_projects_file_is_not_found_and_stays(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, store: _Store,
+) -> None:
+    _, project, _, in_project = await _theirs(db_session)
+    _as(fastapi_app, "u1")
+
+    r = await client.delete(f"/v1/sessions/projects/{project.id}/attachments/{in_project.id}")
+
+    assert r.status_code == 404
+    assert store.deleted == [] and await _count(db_session, in_project) == 1
+
+
+async def test_a_chats_file_or_another_projects_file_is_not_removed_through_a_project(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, store: _Store,
+) -> None:
+    _, project, in_chat, in_project = await _theirs(db_session)
+    other = ChatProject(tenant_id="t1", user_id="u2", name="other")
+    db_session.add(other)
+    await db_session.flush()
+    _as(fastapi_app, "u2")
+
+    chats_file = await client.delete(f"/v1/sessions/projects/{project.id}/attachments/{in_chat.id}")
+    wrong_project = await client.delete(f"/v1/sessions/projects/{other.id}/attachments/{in_project.id}")
+    unknown = await client.delete(f"/v1/sessions/projects/{project.id}/attachments/{uuid.uuid4()}")
+
+    assert [chats_file.status_code, wrong_project.status_code, unknown.status_code] == [404, 404, 404]
+    assert store.deleted == []
+    assert await _count(db_session, in_chat) == 1 and await _count(db_session, in_project) == 1

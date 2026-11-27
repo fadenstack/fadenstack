@@ -11,6 +11,7 @@ import type {
   ChatSession,
   ChatMessage,
   ChatAttachment,
+  ChatSummary,
   ModelAlias,
   Capacity,
   TokenUsage,
@@ -71,6 +72,10 @@ export class ChatApiError extends Error {
   governance: GovernanceNotice | null;
   /** Seconds to wait, for a rate limit. */
   retryAfter: number | null;
+  /** ``pii_pictures_refused``: the project's files that are pictures (``faden.pictures_refused.project_files``). */
+  projectPictures: string[];
+  /** The reply's turn, when the response named it (`x-faden-turn-id`): what a retry is made for. */
+  turnId: string | null;
 
   constructor(
     message: string,
@@ -81,6 +86,8 @@ export class ChatApiError extends Error {
       param?: string | null;
       governance?: GovernanceNotice | null;
       retryAfter?: number | null;
+      projectPictures?: string[];
+      turnId?: string | null;
     } = {},
   ) {
     super(message);
@@ -91,6 +98,8 @@ export class ChatApiError extends Error {
     this.param = init.param ?? null;
     this.governance = init.governance ?? null;
     this.retryAfter = init.retryAfter ?? null;
+    this.projectPictures = init.projectPictures ?? [];
+    this.turnId = init.turnId ?? null;
   }
 }
 
@@ -100,6 +109,7 @@ function errorFields(payload: unknown): {
   status: number | null;
   param: string | null;
   governance: GovernanceNotice | null;
+  projectPictures: string[];
 } {
   const record = (payload && typeof payload === "object" ? payload : {}) as Record<string, unknown>;
   const error = (record.error && typeof record.error === "object" ? record.error : {}) as Record<
@@ -114,7 +124,14 @@ function errorFields(payload: unknown): {
     faden.governance && typeof faden.governance === "object"
       ? (faden.governance as GovernanceNotice)
       : null;
+  const refused = (faden.pictures_refused && typeof faden.pictures_refused === "object"
+    ? faden.pictures_refused
+    : {}) as Record<string, unknown>;
+  const projectPictures = Array.isArray(refused.project_files)
+    ? refused.project_files.filter((name): name is string => typeof name === "string" && name !== "")
+    : [];
   return {
+    projectPictures,
     code: typeof error.code === "string" ? error.code : null,
     type: typeof error.type === "string" ? error.type : null,
     status: typeof error.status === "number" ? error.status : null,
@@ -191,6 +208,7 @@ async function buildApiError(res: Response): Promise<Error> {
           ...errorFields(parsed),
           status: res.status,
           retryAfter: Number.isFinite(retry) && retry > 0 ? retry : null,
+          turnId: res.headers.get("x-faden-turn-id"),
         });
       }
     } catch {
@@ -200,6 +218,12 @@ async function buildApiError(res: Response): Promise<Error> {
     // keep statusText fallback
   }
   return new Error(`API ${res.status}: ${text}`);
+}
+
+/** Whether the API said the thing asked for is gone (404). */
+export function isNotFound(err: unknown): boolean {
+  if (err instanceof ChatApiError) return err.status === 404;
+  return err instanceof Error && /^API 404\b/.test(err.message);
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -310,7 +334,7 @@ async function* deltasOf(
               parsed.error.message ||
               parsed.error.type ||
               "Unknown streaming error",
-            errorFields(parsed),
+            { ...errorFields(parsed), turnId },
           );
         }
         continue;
@@ -402,7 +426,14 @@ export function streamChat(payload: Record<string, unknown>): StreamHandle {
 export function retryTurn(
   sessionId: string,
   turnId: string,
-  body: { model?: string; skills?: string[] } = {},
+  body: {
+    model?: string;
+    skills?: string[];
+    /** How much to think, as on the turn itself (`none` for off). */
+    reasoning_effort?: string;
+    /** Fit the context to this share of its usual budget: a turn that overflowed is tried again with less. */
+    context_factor?: number;
+  } = {},
 ): StreamHandle {
   return postStream(`/sessions/${sessionId}/turns/${turnId}/retry`, body);
 }
@@ -480,7 +511,8 @@ export const chatApi = {
       name: string;
       description: string;
       system_instructions: string;
-      model_alias: string;
+      /** ``null`` clears it. */
+      model_alias: string | null;
     }>,
   ) =>
     request<ChatProject>(`/projects/${id}`, {
@@ -519,6 +551,10 @@ export const chatApi = {
   deleteSession: (id: string) =>
     request<void>(`/sessions/${id}`, { method: "DELETE" }),
 
+  /** The summary standing for the chat's older messages; null when it has none. */
+  getSummary: (sessionId: string) =>
+    request<{ data: ChatSummary | null }>(`/sessions/${sessionId}/summary`).then((r) => r.data),
+
   // Messages
   listMessages: (sessionId: string, limit = 100) =>
     request<{ data: ChatMessage[] }>(
@@ -555,6 +591,36 @@ export const chatApi = {
 
   deleteAttachment: (id: string) =>
     request<void>(`/attachments/${id}`, { method: "DELETE" }),
+
+  // A project's own files: the gateway adds them to every chat of the project.
+  listProjectAttachments: (projectId: string) =>
+    request<{ data: ChatAttachment[] }>(
+      `/projects/${projectId}/attachments`,
+    ).then((r) => r.data),
+
+  uploadProjectAttachment: async (projectId: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${BASE}/projects/${projectId}/attachments`, {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
+    if (!res.ok) {
+      throw await buildApiError(res);
+    }
+    return res.json() as Promise<{
+      attachment: ChatAttachment;
+      extracted_text_length: number;
+      token_estimate: number;
+    }>;
+  },
+
+  /** Deletes the file at once; 404 (already gone) is an error with ``isNotFound`` true. */
+  deleteProjectAttachment: (projectId: string, attachmentId: string) =>
+    request<void>(`/projects/${projectId}/attachments/${attachmentId}`, {
+      method: "DELETE",
+    }),
 
   // Non-streaming chat
   chatCompletion: (payload: Record<string, unknown>) =>

@@ -7,6 +7,7 @@ import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import FormControl from "@mui/material/FormControl";
 import FormControlLabel from "@mui/material/FormControlLabel";
+import FormHelperText from "@mui/material/FormHelperText";
 import InputLabel from "@mui/material/InputLabel";
 import MenuItem from "@mui/material/MenuItem";
 import Paper from "@mui/material/Paper";
@@ -220,6 +221,19 @@ export default function PiiPolicyForm({
                 ))}
               </Select>
             </FormControl>
+            <Box sx={{ width: "100%" }}>
+              <FormControlLabel
+                control={(
+                  <Switch
+                    checked={value.egress.refuse_pictures}
+                    onChange={(event) => patch({ egress: { ...value.egress, refuse_pictures: event.target.checked } })}
+                    disabled={disabled}
+                  />
+                )}
+                label={t("pii_policy.form.refuse_pictures")}
+              />
+              <FormHelperText sx={{ mt: -0.5, ml: 0 }}>{t("pii_policy.form.refuse_pictures_help")}</FormHelperText>
+            </Box>
           </Stack>
         </Stack>
       </Paper>

@@ -48,6 +48,22 @@ import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import StopIcon from "@mui/icons-material/Stop";
 
+/** What the server takes as a model's context length, in tokens. */
+export const CONTEXT_LENGTH_MIN = 1024;
+export const CONTEXT_LENGTH_MAX = 10_000_000;
+
+/**
+ * The context length typed: null for empty (the model's server says), the number when it is a whole number
+ * in range, undefined when it is not (checked before saving).
+ */
+export function contextLengthOf(raw: string): number | null | undefined {
+  const text = raw.trim();
+  if (!text) return null;
+  if (!/^\d+$/.test(text)) return undefined;
+  const value = Number(text);
+  return value >= CONTEXT_LENGTH_MIN && value <= CONTEXT_LENGTH_MAX ? value : undefined;
+}
+
 // ── Joined row type ──────────────────────────────────────────────────
 interface ProviderRow {
   provider: Provider;
@@ -56,7 +72,7 @@ interface ProviderRow {
 }
 
 export default function ProvidersPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
 
   // ── Data ─────────────────────────────────────────────────────────
@@ -122,6 +138,8 @@ export default function ProvidersPage() {
   const [editRemoteModel, setEditRemoteModel] = useState("");
   const [editCallsTools, setEditCallsTools] = useState(true);
   const [editSeesPictures, setEditSeesPictures] = useState(true);
+  // Kept as typed: empty is null (the model's server says).
+  const [editContextLength, setEditContextLength] = useState("");
 
   // ── Derived data ─────────────────────────────────────────────────
   const runtimeByProvider = useMemo(() => {
@@ -195,6 +213,11 @@ export default function ProvidersPage() {
         if (editSeesPictures !== (editTarget.sees_pictures !== false)) {
           payload.sees_pictures = editSeesPictures ? null : false;
         }
+      }
+      // Only a change is sent: empty clears it (null), a number sets it.
+      const context = contextLengthOf(editContextLength);
+      if (context !== undefined && context !== (editTarget.context_length ?? null)) {
+        payload.context_length = context;
       }
       await providers.update(editTarget.id, payload);
       setEditTarget(null);
@@ -490,6 +513,9 @@ export default function ProvidersPage() {
                   setEditRemoteModel(r.provider.remote_model ?? "");
                   setEditCallsTools(r.provider.calls_tools !== false);
                   setEditSeesPictures(r.provider.sees_pictures !== false);
+                  setEditContextLength(
+                    r.provider.context_length != null ? String(r.provider.context_length) : "",
+                  );
                 }}
               >
                 <EditIcon fontSize="small" />
@@ -589,6 +615,7 @@ export default function ProvidersPage() {
         cancelLabel={t("common.cancel")}
         submitDisabled={
           !editName.trim() ||
+          contextLengthOf(editContextLength) === undefined ||
           (editTarget?.target === "remote_endpoint" &&
             !editEndpointUrl.trim() &&
             !editTarget.litellm_provider)
@@ -662,6 +689,23 @@ export default function ProvidersPage() {
             </Typography>
           </Stack>
         )}
+        <TextField
+          label={t("llm_providers.context_length")}
+          value={editContextLength}
+          onChange={(e) => setEditContextLength(e.target.value)}
+          fullWidth
+          sx={{ mt: 2 }}
+          slotProps={{ htmlInput: { inputMode: "numeric" } }}
+          error={contextLengthOf(editContextLength) === undefined}
+          helperText={
+            contextLengthOf(editContextLength) === undefined
+              ? t("llm_providers.context_length_range", {
+                  min: CONTEXT_LENGTH_MIN.toLocaleString(i18n.language),
+                  max: CONTEXT_LENGTH_MAX.toLocaleString(i18n.language),
+                })
+              : t("llm_providers.context_length_help")
+          }
+        />
       </FormDialog>
     </>
   );

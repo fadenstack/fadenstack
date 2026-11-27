@@ -261,6 +261,8 @@
 "Welche Hardware braucht der Server?" = "the-server"
 "Welche GPU-Maschinen werden unterstützt?" = "gpu-machines"
 "Was braucht Internetzugang?" = "what-needs-the-internet"
+"Warum ist die PII-Prüfung auf meiner virtuellen Maschine langsam?" = "the-cpu-and-the-pii-check"
+"Braucht die PII-Prüfung AVX2?" = "the-cpu-and-the-pii-check"
 
 ["operate/installing.md"]
 "Wie aktiviere ich erweiterte PII-Felder?" = "extended-pii-fields"

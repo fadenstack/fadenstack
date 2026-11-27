@@ -36,12 +36,13 @@ EVENTS = {"X-Faden-Events": "ag-ui"}
 
 
 def _faden(raw: str) -> list[dict[str, Any]]:
-    """The named ``faden`` events of an SSE body, in order (the tool mode notice aside: test_tool_modes)."""
+    """The named ``faden`` events of an SSE body, in order (aside: the tool mode notice, test_tool_modes, and a chat
+    turn's context use, test_context_budget)."""
     out = []
     for block in raw.split("\n\n"):
         if block.startswith("event: faden\n"):
             out.append(json.loads(block.split("data: ", 1)[1]))
-    return [e for e in out if e.get("name") != "faden.tool_mode"]
+    return [e for e in out if e.get("name") not in ("faden.tool_mode", "faden.context")]
 
 
 def _text(raw: str) -> str:

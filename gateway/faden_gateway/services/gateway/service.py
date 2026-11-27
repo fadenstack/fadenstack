@@ -8,11 +8,11 @@ import mimetypes
 import re
 import time
 import uuid
-from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import PurePosixPath
-from typing import Any, TypedDict, cast
+from typing import Any, Final, TypedDict, cast
 
 from faden_gateway.db.dao.gateway_dao import GatewayDAO
 from faden_gateway.db.dao.session_dao import SessionDAO
@@ -25,6 +25,13 @@ from faden_gateway.db.models.gateway import (
     TurnStatus,
 )
 from faden_gateway.services.gateway.audit import AuditService
+from faden_gateway.services.gateway.context_assembler import (
+    DROPPED,
+    DROPPED_SEARCHABLE,
+    FALLBACK_BUDGET,
+    REPLY_RESERVE,
+    in_context,
+)
 from faden_gateway.services.gateway.usage_group import UsageGroupResolver, usage_team
 from faden_gateway.services.gateway import approval_settings, usage_hooks, usage_settings
 from faden_gateway.services.extensions import AdmissionContext
@@ -32,6 +39,7 @@ from faden_gateway.services.gateway.auth import AuthContext
 from faden_gateway.services.gateway import (
     answer_variety,
     attachment_search,
+    chat_search,
     faden_events,
     image_generation,
     knowledge,
@@ -44,19 +52,25 @@ from faden_gateway.services.gateway import (
     text_marking,
     text_receipts,
 )
+from faden_gateway.services.gateway import chat_settings, content_hash, summarizer
 from faden_gateway.services.extensions import registry as extension_registry
 from faden_gateway.services.gateway import governance as gov
 from faden_gateway.services.gateway import grants
 from faden_gateway.services.gateway import tool_classes
 from faden_gateway.services.gateway.errors import GatewayError
 from faden_gateway.services.gateway.agents import AgentRequest
-from faden_gateway.services.gateway.llm_adapter import LLMAdapter, reasoning_of
+from faden_gateway.services.gateway.llm_adapter import CONTEXT_OVERFLOW, LLMAdapter, reasoning_of
 from faden_gateway.services.gateway.observability import (
     GatewayObservability,
 )
 from faden_gateway.services.gateway.mcp_client import MCPClient
 from faden_gateway.services.gateway.mcp_tool_cache import MCP_TOOL_PREFIX, MCPToolCache
-from faden_gateway.services.gateway.pii_client import PIIClient, PIIInputTooLargeError, PIIPolicyMismatchError
+from faden_gateway.services.gateway.pii_client import (
+    PIIClient,
+    PIIDeadlineExceededError,
+    PIIInputTooLargeError,
+    PIIPolicyMismatchError,
+)
 from faden_gateway.services.gateway.provenance_client import ProvenanceClient, SignedReceipt
 from faden_gateway.services.gateway.session_titles import title_from_message
 from faden_gateway.services.gateway.pii_policy import (
@@ -384,11 +398,61 @@ _PII_TOO_LARGE_MESSAGE = (
     "nothing was sent. A shorter conversation, fewer tools or smaller tool results fit."
 )
 
+_PII_OUT_OF_TIME_MESSAGE = (
+    "The PII check took longer than its limit for this request ({code}), and the PII policy blocks what it "
+    "cannot check, so nothing was sent. A shorter text fits; an administrator can run the check on a GPU."
+)
+
+
+#: The refusal when the organisation refuses pictures under the PII check (``refuse_pictures``, 0.7.2 G).
+PICTURES_REFUSED: Final = "pii_pictures_refused"
+_PICTURES_REFUSED_MESSAGE = (
+    "Pictures are not checked for personal data, and your organisation does not send them unchecked. "
+    "Remove the picture and send again."
+)
+_PROJECT_PICTURE_REFUSED_MESSAGE = (
+    "Pictures are not checked for personal data, and your organisation does not send them unchecked. "
+    "Remove {file} from the project's Files to use this project's chats."
+)
+
+
+def _picture_count(payload: dict[str, Any]) -> int:
+    """How many picture parts the chat's messages carry."""
+    return sum(
+        1
+        for message in payload.get("messages") or []
+        if isinstance(message, dict) and isinstance(message.get("content"), list)
+        for part in message["content"]
+        if isinstance(part, dict) and part.get("type") == "image_url"
+    )
+
+
+def _refuse_pictures(payload: dict[str, Any], project_pictures: list[str]) -> None:
+    """403 ``pii_pictures_refused`` when *payload* carries a picture: the check cannot read one.
+
+    A picture from the project's Files goes with every chat of the project, so the refusal names it
+    (and ``faden.pictures_refused.project_files`` lists them): removing it there is the way on.
+    """
+    if not _picture_count(payload):
+        return
+    message = (
+        _PROJECT_PICTURE_REFUSED_MESSAGE.format(file=project_pictures[0]) if project_pictures
+        else _PICTURES_REFUSED_MESSAGE
+    )
+    raise GatewayError(
+        status_code=403,
+        message=message,
+        error_type="invalid_request_error",
+        param="project_files" if project_pictures else None,
+        code=PICTURES_REFUSED,
+        extra={"faden": {"pictures_refused": {"project_files": list(project_pictures)}}},
+    )
+
 
 def _pii_blocked(exc: BaseException, unavailable: str) -> GatewayError:
     """A failed PII scan's refusal under fail_action=block.
 
-    The policy's fault, the request's size, else *unavailable*.
+    The policy's fault, the request's size, its time limit, else *unavailable*.
     """
     if isinstance(exc, PIIPolicyMismatchError):
         return GatewayError(
@@ -403,6 +467,13 @@ def _pii_blocked(exc: BaseException, unavailable: str) -> GatewayError:
             message=_PII_TOO_LARGE_MESSAGE.format(code=exc.code),
             error_type="invalid_request_error",
             code="pii_input_too_large",
+        )
+    if isinstance(exc, PIIDeadlineExceededError):
+        return GatewayError(
+            status_code=504,
+            message=_PII_OUT_OF_TIME_MESSAGE.format(code=exc.code),
+            error_type="server_error",
+            code="pii_deadline_exceeded",
         )
     return GatewayError(
         status_code=502, message=unavailable, error_type="server_error", code="pii_service_unavailable",
@@ -595,7 +666,7 @@ def _tool_definition_name(tool: dict[str, Any]) -> str:
 
 
 #: The gateway's tools offered after the MCP tools.
-_AFTER_MCP_TOOLS = knowledge.NAMES | {attachment_search.NAME, skill_files.NAME}
+_AFTER_MCP_TOOLS = knowledge.NAMES | {attachment_search.NAME, chat_search.NAME, skill_files.NAME}
 
 
 def _with_mcp_tools(payload: dict[str, Any], mcp_tools: list[dict[str, Any]]) -> dict[str, Any]:
@@ -631,7 +702,9 @@ def _skills_allow(skills: list[ResolvedSkill], name: str) -> bool:
 
 
 #: Names the gateway's own tools answer to.
-_GATEWAY_TOOLS = system_tools.NAMES | knowledge.NAMES | {attachment_search.NAME, skill_files.NAME}
+_GATEWAY_TOOLS = (
+    system_tools.NAMES | knowledge.NAMES | {attachment_search.NAME, chat_search.NAME, skill_files.NAME}
+)
 
 
 def _short(name: str) -> str:
@@ -785,6 +858,77 @@ def _assistant_turn(content: str | None, calls: list[dict[str, Any]]) -> dict[st
     }
 
 
+def _unsearchable_dropped(payload: dict[str, Any], dropped: int) -> dict[str, Any]:
+    """*payload* with the line for the left-out messages worded for a model that cannot search them."""
+    searchable, plain = DROPPED_SEARCHABLE.format(n=dropped), DROPPED.format(n=dropped)
+    return {**payload, "messages": [
+        {**m, "content": plain} if m.get("role") == "system" and m.get("content") == searchable else m
+        for m in payload.get("messages") or []
+    ]}
+
+
+def _context_factor(value: object) -> float:
+    """The share of the chat's budget a request asks for, 0.5 to 1; anything else is 1.
+
+    The chat page sends 0.75 once, when the model said the context was too long.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return 1.0
+    return float(value) if 0.5 <= value <= 1.0 else 1.0
+
+
+#: A chat whose summary could not be written is not asked again for this long, on this worker: the turn would
+#: wait for a failing model each time (0.7.2 K, layer 5).
+SUMMARY_RETRY_SEC = 600.0
+#: At most this many chats are remembered as failed; the oldest go first.
+_SUMMARY_FAILED_MAX = 1000
+_summary_failed: dict[uuid.UUID, float] = {}
+#: How a summary's answer may not end: cut at its cap, held back by a check, or a tool call instead of text.
+_SUMMARY_UNFINISHED = frozenset({"length", "content_filter", "tool_calls", "function_call"})
+
+
+def _summary_due(sid: uuid.UUID) -> bool:
+    """Whether a summary may be written for chat *sid* now: not while its last attempt is recent."""
+    until = _summary_failed.get(sid)
+    if until is None:
+        return True
+    if time.monotonic() < until:
+        return False
+    _summary_failed.pop(sid, None)
+    return True
+
+
+def _summary_failing(sid: uuid.UUID) -> None:
+    """Remember that chat *sid*'s summary could not be written (``SUMMARY_RETRY_SEC``)."""
+    while len(_summary_failed) >= _SUMMARY_FAILED_MAX:
+        _summary_failed.pop(next(iter(_summary_failed)))
+    _summary_failed[sid] = time.monotonic() + SUMMARY_RETRY_SEC
+
+
+def _summary_text(payload: Any) -> str | None:
+    """A summary's text from the model's whole answer; None for one that did not end as an answer ends."""
+    choices = payload.get("choices") if isinstance(payload, dict) else None
+    first = choices[0] if isinstance(choices, list) and choices and isinstance(choices[0], dict) else None
+    if first is None or first.get("finish_reason") in _SUMMARY_UNFINISHED:
+        return None
+    text = _answer_text({"choices": [first]}).strip()
+    return text or None
+
+
+def _reply_reserve(payload: dict[str, Any]) -> int:
+    """The tokens kept for the reply (0.7.2 K): the request's cap, else 4,096; twice that with thinking."""
+    for key in ("max_completion_tokens", "max_tokens"):
+        value = payload.get(key)
+        if type(value) is int and value > 0:
+            return value
+    kwargs = payload.get("chat_template_kwargs")
+    thinking = (
+        str(payload.get("reasoning_effort") or "").lower() not in ("", "none", "off", "minimal")
+        or (isinstance(kwargs, dict) and kwargs.get("enable_thinking") is True)
+    )
+    return REPLY_RESERVE * 2 if thinking else REPLY_RESERVE
+
+
 def _cap_output(payload: dict[str, Any]) -> None:
     """Cap a chat's reply at ``session_max_output_tokens`` when it sets no cap.
 
@@ -801,12 +945,17 @@ def _cap_output(payload: dict[str, Any]) -> None:
 
 def _report_left_out(
     notices: list[dict[str, Any]] | None, pictures: list[Any], payload: dict[str, Any],
+    *, unreadable: Sequence[Any] = (),
 ) -> None:
-    """Each of the chat's pictures the turn's model did not get, as a Faden event on *notices*."""
+    """Each of the chat's files the turn's model did not get, as a Faden event on *notices*.
+
+    Pictures for a model that does not take pictures, and files whose text could not be read.
+    """
     if notices is None:
         return
     model = str(payload.get("model") or "").strip()
     notices.extend(faden_events.picture_left_out(str(p.id), p.filename, model) for p in pictures)
+    notices.extend(faden_events.file_unreadable(str(f.id), f.filename) for f in unreadable)
 
 
 def _allowing_personal_data(mcp_tools: list[dict[str, Any]] | None) -> set[str]:
@@ -817,15 +966,18 @@ def _allowing_personal_data(mcp_tools: list[dict[str, Any]] | None) -> set[str]:
 def _pii_events(req: _Prepared) -> list[dict[str, Any]]:
     """What goes before the answer, when the client asked for events.
 
-    The PII notice (when something was found), and the client's tools a rule
-    refused.
+    The PII notice (when something was found), that pictures went on unchecked
+    (when the scan ran and the request carried any), a chat turn's context use
+    (``faden.context``), and the client's tools a rule refused.
     """
     if not req.faden_events:
         return []
     notice = (
         faden_events.pii_notice(req.pii_types, req.pii_policy.egress.mode) if req.pii_policy is not None else None
     )
-    return [*([notice] if notice is not None else []), *req.faden_leading]
+    unchecked = faden_events.pictures_unchecked(req.pii_pictures_unchecked)
+    leading = (notice, unchecked, req.context_usage)
+    return [*(event for event in leading if event is not None), *req.faden_leading]
 
 
 async def _leading(events: list[dict[str, Any]], stream: AsyncIterator[bytes]) -> AsyncIterator[bytes]:
@@ -909,6 +1061,9 @@ def _stream_outcome(stats: StreamStats, status_code: int, error_code: str | None
     that event inside a 200: it is logged as the failure it was.
     """
     if stats.error and status_code == 200:
+        if stats.error_code == CONTEXT_OVERFLOW:
+            # Longer than the model's context window: the caller's to shorten, and to try again.
+            return 400, CONTEXT_OVERFLOW
         return 502, "upstream_refused"
     return status_code, error_code
 
@@ -1299,6 +1454,26 @@ class _Prepared:
     faden_events: bool = False
     #: What the egress PII scan found: entity type -> count.
     pii_types: dict[str, int] = field(default_factory=dict)
+    #: Pictures the PII scan passed on unchecked (it reads text only): the most any scan of this request
+    #: saw, as each scan reads the whole conversation (0.7.2 G).
+    pii_pictures_unchecked: int = 0
+    #: The pictures of the project's Files the chat's context carries (their names): they go with every
+    #: chat of the project, so a refusal of pictures names them.
+    project_pictures: list[str] = field(default_factory=list)
+    #: A request the gateway makes for itself (``chat_summary``): no session, skills, knowledge or tools.
+    internal: str | None = None
+    #: The share of the prompt budget the chat's context is fitted to: 0.75 for the one retry after the
+    #: model said the context was too long (0.7.2 K).
+    context_factor: float = 1.0
+    #: How many of the chat's earlier messages its context leaves out, since when the rest go, and the chat:
+    #: ``search_chat`` searches the ones left out (0.7.2 K).
+    chat_dropped: int = 0
+    chat_kept_from: Any = None
+    chat_session: uuid.UUID | None = None
+    #: Whether ``search_chat`` is offered: a route that calls tools, a chat with messages left out.
+    chat_search: bool = False
+    #: The chat turn's context use, for ``faden.context`` (0.7.2 K); None outside a chat.
+    context_usage: dict[str, Any] | None = None
     #: Faden events not yet sent (tool ends, citations, gateway rounds).
     faden_pending: list[dict[str, Any]] = field(default_factory=list)
     #: Faden events of a whole answer, sent in its ``faden`` object.
@@ -1411,6 +1586,11 @@ class GatewayService:
         # Whether each takes pictures (true, false, or null when not known): the chat says so at a
         # picture it would not get. An extra field, as kind is: OpenAI clients read the rest as ever.
         visions = await self.dao.alias_visions([a.alias for a in aliases])
+        # How many tokens each takes (null when not known), so a governed client sizes its context to it
+        # (0.7.2 K): the smallest of its instances', which a request may go to.
+        windows = await self.dao.alias_context_lengths([a.alias for a in aliases])
+        # Which thinking levels each tells apart (null: not known), so a chat offers only those (0.7.2 I.2).
+        levels = await self.dao.alias_reasoning_levels([a.alias for a in aliases])
         return {
             "object": "list",
             "data": [
@@ -1424,6 +1604,8 @@ class GatewayService:
                     "enabled": alias.enabled,
                     "kind": kinds.get(alias.alias),
                     "vision": visions.get(alias.alias),
+                    "context_length": windows.get(alias.alias),
+                    "reasoning_levels": levels.get(alias.alias),
                 }
                 for alias in aliases
             ],
@@ -1442,6 +1624,8 @@ class GatewayService:
         faden_events: bool = False,
         tool_mode: str | None = None,
         purpose: str | None = None,
+        context_factor: float = 1.0,
+        internal: str | None = None,
     ) -> GatewayResponse:
         started = time.perf_counter()
         rerank: dict[str, Any] | None = None
@@ -1460,7 +1644,8 @@ class GatewayService:
 
         req = _Prepared(
             payload=payload, requested_skills=list(skills or []), agent=agent, faden_events=faden_events,
-            tool_mode_header=tool_mode, purpose=purpose,
+            tool_mode_header=tool_mode, purpose=purpose, context_factor=_context_factor(context_factor),
+            internal=internal,
         )
         result: UpstreamResult | None = None
         error_code: str | None = None
@@ -1733,6 +1918,7 @@ class GatewayService:
                 rag_context=req.rag_context,
                 mcp_tool_call_count=len(req.tool_calls),
                 mcp_tool_loop_iterations=req.tool_iterations,
+                pii_pictures_unchecked=req.pii_pictures_unchecked or None,
                 tool_calls=req.tool_calls,
                 **_agent_log_fields(req),
             )
@@ -1905,6 +2091,7 @@ class GatewayService:
         tool_mode: str | None = None,
         background: bool = False,
         purpose: str | None = None,
+        context_factor: float = 1.0,
     ) -> StreamingGatewayResponse:
         """A streamed chat completion.
 
@@ -1919,7 +2106,7 @@ class GatewayService:
 
         req = _Prepared(
             payload=payload, requested_skills=list(skills or []), agent=agent, faden_events=faden_events,
-            tool_mode_header=tool_mode, purpose=purpose,
+            tool_mode_header=tool_mode, purpose=purpose, context_factor=_context_factor(context_factor),
         )
         background = background and bool(session_id) and self.session_dao is not None
         stream_started = False
@@ -2195,6 +2382,7 @@ class GatewayService:
                     rag_context=req.rag_context,
                     mcp_tool_call_count=0,
                     mcp_tool_loop_iterations=0,
+                    pii_pictures_unchecked=req.pii_pictures_unchecked or None,
                     tool_calls=[],
                     **_agent_log_fields(req),
                 )
@@ -3008,6 +3196,9 @@ class GatewayService:
         import hashlib
         req.pii_scope = hashlib.sha256(f"{auth.tenant_id}:{session_id or ''}".encode()).hexdigest()
         chat = endpoint == "/v1/chat/completions"
+        # A chat the gateway asks for itself (a chat's summary): checked, routed, marked and logged as any chat,
+        # but with no session, skills, knowledge or tools of its own.
+        tooled = chat and req.internal is None
         payload = req.payload
         req.client_tools = {_tool_definition_name(t) for t in payload.get("tools") or []}
         req.client_offered = frozenset(req.client_tools)
@@ -3065,7 +3256,7 @@ class GatewayService:
         # The files the chat has, for skills that come in on a file type. Read
         # before the lookups below: the session step uses the same database
         # session, which cannot run two queries at once.
-        file_types = await self._chat_file_types(auth, session_id) if chat and self.skills_client else []
+        file_types = await self._chat_file_types(auth, session_id) if tooled and self.skills_client else []
         (
             (payload, req.session_id, req.project_id),
             req.skills,
@@ -3074,11 +3265,11 @@ class GatewayService:
             req.knowledge_to_search,
         ) = await _together(
             self._inject_session_context(
-                payload, auth, session_id, req=req if searchable else None, saved=req.user_message_ids,
+                payload, auth, session_id, req=req, searchable=searchable, saved=req.user_message_ids,
                 # Sent before the answer, to a client that asked for the events.
                 notices=req.faden_leading,
             )
-            if chat else _value((payload, None, None)),
+            if tooled else _value((payload, None, None)),
             self._resolve_skills(
                 question,
                 auth,
@@ -3089,13 +3280,13 @@ class GatewayService:
                 inline_files_chars=0 if searchable else skill_files.INLINE_CHARS,
                 agent=req.agent,
             )
-            if chat
+            if tooled
             else _value([]),
-            self.mcp_tool_cache.get_tools(auth.tenant_id) if chat and self.mcp_tool_cache else _value(None),
+            self.mcp_tool_cache.get_tools(auth.tenant_id) if tooled and self.mcp_tool_cache else _value(None),
             self.usage_groups.resolve(auth.user_id) if self.usage_groups else _value(None),
             # Asked before the slot, beside the lookups above; kept a minute (knowledge.py), so most
             # turns wait for nothing.
-            self._knowledge_to_search(req, auth, payload, candidates) if chat else _value(None),
+            self._knowledge_to_search(req, auth, payload, candidates) if tooled else _value(None),
         )
         self._book_on(req, team)
         # The tenant's whole catalog, so that a tool keeps its name from chat to chat (tool_names.py).
@@ -3104,7 +3295,7 @@ class GatewayService:
             blocks = [skill_files.skill_block(skill, as_tool=searchable) for skill in req.skills]
             payload = _with_skills(payload, blocks)
         req.payload = payload
-        if chat:
+        if tooled:
             # The session is resolved (and the user's): its tool mode applies.
             await self._resolve_tool_mode(req, auth, {
                 t.get("qualified_name", ""): t["annotations"] for t in mcp_tools or [] if t.get("annotations")
@@ -3126,7 +3317,8 @@ class GatewayService:
         req.pii_policy = _resolve_pii_policy(
             policy,
             session_override=(
-                await self._session_pii_override(req.session_id, auth) or _agent_pii_override(req)
+                await self._session_pii_override(req.session_id or (session_id if req.internal else None), auth)
+                or _agent_pii_override(req)
             ),
             agent_allow_mode_override=(
                 req.agent.agent.pii_allow_mode_override if req.agent is not None else None
@@ -3177,7 +3369,7 @@ class GatewayService:
             routing_metadata={"pii_fallback_outcome": req.fallback_outcome},
         )
 
-        if chat:
+        if tooled:
             # Inject current date/time so the model is aware of "today"
             egress = self._inject_datetime_context(egress)
             # Tools only to a route that calls them, when the client has not
@@ -3194,6 +3386,14 @@ class GatewayService:
                 req.knowledge = True
             if req.attachments:
                 egress = _with_tools(egress, attachment_search.TOOLS)
+            if req.chat_dropped:
+                # The chat's left-out messages: searched by a model that calls tools; for one that cannot,
+                # the line in their place says to ask the person instead.
+                if req.system_tools:
+                    egress = _with_tools(egress, chat_search.TOOLS)
+                    req.chat_search = True
+                else:
+                    egress = _unsearchable_dropped(egress, req.chat_dropped)
         # Apply skill-based tool constraints (after all tools are merged)
         if req.skills:
             egress = self._apply_skill_tool_constraints(egress, req.skills)
@@ -3244,6 +3444,26 @@ class GatewayService:
         if session.in_transaction():
             await session.commit()
 
+    async def _search_chat(self, req: _Prepared, arguments: dict[str, Any]) -> tuple[str, bool]:
+        """``search_chat`` over this chat's messages older than the first one still in its context.
+
+        The chat was resolved for its owner before the turn (``_inject_session_context``); its messages are
+        read oldest first and numbered from 1, so a message keeps its number from one search to the next.
+        """
+        if req.chat_session is None or self.session_dao is None:
+            return chat_search.ChatSearch([]).run(arguments)
+        rows = await self.session_dao.list_messages(session_id=req.chat_session)
+        earlier = [
+            chat_search.EarlierMessage(
+                id=str(m.id), number=number, role=m.role, written=m.created_at.isoformat(),
+                text=m.content or "",
+            )
+            for number, m in enumerate(rows, start=1)
+            if m.role in ("user", "assistant") and in_context(m)
+            and (req.chat_kept_from is None or m.created_at < req.chat_kept_from)
+        ]
+        return chat_search.ChatSearch(earlier).run(arguments)
+
     async def _release(self, req: _Prepared) -> None:
         """Give the request's model slot back, once."""
         if req.decision is not None and not req.released:
@@ -3283,6 +3503,10 @@ class GatewayService:
             # (the backend seeds that default on every install): nothing to enforce.
             _note_default_policy_unenforced()
             return None, candidates
+        if pii_policy.egress.refuse_pictures:
+            # The organisation's choice: a picture cannot be checked, so a request with one is refused here,
+            # before the scan and whatever fail_action says (0.7.2 G). By default it goes on, with a note.
+            _refuse_pictures(req.payload, req.project_pictures)
         try:
             # A policy someone saved, with the PII module off, fails like a scan that errors:
             # fail_action decides. It used to send the payload unscanned, without a word.
@@ -3338,6 +3562,7 @@ class GatewayService:
             # Types and counts only, for a notice in the UI -- never the values.
             for kind, count in result.entity_types.items():
                 req.pii_types[kind] = req.pii_types.get(kind, 0) + count
+            req.pii_pictures_unchecked = max(req.pii_pictures_unchecked, result.pictures_unchecked)
         return result.sanitized_payload, result.token_mapping
 
     async def _lease(
@@ -3506,13 +3731,17 @@ class GatewayService:
         req: _Prepared | None = None,
         saved: list[uuid.UUID] | None = None,
         notices: list[dict[str, Any]] | None = None,
+        *,
+        searchable: bool | None = None,
     ) -> tuple[dict[str, Any], str | None, str | None]:
         """Inject session history and memory into the payload.
 
         Returns ``(updated_payload, resolved_session_id_hex)``
         where the session id is ``None`` when sessions are disabled.
-        With *req*, attached files too long to include are left for the model
-        to search, and go on ``req.attachments``. The chat's pictures go only
+        With *searchable* (the route calls tools), attached files too long to
+        include are left for the model to search, on ``req.attachments``; *req*
+        also hears what the context left out (``chat_dropped``, the project's
+        pictures). *searchable* not given: whether *req* is. The chat's pictures go only
         to a model that takes them; each one left out goes on *notices*, as a
         Faden event for the client.
         """
@@ -3521,7 +3750,7 @@ class GatewayService:
 
         import uuid as _uuid  # noqa: PLC0415
 
-        from faden_gateway.services.gateway.context_assembler import ContextAssembler, in_context  # noqa: PLC0415
+        from faden_gateway.services.gateway.context_assembler import ContextAssembler  # noqa: PLC0415
 
         try:
             sid = _uuid.UUID(session_id_str)
@@ -3543,14 +3772,22 @@ class GatewayService:
                 user_id=auth.user_id,
             )
 
+        # The reply's cap first: its reserve comes off the model's window (0.7.2 K).
+        _cap_output(payload)
+        model = str(payload.get("model") or "").strip()
         assembler = ContextAssembler(
             dao=self.session_dao,
             max_recent_messages=settings.session_max_recent_messages,
-            token_budget=settings.session_token_budget,
+            token_budget=settings.session_token_budget or FALLBACK_BUDGET,
             # The file store, for the chat's attached pictures.
             file_store=getattr(self, "_file_store", None),
-            searchable=req is not None,
+            searchable=(req is not None) if searchable is None else searchable,
             vision=self._takes_pictures(payload),
+            window=await self.dao.alias_context_length(model) if model else None,
+            reply_reserve=_reply_reserve(payload),
+            budget_cap=settings.session_token_budget,
+            history_cap=settings.session_history_max_tokens,
+            factor=req.context_factor if req is not None else 1.0,
         )
 
         # Current request messages become the "tail" of the assembled context
@@ -3600,11 +3837,34 @@ class GatewayService:
             current_messages=current_messages,
             project=project,
         )
+        summarised = False
+        if req is not None and await self._summary_wanted(req, sid, model, assembled):
+            summarised = await self._summarise(
+                auth, sid=sid, model=model, previous=assembled.summary_used, left_out=assembled.uncovered,
+            )
+            if summarised:
+                # The messages just left out are in the chat's summary now: the context again, with it.
+                assembled = await assembler.assemble(
+                    session_id=sid,
+                    tenant_id=auth.tenant_id,
+                    user_id=auth.user_id,
+                    current_messages=current_messages,
+                    project=project,
+                )
 
-        _report_left_out(notices, assembled.pictures_left_out, payload)
+        _report_left_out(notices, assembled.pictures_left_out, payload, unreadable=assembled.files_unreadable)
         payload["messages"] = assembled.messages
-        _cap_output(payload)
         if req is not None:
+            req.chat_dropped, req.chat_kept_from = assembled.dropped, assembled.kept_from
+            req.context_usage = faden_events.context_usage(
+                tokens=assembled.total_token_estimate, budget=assembled.budget, window=assembled.window,
+                dropped=assembled.dropped, summary=assembled.summary_used is not None, summarised=summarised,
+            )
+            req.chat_session = sid
+            req.project_pictures = [
+                a.filename for a in assembled.attachments_used
+                if a.session_id is None and a.project_id is not None and a.content_type.startswith("image/")
+            ]
             req.attachments = [
                 attachment_search.SearchableFile(id=str(a.id), filename=a.filename, text=a.extracted_text or "")
                 for a in assembled.searchable
@@ -3646,6 +3906,75 @@ class GatewayService:
             await self.session_dao.session.commit()
 
         return payload, str(sid), (str(sess.project_id) if sess.project_id else None)
+
+    async def _summary_wanted(self, req: _Prepared, sid: uuid.UUID, model: str, assembled: Any) -> bool:
+        """Whether this turn writes the chat's summary: messages were just left out that no summary covers, on
+        a person's own chat (not an agent's, not the gateway's own request), on a model an administrator
+        switched summaries on for (``chat_settings``, off by default), and not soon after one failed."""
+        return bool(
+            assembled.uncovered and req.internal is None and req.agent is None and model
+            and _summary_due(sid) and await chat_settings.summary_on(model)
+        )
+
+    async def _summarise(
+        self, auth: AuthContext, *, sid: uuid.UUID, model: str, previous: Any, left_out: list[Any],
+    ) -> bool:
+        """Fold the messages just *left_out* into the chat's summary (``summarizer``; 0.7.2 K, layer 5).
+
+        The chat's own model writes it through the gateway's answer path, as the gateway's own request
+        (``internal``): its personal data checked under the chat's settings, on a route that marks what it
+        writes, logged as a request of the chat, with no session, skills, knowledge or tools of its own and
+        nothing stored as a message. With the provenance module on, the summary is signed as content of the
+        kind ``summarised`` (linked to the answer's receipt), or not kept at all. Then it is stored, encrypted,
+        with the chat. Anything failing leaves the chat with the line in place of the left-out messages, and
+        the next try waits ``SUMMARY_RETRY_SEC``. Returns whether a summary was stored.
+        """
+        if self.session_dao is None:
+            return False
+        body: dict[str, Any] = {
+            "model": model,
+            "messages": summarizer.prompt(previous.summary_text if previous is not None else None, left_out),
+            "max_tokens": summarizer.MAX_TOKENS,
+            "temperature": 0.2,
+        }
+        # A model that thinks first would spend the summary's tokens on it: where it can be turned off, it is.
+        if "off" in ((await self.dao.alias_reasoning_levels([model])).get(model) or []):
+            body["reasoning_effort"] = "none"
+        request_id = f"chat-summary-{uuid.uuid4().hex}"
+        # What the turn wrote so far is kept, whatever becomes of the summary.
+        await self._release_request_connection()
+        try:
+            answer = await self.route_non_stream(
+                auth=auth, endpoint="/v1/chat/completions", payload=body, request_id=request_id,
+                session_id=str(sid), internal="chat_summary",
+            )
+            text = _summary_text(answer.payload) if answer.status_code == 200 else None
+            if text is None:
+                raise ValueError(f"the model's answer was not a summary (status {answer.status_code})")
+            record_id = None
+            if self.provenance_client is not None:
+                signed = await self.provenance_client.sign_record({
+                    "content_sha256": content_hash.text_sha256(text),
+                    "media_type": "text/plain",
+                    "edit_kind": "summarised",
+                    "receipt_id": answer.provenance[0] if answer.provenance else None,
+                    "model": model,
+                }, agent=None)
+                record_id = str(signed["record"]["id"])
+            # A savepoint: a summary that cannot be stored takes nothing else of the turn with it (a rollback of
+            # the whole session would also expire what the turn has loaded).
+            async with self.session_dao.session.begin_nested():
+                await self.session_dao.create_summary(
+                    session_id=sid, summary_text=text, last_message_id=left_out[-1].id,
+                    token_estimate=len(summarizer.as_context(text)) // 4 + 1, model_alias=model,
+                    record_id=record_id,
+                )
+            await self.session_dao.session.commit()
+        except Exception as exc:  # the chat goes on without a summary: the line stands for the messages
+            _summary_failing(sid)
+            logger.warning("Chat %s: no summary was written (%s): %s", sid, request_id, exc)
+            return False
+        return True
 
     # ── Skills helpers ───────────────────────────────────────────────────────
 
@@ -3856,6 +4185,7 @@ class GatewayService:
         elif (
             (name in knowledge.NAMES and req.knowledge)
             or (name == attachment_search.NAME and req.attachments)
+            or (name == chat_search.NAME and req.chat_search)
             or (name == skill_files.NAME and req.skill_files)
             or (routed and name.startswith(("client.", "server.")))
         ):
@@ -4268,6 +4598,11 @@ class GatewayService:
                 if req.token_mapping:
                     arguments = _restored(arguments, req.token_mapping)
                 content, is_error = attachment_search.AttachmentSearch(req.attachments).run(arguments)
+            elif name == chat_search.NAME:
+                # The chat's own messages left out of its context, as the attachments are searched.
+                if req.token_mapping:
+                    arguments = _restored(arguments, req.token_mapping)
+                content, is_error = await self._search_chat(req, arguments)
             elif name == skill_files.NAME:
                 # A file of a skill resolved for this request, and no other.
                 assert self.skills_client is not None  # noqa: S101
@@ -4607,6 +4942,7 @@ class GatewayService:
                 rag_context=req.rag_context,
                 mcp_tool_call_count=len(req.tool_calls),
                 mcp_tool_loop_iterations=req.tool_iterations,
+                pii_pictures_unchecked=req.pii_pictures_unchecked or None,
                 tool_calls=req.tool_calls,
                 **_agent_log_fields(req),
             )

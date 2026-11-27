@@ -12,6 +12,7 @@ Streaming chat completions are forwarded as SSE passthrough using
 from __future__ import annotations
 
 import logging
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile
@@ -272,6 +273,18 @@ async def list_messages(
         return await _proxy_error(exc)
 
 
+@router.get("/sessions/{session_id}/summary")
+async def get_session_summary(session_id: uuid.UUID, request: Request) -> JSONResponse:
+    """The chat's summary of its earlier messages, written by a model (0.7.2 K); ``{"data": null}`` without one."""
+    jwt = _jwt_from_cookie(request)
+    client = _client()
+    try:
+        data = await client.get_session_summary(str(session_id), jwt)
+        return JSONResponse(content=data)
+    except Exception as exc:
+        return await _proxy_error(exc)
+
+
 # ── Turns ─────────────────────────────────────────────────────────
 
 
@@ -389,6 +402,60 @@ async def delete_attachment(attachment_id: str, request: Request) -> None:
         await client.delete_attachment(attachment_id, jwt)
     except Exception as exc:
         raise HTTPException(status_code=502, detail="Gateway error") from exc
+
+
+@router.post(
+    "/projects/{project_id}/attachments",
+    status_code=http_status.HTTP_201_CREATED,
+)
+async def upload_project_attachment(
+    project_id: str,
+    request: Request,
+    file: UploadFile | None = None,
+) -> JSONResponse:
+    """A file for the project's Files: it goes with every chat of the project (0.7.2 J)."""
+    jwt = _jwt_from_cookie(request)
+    if not file:
+        raise HTTPException(status_code=400, detail="No file provided")
+    file_bytes = await file.read()
+    client = _client()
+    try:
+        data = await client.upload_project_attachment(
+            project_id,
+            file_bytes,
+            file.filename or "file",
+            file.content_type or "application/octet-stream",
+            jwt,
+        )
+        return JSONResponse(status_code=201, content=data)
+    except Exception as exc:
+        return await _proxy_error(exc)
+
+
+@router.get("/projects/{project_id}/attachments")
+async def list_project_attachments(project_id: str, request: Request) -> JSONResponse:
+    """The project's Files."""
+    jwt = _jwt_from_cookie(request)
+    client = _client()
+    try:
+        data = await client.list_project_attachments(project_id, jwt)
+        return JSONResponse(content=data)
+    except Exception as exc:
+        return await _proxy_error(exc)
+
+
+@router.delete(
+    "/projects/{project_id}/attachments/{attachment_id}", status_code=http_status.HTTP_204_NO_CONTENT,
+)
+async def delete_project_attachment(project_id: str, attachment_id: str, request: Request) -> Response:
+    """Removes a file from the project's Files: the gateway erases it at once. A 404 stays a 404 (gone)."""
+    jwt = _jwt_from_cookie(request)
+    client = _client()
+    try:
+        await client.delete_project_attachment(project_id, attachment_id, jwt)
+    except Exception as exc:
+        return await _proxy_error(exc)
+    return Response(status_code=http_status.HTTP_204_NO_CONTENT)
 
 
 # ── Tool Availability & Policy ────────────────────────────────────

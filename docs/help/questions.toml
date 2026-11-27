@@ -263,6 +263,8 @@
 "What hardware does the server need?" = "the-server"
 "Which GPU machines are supported?" = "gpu-machines"
 "What needs internet access?" = "what-needs-the-internet"
+"Why is the PII check slow on my virtual machine?" = "the-cpu-and-the-pii-check"
+"Does the PII check need AVX2?" = "the-cpu-and-the-pii-check"
 
 ["operate/installing.md"]
 "How do I enable extended PII fields?" = "extended-pii-fields"

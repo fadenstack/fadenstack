@@ -145,6 +145,7 @@ class GatewaySyncService:
         vision: bool | None = None,
         machine_tls: bool = False,
         text_marking: dict[str, Any] | None = None,
+        context_length: int | None = None,
     ) -> None:
         """Create or update gateway routing records for a runtime.
 
@@ -177,6 +178,9 @@ class GatewaySyncService:
             node_metadata = {**(node_metadata or {}), "tools": tools}
         if vision is not None:
             node_metadata = {**(node_metadata or {}), "vision": vision}
+        if context_length:
+            # The model's context length in tokens: the gateway sizes a chat's context to it (0.7.2 K).
+            node_metadata = {**(node_metadata or {}), "context_length": context_length}
         if text_marking:
             # What an administrator set about marking its chat answers (the provider's ``text_marking``).
             node_metadata = {**(node_metadata or {}), "text_marking": text_marking}
@@ -449,6 +453,7 @@ class GatewaySyncService:
         machine_tls: bool = False,
         watermark: dict[str, Any] | None = None,
         text_marking: dict[str, Any] | None = None,
+        context_length: int | None = None,
     ) -> uuid.UUID | None:
         """Create or update gateway routing records for an inference deployment.
 
@@ -533,11 +538,13 @@ class GatewaySyncService:
                                 k: v for k, v in (
                                     ("task", task), ("tools", tools), ("vision", vision),
                                     ("watermark", watermark), ("text_marking", text_marking or None),
+                                    ("context_length", context_length or None),
                                 )
                                 if v is not None
                             },
                         ) if (
                             task or tools is not None or vision is not None or watermark or text_marking
+                            or context_length
                         ) else None,
                         "dep_id": deployment_id,
                         "machine_tls": machine_tls,

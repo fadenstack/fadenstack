@@ -30,6 +30,8 @@ class SanitizeResult:
     token_mapping: dict[str, str] | None = None
     #: What was found, by entity type -- counts only, never the values.
     entity_types: dict[str, int] = field(default_factory=dict)
+    #: Pictures the check passed on unchecked: it reads text only (0.7.2 G).
+    pictures_unchecked: int = 0
 
 
 def _entity_types(report: Any) -> dict[str, int]:
@@ -68,6 +70,23 @@ class PIIInputTooLargeError(RuntimeError):
         self.code = code
 
 
+#: How long the gateway waits for the PII check at most: the PII service starts a request with its base
+#: time and adds time for each window of the text, up to this (its own cap, pii_work_timeout_cap_seconds,
+#: is the same 30 s).
+PII_BUDGET_MS = 30_000
+
+#: The PII service's answer when it could not finish the check within the request's time limit (504).
+DEADLINE_REFUSALS = frozenset({"pii_deadline_exceeded"})
+
+
+class PIIDeadlineExceededError(RuntimeError):
+    """The PII service ran out of time for the request: it checked nothing."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
+
+
 def _refusal(resp: httpx.Response, status: int, codes: frozenset[str]) -> str | None:
     """The PII service's refusal code when *resp* has *status* and one of *codes*; ``None`` otherwise."""
     if resp.status_code != status:
@@ -86,13 +105,16 @@ def _policy_refusal(resp: httpx.Response) -> str | None:
 
 
 def _raise_refusal(resp: httpx.Response) -> None:
-    """Raise what the PII service refused, when it refused the policy or the request's size."""
+    """Raise what the PII service refused: the policy, the request's size, or its time limit."""
     refused = _policy_refusal(resp)
     if refused:
         raise PIIPolicyMismatchError(refused)
     too_large = _refusal(resp, 413, SIZE_REFUSALS)
     if too_large:
         raise PIIInputTooLargeError(too_large)
+    out_of_time = _refusal(resp, 504, DEADLINE_REFUSALS)
+    if out_of_time:
+        raise PIIDeadlineExceededError(out_of_time)
 
 
 class PIIClient:
@@ -116,7 +138,7 @@ class PIIClient:
         token_mapping: dict[str, str] | None = None,
         request_id: str | None = None,
         cache_scope: str = "",
-        budget_ms: int = 8_000,
+        budget_ms: int = PII_BUDGET_MS,
     ) -> SanitizeResult:
         """Call ``POST /api/v1/pii/sanitize`` on the PII service.
 
@@ -154,16 +176,16 @@ class PIIClient:
             body["token_mapping"] = token_mapping
 
         try:
-            headers = {**self._headers, "x-pii-budget-ms": str(min(max(budget_ms, 1), 8_000))}
+            headers = {**self._headers, "x-pii-budget-ms": str(min(max(budget_ms, 1), PII_BUDGET_MS))}
             if request_id:
                 headers["x-request-id"] = request_id
             if cache_scope:
                 headers["x-pii-scope"] = cache_scope[:128]
-            async with asyncio.timeout(10):
+            async with asyncio.timeout(PII_BUDGET_MS / 1000 + 2):
                 resp = await self._http.post(
                     f"{self._base}/api/v1/pii/sanitize",
                     json=body,
-                    timeout=10.0,
+                    timeout=PII_BUDGET_MS / 1000 + 2,
                     headers=headers,
                 )
             _raise_refusal(resp)
@@ -177,18 +199,23 @@ class PIIClient:
                 raise ValueError("PII contract lacks tool argument coverage")
             _validate_shape(payload, data["sanitized_payload"])
             _validate_tool_arguments(payload, data["sanitized_payload"])
+            pictures = _pictures_unchanged(payload, data["sanitized_payload"])
             return SanitizeResult(
                 sanitized_payload=data["sanitized_payload"],
                 entities_found=data["entities_found"],
                 pii_detected=data["entities_found"] > 0,
                 token_mapping=data.get("token_mapping"),
                 entity_types=_entity_types(data.get("pii_report")),
+                pictures_unchecked=pictures,
             )
         except PIIPolicyMismatchError as exc:
             logger.warning("The PII service refused the policy (%s): it does not fit the detector", exc.code)
             raise
         except PIIInputTooLargeError as exc:
             logger.warning("The PII service refused the request as too large to check (%s)", exc.code)
+            raise
+        except PIIDeadlineExceededError as exc:
+            logger.warning("The PII service ran out of time for the request (%s)", exc.code)
             raise
         except Exception:
             # HTTP/validation exceptions can contain response bodies. Never log PII.
@@ -212,6 +239,32 @@ def _validate_shape(original: Any, sanitized: Any, depth: int = 0) -> None:
             _validate_shape(before, after, depth + 1)
     elif not isinstance(original, str) and original != sanitized:
         raise ValueError("Invalid PII response value")
+
+
+def _is_picture(part: Any) -> bool:
+    """A chat message's picture part, as the PII service passes it on unchecked."""
+    image = part.get("image_url") if isinstance(part, dict) and part.get("type") == "image_url" else None
+    return isinstance(image, dict) and isinstance(image.get("url"), str)
+
+
+def _pictures_unchanged(original: dict, sanitized: dict) -> int:
+    """How many pictures *original* carries; each must come back exactly as it went.
+
+    The check reads text only and passes a picture on as it came (0.7.2 G). The shape check lets a
+    string change -- a text is masked -- so a picture is compared whole: a response that altered one
+    is refused like any other broken response.
+    """
+    count = 0
+    for before, after in zip(original.get("messages", []), sanitized.get("messages", []), strict=True):
+        parts = before.get("content") if isinstance(before, dict) else None
+        if not isinstance(parts, list):
+            continue
+        for part, back in zip(parts, after["content"], strict=True):
+            if _is_picture(part):
+                if back != part:
+                    raise ValueError("Invalid PII response: a picture changed")
+                count += 1
+    return count
 
 
 def _validate_tool_arguments(original: dict, sanitized: dict) -> None:

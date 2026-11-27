@@ -94,6 +94,11 @@ Do not filter ports between the machines on that network. Keep the network itsel
 direct cable, a switch of their own or a VLAN. GPU-to-GPU traffic cannot be encrypted, and Ray's own traffic is
 only encrypted once the cluster's **Traffic between machines** switch is on.
 
+Ray listens on all of a machine's addresses, not only on the cluster's network, and answers only callers that have
+the cluster's token. Still, on every other network a machine is on (the office network, a VPN such as Tailscale),
+block Ray's ports with the machine's own firewall: let only the server through there, to the ports the table above
+lists for it (the serving port, a routed vLLM's port, Ray's metrics ports), and ssh for whoever manages the machine.
+
 A machine added to a running cluster is checked first: it must reach the head on the cluster's network (see
 [Clusters](clusters.md#add-machines-to-a-running-cluster)).
 

@@ -54,7 +54,7 @@ with the same key.
 
 | In the provider's row | What it does |
 |---|---|
-| **Edit** | Changes the **Name**, the **Endpoint URL**, the **API Key** and the **Model**, and the switches **Offer the gateway's tools** and **Send the chat's pictures to this model**. |
+| **Edit** | Changes the **Name**, the **Endpoint URL**, the **API Key**, the **Model** and the **Context length (tokens)**, and the switches **Offer the gateway's tools** and **Send the chat's pictures to this model**. |
 | **Stop** | Stops sending requests to it without removing it; **Start** sends them again. |
 | **Delete** | Removes a stopped provider. It cannot be undone. |
 
@@ -66,6 +66,13 @@ with the same key.
     **Send the chat's pictures to this model** works the same way for pictures attached in the chat. Switch
     it off for a model that cannot read pictures: the chat then leaves them out and says so under the reply,
     instead of the reply failing.
+
+??? info "More about Context length"
+    **Context length (tokens)** sets how much of a chat goes to the model: the chat fits the older messages into
+    it. Left empty, it is what the model's server reports. Fill it in for a model at an outside provider, whose
+    server says nothing.
+
+    ![Edit Provider: Name, Endpoint URL, API Key, Model, the two switches and, last, Context length (tokens)](../images/administer/provider-edit.png)
 
 ![The price dialog of a provider's model: Input price and Output price in USD per 1M tokens, with Save](../images/administer/provider-set-price.png)
 

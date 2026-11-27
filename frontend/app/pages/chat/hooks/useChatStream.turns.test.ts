@@ -5,7 +5,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { StreamHandle } from "~/api/chatClient";
+import { ChatApiError, type StreamHandle } from "~/api/chatClient";
 import type { ChatMessage, StreamDelta } from "~/api/chatTypes";
 
 const api = vi.hoisted(() => ({
@@ -16,19 +16,21 @@ const api = vi.hoisted(() => ({
   streamChat: vi.fn(),
   retryTurn: vi.fn(),
   resumeStream: vi.fn(),
+  uploadAttachment: vi.fn(),
 }));
 
 vi.mock("~/api/chatClient", () => ({
   ChatApiError: class ChatApiError extends Error {},
   chatApi: {
     listMessages: api.listMessages, streamStatus: api.streamStatus, getSession: api.getSession, stopTurn: api.stopTurn,
+    uploadAttachment: api.uploadAttachment,
   },
   streamChat: api.streamChat,
   retryTurn: api.retryTurn,
   resumeStream: api.resumeStream,
 }));
 
-import { useChatStream } from "./useChatStream";
+import { errorDetail, readFadenEvent, useChatStream } from "./useChatStream";
 
 const SID = "s1";
 
@@ -241,5 +243,108 @@ describe("useChatStream", () => {
 
     await waitFor(() => expect(result.current.isStreaming).toBe(false));
     expect(result.current.messages.map((m) => [m.id, m.content])).toEqual([["u1", "hi"], ["turn-1", "Hello"]]);
+  });
+});
+
+/** A Faden event of the gateway's stream. */
+function faden(name: string, value: Record<string, unknown>): StreamDelta {
+  return { faden: { type: "CUSTOM", name, value } } as StreamDelta;
+}
+
+describe("a file that could not be read", () => {
+  it("is named, in the reader's words", async () => {
+    api.streamChat.mockReturnValue(stream([
+      { turn_id: "turn-1" },
+      faden("faden.attachment_left_out", {
+        attachmentId: "a1", filename: "scan.pdf", reason: "unreadable", message: "(the gateway's words)",
+      }),
+      { content: "Done." },
+    ]));
+    const { result } = renderHook(() => useChatStream({ sessionId: SID, selectedModel: "m" }));
+
+    await act(() => result.current.send("Read it", "m"));
+
+    expect(result.current.getReplyNotes("turn-1")).toEqual(["scan.pdf was not sent: its text could not be read."]);
+  });
+});
+
+describe("pictures the PII check passed on unchecked", () => {
+  const unchecked = (count: number) => faden("faden.pii_pictures_unchecked", { count, message: "(the gateway's words)" });
+  const turn = (id: string, count: number) =>
+    stream([{ turn_id: id }, unchecked(count), { content: "Seen." }]);
+  const picture = (name: string) => new File(["x"], name, { type: "image/png" });
+
+  it("names the file when one picture went and the message carried exactly that one", async () => {
+    api.uploadAttachment.mockResolvedValue({});
+    api.streamChat.mockReturnValue(turn("turn-1", 1));
+    const { result } = renderHook(() => useChatStream({ sessionId: SID, selectedModel: "m" }));
+
+    await act(() => result.current.send("Look", "m", [picture("cat.png")]));
+
+    expect(result.current.getReplyNotes("turn-1")).toEqual([
+      "Pictures are not checked for personal data, so cat.png went to the model as it is.",
+    ]);
+  });
+
+  it("counts them when several went, and names none when the page knows no name", async () => {
+    api.uploadAttachment.mockResolvedValue({});
+    api.streamChat.mockReturnValueOnce(turn("turn-1", 2)).mockReturnValueOnce(turn("turn-2", 1));
+    const first = renderHook(() => useChatStream({ sessionId: SID, selectedModel: "m" }));
+    await act(() => first.result.current.send("Look", "m", [picture("a.png"), picture("b.png")]));
+    expect(first.result.current.getReplyNotes("turn-1")).toEqual([
+      "Pictures are not checked for personal data, so 2 pictures went to the model as they are.",
+    ]);
+
+    // A project's picture: the page has no name for it.
+    const second = renderHook(() => useChatStream({ sessionId: "s2", selectedModel: "m" }));
+    await act(() => second.result.current.send("Look", "m"));
+    expect(second.result.current.getReplyNotes("turn-2")).toEqual([
+      "Pictures are not checked for personal data, so the picture went to the model as it is.",
+    ]);
+  });
+
+  it("says it once per chat, though the picture goes with every turn", async () => {
+    api.streamChat.mockReturnValueOnce(turn("turn-1", 1)).mockReturnValueOnce(turn("turn-2", 1));
+    const { result } = renderHook(() => useChatStream({ sessionId: SID, selectedModel: "m" }));
+
+    await act(() => result.current.send("one", "m"));
+    await act(() => result.current.send("two", "m"));
+
+    expect(result.current.getReplyNotes("turn-1")).toHaveLength(1);
+    expect(result.current.getReplyNotes("turn-2")).toEqual([]);
+  });
+
+  it("reads the event's count", () => {
+    expect(readFadenEvent({ type: "CUSTOM", name: "faden.pii_pictures_unchecked", value: { count: 3 } } as never)).toEqual({
+      kind: "pictures_unchecked", count: 3,
+    });
+  });
+});
+
+describe("a request the organisation refused for its pictures", () => {
+  it("keeps the code and the project's picture names for the chat to word", () => {
+    const err = Object.assign(new ChatApiError("(the gateway's words)"), {
+      code: "pii_pictures_refused", projectPictures: ["plan.png", "b.png"],
+    });
+
+    expect(errorDetail(err, "hi")).toMatchObject({ kind: "pictures_refused", files: ["plan.png", "b.png"], text: "hi" });
+  });
+});
+
+describe("the approval event", () => {
+  it("carries the tool's arguments and whether they were cut", () => {
+    const read = readFadenEvent({
+      type: "CUSTOM",
+      name: "faden.approval_required",
+      value: {
+        approvalId: "a1", toolCallName: "t", message: "m", timeoutS: 5,
+        arguments: "{\"a\":1}", argumentsTruncated: true, argumentsSha256: "abc",
+      },
+    } as never);
+
+    expect(read).toMatchObject({
+      kind: "approval",
+      approval: { arguments: "{\"a\":1}", argumentsTruncated: true, argumentsSha256: "abc" },
+    });
   });
 });

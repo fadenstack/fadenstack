@@ -164,6 +164,97 @@ class GatewayDAO:
 
         return {alias: vision(values) for alias, values in said.items()}
 
+    async def alias_context_length(self, alias: str) -> int | None:
+        """The context length of the model behind *alias*, in tokens; None when no instance says (0.7.2 K)."""
+        return (await self.alias_context_lengths([alias])).get(alias)
+
+    async def alias_context_lengths(self, aliases: list[str]) -> dict[str, int | None]:
+        """Each alias's context length: the smallest any of its enabled instances says.
+
+        A deployed model says it in ``node_metadata["context_length"]`` (the backend publishes vLLM's
+        ``max_model_len``); a provider of another kind in ``capabilities["context_length"]``, as an
+        administrator configured it. A request may go to any of the instances, so the smallest counts;
+        an instance that says nothing does not lower it. None when none says.
+        """
+        if not aliases:
+            return {}
+        rows = await self.session.execute(
+            select(
+                LLMPoolMembership.model_alias,
+                LLMProviderInstance.node_metadata,
+                LLMProviderInstance.capabilities,
+            )
+            .join(LLMPoolMembership, LLMProviderInstance.id == LLMPoolMembership.provider_instance_id)
+            .where(
+                LLMPoolMembership.model_alias.in_(aliases),
+                LLMPoolMembership.enabled.is_(True),
+                LLMProviderInstance.enabled.is_(True),
+            ),
+        )
+
+        def said_by(metadata: object, caps: object) -> int | None:
+            for source in (metadata, caps):
+                value = source.get("context_length") if isinstance(source, dict) else None
+                if type(value) is int and value > 0:
+                    return value
+            return None
+
+        found: dict[str, int | None] = dict.fromkeys(aliases)
+        for alias, metadata, caps in rows.all():
+            value = said_by(metadata, caps)
+            if value is not None:
+                kept = found.get(alias)
+                found[alias] = value if kept is None else min(kept, value)
+        return found
+
+    async def alias_reasoning_levels(self, aliases: list[str]) -> dict[str, list[str] | None]:
+        """The thinking levels each alias's model tells apart (``off``, ``low``, ``medium``, ``high``; 0.7.2 I.2).
+
+        An instance says it in ``node_metadata`` or ``capabilities`` (``reasoning_levels``, a list); a Qwen3 model
+        on vLLM honours only its template's switch, so for it only ``off`` changes anything (on .22 Low, Medium and
+        High thought as long as Auto). The levels every instance tells apart count, since a request may go to any;
+        None when one of them is not known: the chat then offers all of them.
+        """
+        if not aliases:
+            return {}
+        rows = await self.session.execute(
+            select(
+                LLMPoolMembership.model_alias,
+                LLMProviderInstance.type,
+                LLMProviderInstance.litellm_model,
+                LLMProviderInstance.node_metadata,
+                LLMProviderInstance.capabilities,
+            )
+            .join(LLMPoolMembership, LLMProviderInstance.id == LLMPoolMembership.provider_instance_id)
+            .where(
+                LLMPoolMembership.model_alias.in_(aliases),
+                LLMPoolMembership.enabled.is_(True),
+                LLMProviderInstance.enabled.is_(True),
+            ),
+        )
+        known = ("off", "low", "medium", "high")
+
+        def said_by(kind: object, model: object, metadata: object, caps: object) -> list[str] | None:
+            for source in (metadata, caps):
+                value = source.get("reasoning_levels") if isinstance(source, dict) else None
+                if isinstance(value, list):
+                    return [level for level in known if level in value]
+            if kind == ProviderType.VLLM and "qwen3" in str(model or "").lower():
+                return ["off"]
+            return None
+
+        found: dict[str, list[str] | None] = {}
+        seen: set[str] = set()
+        for alias, kind, model, metadata, caps in rows.all():
+            levels = said_by(kind, model, metadata, caps)
+            if alias in seen:
+                kept = found.get(alias)
+                found[alias] = None if kept is None or levels is None else [lv for lv in kept if lv in levels]
+            else:
+                seen.add(alias)
+                found[alias] = levels
+        return {alias: found.get(alias) for alias in aliases}
+
     async def get_tenant_policy(self, tenant_id: str) -> TenantLLMPolicy | None:
         """Fetch tenant policy."""
         result = await self.session.execute(
@@ -306,6 +397,7 @@ class GatewayDAO:
         rag_context: dict | None = None,
         mcp_tool_call_count: int | None = None,
         mcp_tool_loop_iterations: int | None = None,
+        pii_pictures_unchecked: int | None = None,
         group_id: str | None = None,
         group_path: list[str] | None = None,
         project_id: str | None = None,
@@ -349,6 +441,7 @@ class GatewayDAO:
             rag_context=rag_context,
             mcp_tool_call_count=mcp_tool_call_count,
             mcp_tool_loop_iterations=mcp_tool_loop_iterations,
+            pii_pictures_unchecked=pii_pictures_unchecked,
             group_id=group_id,
             group_path=group_path,
             project_id=project_id,

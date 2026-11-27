@@ -56,6 +56,7 @@ class AuditService:
         rag_context: dict | None = None,
         mcp_tool_call_count: int | None = None,
         mcp_tool_loop_iterations: int | None = None,
+        pii_pictures_unchecked: int | None = None,
         group_id: str | None = None,
         group_path: tuple[str, ...] = (),
         project_id: str | None = None,
@@ -136,6 +137,7 @@ class AuditService:
             rag_context=rag_context,
             mcp_tool_call_count=mcp_tool_call_count,
             mcp_tool_loop_iterations=mcp_tool_loop_iterations,
+            pii_pictures_unchecked=pii_pictures_unchecked,
             group_id=group_id,
             # The team's path at the time of use; none without a team.
             group_path=list(group_path) if group_id and group_path else None,

@@ -770,6 +770,16 @@ def _requested_skills(value: Any) -> list[str]:
     return [v.strip() for v in value if isinstance(v, str) and v.strip()][:20]
 
 
+#: The thinking levels a retry may ask for (``reasoning_effort``, OpenAI's names; 0.7.2 I.2).
+_RETRY_EFFORTS = frozenset({"none", "minimal", "low", "medium", "high", "xhigh"})
+
+
+def _retry_reasoning(body: dict[str, Any]) -> dict[str, Any]:
+    """The thinking level a retry asks for, as the turn it replaces had it; nothing for any other value."""
+    effort = body.get("reasoning_effort")
+    return {"reasoning_effort": effort} if isinstance(effort, str) and effort in _RETRY_EFFORTS else {}
+
+
 @router.post("/v1/chat/completions", response_model=None)
 async def create_chat_completions(
     request: Request,
@@ -827,6 +837,9 @@ async def serve_chat_completions(
         # The chat page's replies run on their own: the page may leave and
         # come back. Not the model's field either.
         background = payload.pop("background", None) is True
+        # The share of the chat's context budget, 0.5 to 1: the chat page's one retry after the model said the
+        # context was too long (0.7.2 K). Not the model's field.
+        context_factor = payload.pop("context_factor", None)
         # Exempt work the request declares (text_marking.py): never the model's field either.
         purpose = await _declared_purpose(request, auth, payload.pop("faden", None))
 
@@ -842,6 +855,7 @@ async def serve_chat_completions(
                 tool_mode=tool_mode,
                 background=background,
                 purpose=purpose,
+                context_factor=context_factor if isinstance(context_factor, (int, float)) else 1.0,
             )
             return _streamed_response(streamed, request_id)
 
@@ -856,6 +870,7 @@ async def serve_chat_completions(
             faden_events=events,
             tool_mode=tool_mode,
             purpose=purpose,
+            context_factor=context_factor if isinstance(context_factor, (int, float)) else 1.0,
         )
         json_response = JSONResponse(
             status_code=non_stream.status_code,
@@ -994,11 +1009,16 @@ async def retry_turn(
                 "model": model,
                 "stream": True,
                 "messages": [{"role": "user", "content": question.content_parts_json or question.content}],
+                **_retry_reasoning(body),
             },
             request_id=request_id,
             session_id=str(session_id),
             skills=_requested_skills(body.get("skills")),
             background=True,
+            # Less of the chat, after the model said it was too long (``context_length_exceeded``): 0.5 to 1.
+            context_factor=(
+                body["context_factor"] if isinstance(body.get("context_factor"), (int, float)) else 1.0
+            ),
         )
         return _streamed_response(streamed, request_id)
     except GatewayError as exc:

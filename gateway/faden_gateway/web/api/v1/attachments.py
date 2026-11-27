@@ -208,6 +208,36 @@ async def list_project_attachments(
     return JSONResponse(status_code=200, content={"data": data})
 
 
+@router.delete(
+    "/projects/{project_id}/attachments/{attachment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_project_attachment(
+    project_id: uuid.UUID,
+    attachment_id: uuid.UUID,
+    request: Request,
+    auth: AuthContext = Depends(require_chat("chat.attachments:delete")),
+    dao: SessionDAO = Depends(),
+) -> JSONResponse:
+    """Remove a file from the project's Files: erased at once, file and record, as a chat's file is.
+
+    Only the caller's own project, and only a file of that project (not one of a chat): anything else is not
+    found, so another person's project or file is not told apart from none.
+    """
+    await _own_project(dao, project_id, auth)
+    att = await dao.get_attachment(
+        attachment_id=attachment_id, tenant_id=auth.tenant_id, user_id=auth.user_id,
+    )
+    if att is None or att.project_id != project_id or att.session_id is not None:
+        return JSONResponse(
+            status_code=404,
+            content={"error": {"message": "Attachment not found", "code": "not_found"}},
+        )
+    svc = _build_service(request, dao)
+    await svc.delete_attachment(attachment_id=attachment_id, tenant_id=auth.tenant_id, user_id=auth.user_id)
+    return JSONResponse(status_code=204, content=None)
+
+
 # ── Stats ─────────────────────────────────────────────────────────
 
 

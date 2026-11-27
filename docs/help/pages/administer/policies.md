@@ -129,8 +129,13 @@ the service refuses unsupported coverage instead of silently ignoring that categ
     of GDPR compliance. Test your organisation's content and field formats.
 
     Numeric or container values under a protected sensitive tool-argument key may be refused because replacing them
-    would change the tool's data type. Non-sensitive values keep their types. Images and audio are not text checks;
-    unsupported protected content follows **If detection fails**.
+    would change the tool's data type. Non-sensitive values keep their types. Pictures are not checked: a picture goes to the model as it is, whatever **If detection fails** says, and
+    the chat tells the person. To refuse messages with pictures while the check is on, switch on **Refuse pictures**
+    (under **Settings → Modules → PII / Privacy → Module settings**, beside **If detection fails**): the person is
+    then told why, and nothing is sent. To keep pictures from just one model at an outside provider, switch off
+    **Send the chat's pictures to this model** on its provider (see [Remote providers](providers.md)): the web chat
+    then leaves them out and says so. Audio and other content that is not text still follows **If detection
+    fails**.
 
 ??? info "More about the fields (the same in both places)"
     The fields are the same in both places:
@@ -409,8 +414,11 @@ Apps that cannot do the second sign-in (older SDK versions) are not offered Bypa
 | A tool rule denied a tool | The tool line says **Not run**. The model is told, with the rule's message, and carries on without it. |
 | A tool needs approval | "… wants to run", with **Approve** and **Decline**. Without an answer within five minutes, the call is not run (**Expired**). |
 | The personal data filter could not run, and the policy blocks | The reply fails with "PII service unavailable and fail_action=block." Nothing was sent to the model. |
+| The filter ran out of time for a long text, and the policy blocks | The reply fails with "The PII check took longer than its limit for this request (pii_deadline_exceeded) …". Nothing was sent. See [Local PII on CPU or GPU](../operate/installing.md#local-pii-on-cpu-or-gpu). |
+| The request is larger than the filter takes at once, and the policy blocks | The reply fails with "The request is too large for the PII check (pii_input_too_large) …". Nothing was sent. A shorter conversation, fewer tools or smaller tool results fit. |
 | The policy does not fit the installed detector (a threshold for the older profile, or a category it does not find), and the policy blocks | The reply fails with "The PII policy does not fit the installed PII detector (…), so nothing was sent." Adopt the installed profile in the policy (see [above](#adopt-an-installed-detector-profile)). |
 | A policy you saved applies, but the PII module is not running, and the policy blocks | The reply fails with "A PII policy is set for this workspace, but the PII module is not running, so nothing was sent." |
+| Pictures are refused under the policy, and a message has one | The reply fails with "Pictures are not checked for personal data, and your organisation does not send them unchecked …". Nothing was sent. |
 | A prompt was refused (content policies, <span class="fs-planned">Planned</span>) | The message is marked **Not sent**, with the policy's message or "This was stopped by your organisation's policy." Nothing is sent to a model or stored. |
 | An answer was refused (content policies, <span class="fs-planned">Planned</span>) | The answer stops and is marked **Answer withheld**. |
 

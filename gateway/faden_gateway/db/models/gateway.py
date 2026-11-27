@@ -451,6 +451,9 @@ class LLMGatewayRequestLog(Base):
     mcp_tool_loop_iterations: Mapped[int | None] = mapped_column(
         Integer, nullable=True, server_default="0",
     )
+    #: Pictures the PII scan passed on unchecked (it reads text only; 0.7.2 G): their count, never what they
+    #: show. NULL when the scan did not run or the request carried none.
+    pii_pictures_unchecked: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -767,6 +770,10 @@ class SessionSummary(Base):
         PGUUID(as_uuid=True), nullable=False,
     )
     token_estimate: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    #: The model that wrote it (the chat's own), and the provenance engine's record of it (edit kind
+    #: ``summarised``): it is shown as AI-written (0.7.2 K).
+    model_alias: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    record_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(),
     )

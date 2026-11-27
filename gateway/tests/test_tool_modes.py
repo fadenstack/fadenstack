@@ -220,11 +220,23 @@ def test_web_search_stays_open_world_whoever_sets_its_class_and_the_skill_tools_
 
 def test_run_skill_script_has_no_class_of_its_own_and_the_profile_never_allows_it() -> None:
     assert tc.Classifier().classify("run_skill_script").tool_class is C.UNKNOWN
-    assert tc.SDK_TOOL_NAMES == {"find_tool", "load_skill", "read_skill_resource", "run_skill_script", "web_search"}
+    assert {
+        "find_tool", "load_skill", "read_result", "read_skill_resource", "run_skill_script", "web_search",
+    } == tc.SDK_TOOL_NAMES
     assert tc.sdk_tools_allowed(local_mcp=True, local_skills=True) == {
-        "find_tool", "load_skill", "read_skill_resource", "web_search",
+        "find_tool", "load_skill", "read_result", "read_skill_resource", "web_search",
     }
-    assert tc.sdk_tools_allowed(local_mcp=False, local_skills=False) == {"find_tool"}
+    assert tc.sdk_tools_allowed(local_mcp=False, local_skills=False) == {"find_tool", "read_result"}
+
+
+def test_read_result_is_the_sdks_read_tool_inside_the_device() -> None:
+    """SDK 0.3.1-rc.4 reads back an earlier result of its own conversation: read, not open-world, always allowed."""
+    found = tc.Classifier().classify("read_result")
+    assert (found.tool_class, found.open_world, found.source) == (C.READ, False, "sdk")
+    assert "read_result" in tc.sdk_tools_allowed(local_mcp=False, local_skills=False)
+    # An admin's rule still decides, as for the SDKs' other tools.
+    ruled = tc.Classifier(rules=(tc.ClassRule(pattern="read_*", tool_class="write"),)).classify("read_result")
+    assert ruled.tool_class is C.WRITE
 
 
 @pytest.mark.anyio

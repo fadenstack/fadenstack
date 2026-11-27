@@ -31,6 +31,7 @@ import ModulesTab from "~/components/ModulesTab";
 import { hasFeature } from "~/api/about";
 import { MAIL_SETTINGS } from "~/api/mailSettings";
 import MailSettingsTab from "~/pages/admin/mail/MailSettingsTab";
+import SummaryModelsField, { SUMMARY_MODELS_KEY } from "~/pages/admin/SummaryModelsField";
 import UsagePrivacySettings from "~/components/usage/UsagePrivacySettings";
 import {
   systemSettingsApi,
@@ -324,7 +325,15 @@ export default function SettingsPage() {
                 spacing={1}
                 alignItems={{ xs: "stretch", md: "center" }}
               >
-                {item.type === "bool" ? (
+                {item.key === SUMMARY_MODELS_KEY ? (
+                  // One switch per chat model instead of a raw JSON list.
+                  <SummaryModelsField
+                    label={item.label}
+                    description={describe(item, t("settings.protected_help"), t("settings.protected_narrowing_help"))}
+                    value={values[item.key]}
+                    onChange={(names) => setValues((prev) => ({ ...prev, [item.key]: names }))}
+                  />
+                ) : item.type === "bool" ? (
                   <FormControlLabel
                     control={
                       <Switch

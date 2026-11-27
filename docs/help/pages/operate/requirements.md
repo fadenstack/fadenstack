@@ -9,6 +9,7 @@ runs and the people using them; a GPU machine is sized by the models it runs.
 |---|---|---|
 | Operating system | Linux, x86_64 | |
 | CPU cores | 4 | 8 |
+| CPU instructions | | AVX2, for the PII check on the CPU ([below](#the-cpu-and-the-pii-check)) |
 | Memory, core services | 8 GB | 12 GB |
 | Memory, with the multilingual PII, MCP and skills modules | 12 GB | 16 GB |
 | Disk, with the runtime images for both kinds of machine (the default) | 150 GB | 250 GB, plus the size of the models you intend to host |
@@ -48,6 +49,18 @@ To size the services again after changing the hardware, run `faden tune` and the
 PII can use a compatible local NVIDIA GPU, or run on CPU without one. CPU handling is slower for concurrent
 requests and long documents. `faden doctor` reports compatibility and CPU availability. See
 [Local PII on CPU or GPU](installing.md#local-pii-on-cpu-or-gpu) for selection and fallback behavior.
+
+### The CPU and the PII check
+
+On a server without a GPU, the PII check runs on the CPU and needs its AVX2 instructions to be fast: without them
+it runs about three times slower, and a long text runs out of its time sooner (see
+[Local PII on CPU or GPU](installing.md#local-pii-on-cpu-or-gpu)). Most x86_64 processors of the last ten years
+have AVX2; on the server, `grep -c avx2 /proc/cpuinfo` shows a number above 0 when they are there.
+
+A virtual machine often hides them: a generic CPU type, such as QEMU's default (`qemu64`, shown as "QEMU Virtual
+CPU") or Proxmox's `kvm64` and `x86-64-v2-AES`, has no AVX2. Give the server's virtual machine the host's CPU type
+and restart it: on Proxmox the CPU type `host`, or `x86-64-v3` where virtual machines move between hosts with
+different processors; on other hypervisors, the setting that passes the host's processor features through.
 
 ??? info "More about sizing the services"
     `faden deploy` and `faden upgrade` size the services for the host they run on: how many worker processes each

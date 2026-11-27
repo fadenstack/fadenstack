@@ -749,3 +749,32 @@ async def test_a_remote_model_can_be_marked_as_taking_no_pictures(
     assert resp.json()["sees_pictures"] is None
     assert published[-1]["vision"] is None
     assert resp.json()["calls_tools"] is None, "the tools setting untouched"
+
+
+async def test_a_remote_models_context_length_can_be_given_and_reaches_its_route(
+    client, fastapi_app, dbsession, superuser, llm_service, monkeypatch,
+) -> None:
+    """0.7.2 K: the gateway sizes a chat's context to the model's window; for an outside provider, as given."""
+    published: list[dict] = []
+
+    async def publish(**kwargs):
+        published.append(kwargs)
+
+    monkeypatch.setattr(llm_service.gateway_sync, "publish_runtime", publish)
+    provider, _runtime = await _litellm_remote(
+        dbsession, litellm_model="deepseek/deepseek-v4.1-flash", remote_model="deepseek/deepseek-v4.1-flash",
+    )
+    fastapi_app.dependency_overrides[current_active_user] = lambda: superuser
+
+    resp = await client.patch(f"/api/llm/providers/{provider.id}", json={"context_length": 131072})
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json()["context_length"] == 131072
+    assert resp.json()["remote_model"] == "deepseek/deepseek-v4.1-flash", "the rest of its capabilities kept"
+    assert [p["context_length"] for p in published] == [131072]
+
+    too_small = await client.patch(f"/api/llm/providers/{provider.id}", json={"context_length": 12})
+    assert too_small.status_code == 422
+
+    resp = await client.patch(f"/api/llm/providers/{provider.id}", json={"context_length": None})
+    assert resp.json()["context_length"] is None
+    assert published[-1]["context_length"] is None

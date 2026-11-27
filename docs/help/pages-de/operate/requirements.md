@@ -10,6 +10,7 @@ Modellen, die sie ausführt.
 |---|---|---|
 | Betriebssystem | Linux, x86_64 | |
 | CPU-Kerne | 4 | 8 |
+| CPU-Befehle | | AVX2, für die PII-Prüfung auf der CPU ([siehe unten](#the-cpu-and-the-pii-check)) |
 | Arbeitsspeicher, Kerndienste | 8 GB | 12 GB |
 | Arbeitsspeicher, mit mehrsprachigem PII, MCP und Skills | 12 GB | 16 GB |
 | Speicherplatz, mit den Runtime-Images für beide Maschinenarten (Standard) | 150 GB | 250 GB, zuzüglich der Größe der Modelle, die Sie bereitstellen wollen |
@@ -51,6 +52,20 @@ Um die Dienste nach einer Änderung der Hardware neu zu bemessen, führen Sie `f
 PII kann eine kompatible lokale NVIDIA-GPU oder ohne GPU die CPU verwenden. Die CPU-Verarbeitung ist bei
 gleichzeitigen Anfragen und langen Dokumenten langsamer. `faden doctor` zeigt Kompatibilität und CPU-Kapazität.
 Siehe [Lokale PII-Verarbeitung auf CPU oder GPU](installing.md#local-pii-on-cpu-or-gpu).
+
+### Die CPU und die PII-Prüfung {#the-cpu-and-the-pii-check}
+
+Auf einem Server ohne GPU läuft die PII-Prüfung auf der CPU und braucht deren AVX2-Befehle, um schnell zu sein:
+Ohne sie läuft sie etwa dreimal langsamer, und ein langer Text überschreitet seine Zeit eher (siehe
+[Lokale PII-Verarbeitung auf CPU oder GPU](installing.md#local-pii-on-cpu-or-gpu)). Die meisten x86_64-Prozessoren
+der letzten zehn Jahre haben AVX2; auf dem Server zeigt `grep -c avx2 /proc/cpuinfo` eine Zahl über 0, wenn es
+vorhanden ist.
+
+Eine virtuelle Maschine verbirgt es oft: Ein allgemeiner CPU-Typ wie die Voreinstellung von QEMU (`qemu64`,
+angezeigt als „QEMU Virtual CPU“) oder bei Proxmox `kvm64` und `x86-64-v2-AES` hat kein AVX2. Geben Sie der
+virtuellen Maschine des Servers den CPU-Typ des Hosts und starten Sie sie neu: bei Proxmox den CPU-Typ `host`, oder
+`x86-64-v3`, wo virtuelle Maschinen zwischen Hosts mit verschiedenen Prozessoren wechseln; bei anderen Hypervisoren
+die Einstellung, die die Prozessorfunktionen des Hosts durchreicht.
 
 ??? info "Mehr zur Bemessung der Dienste"
     `faden deploy` und `faden upgrade` bemessen die Dienste für den Host, auf dem sie laufen: wie viele

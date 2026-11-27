@@ -113,7 +113,17 @@ export interface ModelAlias {
    * A picture attached to a chat goes only to a model that takes pictures.
    */
   vision?: boolean | null;
+  /**
+   * The thinking levels the model tells apart, when the gateway knows; null when it does not
+   * (then every level is offered). An empty list: it takes no level at all.
+   */
+  reasoning_levels?: ReasoningLevel[] | null;
+  /** The model's context length in tokens, when known. */
+  context_length?: number | null;
 }
+
+/** A level passed to the model as `reasoning_effort` (`off` goes as `none`). */
+export type ReasoningLevel = "off" | "low" | "medium" | "high";
 
 /** Whether a model can hold a conversation: an embedding or rerank model cannot. */
 export function isChatModel(model: ModelAlias): boolean {
@@ -154,6 +164,38 @@ export interface StreamDelta {
   /** One of the gateway's events (AG-UI): a tool waiting for approval, one refused, ... */
   faden?: FadenEvent;
 }
+
+/** What `faden.context` says about a turn: how much was sent, what it was fitted to, what no longer goes. */
+export interface ContextUse {
+  /** The context as sent (an estimate). */
+  tokens: number;
+  /** What it was fitted to. */
+  budget: number;
+  /** The model's context length, when known. */
+  window: number | null;
+  /** How many earlier messages no longer go to the model. */
+  dropped: number;
+  /** A summary written by a model stands for them. */
+  summary: boolean;
+  /** It was written this turn. */
+  summarised: boolean;
+}
+
+/** The summary a model wrote of a long chat's older messages (`GET /sessions/{id}/summary`). */
+export interface ChatSummary {
+  id: string;
+  session_id: string;
+  summary_text: string;
+  last_message_id: string | null;
+  token_estimate: number | null;
+  created_at: string;
+  model_alias: string | null;
+  /** Set when the text is marked as AI-written in the content record. */
+  record_id: string | null;
+}
+
+/** The code of a turn whose context was too long for the model (the chat tries it again with less). */
+export const CONTEXT_LENGTH_EXCEEDED = "context_length_exceeded";
 
 /** An AG-UI event the gateway sends beside the answer (``event: faden``). */
 export interface FadenEvent {

@@ -16,11 +16,29 @@ from faden_pii.services.pii.profiles import Profile
 from faden_pii.services.pii.windowing import Window
 
 
+def _read_outcome(future: asyncio.Future) -> None:
+    if not future.cancelled():
+        future.exception()
+
+
 @dataclass
 class RequestBudget:
+    """A request's time: *deadline* now, growing with its windows up to *limit*.
+
+    *started* is when the request came in (0: the deadline does not grow).
+    """
+
     deadline: float
     scope: str = ""
     windows: int = 0
+    started: float = 0.0
+    limit: float = 0.0
+
+    def grow(self, base: float, per_window: float) -> None:
+        """The deadline for the windows known so far, never later than *limit*."""
+        if self.started:
+            wanted = self.started + base + per_window * self.windows
+            self.deadline = max(self.deadline, min(self.limit, wanted))
 
 
 request_budget: ContextVar[RequestBudget | None] = ContextVar(
@@ -98,8 +116,11 @@ class InferenceRuntime:
             self._loop = loop
             self._queue = asyncio.Queue(maxsize=self.settings.pii_pending_windows)
             self._task = loop.create_task(self._run())
+        now = time.monotonic()
         budget = request_budget.get() or RequestBudget(
-            time.monotonic() + self.settings.pii_work_timeout_seconds
+            now + self.settings.pii_work_timeout_seconds,
+            started=now,
+            limit=now + self.settings.pii_work_timeout_cap_seconds,
         )
         if budget.deadline <= time.monotonic():
             raise PIIError("pii_deadline_exceeded", 504)
@@ -146,12 +167,7 @@ class InferenceRuntime:
                     self.retained_bytes += size
                     self._queue.put_nowait(job)
                 acquired.append(job)
-            async with asyncio.timeout_at(
-                loop.time() + max(0, budget.deadline - time.monotonic())
-            ):
-                return await asyncio.gather(
-                    *(asyncio.shield(j.future) for j in acquired)
-                )
+            return await self._within(budget, acquired)
         except TimeoutError as error:
             self.stats["deadlines"] += 1
             raise PIIError("pii_deadline_exceeded", 504) from error
@@ -160,6 +176,31 @@ class InferenceRuntime:
                 job.subscribers -= 1
                 if job.finished and not job.subscribers:
                     self._retire(job)
+
+    @staticmethod
+    async def _within(budget: RequestBudget, acquired: list) -> list:
+        """The jobs' results, waited for until the deadline.
+
+        The deadline grows as the jobs' windows become known (``_prepare``).
+        """
+        gathered = asyncio.gather(*(asyncio.shield(j.future) for j in acquired))
+        try:
+            while True:
+                until = max([budget.deadline, *(j.deadline for j in acquired)])
+                if budget.limit:
+                    until = min(until, budget.limit)
+                remaining = until - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError
+                done, _ = await asyncio.wait({gathered}, timeout=remaining)
+                if done:
+                    return gathered.result()
+        finally:
+            if not gathered.done():
+                # The jobs go on (shielded) for other requests; this wait's own
+                # outcome is read, so asyncio does not report it as never retrieved.
+                gathered.cancel()
+                gathered.add_done_callback(_read_outcome)
 
     def _retire(self, job):
         if self.jobs.pop(job.key, None) is not None:
@@ -208,6 +249,11 @@ class InferenceRuntime:
         ):
             raise PIIError("pii_overloaded", 503)
         job.budget.windows += len(pieces)
+        job.budget.grow(
+            self.settings.pii_work_timeout_seconds,
+            self.settings.pii_work_seconds_per_window,
+        )
+        job.deadline = max(job.deadline, job.budget.deadline)
         job.results.extend(rules)
         job.pieces.extend(pieces)
         job.remaining_windows = len(pieces)

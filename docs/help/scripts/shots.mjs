@@ -442,8 +442,38 @@ const SHOTS = [
   { name: "operate/container-edit", path: () => `/admin/containers/${IDS.container}/edit`, wait: 4000 },
 
   // Fewer words, more pictures: the parts of a screen a step talks about.
-  { name: "use/chat-composer", path: "/chat", wait: 4000, region: { x: 452, y: 826, width: 796, height: 70 } },
+  // The composer since 0.7.2: the text on its own row, the pills and Send under it; its AI notice beneath.
+  { name: "use/chat-composer", path: "/chat", wait: 4000, clip: (p) => p.getByTestId("ai-notice").locator("xpath=..") },
   { name: "use/chat-sidebar", path: "/chat", region: { x: 0, y: 0, width: 260, height: 460 } },
+  // A long chat whose older messages a summary stands for (IDS.summary_chat, a throwaway chat of the signed-in
+  // person on an install with summaries switched on): one question asked here, so the line, Show summary and the
+  // context figure show as they do while the chat is open.
+  {
+    name: "use/chat-summary", path: () => `/chat/${IDS.summary_chat}`, wait: 4000,
+    act: async (p) => {
+      // The composer's own text box (the sidebar has a search box too).
+      const box = p.getByTestId("ai-notice").locator("xpath=..").getByRole("textbox").first();
+      await box.fill("What is still open?");
+      await box.press("Enter");
+      await p.getByTestId("context-figure").first().waitFor({ timeout: 180000 });
+      await settle(p, 1500);
+    },
+    region: { x: 260, y: 0, width: 1180, height: 900 },
+  },
+  {
+    name: "use/chat-summary-dialog", path: () => `/chat/${IDS.summary_chat}`, wait: 4000,
+    act: async (p) => p.getByTestId("show-summary").first().click(),
+    clip: (p) => p.getByRole("dialog"),
+  },
+  {
+    name: "administer/settings-summaries", path: "/admin/settings", wait: 3000, act: withoutNotices,
+    clip: (p) => p.getByTestId("summary-models").locator("xpath=ancestor::*[contains(@class,'MuiPaper-root')][1]"),
+  },
+  {
+    name: "administer/provider-edit", path: "/admin/llm/providers", wait: 3000,
+    act: async (p) => p.getByRole("button", { name: K("common.edit"), exact: true }).first().click(),
+    clip: (p) => p.getByRole("dialog"),
+  },
   {
     name: "use/chat-reply-details", path: "/chat",
     act: async (p) => {
@@ -614,6 +644,14 @@ await context.addCookies([{ name: "fapiauth", value: COOKIE, url: BASE }]);
 await context.addInitScript((lang) => {
   try { localStorage.setItem("i18nextLng", lang); } catch {}
 }, LANG);
+// The signed-in person's saved language wins over the page's (applyUserLanguage): the pictures are taken in LANG by
+// answering that read in this browser only. Nothing is saved on the install.
+await context.route("**/api/admin/users/me/preferences", async (route) => {
+  if (route.request().method() !== "GET") return route.continue();
+  const response = await route.fetch();
+  const body = await response.json().catch(() => ({ preferences: {} }));
+  await route.fulfill({ response, json: { ...body, preferences: { ...(body.preferences ?? {}), language: LANG } } });
+});
 await context.addInitScript(neutral, [...MAP, [host, "ai.example.internal"]]);
 
 let failed = 0;

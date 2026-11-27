@@ -561,6 +561,15 @@ async def agent_profile(
         "model": profile.model_alias,
         # Whether that model sees pictures, so the SDK sends a tool's picture (a rendered slide) or not.
         "vision": await dao.alias_vision(profile.model_alias) if profile.model_alias else None,
+        # How many tokens that model takes (null: not known), so the SDK sizes its context to it (0.7.2 K).
+        "context_length": (
+            await dao.alias_context_length(profile.model_alias) if profile.model_alias else None
+        ),
+        # Which thinking levels that model tells apart (null: not known; 0.7.2 I.2).
+        "reasoning_levels": (
+            (await dao.alias_reasoning_levels([profile.model_alias])).get(profile.model_alias)
+            if profile.model_alias else None
+        ),
         # Whether its tools can make pictures (an image model is set up for the tenant). Never while image
         # generation is off in this version (``image_generation``): the SDKs then offer no picture tools.
         "images": image_generation.ENABLED and await dao.image_alias(auth.tenant_id) is not None,
@@ -772,14 +781,24 @@ async def agent_models(
     caller: Annotated[tuple[AuthContext, AgentRequest], Depends(agent_request)],
     service: Annotated[GatewayService, Depends(get_gateway_service)],
 ) -> Response:
-    """The agent's model, in the OpenAI list shape; the tenant's models when it names none."""
+    """The agent's model, in the OpenAI list shape; the tenant's models when it names none.
+
+    The agent's own entry says, as the tenant's list does, whether the model sees pictures and how many
+    tokens it takes (``context_length``, null when not known; 0.7.2 K).
+    """
     auth, agent = caller
     if agent.agent.model_alias:
+        alias = agent.agent.model_alias
         return JSONResponse(
             {
                 "object": "list",
                 "data": [
-                    {"id": agent.agent.model_alias, "object": "model", "created": 0, "owned_by": "faden"},
+                    {
+                        "id": alias, "object": "model", "created": 0, "owned_by": "faden",
+                        "vision": await service.dao.alias_vision(alias),
+                        "context_length": await service.dao.alias_context_length(alias),
+                        "reasoning_levels": (await service.dao.alias_reasoning_levels([alias])).get(alias),
+                    },
                 ],
             },
         )

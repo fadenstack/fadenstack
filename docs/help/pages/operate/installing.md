@@ -37,9 +37,10 @@ Run `faden doctor` after installing the tool to check the host first.
     `faden deploy /opt/faden`), generates `.env` with random passwords and keys, sizes the services for the host,
     pulls the images for the tool's own release, starts everything, and creates the first administrator. Grafana,
     RabbitMQ and Langfuse each keep a random password of their own in `.env`: none of them is the administrator's
-    console password. Langfuse's first user is the administrator's e-mail with `LANGFUSE_INIT_USER_PASSWORD`; an
-    install made before this release has the console password it was deployed with in those three places, and `.env`
-    holds what each runs on.
+    console password. Langfuse's first user is the administrator's e-mail with `LANGFUSE_INIT_USER_PASSWORD`
+    (`LANGFUSE_INIT_USER_EMAIL` in `.env`: Langfuse takes no address without a domain such as example.com, so an
+    address such as `admin@localhost` gets `.local` added, also on `faden upgrade`); an install made before this
+    release has the console password it was deployed with in those three places, and `.env` holds what each runs on.
 
 ### What it asks
 
@@ -218,7 +219,7 @@ Started by hand with `docker compose` instead, set them yourself, each to a long
 | `FADEN_GATEWAY_PII_SERVICE_TOKEN`, `FADEN_BACKEND_PII_SERVICE_TOKEN`, `FADEN_MCP_PII_SERVICE_TOKEN`, `FADEN_PII_SERVICE_TOKEN` | Calls to the PII service, which refuses every call without it (only its health check is open). One value for all four |
 | `LANGFUSE_SALT`, `LANGFUSE_ENCRYPTION_KEY` (64 hex characters: `openssl rand -hex 32`), `LANGFUSE_NEXTAUTH_SECRET` | Langfuse's API keys, stored keys and sign-ins |
 | `REDIS_AUTH`, `MINIO_ROOT_PASSWORD`, `CLICKHOUSE_PASSWORD`, `GRAFANA_ADMIN_PASSWORD` | The stores and Grafana. Grafana reads its password when it first starts, so changing it later in `.env` does not change it in Grafana |
-| `LANGFUSE_INIT_USER_PASSWORD` | The password of Langfuse's first user (the administrator's e-mail). Langfuse reads it once, when it creates the user: change it in Langfuse after that, and note the new one in `.env` |
+| `LANGFUSE_INIT_USER_PASSWORD` | The password of Langfuse's first user (`LANGFUSE_INIT_USER_EMAIL`, normally the administrator's e-mail). Langfuse reads it once, when it creates the user: change it in Langfuse after that, and note the new one in `.env` |
 | `RABBITMQ_ADMIN_PASS`, `RABBITMQ_BACKEND_PASS`, `RABBITMQ_API_PASS`, `RABBITMQ_PII_PASS` | The message broker. Its users come from `rabbitmq/definitions.json`, which `faden deploy` writes from these |
 
 Outside development, the backend, the gateway and the MCP and skills services do not start on the development
@@ -284,12 +285,16 @@ PII detection runs on your server. Setup downloads the selected model files; cha
 CPU processing is slower, especially with concurrent requests or long documents.
 
 !!! note "A long text on a server without a GPU"
-    The check gives each request at most 8 seconds. On a server without a GPU, a request with a long text (a few
-    thousand characters, such as a document an agent includes) can take longer. Where the PII policy blocks what it
-    cannot check (by default for requests to cloud providers, and for requests to local models when **Protect
-    requests to local models** is on), such a request is then refused, and the message says "PII service
-    unavailable". What an administrator can do: run the check on a GPU (`gliner2-multi-v1` with `gpu-shared` or
-    `gpu-dedicated`, below); for requests to local models, leave **Protect requests to local models** off in the
+    The check gives each request 8 seconds, and half a second more for each part of a long text it reads (a few
+    hundred characters each), at most 30 seconds. On a server without a GPU, a request with a long text (several
+    thousand characters, such as a document an agent includes) can still take longer. Where the PII policy blocks
+    what it cannot check (by default for requests to cloud providers, and for requests to local models when **Protect
+    requests to local models** is on), such a request is then refused with `pii_deadline_exceeded` ("The PII check
+    took longer than its limit for this request …"). What an administrator can do: run the check on a GPU
+    (`gliner2-multi-v1` with `gpu-shared` or `gpu-dedicated`, below); give a virtual machine the host's CPU type
+    (host passthrough), since without the host's AVX2 instructions the check runs about three times slower (see
+    [The CPU and the PII check](requirements.md#the-cpu-and-the-pii-check)); for
+    requests to local models, leave **Protect requests to local models** off in the
     [personal data policy](../administer/policies.md#personal-data), as it is by default; keep texts shorter.
 
 ![The PII language, detector and execution choices](../images/operate/pii-mode-choice.png)
@@ -344,8 +349,8 @@ CPU processing is slower, especially with concurrent requests or long documents.
     `gpu-shared` is for a GPU used by other software too. `gpu-dedicated` is for a GPU kept available for PII;
     selecting it does not stop other software from using that GPU.
 
-    Automatic CPU threads use a quarter of the available threads, capped at eight for CPU execution and two for
-    GPU execution. `--pii-cpu-threads 2` sets an explicit count. Container CPU limits also apply at startup.
+    Automatic CPU threads use half of the available threads for CPU execution, at most eight, and a quarter, at
+    most two, for GPU execution. `--pii-cpu-threads 2` sets an explicit count. Container CPU limits also apply at startup.
     `--pii-gpu-memory-mib 4096` sets the allocator budget; it does not reserve memory from other software.
     The PII container also has a 4 GiB host RAM limit. `FADEN_PII_MEMORY_LIMIT` in `.env` changes that limit;
     run `faden up` afterward. Host RAM and GPU memory are separate budgets.

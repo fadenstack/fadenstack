@@ -148,6 +148,18 @@ def string_leaves(
     return units
 
 
+def is_picture(part: object) -> bool:
+    """A chat message's picture part: ``{"type": "image_url", "image_url": {"url": "<text>"}}``.
+
+    Only this shape: any other part that is not text (audio, a file, a picture
+    in another shape) is still refused as an unsupported surface.
+    """
+    if not isinstance(part, dict) or part.get("type") != "image_url":
+        return False
+    image = part.get("image_url")
+    return isinstance(image, dict) and isinstance(image.get("url"), str)
+
+
 class ExtractedPayload:
     """A copy, ordered text leaves and deferred JSON serialization."""
 
@@ -178,6 +190,8 @@ class ExtractedPayload:
         self.declared_entities = declared_entities
         self.units: list[TextUnit] = []
         self.arguments: list[tuple[dict, str, Any]] = []
+        #: Picture parts passed on unchecked (``is_picture``).
+        self.pictures = 0
         if any(key in self.payload for key in ("prompt", "query", "documents")):
             # The gateway normalizes image prompts and reranking to input.
             raise PIIError("pii_unsupported_surface")
@@ -210,6 +224,11 @@ class ExtractedPayload:
                 )
             elif isinstance(content, list):
                 for number, part in enumerate(content):
+                    if is_picture(part):
+                        # A picture is not checked for personal data: it goes on
+                        # as it came, counted, and the caller tells the person.
+                        self.pictures += 1
+                        continue
                     if (
                         not isinstance(part, dict)
                         or part.get("type") != "text"

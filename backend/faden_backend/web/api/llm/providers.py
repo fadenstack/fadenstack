@@ -175,6 +175,12 @@ def calls_tools(capabilities: dict | None) -> bool | None:
     return value if isinstance(value, bool) else None
 
 
+def context_length(capabilities: dict | None) -> int | None:
+    """The context length an administrator gave the provider's model, in tokens; None: not given."""
+    value = capabilities.get("context_length") if isinstance(capabilities, dict) else None
+    return value if type(value) is int and value > 0 else None
+
+
 def sees_pictures(capabilities: dict | None) -> bool | None:
     """Whether the provider's model is sent the chat's pictures; None: not known (they are sent)."""
     value = capabilities.get("vision") if isinstance(capabilities, dict) else None
@@ -201,6 +207,7 @@ def _provider_to_dto(
         "remote_model": _extract_remote_model(provider.capabilities),
         "calls_tools": calls_tools(provider.capabilities),
         "sees_pictures": sees_pictures(provider.capabilities),
+        "context_length": context_length(provider.capabilities),
     }
     if provider.source_kind and owners:
         owner = owners.get(str(provider.source_id))
@@ -841,6 +848,17 @@ async def update_provider(
             next_capabilities["vision"] = body.sees_pictures
         capabilities_changed = True
 
+    # The model's context length, for the gateway's chat context (0.7.2 K); null: not known.
+    if "context_length" in body.model_fields_set:
+        if next_capabilities is None:
+            base = existing.capabilities if isinstance(existing.capabilities, dict) else {}
+            next_capabilities = dict(base)
+        if body.context_length is None:
+            next_capabilities.pop("context_length", None)
+        else:
+            next_capabilities["context_length"] = body.context_length
+        capabilities_changed = True
+
     # Normalised as on create, so the gateway does not ask for /v1/v1/...
     endpoint_url = _normalize_base_url(body.endpoint_url) if body.endpoint_url else body.endpoint_url
     provider = await provider_dao.update(
@@ -881,7 +899,7 @@ async def update_provider(
     # (which drops the old one) and asked for by it upstream.
     routing_fields = {
         "endpoint_url", "api_key", "litellm_provider", "litellm_model", "extra_params", "calls_tools",
-        "sees_pictures",
+        "sees_pictures", "context_length",
     }
     routing_changed = bool(routing_fields & body.model_fields_set) or renamed
     if existing.target == ProviderTarget.REMOTE_ENDPOINT and routing_changed:

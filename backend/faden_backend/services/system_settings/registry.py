@@ -48,6 +48,15 @@ class SettingDefinition:
         return self.protected and value not in self.narrowing_values
 
 
+def check_model_names(value: object) -> None:
+    """Refuse anything but a list of model names (at most 200, each 1 to 256 characters)."""
+    if not isinstance(value, list) or len(value) > 200 or any(
+        not isinstance(v, str) or not v or len(v) > 256 for v in value
+    ):
+        msg = "Not a list of model names."
+        raise ValueError(msg)
+
+
 def check_app_ids(value: object) -> None:
     """Refuse anything but app ids of the app list, comma-separated (``desktop,nextcloud``)."""
     import re  # noqa: PLC0415
@@ -710,6 +719,24 @@ SETTINGS_REGISTRY: list[SettingDefinition] = [
         default=30,
         apply_scope=SystemApplyScope.LIVE_RELOAD,
         service_targets=(),
+    ),
+    SettingDefinition(
+        key="chat.summary_models",
+        type="json",
+        category="chat",
+        group="summaries",
+        label="Summaries of long chats",
+        description=(
+            "The chat models that write a summary of a long chat's earlier messages when they no longer go to "
+            "the model (a list of model names). All are off by default: a summary is written by the model and "
+            "can leave out constraints, names and numbers, so try it on your own chats first. It is kept "
+            "encrypted with the chat and deleted with it; approvals and permissions never come from it."
+        ),
+        is_secret=False,
+        default=[],
+        apply_scope=SystemApplyScope.LIVE_RELOAD,
+        service_targets=("faden-gateway",),
+        check=check_model_names,
     ),
     SettingDefinition(
         key="rag_lite.rerank_candidates",

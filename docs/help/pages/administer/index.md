@@ -66,6 +66,13 @@ added, they can be switched on and off under **Settings → Modules**; switching
 running through it are interrupted. Their pages, and their steps in **Getting started**, appear only while
 the module is on.
 
+**RAG Lite** is the knowledge base (see [Knowledge](../use/knowledge.md)). It is off on a new installation;
+switched on under **Settings → Modules**, it works at once, without a restart. While it is off, uploading,
+retrying and searching documents are refused with 409 `rag_lite_off` ("RAG Lite is off. Switch the RAG Lite
+module on first."), and agents are not offered the knowledge search. Its documents stay, and can be deleted
+while it is off.
+
+
 **Provenance** is on from the start: it marks generated content as AI-generated, as the EU AI Act requires
 (Art. 50(2)). Switching it off explains what stops being marked, asks you to confirm, and is recorded in the
 audit log with your name and the time. What it marks, and the public check page, are on
