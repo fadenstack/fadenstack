@@ -424,6 +424,8 @@ def gpu_overlay(env_file: Path | None, project_dir: Path | None) -> Path | None:
     """Use the same PII GPU reservation on deploy, restart, upgrade and status."""
     if env_file is None or project_dir is None:
         return None
+    # Callers have passed str (faden dev up did): Path either way.
+    env_file, project_dir = Path(env_file), Path(project_dir)
     selected = read_env_file(env_file).get("FADEN_PII_EXECUTION_PROFILE", "cpu")
     if selected not in ("gpu-shared", "gpu-dedicated"):
         return None

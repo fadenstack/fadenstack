@@ -1183,8 +1183,8 @@ def dev_up(
             env_file = compose_file.parent / ".env"
             ctx = ComposeContext(
                 compose_files=[str(compose_file)],
-                env_file=str(env_file) if env_file.exists() else None,
-                project_dir=str(compose_file.parent),
+                env_file=env_file if env_file.exists() else None,
+                project_dir=compose_file.parent,
             )
             rc = compose_up(ctx, services=INFRA_SERVICES, detach=True)
             if rc != 0:
