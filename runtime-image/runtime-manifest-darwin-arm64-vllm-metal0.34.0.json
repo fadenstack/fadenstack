@@ -1,0 +1,81 @@
+{
+  "schema_version": "1.1.0",
+  "runtime_id": "faden-native-vllm-metal-darwin-arm64-vllm0.34.0",
+  "flavor": "darwin-arm64",
+  "release_tag": "ghcr.io/fadenstack/mac-runtime-arm64:vllm0.34.0-metal0.34.0-1",
+  "native": {
+    "kind": "python-venv",
+    "oci_image": "ghcr.io/fadenstack/mac-runtime-arm64:vllm0.34.0-metal0.34.0-1",
+    "digest": "sha256:8bee73c093eeaa2cfe0f4dd9b790cc28bc8ee15e55eeb7cc71de00d539c62376",
+    "config_digest": "sha256:18d62fbaa59d6532ca00060f4e875409aeed8c67f64e10d511c87d77ed5e7fa2",
+    "layer_digest": "sha256:6f6240bf99354f8d807de966acdba142c1afd98f38827057c5eded6deda684b0",
+    "rootfs_digest": "sha256:57df3922d7705dada7832bf5d4cabdf0dae494b17fabbb49aad26824df8ef5c9",
+    "size_bytes": 591630408,
+    "interpreter": {
+      "abi": "cp312",
+      "implementation": "cpython",
+      "path": "python/cpython-3.12.12-macos-aarch64-none/bin/python3.12",
+      "version": "3.12.12"
+    },
+    "venv": "venv",
+    "entrypoint": [
+      "venv/bin/python",
+      "-m",
+      "vllm.entrypoints.openai.api_server"
+    ],
+    "engines": {
+      "mlx": "0.32.4",
+      "mlx_lm": "0.32.3.dev12+g4cfc64784",
+      "vllm": "0.34.0+cpu",
+      "vllm_metal": "0.34.0"
+    },
+    "patches": {
+      "mlx_lm_fd_cap_raise_only": true
+    },
+    "pyvenv_home_rewrite": true
+  },
+  "unpacked_size_bytes": 2158694400,
+  "lock_sha256": "650e184b0e155d617bca750741b2747c467640f99cd34df3f9e657958142bb41",
+  "target_hardware": {
+    "platform": "Apple Silicon Mac",
+    "gpu": "Apple (Metal)",
+    "architecture": "arm64",
+    "min_os": "macOS 26"
+  },
+  "stack_components": {
+    "python": "3.12.12",
+    "vllm": "0.34.0",
+    "vllm_metal": "0.34.0",
+    "mlx": "0.32.4",
+    "torch": "2.16.0.dev20261013",
+    "transformers": "5.22.2"
+  },
+  "certification": {
+    "overall_status": "uncertified",
+    "channel": "stable",
+    "hardware_target": "Apple Silicon (macOS 26)",
+    "timestamp": "2026-11-27T20:00:39+00:00",
+    "checks": [
+      {
+        "name": "import vllm, vllm_metal, mlx",
+        "status": "PASS",
+        "detail": "smoke import in the built tree"
+      },
+      {
+        "name": "metal available",
+        "status": "PASS",
+        "detail": "mlx.core.metal.is_available()"
+      },
+      {
+        "name": "mlx_lm does not lower RLIMIT_NOFILE",
+        "status": "PASS",
+        "detail": "[1048576, 9223372036854775807] -> [1048576, 9223372036854775807]"
+      },
+      {
+        "name": "relocatable",
+        "status": "PASS",
+        "detail": "tree copied to another path imports vllm_metal"
+      }
+    ]
+  }
+}

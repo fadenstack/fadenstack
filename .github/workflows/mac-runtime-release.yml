@@ -1,0 +1,124 @@
+# Build and publish the Mac runtime: a relocatable Python 3.12 + vLLM 0.34 +
+# vLLM-Metal 0.34 + MLX tree, packed as an OCI image used only as a carrier
+# (FROM scratch, one layer, no entrypoint). Machines never run it as a
+# container: the node agent fetches it through the backend's /images/save and
+# extracts it natively (runtime-image/mac/oci_pack.py says why the config
+# reads linux/arm64 and the real target is in labels).
+#
+#   runtime-image/mac/build_mac_runtime.sh -> ghcr.io/fadenstack/mac-runtime-arm64:<tag>
+#
+# Manual runs default to push off: build, smoke-test and pack only. The same
+# script builds locally on a Mac (never pushes there). After a pushed build,
+# commit the digests it prints into
+# runtime-image/runtime-manifest-darwin-arm64-vllm-metal<v>.json so the backend
+# catalogue pins exactly this artifact.
+#
+# Runner: an Apple Silicon macOS runner (macOS 26, the bundle's minimum).
+# Override with the repository variable MAC_RUNTIME_RUNNER.
+
+name: Release Mac Runtime
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag (e.g. vllm0.34.0-metal0.34.0-1)"
+        required: true
+        default: vllm0.34.0-metal0.34.0-1
+        type: string
+      vllm_metal_wheel_url:
+        description: "URL of the vllm_metal 0.34.0 cp312 macOS arm64 wheel the lock was certified with"
+        required: true
+        type: string
+      vllm_metal_wheel_sha256:
+        description: "sha256 of that wheel"
+        required: true
+        type: string
+      push:
+        description: "Push to GHCR (off: build and validate only)"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mac-runtime-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/fadenstack/mac-runtime-arm64
+  CRANE: github.com/google/go-containerregistry/cmd/crane@v0.20.2
+
+jobs:
+  build:
+    runs-on: ${{ vars.MAC_RUNTIME_RUNNER || 'macos-26' }}
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write   # push only when inputs.push
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+
+      - name: Check the runner is the bundle's platform
+        run: |
+          test "$(uname -s)/$(uname -m)" = Darwin/arm64
+          major="$(sw_vers -productVersion | cut -d. -f1)"
+          test "$major" -ge 26 || { echo "macOS $major is below the bundle minimum 26"; exit 1; }
+
+      - name: Fetch the vllm-metal wheel
+        env:
+          URL: ${{ inputs.vllm_metal_wheel_url }}
+          SHA: ${{ inputs.vllm_metal_wheel_sha256 }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/wheels"
+          curl -fsSL "$URL" -o "$RUNNER_TEMP/wheels/vllm_metal-0.34.0-cp312-cp312-macosx_15_0_arm64.whl"
+          echo "$SHA  $RUNNER_TEMP/wheels/vllm_metal-0.34.0-cp312-cp312-macosx_15_0_arm64.whl" | shasum -a 256 -c -
+
+      - name: Build, patch, smoke-test and pack
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
+          runtime-image/mac/build_mac_runtime.sh --out "$RUNNER_TEMP/build" --wheels "$RUNNER_TEMP/wheels" --tag "$TAG"
+          cat "$RUNNER_TEMP/build/digests.json" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        id: syft
+      - name: SBOM of the runtime tree
+        env:
+          SYFT: ${{ steps.syft.outputs.cmd }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          "$SYFT" scan "dir:$RUNNER_TEMP/build/stage/runtime" -o "spdx-json=$RUNNER_TEMP/build/mac-runtime-arm64-$TAG.spdx.json"
+
+      - name: Push to GHCR
+        if: ${{ inputs.push }}
+        env:
+          TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          go run "$CRANE" auth login ghcr.io -u "$ACTOR" --password-stdin <<< "$GH_TOKEN"
+          mkdir -p "$RUNNER_TEMP/oci" && tar -xf "$RUNNER_TEMP/build/mac-runtime.oci.tar" -C "$RUNNER_TEMP/oci"
+          go run "$CRANE" push "$RUNNER_TEMP/oci" "$IMAGE:$TAG"
+          pushed="$(go run "$CRANE" digest "$IMAGE:$TAG")"
+          want="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["manifest_digest"])' "$RUNNER_TEMP/build/digests.json")"
+          test "$pushed" = "$want" || { echo "registry holds $pushed, built $want"; exit 1; }
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mac-runtime-${{ inputs.tag }}
+          path: |
+            ${{ runner.temp }}/build/digests.json
+            ${{ runner.temp }}/build/runtime-manifest-*.json
+            ${{ runner.temp }}/build/RUNTIME-MANIFEST.json
+            ${{ runner.temp }}/build/smoke.json
+            ${{ runner.temp }}/build/freeze.txt
+            ${{ runner.temp }}/build/*.spdx.json
