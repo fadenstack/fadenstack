@@ -54,13 +54,18 @@ Security fixes go into the latest release. Keep your installation current with `
 
 ## Checking a release
 
-From 0.7.1, every file of a release and every service image comes with:
+From 0.7.1, every file of a release and every image the release builds for the server's services (base, backend,
+frontend, gateway, MCP, PII and skills) comes with:
 
 - an SBOM in CycloneDX 1.6, made for BSI TR-03183-2 (`<file>.cdx.json` on the GitHub release; for an image,
   `<image>-<digest>.cdx.json`);
 - the vulnerability scan's result as OpenVEX (`.openvex.json`), and a CSAF document for each finding that affects us;
 - a signature and SLSA provenance, made by our release workflow with Sigstore (the bundle `<file>.sigstore.json`) and
   as a GitHub attestation.
+
+The image of the provenance engine (`ghcr.io/fadenstack/provenance`) is built by the engine's own repository and is
+not covered: it carries only the SBOM and build provenance that Docker BuildKit attaches, unsigned, and has no
+CycloneDX file, OpenVEX or Sigstore signature.
 
 To check a file you downloaded, with [cosign](https://docs.sigstore.dev/cosign/) or the GitHub CLI:
 
