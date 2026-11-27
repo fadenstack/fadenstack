@@ -59,6 +59,11 @@ KIND: dict[str, str] = {
     T.VALIDATE_FABRIC_CONNECT.value: CHECK,
     T.SYNC_MODEL.value: TRANSFER,
     T.SERVE_RUNTIME_IMAGE.value: TRANSFER,
+    # A runtime download is long; a worker's status must not wait behind it.
+    T.STAGE_NATIVE_RUNTIME.value: TRANSFER,
+    T.NATIVE_RUNTIME_STATUS.value: OBSERVE,
+    T.NATIVE_WORKER_STATUS.value: OBSERVE,
+    T.NATIVE_WORKER_LOGS.value: OBSERVE,
 }
 
 #: Transfers running at once; more wait their turn.

@@ -126,6 +126,9 @@ class AgentConfig:
     #: Needs room for one image tar -- about 12GB for the DGX runtime -- and
     #: falls back to streaming, which cannot resume, when there is not.
     image_download_dir: str = ""
+    #: How many native (vLLM-Metal) workers a Mac runs at once; 0.7.3's
+    #: platform profile is one managed chat deployment per Mac.
+    native_max_workers: int = 1
     #: Built from the fields above plus the backend's authority the agent
     #: learnt (server_trust.build_context); shared by every connection to the
     #: backend. ``None`` while verification is off.
@@ -202,6 +205,7 @@ class AgentConfig:
             ),
             container_runtime=os.getenv("FADEN_NODE_AGENT_CONTAINER_RUNTIME", "auto").strip().lower() or "auto",
             image_download_dir=os.getenv("FADEN_NODE_AGENT_IMAGE_DOWNLOAD_DIR", ""),
+            native_max_workers=int(os.getenv("FADEN_NODE_AGENT_NATIVE_MAX_WORKERS", "1")),
             require_signed_commands=(
                 os.getenv("FADEN_NODE_AGENT_REQUIRE_SIGNED_COMMANDS", "auto").strip().lower() or "auto"
             ),

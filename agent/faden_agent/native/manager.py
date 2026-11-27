@@ -1,0 +1,496 @@
+"""The six native-runtime commands (C1 contract) and the workers they run.
+
+A worker is ``vllm serve`` in its own session (process group), started from a
+staged runtime with an environment built from nothing. Its record is written
+durably before the command returns, so an agent that restarts -- a crash, an
+upgrade, launchd's KeepAlive -- finds it again: a worker still running with
+the recorded pid, creation time and arguments is adopted (no second cold
+start); anything else is marked failed and what is left of its tree ended.
+An agent stopping does not stop its workers; ``faden-agent stop`` and
+``uninstall`` do (``darwin_service.stop_native_workers``).
+"""
+
+from __future__ import annotations
+
+import asyncio
+import contextlib
+import hashlib
+import json
+import logging
+import os
+import shutil
+import subprocess
+import time
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import httpx
+import psutil
+
+from faden_agent.native import proc as procs
+from faden_agent.native import stage as staging
+from faden_agent.native import worker as workers
+from faden_agent.native.common import (
+    NativeError,
+    NativePaths,
+    check_digest,
+    check_id,
+    ensure_private_dir,
+    read_json_nofollow,
+    write_json_durable,
+)
+
+log = logging.getLogger(__name__)
+
+#: The model store M syncs into; snapshot paths must resolve inside it.
+MODEL_STORE_ROOT = Path("/var/db/fadenstack/agent/models")
+RECORD_VERSION = 1
+LIVE = ("starting", "ready")
+_HEADROOM = 1 << 30
+
+FetchTar = Callable[..., Awaitable[Path | None]]
+ProgressEmitter = Callable[[dict[str, Any]], Awaitable[None]]
+
+
+def _env_hash(env: dict[str, str]) -> str:
+    return "sha256:" + hashlib.sha256(json.dumps(env, sort_keys=True).encode()).hexdigest()
+
+
+@dataclass
+class _Handle:
+    popen: subprocess.Popen[bytes] | None
+    watcher: asyncio.Task[None] | None = None
+
+
+class NativeRuntimeManager:
+    #: SIGTERM→SIGKILL grace when the agent itself ends a tree (timeout, restart cleanup).
+    cleanup_grace_s: float = 10.0
+    #: ... and when a new generation replaces a running one.
+    restart_grace_s: float = 30.0
+
+    def __init__(
+        self,
+        *,
+        paths: NativePaths,
+        fetch_tar: FetchTar | None = None,
+        model_root: Path = MODEL_STORE_ROOT,
+        max_workers: int = 1,
+        on_capabilities: Callable[[dict[str, Any]], None] | None = None,
+        poll_interval: float = 2.0,
+        probe_metal: bool = True,
+    ) -> None:
+        self.paths = paths
+        self._fetch_tar = fetch_tar
+        self._model_root = model_root
+        self._max_workers = max(1, int(max_workers))
+        self._on_capabilities = on_capabilities
+        self._poll = poll_interval
+        self._probe_metal = probe_metal
+        self._handles: dict[str, _Handle] = {}
+        self._lock = asyncio.Lock()
+        self._stage_locks: dict[str, asyncio.Lock] = {}
+        self._metal: dict[str, Any] = {"unified_memory_bytes": psutil.virtual_memory().total, "source": "sysctl"}
+        for directory in (paths.root, paths.runtimes, paths.workers, paths.logs, paths.home):
+            ensure_private_dir(directory)
+
+    # ── records ───────────────────────────────────────────────────
+
+    def _record(self, deployment_id: str) -> dict[str, Any] | None:
+        return read_json_nofollow(self.paths.worker_record(deployment_id))
+
+    def _save(self, record: dict[str, Any]) -> None:
+        write_json_durable(self.paths.worker_record(record["deployment_id"]), record)
+
+    def _records(self) -> list[dict[str, Any]]:
+        out = []
+        for path in sorted(self.paths.workers.glob("*.json")):
+            record = read_json_nofollow(path)
+            if record and record.get("deployment_id") == path.stem:
+                out.append(record)
+        return out
+
+    # ── capabilities ──────────────────────────────────────────────
+
+    def capabilities(self) -> dict[str, Any]:
+        return {"native_runtime": 1, "metal": dict(self._metal)}
+
+    async def refresh_metal(self) -> None:
+        """``recommended_max_working_set_bytes`` from the staged runtime's mlx; absent before staging."""
+        runtime = self._newest_runtime(None)
+        if runtime is None or not self._probe_metal:
+            return
+        venv = runtime / "runtime" / "venv"
+        code = "import json, mlx.core as mx; f = getattr(mx, 'device_info', None) or mx.metal.device_info; print(json.dumps(f()))"
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                str(venv / "bin" / "python"), "-I", "-c", code,
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+                env=workers.probe_env(self.paths, venv), start_new_session=True,
+            )
+            try:
+                out, _ = await asyncio.wait_for(proc.communicate(), timeout=60)
+            except TimeoutError:
+                proc.kill()
+                await proc.communicate()
+                raise
+            info = json.loads(out.decode().strip().splitlines()[-1])
+            value = int(info["max_recommended_working_set_size"])
+        except Exception as exc:  # noqa: BLE001 - the estimate stands in
+            log.warning("Could not read Metal's recommended working set from the runtime: %s", exc)
+            return
+        self._metal = {
+            "unified_memory_bytes": int(info.get("memory_size") or self._metal["unified_memory_bytes"]),
+            "recommended_max_working_set_bytes": value,
+            "source": "mlx",
+        }
+        if self._on_capabilities is not None:
+            self._on_capabilities(self.capabilities())
+
+    # ── staging ───────────────────────────────────────────────────
+
+    def _staged(self) -> list[dict[str, Any]]:
+        out = []
+        if not self.paths.runtimes.is_dir():
+            return out
+        for bundle in sorted(self.paths.runtimes.iterdir()):
+            if bundle.name.startswith(".") or not bundle.is_dir():
+                continue
+            for layer in sorted(bundle.iterdir()):
+                stamp = staging.read_stamp(layer) if not layer.name.startswith(".") else None
+                if stamp:
+                    out.append({
+                        "bundle_id": bundle.name,
+                        "layer_digest": stamp["layer_digest"],
+                        "runtime_root": str(layer / "runtime"),
+                        "staged_at": stamp.get("staged_at"),
+                        "engines": stamp.get("engines"),
+                    })
+        return out
+
+    def _newest_runtime(self, bundle_id: str | None, layer_digest: str | None = None) -> Path | None:
+        staged = [s for s in self._staged() if bundle_id is None or s["bundle_id"] == bundle_id]
+        if layer_digest:
+            staged = [s for s in staged if s["layer_digest"] == layer_digest]
+        if not staged:
+            return None
+        best = max(staged, key=lambda s: s.get("staged_at") or 0)
+        return Path(best["runtime_root"]).parent
+
+    async def stage_native_runtime(
+        self, payload: dict[str, Any], *, emit_progress: ProgressEmitter | None = None
+    ) -> dict[str, Any]:
+        bundle_id = check_id(payload.get("bundle_id"), "bundle_id")
+        config_digest = (
+            check_digest(payload.get("config_digest"), "config_digest") if payload.get("config_digest") else None
+        )
+        rootfs_digest = (
+            check_digest(payload.get("rootfs_digest"), "rootfs_digest") if payload.get("rootfs_digest") else None
+        )
+        interpreter_path = payload.get("interpreter_path")
+        interpreter_path = str(interpreter_path) if interpreter_path else None
+        rewrite = payload.get("pyvenv_home_rewrite")
+        rewrite = True if rewrite is None else bool(rewrite)
+        layer_digest = check_digest(payload.get("layer_digest"), "layer_digest")
+        size = workers._int(payload.get("size_bytes"), "size_bytes", 1, staging.MAX_UNPACKED)
+        unpacked = payload.get("unpacked_size_bytes")
+        unpacked = None if unpacked in (None, "") else workers._int(unpacked, "unpacked_size_bytes", 1, staging.MAX_UNPACKED)
+        image = str(payload.get("oci_image") or "")
+        tag = str(payload.get("tag") or "")
+        if not image:
+            raise NativeError("oci_image is required")
+        if tag and ":" not in image.rsplit("/", 1)[-1]:
+            image = f"{image}:{tag}"
+        lock = self._stage_locks.setdefault(bundle_id, asyncio.Lock())
+        async with lock:
+            final = self.paths.runtime_dir(bundle_id, layer_digest)
+            if staging.is_staged(self.paths, bundle_id, layer_digest):
+                return {"ok": True, "staged": True, "runtime_root": str(final / "runtime"),
+                        "layer_digest": layer_digest, "fetched": False}
+            if self._fetch_tar is None:
+                raise NativeError("no image transfer configured", code="unsupported")
+            ensure_private_dir(self.paths.downloads)
+            # docker save may hand over the layer compressed (containerd store) or
+            # not (classic): room for the larger tar, the extracted tree, and a margin.
+            tree = unpacked or size * 4
+            need = max(size, tree) + tree + _HEADROOM
+            free = shutil.disk_usage(self.paths.root).free
+            if free < need:
+                raise NativeError(f"{free >> 20} MiB free, staging needs about {need >> 20} MiB", code="disk_space")
+            tar = await self._fetch_tar(
+                image=image, expect_rootfs=rootfs_digest, directory=self.paths.downloads, emit_progress=emit_progress
+            )
+            if tar is None:
+                raise NativeError("no room to keep the runtime image for verification", code="disk_space")
+            try:
+                if emit_progress is not None:
+                    await emit_progress({"phase": "extracting", "message": f"Verifying and extracting {image}"})
+                root = await asyncio.to_thread(
+                    staging.stage_from_tar, Path(tar), paths=self.paths, bundle_id=bundle_id,
+                    config_digest=config_digest, layer_digest=layer_digest, size_bytes=size,
+                    unpacked_size_bytes=unpacked, rootfs_digest=rootfs_digest,
+                    interpreter_path=interpreter_path, pyvenv_home_rewrite=rewrite,
+                )
+            finally:
+                Path(tar).unlink(missing_ok=True)
+        log.info("Staged native runtime %s %s at %s", bundle_id, layer_digest, root)
+        await self.refresh_metal()
+        return {"ok": True, "staged": True, "runtime_root": str(root / "runtime"),
+                "layer_digest": layer_digest, "fetched": True}
+
+    async def native_runtime_status(self, _payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        return {
+            "ok": True,
+            "staged": [{k: s[k] for k in ("bundle_id", "layer_digest", "runtime_root")} for s in self._staged()],
+            "workers": [self._public(r) for r in self._records()],
+            "max_workers": self._max_workers,
+        }
+
+    # ── workers ───────────────────────────────────────────────────
+
+    @staticmethod
+    def _public(record: dict[str, Any]) -> dict[str, Any]:
+        keys = ("deployment_id", "generation", "state", "pid", "port", "served_model_name",
+                "started_at", "ready_at", "exit_code", "last_error", "stopped_at", "bundle_id", "layer_digest")
+        return {k: record.get(k) for k in keys}
+
+    async def start_native_worker(self, payload: dict[str, Any]) -> dict[str, Any]:
+        spec = workers.parse_spec(payload, model_root=self._model_root)
+        async with self._lock:
+            current = self._record(spec.deployment_id)
+            if current and current.get("state") in LIVE and self._leader(current) is not None:
+                runtime = self._newest_runtime(spec.bundle_id, spec.layer_digest)
+                same = (
+                    current.get("generation") == spec.generation
+                    and runtime is not None
+                    and current.get("cmd_sha256") == procs.cmd_hash(workers.argv(spec, runtime / "runtime" / "venv"))
+                    and current.get("env_sha256") == _env_hash(spec.env)
+                )
+                if same:
+                    return {"ok": True, "pid": current["pid"], "port": current["port"],
+                            "started_at": current["started_at"], "existing": True}
+                # A new generation or a changed payload: the old engine goes first (C1 contract).
+                log.info("Restarting native worker %s: generation %s -> %s",
+                         spec.deployment_id, current.get("generation"), spec.generation)
+                await self._stop_locked(spec.deployment_id, current, grace_s=self.restart_grace_s)
+            live = [r for r in self._records() if r.get("state") in LIVE and r["deployment_id"] != spec.deployment_id
+                    and self._leader(r) is not None]
+            if len(live) >= self._max_workers:
+                names = ", ".join(r["deployment_id"] for r in live)
+                raise NativeError(
+                    f"this machine runs at most {self._max_workers} native worker(s); {names} is running",
+                    code="worker_exists",
+                )
+            if any(r.get("port") == spec.port for r in live) or not workers.port_free(spec.port):
+                raise NativeError(f"port {spec.port} on 127.0.0.1 is in use", code="port_in_use")
+            runtime = self._newest_runtime(spec.bundle_id, spec.layer_digest)
+            if runtime is None:
+                raise NativeError(f"runtime {spec.bundle_id} is not staged", code="not_staged")
+            stamp = staging.read_stamp(runtime)
+            if stamp is None:
+                raise NativeError(f"runtime {runtime} has no valid staged stamp", code="not_staged")
+            venv = runtime / "runtime" / "venv"
+            argv = workers.argv(spec, venv)
+            env = workers.environment(spec, self.paths, venv)
+            ensure_private_dir(self.paths.tmp(spec.deployment_id))
+            ensure_private_dir(self.paths.home / "hf")
+            log_path = self.paths.log_file(spec.deployment_id)
+            workers.rotate_if_big(log_path, 0)  # a new start, a fresh log (the last run's stays as .1)
+            size = workers.snapshot_bytes(spec.snapshot)
+            fd = os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+            try:
+                os.write(fd, f"faden: starting {spec.deployment_id} generation {spec.generation}: "
+                             f"{' '.join(argv[4:])}\n".encode())
+                popen = subprocess.Popen(  # noqa: S603 - argv list, no shell interpolation
+                    argv, stdin=subprocess.DEVNULL, stdout=fd, stderr=subprocess.STDOUT, env=env,
+                    cwd=str(self.paths.tmp(spec.deployment_id)), start_new_session=True, close_fds=True,
+                )
+            finally:
+                os.close(fd)
+            try:
+                created = psutil.Process(popen.pid).create_time()
+            except psutil.Error:
+                created = time.time()
+            record = {
+                "v": RECORD_VERSION,
+                "deployment_id": spec.deployment_id,
+                "generation": spec.generation,
+                "bundle_id": spec.bundle_id,
+                "layer_digest": stamp["layer_digest"],
+                "pid": popen.pid,
+                "pgid": popen.pid,
+                "started_at": created,
+                "argv": argv,
+                "cmd_sha256": procs.cmd_hash(argv),
+                "env_sha256": _env_hash(spec.env),
+                "port": spec.port,
+                "served_model_name": spec.served_model_name,
+                "model": {**spec.model_info, "name": spec.model_name, "snapshot_path": str(spec.snapshot),
+                          "bytes": size},
+                "runtime_root": str(runtime / "runtime"),
+                "log_path": str(log_path),
+                "timeout_s": workers.ready_timeout(size),
+                "state": "starting",
+                "ready_at": None,
+                "exit_code": None,
+                "last_error": None,
+                "stopped_at": None,
+            }
+            self._save(record)
+            self._watch(spec.deployment_id, _Handle(popen=popen))
+            log.info("Started native worker %s (pid %s, port %s)", spec.deployment_id, popen.pid, spec.port)
+            return {"ok": True, "pid": popen.pid, "port": spec.port, "started_at": created}
+
+    def _leader(self, record: dict[str, Any]) -> psutil.Process | None:
+        handle = self._handles.get(record["deployment_id"])
+        if handle is not None and handle.popen is not None and handle.popen.pid == record.get("pid"):
+            # Our own child: its exit is known exactly.
+            if handle.popen.poll() is not None:
+                return None
+            try:
+                return psutil.Process(handle.popen.pid)
+            except psutil.Error:
+                return None
+        return procs.matching(record)
+
+    def _watch(self, deployment_id: str, handle: _Handle) -> None:
+        old = self._handles.get(deployment_id)
+        if old is not None and old.watcher is not None:
+            old.watcher.cancel()
+        self._handles[deployment_id] = handle
+        handle.watcher = asyncio.create_task(self._watcher(deployment_id, handle), name=f"native-{deployment_id}")
+
+    async def _probe_ready(self, port: int, served: str) -> bool:
+        try:
+            async with httpx.AsyncClient(timeout=2.0) as client:
+                response = await client.get(f"http://127.0.0.1:{port}/v1/models")
+            if response.status_code != 200:
+                return False
+            return any(m.get("id") == served for m in response.json().get("data") or [] if isinstance(m, dict))
+        except (httpx.HTTPError, ValueError, AttributeError):
+            return False
+
+    async def _watcher(self, deployment_id: str, handle: _Handle) -> None:
+        while True:
+            record = self._record(deployment_id)
+            if not record or record.get("state") not in LIVE or self._handles.get(deployment_id) is not handle:
+                return
+            log_path = Path(record["log_path"])
+            if self._leader(record) is None:
+                code = handle.popen.poll() if handle.popen is not None else None
+                record.update(state="failed", exit_code=code,
+                              last_error=workers.last_error(log_path) or f"the worker exited (code {code})")
+                # Its children may outlive it.
+                await asyncio.to_thread(procs.stop_tree, None, record.get("pgid"), grace_s=self.cleanup_grace_s / 2,
+                                        not_before=float(record.get("started_at") or 0))
+                self._save(record)
+                log.warning("Native worker %s exited: %s", deployment_id, record["last_error"])
+                return
+            if record["state"] == "starting":
+                if await self._probe_ready(int(record["port"]), record["served_model_name"]):
+                    record.update(state="ready", ready_at=time.time())
+                    self._save(record)
+                    log.info("Native worker %s is ready", deployment_id)
+                elif time.time() - float(record["started_at"]) > float(record.get("timeout_s") or 300):
+                    tail = workers.last_error(log_path)
+                    await self._stop_record(record, grace_s=self.cleanup_grace_s)
+                    record.update(state="failed", stopped_at=time.time(),
+                                  last_error=f"not ready after {record['timeout_s']} s" + (f": {tail}" if tail else ""))
+                    self._save(record)
+                    return
+            workers.rotate_if_big(log_path)
+            await asyncio.sleep(self._poll if record["state"] == "starting" else self._poll * 2.5)
+
+    async def native_worker_status(self, payload: dict[str, Any]) -> dict[str, Any]:
+        deployment_id = check_id(payload.get("deployment_id"), "deployment_id")
+        record = self._record(deployment_id)
+        if record is None:
+            return {"ok": True, "state": "stopped", "port": None}
+        out = {"ok": True, **{k: record.get(k) for k in
+                              ("state", "pid", "port", "ready_at", "exit_code", "last_error", "generation", "started_at")}}
+        if record.get("state") in LIVE and deployment_id not in self._handles:
+            out["state"] = "failed"  # nothing watches it: the agent never adopted it
+            out["last_error"] = "the worker is not tracked by this agent"
+        return out
+
+    async def _stop_record(self, record: dict[str, Any], *, grace_s: float) -> list[int]:
+        handle = self._handles.get(record["deployment_id"])
+        popen = handle.popen if handle is not None and handle.popen is not None and handle.popen.pid == record.get("pid") else None
+        pid = record.get("pid") if (popen is not None or procs.matching(record) is not None) else None
+        return await asyncio.to_thread(
+            procs.stop_tree, pid, record.get("pgid"), grace_s=grace_s,
+            not_before=float(record.get("started_at") or 0),
+            reap=(lambda: popen.poll()) if popen is not None else None,
+        )
+
+    async def stop_native_worker(self, payload: dict[str, Any]) -> dict[str, Any]:
+        deployment_id = check_id(payload.get("deployment_id"), "deployment_id")
+        grace = float(payload.get("grace_s", 30) or 0)
+        grace = min(max(grace, 0.0), 600.0)
+        async with self._lock:
+            record = self._record(deployment_id)
+            if record is None:
+                return {"ok": True, "stopped": True, "exit_code": None, "known": False}
+            code = await self._stop_locked(deployment_id, record, grace_s=grace)
+        return {"ok": True, "stopped": True, "exit_code": code}
+
+    async def _stop_locked(self, deployment_id: str, record: dict[str, Any], *, grace_s: float) -> int | None:
+        handle = self._handles.get(deployment_id)
+        if handle is not None and handle.watcher is not None:
+            handle.watcher.cancel()
+        survivors = await self._stop_record(record, grace_s=grace_s)
+        self._handles.pop(deployment_id, None)
+        if survivors:
+            raise NativeError(f"processes {survivors} of {deployment_id} survived SIGKILL", code="stop_incomplete")
+        code = handle.popen.poll() if handle is not None and handle.popen is not None else record.get("exit_code")
+        record.update(state="stopped", stopped_at=time.time(), exit_code=code)
+        self._save(record)
+        shutil.rmtree(self.paths.tmp(deployment_id), ignore_errors=True)
+        log.info("Stopped native worker %s (exit %s)", deployment_id, code)
+        return code
+
+    async def native_worker_logs(self, payload: dict[str, Any]) -> dict[str, Any]:
+        deployment_id = check_id(payload.get("deployment_id"), "deployment_id")
+        cursor = payload.get("cursor")
+        lines, new_cursor = workers.read_logs(
+            self.paths.log_file(deployment_id), tail=payload.get("tail") or 200,
+            cursor=None if cursor in (None, "") else str(cursor),
+        )
+        return {"ok": True, "lines": lines, "cursor": new_cursor}
+
+    # ── agent start and stop ──────────────────────────────────────
+
+    async def reconcile(self) -> dict[str, list[str]]:
+        """Adopt workers that outlived the agent; fail and clean up the rest."""
+        adopted: list[str] = []
+        failed: list[str] = []
+        for record in self._records():
+            if record.get("state") not in LIVE:
+                continue
+            deployment_id = record["deployment_id"]
+            if procs.matching(record, uid=os.getuid()) is not None:
+                self._watch(deployment_id, _Handle(popen=None))
+                adopted.append(deployment_id)
+                log.info("Adopted native worker %s (pid %s)", deployment_id, record.get("pid"))
+                continue
+            left = await asyncio.to_thread(
+                procs.stop_tree, None, record.get("pgid"), grace_s=self.cleanup_grace_s,
+                not_before=float(record.get("started_at") or 0), uid=os.getuid(),
+            )
+            record.update(state="failed", stopped_at=time.time(),
+                          last_error="the agent restarted and the worker was gone or not the recorded process"
+                          + (f"; {left} survived" if left else ""))
+            self._save(record)
+            failed.append(deployment_id)
+            log.warning("Native worker %s did not survive the agent restart", deployment_id)
+        return {"adopted": adopted, "failed": failed}
+
+    async def close(self) -> None:
+        """Stop watching. Workers keep running: the next agent adopts them."""
+        for handle in self._handles.values():
+            if handle.watcher is not None:
+                handle.watcher.cancel()
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    await handle.watcher
+        self._handles.clear()

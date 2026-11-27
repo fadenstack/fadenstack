@@ -25,6 +25,16 @@ log = logging.getLogger(__name__)
 SECRET_RESULT_KEYS = frozenset({"cluster_token"})
 
 
+_NATIVE_COMMANDS = frozenset({
+    NodeCommandType.STAGE_NATIVE_RUNTIME.value,
+    NodeCommandType.NATIVE_RUNTIME_STATUS.value,
+    NodeCommandType.START_NATIVE_WORKER.value,
+    NodeCommandType.NATIVE_WORKER_STATUS.value,
+    NodeCommandType.STOP_NATIVE_WORKER.value,
+    NodeCommandType.NATIVE_WORKER_LOGS.value,
+})
+
+
 def _without_secrets(normalized: dict[str, Any]) -> dict[str, Any]:
     result = normalized.get("result")
     if not isinstance(result, dict) or not SECRET_RESULT_KEYS & result.keys():
@@ -44,6 +54,7 @@ class CommandDispatcher:
         events: EventBuffer,
         on_refresh_inventory: Callable[[], None] | None = None,
         ray_manager: RayManager | None = None,
+        native_manager: Any = None,
     ) -> None:
         self._state = state_store
         self._runtime = runtime_manager
@@ -51,6 +62,8 @@ class CommandDispatcher:
         self._events = events
         self._on_refresh_inventory = on_refresh_inventory
         self._ray = ray_manager
+        #: ``native.manager.NativeRuntimeManager`` on a Mac; ``None`` elsewhere.
+        self._native = native_manager
         # command_id -> running task.  The backend re-dispatches in-flight
         # commands on reconnect (E); the stream connection must never run
         # the same deploy twice concurrently (two ``docker run`` = two
@@ -203,6 +216,22 @@ class CommandDispatcher:
         async with self._order.turn(command_type, notify=emit_progress):
             return await self._execute(command_type=command_type, payload=payload, emit_progress=emit_progress)
 
+    async def _native_command(
+        self, command_type: str, payload: dict[str, Any], emit_progress: ProgressEmitter
+    ) -> dict[str, Any]:
+        if self._native is None:
+            from faden_agent.native import NativeError  # noqa: PLC0415
+
+            raise NativeError(
+                f"{command_type}: this machine has no native runtime support (macOS on Apple silicon only).",
+                code="unsupported",
+            )
+        if command_type == NodeCommandType.STAGE_NATIVE_RUNTIME.value:
+            self._guard.validate_image(str(payload.get("oci_image") or ""))
+            return await self._native.stage_native_runtime(payload, emit_progress=emit_progress)
+        handler = getattr(self._native, command_type)
+        return await handler(payload)
+
     async def _execute(
         self, *, command_type: str, payload: dict[str, Any], emit_progress: ProgressEmitter,
     ) -> dict[str, Any]:
@@ -272,6 +301,8 @@ class CommandDispatcher:
             return await self._ray.delete_serve_app(payload)
         if command_type == NodeCommandType.MODEL_TLS_ROUTE.value:
             return await self._runtime.model_tls_route(payload)
+        if command_type in _NATIVE_COMMANDS:
+            return await self._native_command(command_type, payload, emit_progress)
         if command_type == NodeCommandType.SHUTDOWN_SERVE.value:
             if not self._ray:
                 raise RuntimeManagerError("Ray manager not available")

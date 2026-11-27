@@ -62,6 +62,14 @@ class NodeCommandType(enum.StrEnum):
     # --- Can this machine download models itself? ---
     CHECK_INTERNET = "check_internet"
 
+    # --- Native runtimes: vLLM-Metal on a Mac, no containers (native/) ---
+    STAGE_NATIVE_RUNTIME = "stage_native_runtime"
+    NATIVE_RUNTIME_STATUS = "native_runtime_status"
+    START_NATIVE_WORKER = "start_native_worker"
+    NATIVE_WORKER_STATUS = "native_worker_status"
+    STOP_NATIVE_WORKER = "stop_native_worker"
+    NATIVE_WORKER_LOGS = "native_worker_logs"
+
 
 class CommandResult(TypedDict, total=False):
     """Normalized command result sent over stream."""

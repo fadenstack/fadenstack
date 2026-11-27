@@ -855,12 +855,66 @@ def activate(
     )
 
 
-def stop(runner: Runner, layout: Layout) -> bool:
-    """Stop the job and remove its definition (as ``stop`` removes the unit on Linux)."""
+def stop(runner: Runner, layout: Layout, *, say: Callable[[str], None] = print) -> bool:
+    """Stop the job and remove its definition (as ``stop`` removes the unit on Linux).
+
+    Its native workers (vLLM) go too: an agent restart leaves them running
+    for the next agent to adopt, but after ``stop`` nothing would, and an
+    orphaned vLLM holds tens of GB with no proxy in front of it. ``activate``
+    (install, upgrade) only boots the job out, and keeps them.
+    """
     was = job_state(runner).loaded
     bootout(runner)
     layout.plist.unlink(missing_ok=True)
+    uid = _read_attr(runner, "Users", SERVICE_USER, "UniqueID")
+    if uid and uid.isdigit():
+        stop_native_workers(layout, int(uid), say=say)
     return was
+
+
+def stop_native_workers(
+    layout: Layout, uid: int, *, say: Callable[[str], None] = print, grace_s: float = 30.0
+) -> list[str]:
+    """End the service's vLLM workers, as root, reading their records only.
+
+    Root never writes in the service's directory. Each record is read with no
+    symlink, fifo or hardlink followed and must belong to the service user;
+    its process must still be the recorded one (pid, creation time, command)
+    and run as the service user, and only such processes are signalled, one
+    by one -- never by user (``distnoted``/``cfprefsd`` run as it too).
+    Returns the deployments with processes left.
+    """
+    from faden_agent.native import proc as native_proc  # noqa: PLC0415
+    from faden_agent.native.common import read_json_nofollow  # noqa: PLC0415
+
+    workers = layout.state_dir / "native" / "workers"
+    try:
+        entries = sorted(workers.iterdir()) if workers.is_dir() and not workers.is_symlink() else []
+    except OSError:
+        entries = []
+    left: list[str] = []
+    for path in entries:
+        if path.suffix != ".json":
+            continue
+        record = read_json_nofollow(path, owner=uid)
+        if not record or record.get("state") not in ("starting", "ready"):
+            continue
+        name = str(record.get("deployment_id") or path.stem)
+        leader = native_proc.matching(record, uid=uid)
+        pid = leader.pid if leader is not None else None
+        pgid = record.get("pgid")
+        # The group is the leader's own (start_new_session); any other value is not trusted.
+        pgid = pgid if isinstance(pgid, int) and pgid > 1 and pgid == record.get("pid") else None
+        survivors = native_proc.stop_tree(
+            pid, pgid, grace_s=grace_s, not_before=float(record.get("started_at") or 0),
+            uid=uid, use_killpg=False,
+        )
+        if survivors:
+            left.append(name)
+            say(f"  The model worker {name} still runs (pids {survivors}).")
+        elif pid is not None:
+            say(f"  Stopped the model worker {name}.")
+    return left
 
 
 def uninstall(
@@ -874,7 +928,7 @@ def uninstall(
 
     Returns whether everything is gone; what is left is reported through *say*.
     """
-    stop(runner, layout)
+    stop(runner, layout, say=say)
     number = read_marker(layout).get("id")
     uid = _read_attr(runner, "Users", SERVICE_USER, "UniqueID")
     gid = _read_attr(runner, "Groups", SERVICE_USER, "PrimaryGroupID")
