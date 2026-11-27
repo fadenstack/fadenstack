@@ -22,10 +22,21 @@ describe("installCommand", () => {
     const line = installCommand("https://192.0.2.61", { caSha256: SHA });
     const steps = line.split(" && ");
     expect(steps[0]).toBe(`curl -fsSLk -o ${CA_FILE} https://192.0.2.61/api/install/ca.crt`);
-    expect(steps[1]).toBe(`echo "${SHA}  ${CA_FILE}" | sha256sum -c --quiet`);
+    expect(steps[1]).toBe(
+      `if [ "$(uname)" = Darwin ]; then echo "${SHA}  ${CA_FILE}" | shasum -a 256 -c --quiet; ` +
+        `else echo "${SHA}  ${CA_FILE}" | sha256sum -c --quiet; fi`,
+    );
     // Only after the check: the installer, verified against it; the -k is for the authority alone.
     expect(steps[2]).toBe(`curl -fsSLO --cacert ${CA_FILE} https://192.0.2.61/api/install/faden-agent.sh`);
     expect(steps[3]).toBe(`sudo sh faden-agent.sh --join https://192.0.2.61 --ca-file ${CA_FILE}`);
+  });
+
+  it("checks with a tool each system has: shasum on a Mac, GNU sha256sum on Linux", () => {
+    const check = installCommand("https://192.0.2.61", { caSha256: SHA }).split(" && ")[1];
+    // Linux runs exactly the line it always ran.
+    expect(check).toContain(`else echo "${SHA}  ${CA_FILE}" | sha256sum -c --quiet; fi`);
+    // macOS's BSD sha256sum rejects -c from stdin and --quiet; shasum takes both.
+    expect(check).toMatch(/^if \[ "\$\(uname\)" = Darwin \]; then echo "[0-9a-f]{64}  server-ca\.crt" \| shasum -a 256 -c --quiet;/);
   });
 
   it("carries a token the same way", () => {

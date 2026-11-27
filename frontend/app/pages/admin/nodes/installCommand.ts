@@ -10,8 +10,21 @@
  * (`caSha256`, from /api/install/address) before trusting anything from the
  * backend: the installer is fetched verified against it, and handed it with
  * `--ca-file` so the agent keeps it.
+ *
+ * The check runs `shasum` on a Mac and `sha256sum` elsewhere: macOS ships a BSD
+ * `sha256sum` that rejects both `-c` from stdin and `--quiet`, while Linux keeps
+ * the GNU line it always had. Written as `if`, not `$TOOL`, because zsh -- the
+ * Mac's shell -- does not split an unquoted variable into words.
  */
 export const CA_FILE = "server-ca.crt";
+
+function caCheck(caSha256: string): string {
+  const line = `echo "${caSha256}  ${CA_FILE}"`;
+  return (
+    `if [ "$(uname)" = Darwin ]; then ${line} | shasum -a 256 -c --quiet; ` +
+    `else ${line} | sha256sum -c --quiet; fi`
+  );
+}
 
 export function installCommand(
   origin: string,
@@ -21,7 +34,7 @@ export function installCommand(
   if (caSha256 && origin.startsWith("https://")) {
     return (
       `curl -fsSLk -o ${CA_FILE} ${origin}/api/install/ca.crt && ` +
-      `echo "${caSha256}  ${CA_FILE}" | sha256sum -c --quiet && ` +
+      `${caCheck(caSha256)} && ` +
       `curl -fsSLO --cacert ${CA_FILE} ${origin}/api/install/faden-agent.sh && ` +
       `sudo sh faden-agent.sh ${how} --ca-file ${CA_FILE}`
     );
