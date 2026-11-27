@@ -206,6 +206,19 @@ class TestTheAccount:
         ds.ensure_account(mac, layout, VERSION, environ={})
         assert seen and all(seen)
 
+    def test_the_markers_directory_is_checked_before_it_is_used(
+        self, mac: FakeMac, layout: Layout, tmp_path: Path
+    ) -> None:
+        elsewhere = tmp_path / "elsewhere"
+        elsewhere.mkdir()
+        os.chmod(elsewhere, 0o777)
+        layout.marker.parent.parent.mkdir(parents=True)
+        layout.marker.parent.symlink_to(elsewhere)
+        with pytest.raises(ds.DarwinServiceError, match="not a directory owned by root"):
+            ds.ensure_account(mac, layout, VERSION, environ={})
+        assert oct(elsewhere.stat().st_mode & 0o777) == "0o777"
+        assert ds.SERVICE_USER not in mac.users
+
     def test_a_fleet_range_is_honoured(self, mac: FakeMac, layout: Layout) -> None:
         identity = ds.ensure_account(mac, layout, VERSION, environ={ds.ID_RANGE_ENV: "420-425"})
         assert identity.uid == 420
@@ -363,6 +376,39 @@ class TestFiles:
         layout.models.symlink_to(target)
         ds.prepare_files(mac, layout, _svc())
         assert oct(target.stat().st_mode & 0o777) == "0o755"
+
+    @pytest.mark.parametrize("left", ["empty", "with-models"])
+    def test_a_hand_over_cut_short_is_finished(
+        self, mac: FakeMac, layout: Layout, monkeypatch: pytest.MonkeyPatch, left: str
+    ) -> None:
+        """A run stopped between mkdir and chown leaves root's empty directory: finish it."""
+        other = ds.Identity(ds.SERVICE_USER, ME + 1000, MY_GROUP + 1000)  # "root" is ME here
+        layout.state_dir.mkdir(parents=True)
+        if left == "with-models":
+            layout.models.mkdir()
+        monkeypatch.setattr(ds, "_check_service_dir", lambda *_a: None)  # the fake cannot chown
+        monkeypatch.setattr(ds, "_service_log", lambda *_a: None)
+        ds.prepare_files(mac, layout, other)
+        owner = f"{ME + 1000}:{MY_GROUP + 1000}"
+        assert [ds.CHOWN, "-h", owner, str(layout.models)] in _chowns(mac)
+        assert [ds.CHOWN, "-h", owner, str(layout.state_dir)] in _chowns(mac)
+
+    def test_a_root_state_dir_with_anything_in_it_is_refused(self, mac: FakeMac, layout: Layout) -> None:
+        other = ds.Identity(ds.SERVICE_USER, ME + 1000, MY_GROUP + 1000)
+        layout.state_dir.mkdir(parents=True, mode=0o700)
+        (layout.state_dir / "state.json").write_text("{}")
+        with pytest.raises(ds.DarwinServiceError, match="private directory"):
+            ds.prepare_files(mac, layout, other)
+        assert not any(str(layout.state_dir) in " ".join(c) for c in _chowns(mac))
+
+    def test_a_log_launchd_made_as_root_is_handed_over(self, mac: FakeMac, layout: Layout) -> None:
+        other = ds.Identity(ds.SERVICE_USER, ME + 1000, MY_GROUP + 1000)
+        layout.log_dir.mkdir(parents=True)
+        layout.launchd_log.write_text("from launchd\n")
+        os.chmod(layout.launchd_log, 0o644)
+        ds._service_log(mac, layout, layout.launchd_log, other)
+        assert oct(layout.launchd_log.stat().st_mode & 0o777) == "0o640"
+        assert [ds.CHOWN, "-h", f"{ME + 1000}:{MY_GROUP + 1000}", str(layout.launchd_log)] in _chowns(mac)
 
     def test_a_state_dir_open_to_others_is_refused(self, mac: FakeMac, layout: Layout) -> None:
         ds.prepare_files(mac, layout, _svc())
@@ -557,6 +603,42 @@ class TestActivation:
         assert ds.current_build(layout) == good
         assert mac.loaded
 
+    def test_a_reinstall_launchd_will_not_load_is_tried_again_then_reported_as_down(
+        self, mac: FakeMac, layout: Layout, tmp_path: Path
+    ) -> None:
+        identity = _ready(mac, layout)
+        clock = Clock()
+        quiet = {"say": lambda _m: None, "sleep": clock.sleep, "clock": clock}
+        source = _binary(tmp_path, b"same")
+        ds.activate(mac, layout, identity, source, VERSION, **quiet)
+        mac.bootstrap_fails_for = {ds.current_build(layout)}
+        mac.calls.clear()
+        with pytest.raises(ds.DarwinServiceError, match="It is not running.*sudo faden-agent start"):
+            ds.activate(mac, layout, identity, source, VERSION, **quiet)
+        assert mac.verbs(ds.LAUNCHCTL).count("bootstrap") == 2
+        assert not mac.loaded
+
+    def test_a_reinstall_whose_first_load_fails_once_still_starts(
+        self, mac: FakeMac, layout: Layout, tmp_path: Path
+    ) -> None:
+        identity = _ready(mac, layout)
+        clock = Clock()
+        quiet = {"say": lambda _m: None, "sleep": clock.sleep, "clock": clock}
+        source = _binary(tmp_path, b"same")
+        ds.activate(mac, layout, identity, source, VERSION, **quiet)
+        original = mac._launchctl
+        failed = []
+
+        def once(args: list[str]) -> Result:
+            if args[0] == "bootstrap" and not failed:
+                failed.append(True)
+                return Result(5, "", "Bootstrap failed: 5: Input/output error")
+            return original(args)
+
+        mac._launchctl = once  # type: ignore[method-assign]
+        ds.activate(mac, layout, identity, source, VERSION, **quiet)
+        assert mac.loaded
+
     def test_a_good_upgrade_keeps_the_previous_build_and_no_older(
         self, mac: FakeMac, layout: Layout, tmp_path: Path
     ) -> None:
@@ -659,21 +741,36 @@ class TestStopAndUninstall:
         assert _kills(mac) == []
         assert any("did not create it" in s for s in said)
 
-    @pytest.mark.parametrize("changed", ["Users", "Groups"])
-    def test_uninstall_never_kills_or_deletes_when_the_id_changed(
-        self, mac: FakeMac, layout: Layout, changed: str
-    ) -> None:
+    def test_a_user_whose_uid_changed_is_neither_killed_nor_deleted(self, mac: FakeMac, layout: Layout) -> None:
         """The marker's number may now be someone else's: killing by it would kill their processes."""
         _install_account(mac, layout, 452)
-        table = mac.users if changed == "Users" else mac.groups
-        table[ds.SERVICE_USER]["UniqueID" if changed == "Users" else "PrimaryGroupID"] = "460"
+        mac.users[ds.SERVICE_USER]["UniqueID"] = "460"
         said: list[str] = []
         ds.uninstall(mac, layout, say=said.append, sleep=lambda _s: None)
         assert _kills(mac) == []
-        assert not any("-delete" in c for c in mac.calls)
         assert ds.SERVICE_USER in mac.users
+        assert ds.SERVICE_USER not in mac.groups, "the group still has the marker's number"
         assert layout.marker.exists(), "the marker stays while the account does"
-        assert any("not the 452 Fadenstack created" in s for s in said)
+        assert any("account" in s and "not the 452 Fadenstack created" in s for s in said)
+
+    def test_a_group_whose_gid_changed_is_kept(self, mac: FakeMac, layout: Layout) -> None:
+        _install_account(mac, layout, 452)
+        mac.groups[ds.SERVICE_USER]["PrimaryGroupID"] = "460"
+        said: list[str] = []
+        ds.uninstall(mac, layout, say=said.append, sleep=lambda _s: None)
+        assert ds.SERVICE_USER not in mac.users
+        assert ds.SERVICE_USER in mac.groups
+        assert any("group" in s and "not the 452 Fadenstack created" in s for s in said)
+
+    def test_a_group_left_by_an_interrupted_uninstall_is_removed_next_time(
+        self, mac: FakeMac, layout: Layout
+    ) -> None:
+        _install_account(mac, layout, 452)
+        del mac.users[ds.SERVICE_USER]
+        assert ds.uninstall(mac, layout, say=lambda _m: None, sleep=lambda _s: None) is True
+        assert ds.SERVICE_USER not in mac.groups
+        assert _kills(mac) == [], "no user record: nobody's processes are killed by number"
+        assert not layout.marker.exists()
 
     def test_uninstall_after_the_account_is_gone_kills_nothing(self, mac: FakeMac, layout: Layout) -> None:
         layout.marker.parent.mkdir(parents=True)

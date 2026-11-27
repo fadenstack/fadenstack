@@ -101,9 +101,15 @@ class Runner:
         return Result(proc.returncode, proc.stdout, proc.stderr)
 
     def call(self, argv: Sequence[str], *, uid: int, gid: int, env: dict[str, str], cwd: str) -> int:
-        """Run *argv* as *uid*:*gid* with the terminal attached (the join shows its code and waits)."""
+        """Run *argv* as *uid*:*gid*, its output on this terminal (the join shows its code and waits).
+
+        In a session of its own (setsid): with no controlling terminal, a
+        process of the service's cannot push keystrokes (TIOCSTI) into the
+        administrator's shell. Ctrl+C reaches this process, which stops it.
+        """
         return subprocess.run(  # noqa: S603 - our own staged binary, no shell
             list(argv), check=False, user=uid, group=gid, extra_groups=[], env=env, cwd=cwd,
+            stdin=subprocess.DEVNULL, start_new_session=True,
         ).returncode
 
 
@@ -263,13 +269,12 @@ def read_marker(layout: Layout) -> dict[str, str]:
 
 
 def _write_marker(layout: Layout, number: int, version: str) -> None:
-    layout.marker.parent.mkdir(parents=True, exist_ok=True)
-    os.chmod(layout.marker.parent, 0o755)
-    layout.marker.write_text(
-        f"name={SERVICE_USER}\nid={number}\ncreated={time.strftime('%Y-%m-%dT%H:%M:%S%z')}\nversion={version}\n",
-        encoding="utf-8",
+    _root_dir(layout, layout.marker.parent)
+    _atomic_write(
+        layout.marker,
+        f"name={SERVICE_USER}\nid={number}\ncreated={time.strftime('%Y-%m-%dT%H:%M:%S%z')}\nversion={version}\n".encode(),
+        0o644,
     )
-    os.chmod(layout.marker, 0o644)
 
 
 def allocate_id(runner: Runner, lo: int, hi: int) -> int:
@@ -431,6 +436,25 @@ def _check_service_dir(layout: Layout, directory: Path, identity: Identity) -> N
         )
 
 
+def _unfinished_hand_over(layout: Layout, st: os.stat_result, identity: Identity) -> bool:
+    """A state directory still root's because a run stopped between mkdir and chown.
+
+    Finished only while nothing is in it but an empty models directory of
+    root's: nobody but root could have put anything there, and there is none.
+    """
+    if st.st_uid == identity.uid or st.st_uid != layout.root_uid or not stat.S_ISDIR(st.st_mode):
+        return False
+    entries = os.listdir(layout.state_dir)
+    if entries == []:
+        return True
+    if entries == ["models"]:
+        models = os.lstat(layout.models)
+        return (
+            stat.S_ISDIR(models.st_mode) and models.st_uid == layout.root_uid and os.listdir(layout.models) == []
+        )
+    return False
+
+
 def _service_log(runner: Runner, layout: Layout, log: Path, identity: Identity) -> None:
     """A log file of the service's, in root's log directory: created once, else checked."""
     try:
@@ -441,10 +465,22 @@ def _service_log(runner: Runner, layout: Layout, log: Path, identity: Identity) 
         os.chmod(log, 0o640)
         _chown(runner, f"{identity.uid}:{identity.gid}", log)
         return
-    if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1 or st.st_uid != identity.uid:
+    if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1 or st.st_uid not in (identity.uid, layout.root_uid):
         raise DarwinServiceError(
             f"{layout.real(log)} is not a plain log file of {SERVICE_USER}'s. Refusing to use it."
         )
+    if st.st_uid == layout.root_uid and st.st_uid != identity.uid:
+        # launchd or newsyslog made it as root. Root's directory, so nobody else
+        # can swap it; still opened without following links and checked again.
+        fd = os.open(log, os.O_WRONLY | os.O_NOFOLLOW)
+        try:
+            again = os.fstat(fd)
+            if not stat.S_ISREG(again.st_mode) or again.st_nlink != 1 or again.st_ino != st.st_ino:
+                raise DarwinServiceError(f"{layout.real(log)} changed while being checked. Refusing to use it.")
+            os.fchmod(fd, 0o640)
+        finally:
+            os.close(fd)
+        _chown(runner, f"{identity.uid}:{identity.gid}", log)
 
 
 def prepare_files(runner: Runner, layout: Layout, identity: Identity) -> None:
@@ -458,12 +494,15 @@ def prepare_files(runner: Runner, layout: Layout, identity: Identity) -> None:
         _root_dir(layout, directory)
     owner = f"{identity.uid}:{identity.gid}"
     try:
-        os.lstat(layout.state_dir)
+        st = os.lstat(layout.state_dir)
     except FileNotFoundError:
         os.mkdir(layout.state_dir, 0o700)
-        os.mkdir(layout.models, 0o700)
-        os.chmod(layout.state_dir, 0o700)
-        os.chmod(layout.models, 0o700)
+        st = None
+    if st is None or _unfinished_hand_over(layout, st, identity):
+        for directory in (layout.state_dir, layout.models):
+            if not os.path.lexists(directory):
+                os.mkdir(directory, 0o700)
+            os.chmod(directory, 0o700)
         _chown(runner, owner, layout.models)  # before its parent becomes the service's
         _chown(runner, owner, layout.state_dir)
     _check_service_dir(layout, layout.state_dir, identity)
@@ -732,14 +771,24 @@ def activate(
     _chown(runner, "0:0", layout.plist)
 
     previous = current_build(layout)
-    was_loaded = job_state(runner).loaded
     bootout(runner, sleep=sleep)
+    load_error: Exception | None = None
     try:
         select_build(layout, name)
         link_cli(layout)
         bootstrap(runner, layout)
     except (DarwinServiceError, OSError) as exc:
-        ok, why = False, f"it could not be loaded ({exc})"
+        load_error = exc
+        if not previous or previous == name:
+            # Nothing else to go back to: try loading once more (a transient launchctl error).
+            sleep(2.0)
+            try:
+                bootstrap(runner, layout)
+                load_error = None
+            except (DarwinServiceError, OSError) as again:
+                load_error = again
+    if load_error is not None:
+        ok, why = False, f"it could not be loaded ({load_error})"
     else:
         say("  Waiting for the service to settle...")
         ok, why = wait_healthy(runner, sleep=sleep, clock=clock)
@@ -761,9 +810,13 @@ def activate(
             f"Build {name} did not start: {why}. Rolled back to {previous}, which is {state}. "
             f"See {layout.real(layout.log_file)} and {layout.real(layout.launchd_log)}."
         )
-    detail = "" if was_loaded else " It stays loaded and launchd keeps retrying."
+    if job_state(runner).loaded:
+        detail = "It stays loaded and launchd keeps restarting it."
+    else:
+        detail = "It is not running. Once the cause is fixed, start it with: sudo faden-agent start"
     raise DarwinServiceError(
-        f"The service did not start: {why}.{detail} See {layout.real(layout.log_file)} and {layout.real(layout.launchd_log)}."
+        f"The service did not start: {why}. {detail} "
+        f"See {layout.real(layout.log_file)} and {layout.real(layout.launchd_log)}."
     )
 
 
@@ -790,8 +843,12 @@ def uninstall(
     number = read_marker(layout).get("id")
     uid = _read_attr(runner, "Users", SERVICE_USER, "UniqueID")
     gid = _read_attr(runner, "Groups", SERVICE_USER, "PrimaryGroupID")
-    ours = bool(number) and uid == number and gid == number
-    if ours:
+    # Each record goes when its own number is the marker's: a run that deleted
+    # the user and then failed leaves a group the next run still removes.
+    user_ours = bool(number) and uid == number
+    group_ours = bool(number) and gid == number
+    ours = user_ours or group_ours
+    if user_ours:
         # The per-user distnoted/cfprefsd agents launchd started for the account
         # outlive the job; an account is not deleted under running processes.
         # Only now that the number is known to be this account's.
@@ -803,14 +860,18 @@ def uninstall(
         else:
             runner.run([PKILL, "-KILL", "-U", number])
         _must(runner, [DSCL, ".", "-delete", f"/Users/{SERVICE_USER}"])
-        _must(runner, [DSCL, ".", "-delete", f"/Groups/{SERVICE_USER}"])
         say(f"  Deleted the account {SERVICE_USER} ({number}).")
-    elif uid is not None or gid is not None:
-        why = (
-            "Fadenstack did not create it (no marker)" if not number
-            else f"its UID {uid} and GID {gid} are not the {number} Fadenstack created"
-        )
-        say(f"  Not deleting {SERVICE_USER} and not stopping its processes: {why}.")
+    if group_ours:
+        _must(runner, [DSCL, ".", "-delete", f"/Groups/{SERVICE_USER}"])
+        say(f"  Deleted the group {SERVICE_USER} ({number}).")
+    for kind, found, mine in (("account", uid, user_ours), ("group", gid, group_ours)):
+        if found is not None and not mine:
+            why = (
+                "Fadenstack did not create it (no marker)" if not number
+                else f"its number {found} is not the {number} Fadenstack created"
+            )
+            stopping = " and not stopping its processes" if kind == "account" else ""
+            say(f"  Not deleting the {kind} {SERVICE_USER}{stopping}: {why}.")
 
     left: list[str] = []
     try:

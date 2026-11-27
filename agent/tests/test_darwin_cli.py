@@ -275,3 +275,50 @@ def test_an_incomplete_uninstall_fails(
         agent_main.cmd_uninstall()
     assert exc.value.code == 1
     assert "not complete" in capsys.readouterr().out
+
+
+_CHILD_ENV_ALLOWED = {
+    agent_main._DARWIN_JOIN_CHILD, "HOME", "USER", "LOGNAME", "PATH", "TMPDIR", "LANG", "LC_ALL", "TERM", "NO_COLOR",
+}
+
+
+def test_the_join_child_gets_none_of_roots_environment(
+    on_a_mac: list[str], runner: FakeRunner, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _no_join_as_root(monkeypatch)
+    monkeypatch.setattr(agent_main, "_save_env_file", lambda env: Path("/dev/null"))
+    for key, value in {
+        "SUDO_USER": "admin", "SUDO_UID": "501", "SUDO_COMMAND": "/bin/sh faden-agent.sh", "SUDO_GID": "20",
+        "HOME": "/var/root", "USER": "root", "LOGNAME": "root", "MAIL": "/var/mail/root", "SHELL": "/bin/zsh",
+        "SSH_AUTH_SOCK": "/private/tmp/agent.sock", "TMPDIR": "/var/folders/root/T/", "PYTHONPATH": "/evil",
+        "DYLD_INSERT_LIBRARIES": "/evil.dylib", "PATH": "/opt/evil:/usr/bin",
+    }.items():
+        monkeypatch.setenv(key, value)
+    agent_main.cmd_join("http://192.0.2.220:8000")
+    env = runner.calls[0]["env"]
+    assert set(env) - _CHILD_ENV_ALLOWED <= {k for k in env if k.startswith("FADEN_NODE_AGENT_")}
+    assert not any(k.startswith(("SUDO_", "DYLD_", "PYTHON")) for k in env)
+    assert env["USER"] == env["LOGNAME"] == ds.SERVICE_USER
+    assert env["HOME"] == str(tmp_path / "root/var/db/fadenstack/agent")
+    assert env["PATH"] == "/usr/bin:/bin:/usr/sbin:/sbin"
+    assert env["TMPDIR"] == "/private/tmp"
+    assert "root" not in {env["USER"], env["LOGNAME"]} and "/var/root" not in env.values()
+
+
+def test_the_join_child_has_no_controlling_terminal(monkeypatch: pytest.MonkeyPatch) -> None:
+    """setsid: a process of the service's cannot push keystrokes into the admin's shell."""
+    seen: dict[str, Any] = {}
+
+    class Done:
+        returncode = 0
+
+    def run(argv: list[str], **kwargs: Any) -> Done:
+        seen.update(kwargs)
+        return Done()
+
+    monkeypatch.setattr(ds.subprocess, "run", run)
+    assert ds.Runner().call(["/x", "join"], uid=452, gid=452, env={}, cwd="/") == 0
+    assert seen["start_new_session"] is True
+    assert seen["stdin"] is ds.subprocess.DEVNULL
+    assert seen["user"] == 452 and seen["group"] == 452 and seen["extra_groups"] == []
+    assert "stdout" not in seen and "capture_output" not in seen, "the code must reach the terminal"
