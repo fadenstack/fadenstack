@@ -428,6 +428,42 @@ async def _download_resumable(
             await asyncio.sleep(delay)
 
 
+async def download_image_tar(
+    *,
+    client: httpx.AsyncClient,
+    credential: str,
+    image: str,
+    directory: Path,
+    expect_id: str | None = None,
+    expect_rootfs: str | None = None,
+    emit_progress: Callable[[dict[str, Any]], Any] | None = None,
+) -> Path | None:
+    """The image's ``docker save`` tar on disk, resumable, without loading it anywhere.
+
+    For the native runtime (``native/stage.py``), which extracts the layer
+    itself. ``None`` when there is no room to keep it.
+    """
+    last_colon = image.rfind(":")
+    if last_colon > 0 and "/" not in image[last_colon:]:
+        name, tag = image[:last_colon], image[last_colon + 1:]
+    else:
+        name, tag = image, "latest"
+    params = {"image": name, "tag": tag}
+    if expect_id:
+        params["expect_id"] = expect_id
+    if expect_rootfs:
+        params["expect_rootfs"] = expect_rootfs
+    return await _download_resumable(
+        client=client,
+        url="/api/node-files/images/save",
+        params=params,
+        headers={"Authorization": f"Bearer {credential}"},
+        directory=directory,
+        image=image,
+        emit_progress=emit_progress,
+    )
+
+
 async def _file_chunks(path: Path, size: int = 1024 * 1024) -> AsyncIterator[bytes]:
     """Read a file as an async byte stream without blocking the event loop."""
     with path.open("rb") as handle:

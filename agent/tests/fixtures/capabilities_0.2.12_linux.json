@@ -1,0 +1,20 @@
+{
+  "_source": "node-agent-v0.2.12: agent/faden_agent/preflight.py build_static_capabilities() keys plus the static_capabilities[...] assignments in service.py; a Linux agent advertises exactly these",
+  "linux_capability_keys": [
+    "command_continuity",
+    "container_runtime",
+    "docker_available",
+    "gpu_count",
+    "gpu_vendor",
+    "hostname",
+    "machine",
+    "model_download",
+    "model_tls",
+    "os",
+    "paths",
+    "processor",
+    "ray_drain",
+    "ray_tls",
+    "serve_scale"
+  ]
+}

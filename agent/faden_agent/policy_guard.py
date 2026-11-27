@@ -18,11 +18,13 @@ class PolicyGuard:
         NodeCommandType.START_WORKLOAD.value,
         NodeCommandType.RESTART_WORKLOAD.value,
         NodeCommandType.UPDATE_WORKLOAD.value,
+        NodeCommandType.START_NATIVE_WORKER.value,
     }
     _BLOCKED_DURING_DRAIN = {
         NodeCommandType.DEPLOY_WORKLOAD.value,
         NodeCommandType.START_WORKLOAD.value,
         NodeCommandType.RESTART_WORKLOAD.value,
+        NodeCommandType.START_NATIVE_WORKER.value,
     }
 
     def __init__(self, *, image_allowlist: list[str] | None = None) -> None:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import errno
 import socket
+import sys
 import time
 import logging
 from pathlib import Path
@@ -27,7 +28,7 @@ from faden_agent.log_collector import LogCollector
 from faden_agent.log_cursors import LogCursors
 from faden_agent.loki_client import LokiClient
 from faden_agent.ray_log_forwarder import RayServeLogForwarder
-from faden_agent.image_loader import load_image_from_backend
+from faden_agent.image_loader import download_image_tar, load_image_from_backend
 from faden_agent.model_puller import pull_model
 from faden_agent.model_tls import ModelTls
 from faden_agent.policy_guard import PolicyGuard
@@ -91,6 +92,32 @@ def log_stream_failure(exc: BaseException, retry_in: float) -> None:
         log.warning("Node stream unavailable: %s; retrying in %.0f s.", reason, retry_in)
 
 
+
+def add_agent_capabilities(static_capabilities: dict[str, Any]) -> None:
+    """What this agent can do, beside what preflight found (the same on every platform)."""
+    # This agent can put the model-TLS proxy in front of what it serves
+    # (model_tls.py); the backend sends loopback binds only to agents that say so.
+    static_capabilities["model_tls"] = 1
+    # ... and run Ray with mutual TLS between the cluster's machines (ray/ray_tls.py).
+    # 2: and say in each ENSURE_RAY_RUNTIME result what the container runs
+    # (1 was a lab build that did not).
+    static_capabilities["ray_tls"] = 2
+    # ... and download a model from the Hub itself, and say whether it can
+    # reach it (hf_download.py): a cluster's "machines download models".
+    static_capabilities["model_download"] = 1
+    # ... and keep a command running when its connection drops, deliver its
+    # result on the next, and say on connecting what runs and what finished
+    # (stream_client.py): the server then leaves them alone when it sees a
+    # connection close, instead of failing them as lost.
+    static_capabilities["command_continuity"] = 1
+    # ... and drain a machine out of its Ray cluster, Serve moving its
+    # copies first (ray/drain.py, serve_drain_patch.py).
+    static_capabilities["ray_drain"] = 1
+    # ... and change how many copies a model runs without restarting the
+    # copies that run (ray/scale.py, SCALE_SERVE_APP).
+    static_capabilities["serve_scale"] = 1
+
+
 class NodeAgentService:
     """Bootstraps onboarding and runs persistent stream loop."""
 
@@ -108,6 +135,8 @@ class NodeAgentService:
         # Held so the forwarders are never garbage-collected mid-run.
         self._log_tasks: list[asyncio.Task[None]] = []
         self._ray_manager: Any = None  # typed import is local (optional dep)
+        #: The native vLLM-Metal runtime (native/manager.py), on a Mac only.
+        self._native: Any = None
         self._model_tls: ModelTls | None = None
         self._hf_cache: str | None = None
 
@@ -135,27 +164,8 @@ class NodeAgentService:
             gpu_collector,
             paths=paths,
         )
-        # This agent can put the model-TLS proxy in front of what it serves
-        # (model_tls.py); the backend sends loopback binds only to agents that say so.
-        static_capabilities["model_tls"] = 1
-        # ... and run Ray with mutual TLS between the cluster's machines (ray/ray_tls.py).
-        # 2: and say in each ENSURE_RAY_RUNTIME result what the container runs
-        # (1 was a lab build that did not).
-        static_capabilities["ray_tls"] = 2
-        # ... and download a model from the Hub itself, and say whether it can
-        # reach it (hf_download.py): a cluster's "machines download models".
-        static_capabilities["model_download"] = 1
-        # ... and keep a command running when its connection drops, deliver its
-        # result on the next, and say on connecting what runs and what finished
-        # (stream_client.py): the server then leaves them alone when it sees a
-        # connection close, instead of failing them as lost.
-        static_capabilities["command_continuity"] = 1
-        # ... and drain a machine out of its Ray cluster, Serve moving its
-        # copies first (ray/drain.py, serve_drain_patch.py).
-        static_capabilities["ray_drain"] = 1
-        # ... and change how many copies a model runs without restarting the
-        # copies that run (ray/scale.py, SCALE_SERVE_APP).
-        static_capabilities["serve_scale"] = 1
+        add_agent_capabilities(static_capabilities)
+        native_manager = await self._start_native(static_capabilities)
         log.info("Static capabilities: %s", static_capabilities)
         if not bool(static_capabilities.get("docker_available")):
             log.warning("Container runtime is not available; runtime commands will fail until daemon is reachable.")
@@ -323,6 +333,7 @@ class NodeAgentService:
             events=events,
             on_refresh_inventory=stream.trigger_inventory,
             ray_manager=ray_manager,
+            native_manager=native_manager,
         )
         stream._dispatcher = dispatcher
         self._stream = stream
@@ -445,6 +456,58 @@ class NodeAgentService:
         self._client.http.base_url = target
         return True
 
+    async def _start_native(self, static_capabilities: dict[str, Any]) -> Any:
+        """On a Mac: the native vLLM-Metal runtime, its workers adopted before any command arrives.
+
+        ``None`` elsewhere -- Linux runs models in containers, and its
+        capabilities and commands are unchanged.
+        """
+        if sys.platform != "darwin" or self._native is not None:
+            return self._native
+        from faden_agent.native import NativePaths  # noqa: PLC0415
+        from faden_agent.native.manager import NativeRuntimeManager  # noqa: PLC0415
+
+        async def _fetch_tar(
+            *, image: str, directory: Path, expect_rootfs: str | None = None, emit_progress: Any = None
+        ) -> Path | None:
+            credential = self._state_store.state.credential
+            if not credential:
+                raise RuntimeError("No credential available for the runtime transfer.")
+            return await download_image_tar(
+                client=self._client.http, credential=credential, image=image,
+                directory=directory, expect_rootfs=expect_rootfs, emit_progress=emit_progress,
+            )
+
+        def _capabilities(update: dict[str, Any]) -> None:
+            # The same dict the stream sends with every inventory.
+            static_capabilities.update(update)
+            log.info("Native runtime capabilities: %s", update)
+
+        try:
+            manager = NativeRuntimeManager(
+                paths=NativePaths.for_state_path(self._config.state_path),
+                fetch_tar=_fetch_tar,
+                max_workers=self._config.native_max_workers,
+                sandbox=self._config.native_sandbox,
+                sandbox_config_error=self._config.native_sandbox_error,
+                sandbox_deny=[
+                    Path(self._config.state_path).parent,
+                    *([Path(self._config.model_tls_dir)] if self._config.model_tls_dir else []),
+                    Path("/Library/Fadenstack"),
+                ],
+                on_capabilities=_capabilities,
+            )
+            result = await manager.reconcile()
+        except Exception:  # noqa: BLE001 - the agent still serves everything else
+            log.exception("The native runtime could not start; native_runtime is not advertised")
+            return None
+        if result["adopted"] or result["failed"]:
+            log.info("Native workers after restart: %s", result)
+        static_capabilities.update(manager.capabilities())
+        await manager.refresh_metal()
+        self._native = manager
+        return manager
+
     async def stop(self, *, timeout: float = 3.0) -> str | None:
         """Stop reconnecting and close the node stream with 1001, within *timeout*.
 
@@ -459,6 +522,9 @@ class NodeAgentService:
     async def close(self) -> None:
         """Close outbound HTTP resources, SDK attach, and flush state."""
         self._state_store.flush_seq()
+        if self._native is not None:
+            # Stops watching only: the workers keep serving, the next agent adopts them.
+            await self._native.close()
         if self._ray_manager is not None:
             try:
                 await self._ray_manager.close()

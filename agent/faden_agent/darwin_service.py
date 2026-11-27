@@ -855,12 +855,123 @@ def activate(
     )
 
 
-def stop(runner: Runner, layout: Layout) -> bool:
-    """Stop the job and remove its definition (as ``stop`` removes the unit on Linux)."""
+def stop(runner: Runner, layout: Layout, *, say: Callable[[str], None] = print) -> bool:
+    """Stop the job and remove its definition (as ``stop`` removes the unit on Linux).
+
+    Its native workers (vLLM) go too: an agent restart leaves them running
+    for the next agent to adopt, but after ``stop`` nothing would, and an
+    orphaned vLLM holds tens of GB with no proxy in front of it. ``activate``
+    (install, upgrade) only boots the job out, and keeps them.
+    """
     was = job_state(runner).loaded
     bootout(runner)
     layout.plist.unlink(missing_ok=True)
+    uid = _read_attr(runner, "Users", SERVICE_USER, "UniqueID")
+    if uid and uid.isdigit():
+        try:
+            stop_native_workers(layout, int(uid), say=say)
+        except Exception as exc:  # noqa: BLE001 - stop and uninstall go on; pkill -U remains the backstop
+            say(f"  Could not stop the model workers: {exc}")
     return was
+
+
+def stop_native_workers(
+    layout: Layout, uid: int, *, say: Callable[[str], None] = print, grace_s: float = 30.0
+) -> list[str]:
+    """End the service's vLLM workers, as root, reading their records only.
+
+    Root never writes in the service's directory. Each directory on the way
+    is opened without following a symlink and must belong to the service
+    user; each record is read the same way and must be a regular file with
+    one link, owned by the service user, and valid field by field. A
+    record's process must still be the recorded one (pid, creation time,
+    command) and run as the service user; only such processes (and its
+    verified descendants) are signalled, one by one -- never by user
+    (``distnoted``/``cfprefsd`` run as it too). A bad record is reported
+    and skipped: it never stops the rest, nor the uninstall after it.
+    Returns the deployments with processes left.
+    """
+    from faden_agent.native import proc as native_proc  # noqa: PLC0415
+
+    left: list[str] = []
+    for name, record in _worker_records(layout, uid, say=say):
+        shown = name if _SAFE_NAME.fullmatch(name) else repr(name)[:80]
+        try:
+            native_proc.validate(record)
+            if record.get("state") not in ("starting", "ready"):
+                continue
+            leader = native_proc.matching(record, uid=uid)
+            survivors = native_proc.stop_worker(record, leader, grace_s=grace_s, uid=uid)
+        except Exception as exc:  # noqa: BLE001 - one bad record must not stop the rest
+            say(f"  Skipped the model worker record {shown}: {exc}")
+            continue
+        if survivors:
+            left.append(name)
+            say(f"  The model worker {shown} still runs (pids {survivors}).")
+        elif leader is not None:
+            say(f"  Stopped the model worker {shown}.")
+    # Whatever a record did not name (a corrupt or missing record, a helper that
+    # detached): every process of the service user carrying a worker marker.
+    try:
+        rest = native_proc.marked(uid=uid, any_marker=True)
+        if rest:
+            survivors = native_proc.stop_processes(rest, grace_s=grace_s, uid=uid)
+            say(f"  Stopped {len(rest) - len(survivors)} more model worker process(es) found by their marker.")
+            if survivors:
+                left.append("marker")
+                say(f"  Model worker processes still run (pids {survivors}).")
+    except Exception as exc:  # noqa: BLE001 - stop and uninstall go on
+        say(f"  Could not look for unrecorded model worker processes: {exc}")
+    return left
+
+
+_SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+_MAX_RECORDS = 64
+
+
+def _open_dir(name: str, uid: int, *, dir_fd: int | None = None) -> int | None:
+    flags = os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        fd = os.open(name, flags, dir_fd=dir_fd)
+    except OSError:
+        return None
+    if os.fstat(fd).st_uid != uid:
+        os.close(fd)
+        return None
+    return fd
+
+
+def _worker_records(layout: Layout, uid: int, *, say: Callable[[str], None]) -> list[tuple[str, dict]]:
+    """``(name, record)`` for each readable worker record; nothing raises."""
+    from faden_agent.native.common import read_json_nofollow  # noqa: PLC0415
+
+    out: list[tuple[str, dict]] = []
+    fds: list[int] = []
+    try:
+        fd = _open_dir(str(layout.state_dir), uid)
+        for part in ("native", "workers"):
+            if fd is None:
+                return out
+            fds.append(fd)
+            fd = _open_dir(part, uid, dir_fd=fd)
+        if fd is None:
+            return out
+        fds.append(fd)
+        names = sorted(n for n in os.listdir(fd) if n.endswith(".json"))
+        if len(names) > _MAX_RECORDS:
+            say(f"  {len(names)} model worker records; reading the first {_MAX_RECORDS}.")
+        for entry in names[:_MAX_RECORDS]:
+            record = read_json_nofollow(Path(entry), owner=uid, dir_fd=fd)
+            if record is None:
+                say(f"  Skipped the model worker record {repr(entry)[:80]}: not a readable record of {SERVICE_USER}.")
+                continue
+            out.append((entry[:-5], record))
+    except OSError as exc:
+        say(f"  Could not read the model worker records: {exc}")
+    finally:
+        for opened in fds:
+            os.close(opened)
+    return out
 
 
 def uninstall(
@@ -874,7 +985,7 @@ def uninstall(
 
     Returns whether everything is gone; what is left is reported through *say*.
     """
-    stop(runner, layout)
+    stop(runner, layout, say=say)
     number = read_marker(layout).get("id")
     uid = _read_attr(runner, "Users", SERVICE_USER, "UniqueID")
     gid = _read_attr(runner, "Groups", SERVICE_USER, "PrimaryGroupID")
