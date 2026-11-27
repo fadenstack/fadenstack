@@ -204,6 +204,43 @@ export function HostModelDialog({
   // Another cluster has other machines.
   useEffect(() => setMachine(""), [cluster]);
   const fit: Fit | null = (cluster && detail?.fits[cluster]) || null;
+
+  // A Mac's share, context and requests at once are one plan: when the operator changes what the plan
+  // depends on, the backend re-plans it (the same function admission uses) and the share follows.
+  const isMac = Boolean(chosen?.metal);
+  const [planFit, setPlanFit] = useState<Fit | null>(null);
+  const shareChosen = useRef(false);
+  const askedContext = Number(config.max_model_len) || null;
+  const askedSeqs = Number(config.max_num_seqs) || null;
+  const askedDtype = typeof config.dtype === "string" ? config.dtype : null;
+  useEffect(() => {
+    setPlanFit(null);
+    shareChosen.current = false;
+  }, [open, repo, cluster]);
+  useEffect(() => {
+    if (!open || !repo || !cluster || !isMac || !detail) return;
+    let live = true;
+    shareChosen.current = false;
+    const timer = window.setTimeout(() => {
+      marketplaceApi
+        .detail(repo, cluster, askedContext, { sequences: askedSeqs, dtype: askedDtype })
+        .then((d) => {
+          const planned = d.fits[cluster];
+          if (!live || !planned) return;
+          setPlanFit(planned);
+          const share = planned.suggested_gpu_memory_utilization;
+          if (planned.status === "fits" && share != null && !shareChosen.current) {
+            setConfig((c) => (c.gpu_memory_utilization === share ? c : { ...c, gpu_memory_utilization: share }));
+          }
+        })
+        .catch(() => undefined);
+    }, 250);
+    return () => {
+      live = false;
+      window.clearTimeout(timer);
+    };
+  }, [open, repo, cluster, isMac, detail, askedContext, askedSeqs, askedDtype]);
+  const shownFit = planFit ?? fit;
   const pictures = detail?.model?.task === "images";
   // Off (or not yet known) means a picture model cannot be hosted from here.
   const imagesOn = useImageGeneration();
@@ -414,7 +451,7 @@ export function HostModelDialog({
                 copies={copies}
                 maxCopies={maxCopies}
                 onCopies={setCopies}
-                fit={fit}
+                fit={shownFit}
                 chosen={chosen}
                 offerMachine={offerMachine}
                 machine={machine}
@@ -448,11 +485,25 @@ export function HostModelDialog({
                   }}
                 />
               )}
+              {isMac && <MacFitPanel fit={shownFit} />}
               <EngineSettingsEditor
                 value={config}
                 extra={extra}
                 target="cluster"
+                mac={
+                  chosen?.metal && detail?.metal_policy
+                    ? {
+                        policy: detail.metal_policy,
+                        workingSetBytes: shownFit?.metal?.working_set_bytes ?? chosen.metal.working_set_bytes ?? null,
+                        runtimeVersion: chosen.metal.runtime_version ?? null,
+                      }
+                    : undefined
+                }
                 onChange={(v, e) => {
+                  // Only the share moved: the operator chose it, so the plan stops overriding it.
+                  const only = (k: string) =>
+                    v[k] !== config[k] && ["max_model_len", "max_num_seqs", "dtype"].every((o) => v[o] === config[o]);
+                  if (only("gpu_memory_utilization")) shareChosen.current = true;
                   setEdited(true);
                   setConfig(v);
                   setExtra(e);

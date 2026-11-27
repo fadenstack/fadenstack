@@ -3969,6 +3969,7 @@
       "label": "Anteil am Beschleunigerspeicher",
       "help": "Zuerst die Gewichte; der Rest hält Unterhaltungen. Lassen Sie Platz, wenn andere Modelle die Karte teilen.",
       "help_bytes": "Bis zu {{size}} jeder {{total}}-Karte: zuerst die Gewichte, der Rest für Unterhaltungen.",
+      "help_mac": "Bis zu {{size}} der {{total}}, die dieser Mac bietet: zuerst die Gewichte, der Rest für Unterhaltungen.",
       "default": "Nicht gesetzt: {{pct}} % werden verwendet."
     },
     "kv8": {
@@ -4006,6 +4007,15 @@
       "label": "Graph-Erfassung überspringen",
       "help": "Startet schneller und braucht weniger Speicher, erzeugt aber langsamer. Auf manchen älteren GPUs nötig."
     },
+    "mac": {
+      "kv_cache_dtype": "Auf einem Mac nicht verfügbar: vLLM-Metal unterstützt keinen 8-Bit-Kontextcache.",
+      "enable_prefix_caching": "Das Wiederverwenden von Prompt-Anfängen bleibt auf einem Mac aus.",
+      "enable_chunked_prefill": "Auf einem Mac nicht verfügbar: vLLM-Metal entscheidet selbst, wie lange Prompts geteilt werden.",
+      "enforce_eager": "Auf einem Mac nicht verfügbar: es gibt keine Graph-Aufzeichnung, die man überspringen könnte.",
+      "trust_remote_code": "Auf einem Mac nicht verfügbar: der eigene Code eines Repositorys wird nicht ausgeführt.",
+      "preset": "Auf einem Mac nicht verfügbar: es braucht eine Einstellung, die ein Mac ablehnt ({{setting}}).",
+      "parsers": "Nur auf einem Mac getestete Formate werden angeboten."
+    },
     "admin_only": "Das kann nur ein Administrator ändern.",
     "remote": {
       "label": "Eigenen Code des Modells ausführen",
@@ -4014,6 +4024,8 @@
     },
     "all": {
       "title": "Alle vLLM-Einstellungen ({{count}}, vLLM {{version}})",
+      "title_mac": "Einstellungen, die dieser Mac erlaubt ({{count}}, vLLM-Metal {{version}})",
+      "title_mac_nover": "Einstellungen, die dieser Mac erlaubt ({{count}})",
       "search": "Nach Flag oder Beschreibung suchen…",
       "only_set": "Nur gesetzte",
       "no_match": "Keine Einstellung passt.",

@@ -3967,6 +3967,7 @@
       "label": "Share of the accelerator's memory",
       "help": "Weights first; the rest holds conversations. Leave room if other models share the card.",
       "help_bytes": "Up to {{size}} of each {{total}} card: weights first, the rest holds conversations.",
+      "help_mac": "Up to {{size}} of the {{total}} this Mac offers: weights first, the rest holds conversations.",
       "default": "Not set: {{pct}}% is used."
     },
     "kv8": {
@@ -4004,6 +4005,15 @@
       "label": "Skip graph capture",
       "help": "Starts faster and uses less memory, but generates more slowly. Needed on some older GPUs."
     },
+    "mac": {
+      "kv_cache_dtype": "Not available on a Mac: vLLM-Metal does not support an 8-bit context cache.",
+      "enable_prefix_caching": "Prefix caching stays off on a Mac.",
+      "enable_chunked_prefill": "Not available on a Mac: vLLM-Metal decides how it splits long prompts.",
+      "enforce_eager": "Not available on a Mac: there is no graph capture to skip.",
+      "trust_remote_code": "Not available on a Mac: running a repository's own code is not offered.",
+      "preset": "Not available on a Mac: it needs a setting a Mac refuses ({{setting}}).",
+      "parsers": "Only formats tested on a Mac are listed."
+    },
     "admin_only": "Only an administrator can change this.",
     "remote": {
       "label": "Run the model's own code",
@@ -4012,6 +4022,8 @@
     },
     "all": {
       "title": "All vLLM settings ({{count}}, vLLM {{version}})",
+      "title_mac": "Settings this Mac allows ({{count}}, vLLM-Metal {{version}})",
+      "title_mac_nover": "Settings this Mac allows ({{count}})",
       "search": "Search by flag or description…",
       "only_set": "Only the ones set",
       "no_match": "No setting matches.",

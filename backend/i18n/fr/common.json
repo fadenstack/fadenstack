@@ -3969,6 +3969,7 @@
       "label": "Part de la mémoire de l'accélérateur",
       "help": "D'abord les poids ; le reste contient les conversations. Laissez de la place si d'autres modèles partagent la carte.",
       "help_bytes": "Jusqu'à {{size}} de chaque carte de {{total}} : d'abord les poids, le reste pour les conversations.",
+      "help_mac": "Jusqu'à {{size}} des {{total}} qu'offre ce Mac : d'abord les poids, le reste pour les conversations.",
       "default": "Non défini : {{pct}} % sont utilisés."
     },
     "kv8": {
@@ -4006,6 +4007,15 @@
       "label": "Ignorer la capture de graphes",
       "help": "Démarre plus vite et utilise moins de mémoire, mais génère plus lentement. Nécessaire sur certains GPU anciens."
     },
+    "mac": {
+      "kv_cache_dtype": "Indisponible sur un Mac : vLLM-Metal ne prend pas en charge un cache de contexte 8 bits.",
+      "enable_prefix_caching": "La réutilisation des débuts de prompt reste désactivée sur un Mac.",
+      "enable_chunked_prefill": "Indisponible sur un Mac : vLLM-Metal décide lui-même comment découper les longs prompts.",
+      "enforce_eager": "Indisponible sur un Mac : il n'y a pas de capture de graphe à ignorer.",
+      "trust_remote_code": "Indisponible sur un Mac : l'exécution du code propre d'un dépôt n'est pas proposée.",
+      "preset": "Indisponible sur un Mac : il exige un réglage qu'un Mac refuse ({{setting}}).",
+      "parsers": "Seuls les formats testés sur un Mac sont proposés."
+    },
     "admin_only": "Seul un administrateur peut modifier ceci.",
     "remote": {
       "label": "Exécuter le code du modèle",
@@ -4014,6 +4024,8 @@
     },
     "all": {
       "title": "Tous les réglages vLLM ({{count}}, vLLM {{version}})",
+      "title_mac": "Réglages que ce Mac autorise ({{count}}, vLLM-Metal {{version}})",
+      "title_mac_nover": "Réglages que ce Mac autorise ({{count}})",
       "search": "Rechercher par option ou description…",
       "only_set": "Seulement ceux définis",
       "no_match": "Aucun réglage ne correspond.",

@@ -126,6 +126,9 @@ async def cluster_hardware(session: Any) -> list[ClusterHardware]:
                         )
                 except Exception:  # noqa: BLE001 - the version is a nicety, never a blocker
                     version = None
+        if metal is not None:
+            # The Mac runtime's own version (0.34), not the Linux engine's.
+            metal = {**metal, "runtime_version": getattr(env, "runtime_version", None) or version}
         clusters.append(ClusterHardware(
             environment_id=str(env.id),
             name=env.name,

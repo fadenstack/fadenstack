@@ -176,11 +176,17 @@ def per_gpu_bytes(needs: ModelNeeds, *, tp: int, context: int, kv_bytes_per_toke
     return math.ceil(weights / tp + kv_share + state / tp) + OVERHEAD_BYTES
 
 
+def kv_dtype_bytes_for(dtype: Any) -> int:
+    """Bytes per KV element when the engine runs at *dtype* (float32 doubles the cache; the rest are 16-bit)."""
+    return 4 if str(dtype or "").lower() in {"float32", "float", "fp32"} else 2
+
+
 def plan(needs: ModelNeeds, hardware: ClusterHardware, *, context: int | None = None,
-         kv_dtype_bytes: int = 2, allow_sharing: bool = True) -> Fit:
+         kv_dtype_bytes: int = 2, allow_sharing: bool = True, sequences: int | None = None) -> Fit:
     """The smallest shape that runs *needs* on *hardware*, or why none does."""
     if hardware.metal:
-        return plan_metal(needs, hardware.metal, context=context, kv_dtype_bytes=kv_dtype_bytes)
+        return plan_metal(needs, hardware.metal, context=context, kv_dtype_bytes=kv_dtype_bytes,
+                          sequences=sequences)
     gpus = hardware.gpus
     if not gpus:
         return Fit(status="no_accelerators", notes=["no_accelerators"])
