@@ -226,6 +226,8 @@ async def test_the_environment_is_ready_once_its_runtime_is_staged(
     assert payload["tag"] == "vllm0.34.0-metal0.34.0-1"
     assert payload["layer_digest"] == _mac_runtime.native.layer_digest
     assert payload["rootfs_digest"] == _mac_runtime.native.rootfs_digest
+    # The fixture manifest records no unpacked size: the payload is as before.
+    assert "unpacked_size_bytes" not in payload
 
     script.steps["stage"] = StepOutcome("done", {"staged": True, "runtime_root": "/var/db/fadenstack/runtimes/x"})
     await reconciliation.reconcile_environment(ctx, env)
@@ -775,3 +777,25 @@ async def test_force_delete_is_for_standalone_only(dbsession: AsyncSession) -> N
     dep = await _deployment(dbsession, env)
     with pytest.raises(ConflictError, match="standalone"):
         await DeploymentService(dbsession).delete(dep.id, force=True)
+
+
+
+async def test_the_stage_payload_carries_the_unpacked_size_when_the_manifest_has_one(
+    dbsession: AsyncSession, script: Script, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from tests.test_native_bundles import darwin_target, native_manifest
+
+    from faden_backend.services.inference.bundles import native_bundle_from_manifest
+
+    manifest = native_manifest()
+    manifest["native"]["unpacked_size_bytes"] = 2_158_704_640
+    bundle = native_bundle_from_manifest(
+        manifest, bundle_id="faden-native-vllm-metal-darwin-arm64-vllm0.34.0", display_name="Mac runtime",
+        driver="standalone", target_architecture=darwin_target(),
+    )
+    monkeypatch.setitem(default_bundle_registry._bundles, bundle.bundle_id, bundle)  # noqa: SLF001
+    env = await _environment(dbsession)
+    await _member(dbsession, env, await _node(dbsession, MAC))
+    await reconciliation.reconcile_environment(_Ctx(dbsession), env)
+    payload = next(p for s, _, p in script.asked if s == "stage")
+    assert payload["unpacked_size_bytes"] == 2_158_704_640
