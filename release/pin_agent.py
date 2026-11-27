@@ -12,7 +12,9 @@ binary. The digests are read from the ``.sha256`` files of the
 ``write`` takes the version from AGENT_VERSION in the backend. ``check`` fails if
 the file's version differs from it, or any digest differs from the release's.
 
-Every build in BUILDS must be in the release. The Mac pkg (``macos-arm64-pkg``,
+Every build in BUILDS must be in the release; the Mac build from
+FIRST_MAC_AGENT_VERSION on (the releases before it have none, and a core
+release still pinning one of them must pass). The Mac pkg (``macos-arm64-pkg``,
 the notarized ``faden-agent-macos-arm64.pkg``) is pinned when the release has
 one: a release built without the Apple signing secrets has none.
 """
@@ -30,6 +32,10 @@ from pathlib import Path
 INSTALL = Path(__file__).resolve().parents[1] / "backend" / "faden_backend" / "web" / "api" / "install"
 PIN = INSTALL / "agent_release.json"
 BUILDS = ("linux-x86_64", "linux-aarch64", "macos-arm64")
+#: The first node-agent release with a Mac build. Older ones are pinned without
+#: one: their releases have no faden-agent-macos-arm64 to pin.
+FIRST_MAC_AGENT_VERSION = "0.3.0"
+MAC_BUILDS = frozenset({"macos-arm64"})
 #: Pinned when the release carries them, under the key, from the file named.
 OPTIONAL = {"macos-arm64-pkg": "macos-arm64.pkg"}
 URL = "https://github.com/fadenstack/fadenstack/releases/download/node-agent-v{version}/faden-agent-{build}.sha256"
@@ -42,6 +48,21 @@ def backend_version() -> str:
     if not match:
         sys.exit("AGENT_VERSION not found in the backend")
     return match.group(1)
+
+
+def _release(version: str) -> tuple[int, ...]:
+    """*version*'s release numbers, for ordering (``0.3.0`` -> ``(0, 3, 0)``); a suffix is ignored."""
+    match = re.match(r"^(\d+(?:\.\d+)*)", version)
+    if not match:
+        sys.exit(f"{version!r} is not an agent version")
+    return tuple(int(part) for part in match.group(1).split("."))
+
+
+def builds_for(version: str) -> tuple[str, ...]:
+    """The builds the ``node-agent-v<version>`` release must carry."""
+    if _release(version) >= _release(FIRST_MAC_AGENT_VERSION):
+        return BUILDS
+    return tuple(build for build in BUILDS if build not in MAC_BUILDS)
 
 
 def _fetch(url: str) -> str:
@@ -60,7 +81,7 @@ def _digest(key: str, text: str) -> str:
 def published(version: str) -> dict[str, str]:
     """The digest of each build in the ``node-agent-v<version>`` release, keyed as the pin keys them."""
     digests: dict[str, str] = {}
-    for build in BUILDS:
+    for build in builds_for(version):
         try:
             text = _fetch(URL.format(version=version, build=build))
         except urllib.error.HTTPError as exc:
@@ -69,6 +90,8 @@ def published(version: str) -> dict[str, str]:
             raise
         digests[build] = _digest(build, text)
     for key, name in OPTIONAL.items():
+        if _release(version) < _release(FIRST_MAC_AGENT_VERSION):
+            break  # Mac files only
         try:
             text = _fetch(URL.format(version=version, build=name))
         except urllib.error.HTTPError as exc:
