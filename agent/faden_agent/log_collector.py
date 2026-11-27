@@ -1,4 +1,4 @@
-"""System log collection for Linux (journald) and Windows (Event Log).
+"""System log collection for Linux (journald), Windows (Event Log) and macOS (the agent's log file).
 
 Yields timestamped log lines from the host OS, resuming from
 the last-seen cursor on each call.  The collector is designed to
@@ -11,13 +11,21 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import sys
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 log = logging.getLogger(__name__)
+
+# ``2026-11-28 00:03:20,388 INFO [logger] message`` -- the agent's own format.
+_AGENT_LINE = re.compile(r"^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d),(\d{3}) (\w+) \[([^\]]*)\] ")
+# Loggers whose records are the shipping itself; sending them would feed the loop.
+_SELF_LOGGERS = ("httpx", "httpcore", "faden_agent.loki")
+_FIRST_READ_BYTES = 256 * 1024
 
 
 @dataclass(slots=True)
@@ -38,8 +46,9 @@ class LogCollector:
     only new entries are returned on each call.
     """
 
-    def __init__(self, *, max_lines: int = 500) -> None:
+    def __init__(self, *, max_lines: int = 500, log_file: Path | None = None) -> None:
         self._max_lines = max_lines
+        self._log_file = log_file
 
     async def collect(self, after: str | None = None) -> tuple[list[LogEntry], str | None]:
         """Up to ``max_lines`` entries after the position *after*, oldest first, and the new position.
@@ -54,6 +63,8 @@ class LogCollector:
     def _collect_sync(self, after: str | None) -> tuple[list[LogEntry], str | None]:
         if sys.platform == "win32":
             return self._collect_windows(after)
+        if sys.platform == "darwin":
+            return self._collect_file(after)
         return self._collect_journald(after)
 
     # ── Linux: journalctl ────────────────────────────────────
@@ -146,6 +157,110 @@ class LogCollector:
             level = "debug"
 
         return ts_ns, level
+
+    # ── macOS: the agent's own log file ──────────────────────
+
+    # A Mac has no journal; the system-log source is the service's log file,
+    # followed by (inode, offset) so newsyslog rotation loses nothing.
+    # (Follow-up: the unified log via ``log show``.)
+
+    def _collect_file(self, after: str | None) -> tuple[list[LogEntry], str | None]:
+        path = self._log_file
+        if path is None:
+            from faden_agent.darwin_service import Layout  # noqa: PLC0415
+
+            path = Layout().log_file
+        try:
+            return self._follow(path, after)
+        except OSError as exc:
+            log.debug("Cannot read %s: %s", path, exc)
+            return [], after
+
+    def _follow(self, path: Path, after: str | None) -> tuple[list[LogEntry], str | None]:
+        try:
+            cur = path.stat()
+        except FileNotFoundError:
+            return [], after
+        ino, off = _parse_cursor(after)
+        first = ino is None
+        target = path
+        if first:
+            ino, off = cur.st_ino, max(0, cur.st_size - _FIRST_READ_BYTES)
+        elif ino != cur.st_ino:
+            # Rotated: finish the old file if it is still around, then start the new one.
+            old = _find_by_inode(path, ino)
+            if old is None:
+                ino, off = cur.st_ino, 0
+            else:
+                target = old
+        elif cur.st_size < off:  # truncated in place
+            off = 0
+
+        entries, new_off, more = self._read_entries(target, off, skip_partial=first and off > 0)
+        if target is not path and not more:
+            # The old file is drained; carry on at the start of the live one.
+            tail, tail_off, _ = self._read_entries(path, 0, budget=self._max_lines - len(entries))
+            return entries + tail, f"{cur.st_ino}:{tail_off}"
+        return entries, f"{ino}:{new_off}"
+
+    def _read_entries(
+        self, path: Path, offset: int, *, skip_partial: bool = False, budget: int | None = None,
+    ) -> tuple[list[LogEntry], int, bool]:
+        """Whole entries from *offset*; stops at the budget on an entry boundary.
+
+        Returns the entries, the offset after them, and whether more is waiting.
+        """
+        budget = self._max_lines if budget is None else budget
+        entries: list[LogEntry] = []
+        if budget <= 0:
+            return entries, offset, True
+        current: list[str] = []
+        pos = offset
+        with path.open("rb") as fh:
+            fh.seek(offset)
+            while True:
+                raw = fh.readline()
+                if not raw or not raw.endswith(b"\n"):
+                    break  # EOF, or a line still being written
+                text = raw.decode("utf-8", errors="replace").rstrip("\n")
+                line_start = pos
+                pos += len(raw)
+                header = _AGENT_LINE.match(text)
+                if skip_partial:
+                    if not header:
+                        continue
+                    skip_partial = False
+                if header:
+                    if current:
+                        self._emit(entries, current)
+                        if len(entries) >= budget:
+                            return entries, line_start, True
+                    current = [text]
+                elif current:
+                    current.append(text)  # a traceback belongs to its entry
+                else:
+                    current = [text]
+        if current:
+            self._emit(entries, current)
+        return entries, pos, False
+
+    @staticmethod
+    def _emit(entries: list[LogEntry], lines: list[str]) -> None:
+        text = "\n".join(lines)
+        header = _AGENT_LINE.match(lines[0])
+        if header is None:
+            entries.append(LogEntry(timestamp_ns=time.time_ns(), line=text))
+            return
+        logger = header.group(4)
+        if logger.startswith(_SELF_LOGGERS):
+            return
+        try:
+            ts_ns = int(datetime.strptime(header.group(1), "%Y-%m-%d %H:%M:%S").timestamp() * 1e9) + int(header.group(2)) * 1_000_000
+        except ValueError:
+            ts_ns = time.time_ns()
+        name = header.group(3).upper()
+        level = "error" if name in ("ERROR", "CRITICAL", "FATAL") else "warning" if name.startswith("WARN") else "debug" if name == "DEBUG" else "info"
+        entries.append(LogEntry(timestamp_ns=ts_ns, line=text, level=level))
 
     # ── Windows: wevtutil ────────────────────────────────────
 
@@ -252,6 +367,25 @@ class LogCollector:
             # Chronological: /rd:true reads newest first.
             entries.reverse()
         return entries, max_ts or after
+
+
+def _parse_cursor(after: str | None) -> tuple[int | None, int]:
+    try:
+        ino, off = (after or "").split(":")
+        return int(ino), int(off)
+    except ValueError:
+        return None, 0
+
+
+def _find_by_inode(path: Path, ino: int) -> Path | None:
+    """The rotated-away copy of *path* (``agent.log.0`` ...) that has inode *ino*, if still uncompressed."""
+    try:
+        for cand in path.parent.glob(path.name + ".*"):
+            if cand.suffix not in (".gz", ".bz2") and cand.stat().st_ino == ino:
+                return cand
+    except OSError:
+        pass
+    return None
 
 
 def _win_level(level_id: int) -> str:
