@@ -423,10 +423,17 @@ class EnvironmentService:
         node_role = _enum(role, EnvironmentNodeRole, what="role")
         control_plane = await self.control_plane_dao.get(environment.control_plane_id)
         driver = getattr(control_plane, "driver", None) or "ray"
+        # Fail closed: only Ray runs its TLS membership check, only standalone
+        # its own; a driver this server does not know adds no machine at all.
         if driver == "ray":
             await self._require_ray_tls_member(environment, node_id)
         elif driver == "standalone":
             await self._require_standalone_member(environment, node_id)
+        else:
+            raise ConflictError(
+                f"This environment's control plane uses the driver {driver!r}, which this server "
+                "does not know, so no machine can be added to it."
+            )
         try:
             member = await self.node_dao.add_node(environment_id, node_id, node_role)
         except IntegrityError as exc:

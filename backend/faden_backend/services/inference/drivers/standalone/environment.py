@@ -16,7 +16,7 @@ from typing import Any
 
 from faden_backend.db.dao.inference_dao import EnvironmentNodeDAO
 from faden_backend.db.models.inference import EnvironmentStatus, InferenceEnvironment
-from faden_backend.db.models.node_control import NodeCommandType
+from faden_backend.db.models.node_control import NodeCommandType, NodeHealthStatus
 from faden_backend.services.inference.bundles import default_bundle_registry
 from faden_backend.services.inference.drivers.standalone.admission import node_refusal
 from faden_backend.services.inference.drivers.standalone.commands import NativeCommands
@@ -119,8 +119,17 @@ class StandaloneEnvironmentManager:
         native["staged"] = stage.result
         native["staged_at"] = native.get("staged_at") or datetime.now(tz=UTC).isoformat()
         self._save(environment, native)
-        self._set_members(members, "alive")
         environment.runtime_version = bundle.compatibility_matrix.vllm_version or environment.runtime_version
+        if str(getattr(node, "status", "") or "") == NodeHealthStatus.OFFLINE.value:
+            # Staged, but the machine is not connected: what it serves cannot
+            # be reached, and nothing sent to it would arrive.
+            self._set_members(members, "dead")
+            self._observe(
+                environment, EnvironmentStatus.DEGRADED,
+                f"{name} is offline: its models cannot be reached until it reconnects.",
+            )
+            return
+        self._set_members(members, "alive")
         self._observe(environment, EnvironmentStatus.READY, None)
 
     @staticmethod

@@ -311,7 +311,8 @@ async def test_an_engine_that_died_fails_with_its_error(dbsession: AsyncSession,
     script.steps["start"] = StepOutcome("done", {"pid": 1})
     script.status = {"state": "failed", "last_error": "Metal out of memory"}
     await reconciliation.reconcile_deployment(_Ctx(dbsession), dep)
-    assert dep.phase == DeploymentPhase.FAILED.value
+    # The first death is retried after a back-off (see the crash-loop test below).
+    assert dep.phase == DeploymentPhase.DEGRADED.value
     assert "Metal out of memory" in dep.phase_message
 
 
@@ -481,3 +482,213 @@ async def test_stopping_the_environment_takes_the_engine_down_and_waits(dbsessio
     assert dep.phase == DeploymentPhase.PENDING.value
     assert "starts again with it" in dep.phase_message
     assert dep.observed_status_json["native"]["public_port"] == public, "it comes back on the same port"
+
+
+async def test_a_parked_deployment_sends_nothing_more_while_its_environment_is_stopped(
+    dbsession: AsyncSession, script: Script,
+) -> None:
+    """Review #2: after unroute and stop succeeded, the next passes send no command."""
+    env, _ = await _ready_environment(dbsession)
+    dep = await _deployment(dbsession, env)
+    ctx = _Ctx(dbsession)
+    script.steps.update(start=StepOutcome("done", {}), route=StepOutcome("done", {}))
+    script.status = {"state": "ready"}
+    await reconciliation.reconcile_deployment(ctx, dep)
+    env.desired_state = "stopped"
+    script.steps.update(unroute=StepOutcome("done", {}), stop=StepOutcome("done", {}))
+    await reconciliation.reconcile_deployment(ctx, dep)
+    script.asked.clear()
+    for _ in range(3):
+        await reconciliation.reconcile_deployment(ctx, dep)
+    assert script.asked == []
+    assert dep.phase == DeploymentPhase.PENDING.value
+
+    # The environment starts again: so does the model, on its old port.
+    public = dep.observed_status_json["native"]["public_port"]
+    env.desired_state = "running"
+    script.steps.pop("start")
+    await reconciliation.reconcile_deployment(ctx, dep)
+    start = next(p for s, _, p in script.asked if s == "start")
+    assert start["port"] == public + 20000
+
+
+async def test_a_crashing_engine_backs_off_then_gives_up_until_asked_again(
+    dbsession: AsyncSession, script: Script, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Review #3: no restart loop. 30 s, 60 s, 120 s, then FAILED until an operator or a new generation."""
+    from datetime import UTC, datetime, timedelta
+
+    from faden_backend.services.inference.drivers.standalone import deployment as module
+    from faden_backend.services.inference.service import _queue_for_reconcile
+
+    clock = [datetime(2026, 11, 28, 12, 0, tzinfo=UTC)]
+
+    class _Clock(datetime):
+        @classmethod
+        def now(cls, tz: Any = None) -> datetime:  # noqa: ARG003
+            return clock[0]
+
+    monkeypatch.setattr(module, "datetime", _Clock)
+    env, _ = await _ready_environment(dbsession)
+    dep = await _deployment(dbsession, env)
+    ctx = _Ctx(dbsession)
+    script.steps["start"] = StepOutcome("done", {"pid": 1})
+    script.status = {"state": "failed", "last_error": "Metal out of memory"}
+
+    def starts() -> int:
+        return sum(1 for s, _, _ in script.asked if s == "start")
+
+    await reconciliation.reconcile_deployment(ctx, dep)  # start 1, dies
+    assert starts() == 1
+    assert dep.phase == DeploymentPhase.DEGRADED.value
+    assert "again in 30 s" in dep.phase_message and "attempt 2 of 4" in dep.phase_message
+
+    await reconciliation.reconcile_deployment(ctx, dep)  # still backing off
+    assert starts() == 1
+
+    for wait in (30, 60, 120):
+        clock[0] += timedelta(seconds=wait + 1)
+        await reconciliation.reconcile_deployment(ctx, dep)
+    assert starts() == 4
+    assert dep.phase == DeploymentPhase.FAILED.value
+    assert "stopped 4 times" in dep.phase_message and "Metal out of memory" in dep.phase_message
+    assert dep.observed_generation == dep.generation, "parked: out of the reconciler's queue"
+
+    clock[0] += timedelta(hours=1)
+    await reconciliation.reconcile_deployment(ctx, dep)
+    assert starts() == 4, "given up: no start without an operator"
+
+    _queue_for_reconcile(dep)  # the operator's "reconcile"
+    await reconciliation.reconcile_deployment(ctx, dep)
+    assert starts() == 5
+
+    script.status = {"state": "ready"}
+    script.steps["route"] = StepOutcome("done", {})
+    clock[0] += timedelta(seconds=31)
+    await reconciliation.reconcile_deployment(ctx, dep)
+    assert dep.phase == DeploymentPhase.RUNNING.value
+    assert "restarts" not in dep.observed_status_json["native"]
+
+
+async def test_a_new_generation_gets_a_fresh_set_of_restarts(dbsession: AsyncSession, script: Script) -> None:
+    env, _ = await _ready_environment(dbsession)
+    dep = await _deployment(dbsession, env)
+    native = {"commands": {}, "restarts": {"generation": dep.generation, "count": 4, "gave_up": True, "last_error": "x"}}
+    dep.observed_status_json = {"native": native}
+    dep.observed_generation = dep.generation
+    await reconciliation.reconcile_deployment(_Ctx(dbsession), dep)
+    assert not any(s == "start" for s, _, _ in script.asked)
+    dep.generation += 1
+    await reconciliation.reconcile_deployment(_Ctx(dbsession), dep)
+    assert any(s == "start" for s, _, _ in script.asked)
+
+
+# ── Ray still gets every Ray step (review #6, #9) ────────────────────────
+
+
+async def test_a_ray_reconcile_still_syncs_members_and_metrics_with_its_own_driver(
+    dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from types import SimpleNamespace
+
+    from faden_backend.services.llm import monitoring
+
+    class _RayEnv:
+        async def reconcile_environment(self, session: Any, environment: Any, **_: Any) -> None:
+            return None
+
+    ray_cls = registry.get("ray")
+    real_init = ray_cls.__init__
+
+    def init(self: Any) -> None:
+        real_init(self)
+        self.environment_manager = _RayEnv()
+
+    scraped: list[str] = []
+
+    async def scrape(self: Any, session: Any, metrics: Any, environment: Any) -> list[Any]:
+        scraped.append(self.key)
+        return [SimpleNamespace(address="10.0.9.1", port=8080)]
+
+    class _Provisioner:
+        synced: list[Any] = []
+
+        async def sync_ray_targets(self, **kw: Any) -> int:
+            self.synced.append(kw["targets"])
+            return 1
+
+        async def provision_environment(self, **_: Any) -> None:
+            return None
+
+        async def remove_ray_targets(self, *_: Any, **__: Any) -> int:
+            return 0
+
+    provisioner = _Provisioner()
+    monkeypatch.setattr(ray_cls, "__init__", init)
+    monkeypatch.setattr(ray_cls, "_scrape_targets", scrape)
+    monkeypatch.setattr(monitoring, "get_monitoring_provisioner", lambda: provisioner)
+
+    env = await _environment(dbsession, driver="ray")
+    node = await _node(dbsession, GB10, host="10.0.9.1")
+    await _member(dbsession, env, node)
+    env.status = EnvironmentStatus.READY
+    env.observed_status_json = {
+        "cluster": {
+            "alive": True,
+            "nodes": [{"alive": True, "node_ip": "10.0.9.1", "node_name": "10.0.9.1", "node_manager_address": "10.0.9.1"}],
+            "metrics": {"targets": [{"address": "10.0.9.1", "port": 8080}]},
+        },
+    }
+    await dbsession.flush()
+
+    await reconciliation.reconcile_environment(_Ctx(dbsession), env)
+
+    member = (await dbsession.execute(select(InferenceEnvironmentNode).where(InferenceEnvironmentNode.environment_id == env.id))).scalar_one()
+    assert member.member_status == "alive", "member status synced from Ray's node records"
+    assert scraped == ["ray"], "metrics resolved through the environment's own Ray driver"
+    assert provisioner.synced == [[{"address": "10.0.9.1", "port": 8080}]]
+
+
+async def test_add_node_still_runs_the_ray_tls_check_for_ray(
+    dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from faden_backend.services.inference import ray_tls
+
+    async def refuse(session: Any, environment: Any, node: Any) -> str:
+        return "This machine cannot apply Ray TLS."
+
+    monkeypatch.setattr(ray_tls, "member_refusal", refuse)
+    env = await _environment(dbsession, driver="ray")
+    env.config_json = {"ray_tls": True}
+    await dbsession.flush()
+    with pytest.raises(ConflictError, match="cannot apply Ray TLS"):
+        await EnvironmentService(dbsession).add_node(env.id, (await _node(dbsession, GB10)).id)
+
+
+async def test_add_node_refuses_a_driver_it_does_not_know(dbsession: AsyncSession) -> None:
+    env = await _environment(dbsession, driver="exo")
+    with pytest.raises(ConflictError, match="does not know"):
+        await EnvironmentService(dbsession).add_node(env.id, (await _node(dbsession, GB10)).id)
+
+
+async def test_an_offline_mac_degrades_its_environment_and_its_serving_models(
+    dbsession: AsyncSession, script: Script,
+) -> None:
+    """Review #7: an offline Mac is not READY."""
+    env, mac = await _ready_environment(dbsession)
+    dep = await _deployment(dbsession, env)
+    ctx = _Ctx(dbsession)
+    script.steps.update(stage=StepOutcome("done", {}), start=StepOutcome("done", {}), route=StepOutcome("done", {}))
+    script.status = {"state": "ready"}
+    await reconciliation.reconcile_deployment(ctx, dep)
+    assert dep.phase == DeploymentPhase.RUNNING.value
+
+    mac.status = "offline"
+    await dbsession.flush()
+    await reconciliation.reconcile_environment(ctx, env)
+    assert env.status == EnvironmentStatus.DEGRADED
+    assert "offline" in env.status_message
+    script.asked.clear()
+    await reconciliation.reconcile_deployment(ctx, dep)
+    assert dep.phase == DeploymentPhase.DEGRADED.value
+    assert script.asked == []

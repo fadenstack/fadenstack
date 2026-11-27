@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
@@ -44,6 +45,11 @@ DRIVER_KEY = "standalone"
 #: Public ports handed out when a deployment names none. Below 12768 so that
 #: the internal port (+20000) stays under the ephemeral range.
 PUBLIC_PORT_RANGE = range(8100, 9000)
+
+#: Restarts of an engine that died, per generation, before giving up; the
+#: wait before each doubles from this (30 s, 60 s, 120 s).
+MAX_RESTARTS = 3
+RESTART_BACKOFF_SEC = 30
 
 #: How long a machine may take to fetch, verify and start (cold start ~100 s, Gate 0d).
 START_TIMEOUT_SEC = 600
@@ -128,7 +134,9 @@ class StandaloneDeploymentManager:
         if bundle is None or bundle.native is None:
             self._fail(deployment, f"No certified native runtime for {node.agent_id or node.host}.")
             return
-        if str(environment.desired_state) != "running":
+        if str(environment.desired_state) == "running":
+            native.pop("parked", None)  # it may start again
+        else:
             # Its environment was stopped: the engine goes too (route first,
             # as on a stop), and the model waits to start again with it.
             await self._reconcile_absent(
@@ -139,7 +147,19 @@ class StandaloneDeploymentManager:
                 ),
             )
             return
-        if str(getattr(environment.status, "value", environment.status)) != EnvironmentStatus.READY.value:
+        env_status = str(getattr(environment.status, "value", environment.status))
+        if env_status == EnvironmentStatus.DEGRADED.value and deployment.phase in (
+            DeploymentPhase.RUNNING.value, DeploymentPhase.DEGRADED.value,
+        ):
+            # Its machine dropped off: it may well still be serving, but nothing
+            # can be checked or changed until it is back.
+            self._observe(
+                deployment, DeploymentPhase.DEGRADED,
+                environment.status_message or f"{environment.name} is degraded.",
+                observed={"reason": "environment degraded"}, mark_observed=False,
+            )
+            return
+        if env_status != EnvironmentStatus.READY.value:
             self._observe(
                 deployment, DeploymentPhase.PENDING,
                 f"Waiting for {environment.name}: its runtime is not ready on {node.agent_id or node.host}.",
@@ -181,13 +201,14 @@ class StandaloneDeploymentManager:
         }
         native["memory"] = budget
 
+        if self._held_back(deployment, native):
+            return
         start = await commands.step(
             "start", node_id=node.id, command_type=NodeCommandType.START_NATIVE_WORKER.value,
             payload=start_payload, timeout_sec=START_TIMEOUT_SEC,
         )
         if start.failed:
-            commands.forget("start")
-            self._fail(deployment, f"The engine did not start: {start.error}")
+            self._engine_down(deployment, native, commands, f"did not start: {start.error}")
             return
         if not start.done:
             self._observe(
@@ -203,13 +224,9 @@ class StandaloneDeploymentManager:
         state = str((status or {}).get("state") or "unknown")
         native["worker"] = status
         if state in ("failed", "stopped"):
-            # Gone: a new start at the next pass, after saying why.
-            commands.forget("start")
-            commands.forget("route")
-            self._fail(
-                deployment,
-                f"The engine {state}: {(status or {}).get('last_error') or 'no reason given'}",
-                mark_observed=True,
+            # Gone: started again after a back-off, a few times at most.
+            self._engine_down(
+                deployment, native, commands, f"{state}: {(status or {}).get('last_error') or 'no reason given'}",
             )
             return
         if state != "ready":
@@ -240,11 +257,79 @@ class StandaloneDeploymentManager:
             )
             return
 
+        native.pop("restarts", None)  # it serves: the count starts over
         base = f"https://{node.host}:{public_port}"
         await self._publish(session, deployment, base, spec, served_name)
         self._observe(
             deployment, DeploymentPhase.RUNNING, f"Serving on {base}/v1",
             observed={"reason": "ready", "base_url": f"{base}/v1"}, ready=1, total=1,
+        )
+
+    # ------------------------------------------------------------------
+    # Restarts: back off, then give up until someone asks again
+    # ------------------------------------------------------------------
+
+    def _engine_down(
+        self, deployment: InferenceDeployment, native: dict[str, Any], commands: NativeCommands, reason: str,
+    ) -> None:
+        """The engine is gone: schedule a restart after a back-off, or give up after the last attempt."""
+        commands.forget("start")
+        commands.forget("route")
+        generation = int(deployment.generation or 0)
+        restarts = dict(native.get("restarts") or {})
+        if restarts.get("generation") != generation:
+            restarts = {"generation": generation, "count": 0}
+        restarts["count"] = int(restarts.get("count") or 0) + 1
+        restarts["last_error"] = reason
+        if restarts["count"] > MAX_RESTARTS:
+            restarts["gave_up"] = True
+            restarts.pop("next_at", None)
+            native["restarts"] = restarts
+            self._fail(deployment, self._gave_up_message(restarts), mark_observed=True)
+            return
+        delay = RESTART_BACKOFF_SEC * 2 ** (restarts["count"] - 1)
+        restarts["next_at"] = (datetime.now(tz=UTC) + timedelta(seconds=delay)).isoformat()
+        native["restarts"] = restarts
+        # DEGRADED keeps it in the reconciler's queue; FAILED would park it.
+        self._observe(
+            deployment, DeploymentPhase.DEGRADED,
+            f"The engine {reason}. Starting it again in {delay} s "
+            f"(attempt {restarts['count'] + 1} of {MAX_RESTARTS + 1}).",
+            observed={"reason": "restarting", "restarts": restarts}, mark_observed=False, ready=0, total=1,
+        )
+
+    def _held_back(self, deployment: InferenceDeployment, native: dict[str, Any]) -> bool:
+        """Whether this pass must not start the engine: waiting out a back-off, or given up."""
+        restarts = native.get("restarts") or {}
+        if restarts.get("generation") != int(deployment.generation or 0):
+            native.pop("restarts", None)  # a new generation: a fresh start
+            return False
+        if restarts.get("gave_up"):
+            if (deployment.observed_generation or 0) < (deployment.generation or 0):
+                # Giving up stamped the generation observed; it lags again only
+                # because an operator asked for another try (request_reconcile).
+                native.pop("restarts", None)
+                return False
+            self._fail(deployment, self._gave_up_message(restarts), mark_observed=True)
+            return True
+        next_at = restarts.get("next_at")
+        if next_at and datetime.now(tz=UTC) < datetime.fromisoformat(next_at):
+            left = int((datetime.fromisoformat(next_at) - datetime.now(tz=UTC)).total_seconds()) + 1
+            self._observe(
+                deployment, DeploymentPhase.DEGRADED,
+                f"The engine {restarts.get('last_error')}. Starting it again in {left} s "
+                f"(attempt {int(restarts.get('count') or 0) + 1} of {MAX_RESTARTS + 1}).",
+                observed={"reason": "restarting", "restarts": restarts}, mark_observed=False, ready=0, total=1,
+            )
+            return True
+        return False
+
+    @staticmethod
+    def _gave_up_message(restarts: dict[str, Any]) -> str:
+        return (
+            f"The engine stopped {restarts.get('count')} times; the last time it "
+            f"{restarts.get('last_error')}. Not starting it again: fix the cause, then reconcile "
+            "or change the deployment."
         )
 
     async def _snapshot_path(
@@ -339,7 +424,11 @@ class StandaloneDeploymentManager:
             (DeploymentPhase.DELETED, "Deleted.") if deleting else (DeploymentPhase.STOPPED, "Stopped.")
         )
         machines = await EnvironmentNodeDAO(session).machines(deployment.environment_id)
-        started = bool(native["commands"].get("start")) or bool(native.get("public_port"))
+        # ``parked``: taken down for a stopped environment, port kept for the
+        # restart. Nothing runs, so nothing is sent again pass after pass.
+        started = not native.get("parked") and (
+            bool(native["commands"].get("start")) or bool(native.get("public_port"))
+        )
         if not machines or not started:
             # Nothing was started (or the machine left): nothing to take down.
             await self._retire(session, deployment.id)
@@ -388,6 +477,8 @@ class StandaloneDeploymentManager:
             commands.forget(step)
         if not deleting and done is None:
             native.pop("public_port", None)
+        if done is not None:
+            native["parked"] = True
         self._observe(
             deployment, done_phase, done_message,
             observed={"reason": done_phase.value}, ready=0,
