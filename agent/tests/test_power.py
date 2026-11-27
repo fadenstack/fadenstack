@@ -160,3 +160,22 @@ async def test_linux_starts_no_guard(monkeypatch: pytest.MonkeyPatch) -> None:
     host = SimpleNamespace(_power=None, _config=SimpleNamespace(prevent_idle_sleep=True, prevent_idle_sleep_error=None))
     await NodeAgentService._start_power_guard(host)  # type: ignore[arg-type]
     assert host._power is None
+
+
+def test_holder_of_finds_caffeinate_watching_a_child_of_the_launchd_pid(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Onefile build: launchd's pid is the bootloader; its child, the Python agent, is what caffeinate watches."""
+
+    class P:
+        def __init__(self, pid, ppid, cmdline):
+            self.info = {"pid": pid, "ppid": ppid, "cmdline": cmdline}
+
+    procs = [
+        P(6312, 1, ["faden-agent", "run"]),
+        P(6314, 6312, ["faden-agent", "run"]),
+        P(6400, 1, [power.CAFFEINATE, "-i", "-w", "6314"]),
+        P(6500, 1, [power.CAFFEINATE, "-i", "-w", "9999"]),
+    ]
+    monkeypatch.setattr(psutil, "process_iter", lambda *_a, **_k: iter(procs))
+    assert power.IdleSleepGuard.holder_of(6312) == 6400
+    assert power.IdleSleepGuard.holder_of(6314) == 6400
+    assert power.IdleSleepGuard.holder_of(7777) is None

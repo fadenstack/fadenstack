@@ -132,10 +132,14 @@ class IdleSleepGuard:
         """The ``caffeinate -i -w <agent_pid>`` keeping that agent's Mac awake, if any."""
         import psutil  # noqa: PLC0415
 
-        want = ["-i", "-w", str(agent_pid)]
-        for proc in psutil.process_iter(["pid", "cmdline"]):
+        # A packaged (onefile) agent is two processes: the pid launchd knows is the
+        # bootloader, and the Python agent that starts caffeinate is its child.
+        procs = list(psutil.process_iter(["pid", "ppid", "cmdline"]))
+        watched = {agent_pid} | {p.info["pid"] for p in procs if p.info.get("ppid") == agent_pid}
+        for proc in procs:
             cmdline = proc.info.get("cmdline") or []
-            if cmdline[:1] == [CAFFEINATE] and cmdline[1:] == want:
+            if cmdline[:3] == [CAFFEINATE, "-i", "-w"] and len(cmdline) == 4 and cmdline[3].isdigit() \
+                    and int(cmdline[3]) in watched:
                 return proc.info["pid"]
         return None
 

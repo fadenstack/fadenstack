@@ -21,12 +21,14 @@ class FakeRunner:
     def __init__(self, events: list[str]) -> None:
         self.events = events
         self.rc = 0
+        #: Per-call statuses, consumed first (the check, then the join); ``rc`` afterwards.
+        self.rcs: list[int] = []
         self.calls: list[dict[str, Any]] = []
 
     def call(self, argv: list[str], *, uid: int, gid: int, env: dict[str, str], cwd: str) -> int:
         self.events.append("join-as-service")
         self.calls.append({"argv": argv, "uid": uid, "gid": gid, "env": env, "cwd": cwd})
-        return self.rc
+        return self.rcs.pop(0) if self.rcs else self.rc
 
 
 @pytest.fixture()
@@ -82,7 +84,9 @@ def test_root_prepares_then_runs_the_join_as_the_service_then_activates(
     agent_main.cmd_join("http://192.0.2.220:8000")
     assert on_a_mac.index("probe") < on_a_mac.index("stage") < on_a_mac.index("join-as-service")
     assert on_a_mac.index("join-as-service") < on_a_mac.index("activate")
-    call = runner.calls[0]
+    call = runner.calls[-1]
+    assert call["env"].get(agent_main._DARWIN_JOIN_CHECK) is None
+    assert runner.calls[0]["env"][agent_main._DARWIN_JOIN_CHECK] == "1"
     assert (call["uid"], call["gid"]) == (452, 452)
     assert call["argv"] == [str(tmp_path / "root/Library/Fadenstack/agent/0.2.12-abc/faden-agent"), "join"]
     state_dir = str(tmp_path / "root/var/db/fadenstack/agent")
@@ -112,6 +116,51 @@ def test_a_member_running_the_line_again_is_upgraded_without_a_join(
     runner.rc = agent_main._DARWIN_JOIN_MEMBER
     agent_main.cmd_join("http://192.0.2.220:8000")
     assert on_a_mac[-1] == "activate"
+
+
+def _two_phase(
+    on_a_mac: list[str], runner: FakeRunner, monkeypatch: pytest.MonkeyPatch, check_rc: int, join_rc: int = 0
+) -> None:
+    _no_join_as_root(monkeypatch)
+    monkeypatch.setattr(agent_main, "_save_env_file", lambda env: Path("/dev/null"))
+    monkeypatch.setattr(ds, "bootout", lambda _runner, **_k: on_a_mac.append("bootout"))
+    runner.rcs = [check_rc, join_rc]
+    agent_main.cmd_join("http://192.0.2.220:8000")
+
+
+def test_not_a_member_stops_the_old_service_before_the_join_writes_state(
+    on_a_mac: list[str], runner: FakeRunner, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _two_phase(on_a_mac, runner, monkeypatch, agent_main._DARWIN_JOIN_NOT_MEMBER)
+    tail = on_a_mac[on_a_mac.index("stage"):]
+    assert tail[:4] == ["stage", "join-as-service", "bootout", "join-as-service"]
+    assert tail[-1] == "activate"
+    assert runner.calls[0]["env"][agent_main._DARWIN_JOIN_CHECK] == "1"
+    assert agent_main._DARWIN_JOIN_CHECK not in runner.calls[1]["env"]
+
+
+def test_unknown_membership_joins_without_stopping_a_possibly_healthy_agent(
+    on_a_mac: list[str], runner: FakeRunner, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _two_phase(on_a_mac, runner, monkeypatch, agent_main._DARWIN_JOIN_UNKNOWN)
+    assert "bootout" not in on_a_mac
+    assert len(runner.calls) == 2 and on_a_mac[-1] == "activate"
+
+
+def test_member_neither_stops_nor_joins_just_starts(
+    on_a_mac: list[str], runner: FakeRunner, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _two_phase(on_a_mac, runner, monkeypatch, agent_main._DARWIN_JOIN_MEMBER)
+    assert "bootout" not in on_a_mac
+    assert len(runner.calls) == 1 and on_a_mac[-1] == "activate"
+
+
+def test_a_failed_join_after_the_stop_never_starts(
+    on_a_mac: list[str], runner: FakeRunner, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with pytest.raises(SystemExit):
+        _two_phase(on_a_mac, runner, monkeypatch, agent_main._DARWIN_JOIN_NOT_MEMBER, join_rc=1)
+    assert "bootout" in on_a_mac and "activate" not in on_a_mac
 
 
 class TestTheJoinAsTheService:
@@ -149,6 +198,34 @@ class TestTheJoinAsTheService:
         async def member(_config: Any) -> dict:
             return {"agent_id": "mac-01"}
 
+        monkeypatch.setattr(agent_main, "_existing_membership", member)
+        assert self._exit() == agent_main._DARWIN_JOIN_MEMBER
+
+    def test_check_mode_reports_not_a_member_without_joining(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        async def not_member(_config: Any) -> None:
+            return None
+
+        async def never(_config: Any) -> bool:
+            raise AssertionError("check mode must not join")
+
+        monkeypatch.setenv(agent_main._DARWIN_JOIN_CHECK, "1")
+        monkeypatch.setattr(agent_main, "_existing_membership", not_member)
+        monkeypatch.setattr(agent_main, "_join_flow", never)
+        assert self._exit() == agent_main._DARWIN_JOIN_NOT_MEMBER
+
+    def test_check_mode_reports_unknown_when_the_backend_cannot_say(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        async def unknown(_config: Any) -> None:
+            raise agent_main._MembershipUnknown("unreachable")
+
+        monkeypatch.setenv(agent_main._DARWIN_JOIN_CHECK, "1")
+        monkeypatch.setattr(agent_main, "_existing_membership", unknown)
+        assert self._exit() == agent_main._DARWIN_JOIN_UNKNOWN
+
+    def test_check_mode_reports_a_member(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        async def member(_config: Any) -> dict:
+            return {"agent_id": "mac-01"}
+
+        monkeypatch.setenv(agent_main._DARWIN_JOIN_CHECK, "1")
         monkeypatch.setattr(agent_main, "_existing_membership", member)
         assert self._exit() == agent_main._DARWIN_JOIN_MEMBER
 
@@ -278,7 +355,7 @@ def test_an_incomplete_uninstall_fails(
 
 
 _CHILD_ENV_ALLOWED = {
-    agent_main._DARWIN_JOIN_CHILD, "HOME", "USER", "LOGNAME", "PATH", "TMPDIR", "LANG", "LC_ALL", "TERM", "NO_COLOR",
+    agent_main._DARWIN_JOIN_CHILD, agent_main._DARWIN_JOIN_CHECK, "HOME", "USER", "LOGNAME", "PATH", "TMPDIR", "LANG", "LC_ALL", "TERM", "NO_COLOR",
 }
 
 

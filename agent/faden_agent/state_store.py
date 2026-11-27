@@ -50,6 +50,9 @@ class StateStore:
         except OSError as exc:
             log.warning("Cannot create state directory %s: %s", self.path.parent, exc)
         self.state = AgentState()
+        #: The credential and node_id this instance last loaded from, or wrote
+        #: to, the file. A different value on disk was written by someone else.
+        self._known_identity: tuple[str | None, str | None] = (None, None)
         self.load()
 
     def load(self) -> None:
@@ -76,9 +79,16 @@ class StateStore:
             commands_signed=bool(raw.get("commands_signed", False)),
             updated_at=str(raw.get("updated_at") or datetime.now(tz=UTC).isoformat()),
         )
+        self._known_identity = (self.state.node_id, self.state.credential)
 
     def save(self) -> None:
-        """Write state atomically to avoid truncated files."""
+        """Write state atomically to avoid truncated files.
+
+        Never clobbers a credential another process wrote: if the file's
+        credential/node_id differ from what this instance last loaded or
+        wrote, the file's win (in memory too) and the rest is still saved.
+        """
+        self._adopt_foreign_identity()
         self.state.updated_at = datetime.now(tz=UTC).isoformat()
         payload = {
             "node_id": self.state.node_id,
@@ -103,6 +113,7 @@ class StateStore:
                 with os.fdopen(fd, "w", encoding="utf-8") as handle:
                     json.dump(payload, handle, indent=2, sort_keys=True)
             tmp.replace(self.path)
+            self._known_identity = (self.state.node_id, self.state.credential)
             if sys.platform == "win32":
                 _win_restrict_file(self.path)
         except (TypeError, ValueError) as exc:
@@ -131,6 +142,24 @@ class StateStore:
                 log.error("StateStore retry save failed: %s", retry_exc)
         except OSError as exc:
             log.warning("Cannot persist state to %s: %s", self.path, exc)
+
+    def _adopt_foreign_identity(self) -> None:
+        """Take over a credential/node_id another process wrote since we last looked."""
+        try:
+            with self.path.open("r", encoding="utf-8") as handle:
+                raw = json.load(handle)
+            on_disk = (raw.get("node_id"), raw.get("credential"))
+        except (OSError, ValueError, AttributeError):
+            return
+        if on_disk == self._known_identity:
+            return
+        log.warning(
+            "State file %s holds a credential/node_id written by another process; keeping it "
+            "instead of overwriting it with this process's (node %s -> %s).",
+            self.path, self.state.node_id, on_disk[0],
+        )
+        self.state.node_id, self.state.credential = on_disk
+        self._known_identity = on_disk
 
     def next_seq(self) -> int:
         """Return next monotonic tx sequence for stream messages."""
