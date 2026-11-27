@@ -13,6 +13,35 @@ from aiodocker import Docker
 _DEFAULT_DOCKER_URL = "http://127.0.0.1:2375" if sys.platform == "win32" else "unix:///var/run/docker.sock"
 
 
+def default_docker_url(
+    platform: str = sys.platform,
+    environ: Any = None,
+    home: str | None = None,
+    exists: Any = os.path.exists,
+) -> str:
+    """The Docker Engine a backend talks to when it is not told one.
+
+    Linux and Windows: the fixed default, exactly as before. macOS: a backend
+    run from a checkout (the lab, a developer's Mac) has no
+    ``/var/run/docker.sock`` unless Docker Desktop's "Allow the default Docker
+    socket" is on; its engine is at ``~/.docker/run/docker.sock``. So on macOS
+    ``DOCKER_HOST`` wins, then the default socket when it exists, then Docker
+    Desktop's per-user one. Without this, ``/images/save`` answered "not found
+    on this host" for every image on such a Mac.
+    """
+    if platform != "darwin":
+        return _DEFAULT_DOCKER_URL
+    env = os.environ if environ is None else environ
+    if env.get("DOCKER_HOST"):
+        return str(env["DOCKER_HOST"])
+    if exists("/var/run/docker.sock"):
+        return _DEFAULT_DOCKER_URL
+    desktop = os.path.join(home or os.path.expanduser("~"), ".docker", "run", "docker.sock")
+    if exists(desktop):
+        return f"unix://{desktop}"
+    return _DEFAULT_DOCKER_URL
+
+
 def _resolve_bind_path(host_path: str) -> str:
     """Resolve a host-side bind-mount path to an absolute, Docker-compatible form.
 
@@ -73,7 +102,7 @@ class DockerService:
     """
 
     def __init__(self, url: str | None = None) -> None:
-        self._url = url or _DEFAULT_DOCKER_URL
+        self._url = url or default_docker_url()
         self._client: Docker | None = None
 
     @property
