@@ -12,6 +12,7 @@ The console calls them **Machines**. The agent, the API and some messages still 
 - You are signed in to the console as an administrator.
 - The machine meets the [System requirements](requirements.md#gpu-machines): Linux on x86_64 with an NVIDIA GPU,
   or an NVIDIA DGX Spark, with Docker or Podman.
+- Or it is a Mac with Apple Silicon (M1 or newer) on macOS 26 or newer (see [A Mac](#a-mac)).
 - `nvidia-smi` on the machine prints your card. A machine that cannot see its GPU still joins, but cannot be put
   in a cluster.
 - The machine can reach the server at an address you know, such as `https://ai.example.internal`.
@@ -61,6 +62,38 @@ sudo loginctl enable-linger <user>
 ```
 
 If your user has passwordless `sudo` but you want a user service anyway, add `--user` to the line, still without `sudo`.
+
+### A Mac
+
+!!! note "Preview"
+    A server offers the Mac agent only when it carries a Mac build of it. Released servers do not carry one yet.
+
+A Mac with Apple Silicon on macOS 26 or newer joins with the same line, run in Terminal by a user who may use
+`sudo` (an administrator). `sudo` asks for that user's password. An Intel Mac and older macOS versions are refused
+before anything is downloaded, and the line without `sudo` stops and asks for it: on a Mac the agent always runs
+as a system service.
+
+The installer creates a hidden account for the agent, `_fadenagent`, that cannot log in and is no administrator.
+After you approve the machine, the agent runs as the system service `com.fadenstack.agent` under that account, from
+the Mac's start and with nobody logged in. Its files:
+
+| What | Where |
+|---|---|
+| The agent | `/Library/Fadenstack/agent/`, and the command `/usr/local/bin/faden-agent` |
+| Settings | `/Library/Fadenstack/agent.env` |
+| Its identity and state, readable only by the agent | `/var/db/fadenstack/agent/` |
+| Log, rotated by the system | `/var/log/fadenstack/agent.log` |
+
+!!! warning "FileVault"
+    With FileVault on, a Mac that restarted unexpectedly (after a power cut, for example) starts the agent only
+    once someone unlocks the disk at the Mac. The machine stays offline until then. To restart on purpose without
+    that, use `sudo fdesetup authrestart`: the Mac restarts to the login window with the disk unlocked, and the
+    agent starts without anyone logging in.
+
+On a Mac every agent command that changes the service needs `sudo`: `sudo faden-agent status`,
+`sudo faden-agent stop`, and `sudo faden-agent uninstall`, which removes the service, the `_fadenagent` account,
+the state and the logs. To update it, run the install line again: when the new agent does not keep running, the
+Mac goes back to the one before.
 
 ### Without approving each machine
 
@@ -164,7 +197,8 @@ The network a cluster runs on is chosen separately, when you create the cluster.
 
 1. If the machine is in a cluster, take it out first: on the cluster's page, select the machine and
    **Remove from cluster** (see [Clusters](clusters.md#remove-a-machine-from-a-cluster)).
-2. On the machine, stop the agent: `sudo faden-agent stop` (or `faden-agent stop` for a user service).
+2. On the machine, stop the agent: `sudo faden-agent stop` (or `faden-agent stop` for a user service). On a Mac,
+   `sudo faden-agent uninstall` stops it and removes it with its account, state and logs.
 3. Check that nothing is left running: `pgrep -af faden-agent` prints nothing.
 4. In **Machines**, select **Delete machine** on its row, type its name to confirm, and select **Delete**. If
    runtimes or providers were set up on it, you can delete them with it.
@@ -183,6 +217,9 @@ it did the first time.
 | The installer asks for a `sudo` password you do not have | Leave `sudo` out of the line (see [Without sudo](#without-sudo)). |
 | **`ERROR: this backend publishes no agent build for linux-…`** | There is no agent build for this machine: on Linux, the agent runs on x86_64 and aarch64 only. |
 | **`ERROR: the download does not match the expected digest.`** | The download is not the build the server expects, usually because the copy in `~/fadenstack/agent-binaries/` is from an older release. Replace it with the current release's builds. |
+| **`ERROR: this is an Intel Mac.`** or **`… needs macOS 26 or newer.`** | The agent runs on Macs with Apple Silicon on macOS 26 or newer only. |
+| **`ERROR: on a Mac the agent installs as a system service. Run this with sudo`** | Run the line as the console gives it, with `sudo`, as a user who may use `sudo`. |
+| **`… _fadenagent … Refusing to continue`** on a Mac | An account of that name exists that Fadenstack did not create, or that changed since. Nothing was changed; ask whoever manages the Mac. |
 | The machine never shows up for approval | A request expires if nobody approves it in time; run the line again for a new code. If the machine cannot reach the server at all, the installer says `could not reach` with the address: pick another address in **Add a machine**. |
 | The machine joined but shows no GPU | The driver works in your shell but not for the service. Check that `nvidia-smi` is on a standard path, and that the service runs the agent you installed: `sudo systemctl show faden-agent -p ExecStart` (or `systemctl --user show faden-agent -p ExecStart`). |
 

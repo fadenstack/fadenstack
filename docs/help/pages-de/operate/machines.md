@@ -14,6 +14,7 @@ ist dasselbe.
 - Sie sind in der Konsole als Administrator angemeldet.
 - Die Maschine erfüllt die [Systemanforderungen](requirements.md#gpu-machines): Linux auf x86_64 mit einer
   NVIDIA-GPU oder eine NVIDIA DGX Spark, mit Docker oder Podman.
+- Oder sie ist ein Mac mit Apple Silicon (M1 oder neuer) unter macOS 26 oder neuer (siehe [Ein Mac](#a-mac)).
 - `nvidia-smi` gibt auf der Maschine Ihre Karte aus. Eine Maschine, die ihre GPU nicht sieht, tritt trotzdem bei,
   kann aber keinem Cluster hinzugefügt werden.
 - Die Maschine erreicht den Server unter einer Adresse, die Sie kennen, z. B. `https://ai.example.internal`.
@@ -72,6 +73,39 @@ sudo loginctl enable-linger <user>
 
 Wenn Ihr Benutzer `sudo` ohne Passwort verwenden kann, Sie aber trotzdem einen Benutzerdienst möchten, ergänzen Sie
 die Zeile um `--user`, weiterhin ohne `sudo`.
+
+### Ein Mac {#a-mac}
+
+!!! note "Vorschau"
+    Ein Server bietet den Mac-Agent nur an, wenn er einen Mac-Build davon bereithält. Veröffentlichte Server
+    halten noch keinen bereit.
+
+Ein Mac mit Apple Silicon unter macOS 26 oder neuer tritt mit derselben Zeile bei, im Terminal ausgeführt von einem
+Benutzer, der `sudo` verwenden darf (einem Administrator). `sudo` fragt nach dessen Passwort. Ein Intel-Mac und
+ältere macOS-Versionen werden abgelehnt, bevor etwas heruntergeladen wird, und die Zeile ohne `sudo` bricht ab und
+verlangt es: Auf einem Mac läuft der Agent immer als Systemdienst.
+
+Das Installationsprogramm legt für den Agent ein verborgenes Konto an, `_fadenagent`, das sich nicht anmelden kann
+und kein Administrator ist. Nachdem Sie die Maschine genehmigt haben, läuft der Agent unter diesem Konto als
+Systemdienst `com.fadenstack.agent`, ab dem Start des Macs und ohne dass jemand angemeldet ist. Seine Dateien:
+
+| Was | Wo |
+|---|---|
+| Der Agent | `/Library/Fadenstack/agent/` und der Befehl `/usr/local/bin/faden-agent` |
+| Einstellungen | `/Library/Fadenstack/agent.env` |
+| Seine Identität und sein Zustand, nur für den Agent lesbar | `/var/db/fadenstack/agent/` |
+| Protokoll, vom System rotiert | `/var/log/fadenstack/agent.log` |
+
+!!! warning "FileVault"
+    Mit eingeschaltetem FileVault startet ein Mac, der unerwartet neu gestartet ist (etwa nach einem
+    Stromausfall), den Agent erst, wenn jemand am Mac das Volume entsperrt. Bis dahin bleibt die Maschine offline.
+    Für einen geplanten Neustart ohne dieses Problem verwenden Sie `sudo fdesetup authrestart`: Der Mac startet
+    mit entsperrtem Volume bis zum Anmeldefenster neu, und der Agent startet, ohne dass sich jemand anmeldet.
+
+Auf einem Mac brauchen alle Agent-Befehle, die den Dienst ändern, `sudo`: `sudo faden-agent status`,
+`sudo faden-agent stop` und `sudo faden-agent uninstall`, das den Dienst, das Konto `_fadenagent`, den Zustand und
+die Protokolle entfernt. Zum Aktualisieren führen Sie die Installationszeile erneut aus: Läuft der neue Agent nicht
+stabil, kehrt der Mac zum vorherigen zurück.
 
 ### Ohne jede Maschine zu genehmigen {#without-approving-each-machine}
 
@@ -180,7 +214,8 @@ Das Netzwerk, in dem ein Cluster läuft, wählen Sie separat beim Anlegen des Cl
 1. Wenn die Maschine zu einem Cluster gehört, nehmen Sie sie zuerst heraus: Wählen Sie auf der Seite des Clusters
    die Maschine und **Aus Cluster entfernen** (siehe [Cluster](clusters.md#remove-a-machine-from-a-cluster)).
 2. Stoppen Sie auf der Maschine den Agent: `sudo faden-agent stop` (oder `faden-agent stop` bei einem
-   Benutzerdienst).
+   Benutzerdienst). Auf einem Mac stoppt `sudo faden-agent uninstall` ihn und entfernt ihn samt Konto, Zustand und
+   Protokollen.
 3. Prüfen Sie, dass nichts mehr läuft: `pgrep -af faden-agent` gibt nichts aus.
 4. Wählen Sie in **Maschinen** in ihrer Zeile **Maschine löschen**, geben Sie zur Bestätigung ihren Namen ein und
    wählen Sie **Löschen**. Wurden Runtimes oder Provider auf ihr eingerichtet, können Sie diese mit löschen.
@@ -199,6 +234,9 @@ erneut auf ihr aus; sie stellt dann wie beim ersten Mal eine Beitrittsanfrage.
 | Das Installationsprogramm fragt nach einem `sudo`-Passwort, das Sie nicht haben | Lassen Sie `sudo` in der Zeile weg (siehe [Ohne sudo](#without-sudo)). |
 | **`ERROR: this backend publishes no agent build for linux-…`** | Für diese Maschine gibt es keinen Agent-Build: Unter Linux läuft der Agent nur auf x86_64 und aarch64. |
 | **`ERROR: the download does not match the expected digest.`** | Der Download ist nicht der Build, den der Server erwartet, meist weil die Kopie in `~/fadenstack/agent-binaries/` aus einem älteren Release stammt. Ersetzen Sie sie durch die Builds des aktuellen Releases. |
+| **`ERROR: this is an Intel Mac.`** oder **`… needs macOS 26 or newer.`** | Der Agent läuft nur auf Macs mit Apple Silicon unter macOS 26 oder neuer. |
+| **`ERROR: on a Mac the agent installs as a system service. Run this with sudo`** | Führen Sie die Zeile so aus, wie die Konsole sie anzeigt, mit `sudo`, als Benutzer, der `sudo` verwenden darf. |
+| **`… _fadenagent … Refusing to continue`** auf einem Mac | Es gibt ein Konto dieses Namens, das Fadenstack nicht angelegt hat oder das sich seitdem verändert hat. Es wurde nichts geändert; fragen Sie, wer den Mac verwaltet. |
 | Die Maschine erscheint nie zur Genehmigung | Eine Anfrage läuft ab, wenn sie niemand rechtzeitig genehmigt; führen Sie die Zeile erneut aus, um einen neuen Code zu erhalten. Kann die Maschine den Server überhaupt nicht erreichen, meldet das Installationsprogramm `could not reach` mit der Adresse: Wählen Sie in **Maschine hinzufügen** eine andere Adresse. |
 | Die Maschine ist beigetreten, zeigt aber keine GPU | Der Treiber funktioniert in Ihrer Shell, aber nicht für den Dienst. Prüfen Sie, ob `nvidia-smi` in einem Standardpfad liegt und ob der Dienst den Agent ausführt, den Sie installiert haben: `sudo systemctl show faden-agent -p ExecStart` (oder `systemctl --user show faden-agent -p ExecStart`). |
 
