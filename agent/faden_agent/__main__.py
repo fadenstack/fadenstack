@@ -1515,7 +1515,12 @@ def _cmd_start_darwin(user: bool | None, ca_file: str | None) -> None:
     env = dict(line.split("=", 1) for line in _collect_env_lines())
     layout = darwin_service.Layout()
     env[f"{_ENV_PREFIX}STATE_PATH"] = str(layout.state_file)
-    env[f"{_ENV_PREFIX}MODEL_STORE"] = env.get(f"{_ENV_PREFIX}MODEL_STORE") or str(layout.models)
+    # The Mac store is fixed: the service owns it (0700) and the native runtime reads it. A path an
+    # old interactive configure saved (the Linux wizard default) would sit on the read-only system volume.
+    configured_store = env.get(f"{_ENV_PREFIX}MODEL_STORE")
+    if configured_store and configured_store != str(layout.models):
+        print(f"Note: the model store is {layout.models} on a Mac; ignoring the configured {configured_store}.")
+    env[f"{_ENV_PREFIX}MODEL_STORE"] = str(layout.models)
     if not env.get(f"{_ENV_PREFIX}BACKEND_URL"):
         _err("BACKEND_URL is not set. Run 'sudo faden-agent join <backend>' first.")
         sys.exit(1)
