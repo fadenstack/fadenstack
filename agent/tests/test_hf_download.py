@@ -250,6 +250,7 @@ def test_a_store_the_agent_cannot_write_is_named_with_the_fix(monkeypatch: pytes
     real_access = hf_download.os.access
     monkeypatch.setattr(hf_download.os, "access", lambda p, mode: False if Path(p) == locks else real_access(p, mode))
     monkeypatch.setenv("USER", "user")
+    monkeypatch.setattr(hf_download.sys, "platform", "linux")
 
     problem = hf_download.store_problem(str(tmp_path), REPO)
 
