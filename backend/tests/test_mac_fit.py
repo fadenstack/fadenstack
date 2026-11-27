@@ -252,3 +252,43 @@ def test_the_backend_list_equals_the_agents() -> None:
     theirs = {k: (v.pattern if v else None) for k, v in table.items()}  # noqa: SLF001
     ours = {k: (v.pattern if v else None) for k, v in metal_policy.EXTRA_ALLOWED.items()}
     assert ours == theirs
+
+
+# --- the form's policy and the re-plan ------------------------------------------------------------
+
+def test_the_form_policy_is_the_checks_own_list() -> None:
+    policy = metal_policy.form_policy()
+    allowed = set(policy["allowed_keys"])
+    assert allowed == set(metal_policy.ALLOWED_KEYS)
+    # What the Host Model form can set and a Mac refuses is exactly what is not allowed.
+    for key in ("kv_cache_dtype", "enforce_eager", "trust_remote_code", "enable_chunked_prefill"):
+        assert key not in allowed
+        assert metal_policy.check({key: True}), key
+    assert policy["forced"] == {"enable_prefix_caching": False}
+    assert metal_policy.check({"enable_prefix_caching": True})
+    assert metal_policy.check({"enable_prefix_caching": False}) is None
+    for parser in policy["tool_parsers"]:
+        assert metal_policy.check({"tool_call_parser": parser}) is None
+    for parser in policy["reasoning_parsers"]:
+        assert metal_policy.check({"reasoning_parser": parser}) is None
+
+
+def test_the_share_follows_context_sequences_and_dtype() -> None:
+    needs = qwen06()
+    m = metal(64, working_set=R64)
+    full = fit_mod.plan_metal(needs, m)
+    small = fit_mod.plan_metal(needs, m, context=8192)
+    assert small.context == 8192
+    assert small.suggested_gpu_memory_utilization < full.suggested_gpu_memory_utilization
+    one = fit_mod.plan_metal(needs, m, context=8192, sequences=1)
+    assert one.suggested_gpu_memory_utilization < small.suggested_gpu_memory_utilization
+    wide = fit_mod.plan_metal(needs, m, context=8192, kv_dtype_bytes=fit_mod.kv_dtype_bytes_for("float32"))
+    assert wide.suggested_gpu_memory_utilization > small.suggested_gpu_memory_utilization
+    assert fit_mod.kv_dtype_bytes_for("bfloat16") == 2 and fit_mod.kv_dtype_bytes_for(None) == 2
+
+
+def test_plan_passes_sequences_to_a_mac_only() -> None:
+    hardware = fit_mod.ClusterHardware(
+        environment_id="e", name="mac", status="ready", machines=[], vllm_version=None, metal=metal(64, working_set=R64),
+    )
+    assert fit_mod.plan(qwen06(), hardware, context=8192, sequences=2).max_num_seqs == 2

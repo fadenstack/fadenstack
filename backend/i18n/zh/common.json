@@ -3969,6 +3969,7 @@
       "label": "加速器内存占比",
       "help": "先存放权重，其余用于会话。若其他模型共用显卡，请预留空间。",
       "help_bytes": "每张 {{total}} 显卡最多使用 {{size}}：先存放权重，其余用于会话。",
+      "help_mac": "最多使用这台 Mac 提供的 {{total}} 中的 {{size}}：先存放权重，其余用于会话。",
       "default": "未设置：将使用 {{pct}}%。"
     },
     "kv8": {
@@ -4006,6 +4007,15 @@
       "label": "跳过图捕获",
       "help": "启动更快、内存占用更少，但生成速度较慢。部分旧 GPU 需要开启。"
     },
+    "mac": {
+      "kv_cache_dtype": "Mac 上不可用：vLLM-Metal 不支持 8 位上下文缓存。",
+      "enable_prefix_caching": "在 Mac 上，前缀缓存始终保持关闭。",
+      "enable_chunked_prefill": "Mac 上不可用：vLLM-Metal 自行决定如何拆分长提示。",
+      "enforce_eager": "Mac 上不可用：没有可跳过的图捕获。",
+      "trust_remote_code": "Mac 上不可用：不提供运行仓库自带代码。",
+      "preset": "Mac 上不可用：它需要 Mac 不接受的设置（{{setting}}）。",
+      "parsers": "仅列出已在 Mac 上测试过的格式。"
+    },
     "admin_only": "只有管理员可以更改此项。",
     "remote": {
       "label": "运行模型自带代码",
@@ -4014,6 +4024,8 @@
     },
     "all": {
       "title": "全部 vLLM 设置（{{count}} 项，vLLM {{version}}）",
+      "title_mac": "这台 Mac 允许的设置（{{count}} 项，vLLM-Metal {{version}}）",
+      "title_mac_nover": "这台 Mac 允许的设置（{{count}} 项）",
       "search": "按参数或描述搜索…",
       "only_set": "仅显示已设置",
       "no_match": "没有匹配的设置。",

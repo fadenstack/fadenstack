@@ -34,6 +34,8 @@ _REASONS = {
     "pipeline_parallel_size": "a Mac runs one copy on one machine",
     "data_parallel_size": "a Mac runs one copy on one machine",
     "speculative_config": "speculative decoding is not supported by vLLM-Metal",
+    "enforce_eager": "graph capture is not part of vLLM-Metal, so there is nothing to skip",
+    "enable_chunked_prefill": "vLLM-Metal decides how it splits long prompts",
 }
 
 #: vLLM argument names for ``extra_args`` (C2's allowlist is the same set).
@@ -41,6 +43,22 @@ _FLAG = {
     "dtype": "--dtype", "max_num_seqs": "--max-num-seqs", "max_num_batched_tokens": "--max-num-batched-tokens",
     "seed": "--seed", "generation_config": "--generation-config",
 }
+
+
+def form_policy() -> dict[str, Any]:
+    """What the Host Model form may offer for a Mac: the one list the console reads.
+
+    ``allowed_keys`` are the settings :func:`check` can accept; every other key is
+    hidden or disabled in the form (with its own sentence there). ``forced`` are
+    settings whose only value is fixed by the backend. Derived from the same
+    constants as :func:`check`, so the form and the refusal cannot drift.
+    """
+    return {
+        "allowed_keys": sorted(ALLOWED_KEYS),
+        "forced": {"enable_prefix_caching": False},
+        "tool_parsers": sorted(CERTIFIED_TOOL_PARSERS),
+        "reasoning_parsers": sorted(CERTIFIED_REASONING_PARSERS),
+    }
 
 
 def check(config: dict[str, Any] | None) -> str | None:

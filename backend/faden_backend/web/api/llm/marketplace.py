@@ -320,6 +320,9 @@ async def model_detail(
     repo_id: str,
     cluster_id: str | None = None,
     context: int | None = Query(None, ge=256, le=4_194_304),
+    #: Mac only: re-plan for this many requests at once and this dtype (the form's choices).
+    sequences: int | None = Query(None, ge=1, le=100_000),
+    dtype: str | None = Query(None, max_length=32),
     _user: User = Depends(_READ),
     session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
@@ -349,12 +352,18 @@ async def model_detail(
             detail["capabilities"] = sorted(set(detail.get("capabilities") or []) | set(entry.capabilities))
     arch = detail.get("architecture_facts") or {}
     needs = _needs(detail)
-    fits = {c.environment_id: fit_mod.plan(needs, c, context=context).to_dict() for c in hardware}
+    def _plan(c: fit_mod.ClusterHardware) -> fit_mod.Fit:
+        if c.metal:
+            return fit_mod.plan(needs, c, context=context, sequences=sequences,
+                                kv_dtype_bytes=fit_mod.kv_dtype_bytes_for(dtype))
+        return fit_mod.plan(needs, c, context=context)
+
+    fits = {c.environment_id: _plan(c).to_dict() for c in hardware}
     # Whether each cluster's runtime can load it at all -- said here, before
     # anyone downloads 132 GB to find out (services/marketplace/compat.py).
     compatibility = {c.environment_id: compat_mod.check(arch, c.runtime).to_dict() for c in hardware}
     chosen = _cluster(hardware, cluster_id)
-    chosen_fit = fit_mod.plan(needs, chosen, context=context) if chosen is not None else None
+    chosen_fit = _plan(chosen) if chosen is not None else None
     suggestion = settings_mod.suggest(detail, chosen_fit if chosen_fit and chosen_fit.status == "fits" else None)
     # vLLM's own recipe, when it publishes one: ahead of our family rules,
     # behind the settings we tested ourselves (curated, below).
@@ -383,6 +392,7 @@ async def model_detail(
         "fits": fits,
         "compatibility": compatibility,
         "suggested": suggestion,
+        "metal_policy": metal_policy.form_policy() if chosen is not None and chosen.metal else None,
         "recipe": recipe.to_dict(vllm_version=chosen.vllm_version if chosen else None) if recipe else None,
         "local": local.get(repo_id),
     }
@@ -463,6 +473,7 @@ async def _check_for_mac(session: AsyncSession, body: HostBody) -> dict[str, Any
     chosen = fit_mod.plan_metal(
         needs, cluster.metal, context=int(asked_len) if asked_len else None,
         sequences=int(asked_seqs) if asked_seqs else None,
+        kv_dtype_bytes=fit_mod.kv_dtype_bytes_for(config.get("dtype")),
     )
     info = chosen.metal or {}
     if chosen.status == "too_large":

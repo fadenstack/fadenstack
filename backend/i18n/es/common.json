@@ -3969,6 +3969,7 @@
       "label": "Parte de la memoria del acelerador",
       "help": "Primero los pesos; el resto guarda conversaciones. Deje espacio si otros modelos comparten la tarjeta.",
       "help_bytes": "Hasta {{size}} de cada tarjeta de {{total}}: primero los pesos, el resto para conversaciones.",
+      "help_mac": "Hasta {{size}} de los {{total}} que ofrece este Mac: primero los pesos, el resto para conversaciones.",
       "default": "Sin definir: se usa el {{pct}} %."
     },
     "kv8": {
@@ -4006,6 +4007,15 @@
       "label": "Omitir captura de grafos",
       "help": "Arranca más rápido y usa menos memoria, pero genera más despacio. Necesario en algunas GPU antiguas."
     },
+    "mac": {
+      "kv_cache_dtype": "No disponible en un Mac: vLLM-Metal no admite una caché de contexto de 8 bits.",
+      "enable_prefix_caching": "La reutilización de inicios de prompt sigue desactivada en un Mac.",
+      "enable_chunked_prefill": "No disponible en un Mac: vLLM-Metal decide cómo divide los prompts largos.",
+      "enforce_eager": "No disponible en un Mac: no hay captura de grafos que omitir.",
+      "trust_remote_code": "No disponible en un Mac: no se ofrece ejecutar el código propio de un repositorio.",
+      "preset": "No disponible en un Mac: necesita un ajuste que un Mac rechaza ({{setting}}).",
+      "parsers": "Solo se muestran los formatos probados en un Mac."
+    },
     "admin_only": "Solo un administrador puede cambiar esto.",
     "remote": {
       "label": "Ejecutar el código propio del modelo",
@@ -4014,6 +4024,8 @@
     },
     "all": {
       "title": "Todos los ajustes de vLLM ({{count}}, vLLM {{version}})",
+      "title_mac": "Ajustes que permite este Mac ({{count}}, vLLM-Metal {{version}})",
+      "title_mac_nover": "Ajustes que permite este Mac ({{count}})",
       "search": "Buscar por opción o descripción…",
       "only_set": "Solo los definidos",
       "no_match": "Ningún ajuste coincide.",
