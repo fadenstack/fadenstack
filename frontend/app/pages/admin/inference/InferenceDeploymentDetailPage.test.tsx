@@ -599,4 +599,45 @@ describe("InferenceDeploymentDetailPage", () => {
     expect(screen.queryByText("Started LLMDeployment:qwen")).not.toBeInTheDocument();
     expect(screen.getByText(/\(EngineCore pid=1\) ValueError/)).toBeInTheDocument();
   });
+
+  it("shows the engine cards and the dashboard link for a Mac (standalone) deployment", async () => {
+    // What the standalone driver returns now: the one machine's scrape target,
+    // no Ray application or replica table, and the metrics route answers 200
+    // (it was 501, which showed "metrics unavailable").
+    vi.spyOn(inferenceApi, "deploymentMetrics").mockResolvedValue({
+      deployment_id: DEPLOYMENT_ID,
+      app_name: "qwen-serve",
+      app_status: "running",
+      replicas_ready: 1,
+      replicas_total: 1,
+      deployments: [],
+      scrape_targets: [
+        { node_id: null, address: "10.0.0.9", port: 9468, url: "http://10.0.0.9:9468/metrics" },
+      ],
+      traffic: null,
+      partials: [],
+      observed_at: "2026-11-28T12:00:00Z",
+    } as never);
+    vi.spyOn(inferenceApi, "deploymentMonitoringStats").mockResolvedValue({
+      enabled: true,
+      stale: false,
+      dashboard_url: "http://grafana.example/d/abc",
+      stats: {
+        running_requests: 2,
+        waiting_requests: 0,
+        kv_cache_usage: 12.5,
+        prefix_cache_hit_rate: null,
+        mtp_acceptance: null,
+        generation_tokens_per_sec: 41.2,
+        preemption_rate: 0,
+      },
+    } as never);
+    await renderDetail();
+
+    expect(await screen.findByText("41.2")).toBeInTheDocument();
+    expect(screen.getByText("12.5%")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open Grafana dashboard" })).toBeInTheDocument();
+    expect(screen.queryByText(/metrics unavailable/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/http:\/\/10\.0\.0\.9:9468\/metrics/)).toBeInTheDocument();
+  });
 });
