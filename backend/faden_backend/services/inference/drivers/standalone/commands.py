@@ -126,7 +126,12 @@ class NativeCommands:
             idempotency_key=f"standalone:{self._owner}:ask:{command_type}:{uuid.uuid4().hex[:12]}",
             timeout_sec=max(int(wait_sec) * 3, 30),
         )
+        await self._gateway.publish()  # the agent cannot see an uncommitted command
         done = await self._gateway.wait(command.id, budget_sec=wait_sec, poll_interval_sec=0.5)
-        if done is None or str(done.status) != NodeCommandStatus.SUCCEEDED.value:
+        if done is None:
             return None
+        if str(done.status) != NodeCommandStatus.SUCCEEDED.value:
+            # Answered, but with a failure: say so, rather than pass it off as silence.
+            error = getattr(done, "error_message", None) or f"{command_type} ended {done.status}"
+            return {"ok": False, "error": str(error)}
         return dict(done.result_json or {})

@@ -109,6 +109,18 @@ class NodeCommandGateway:
         else:
             raise RuntimeError("NodeCommandGateway has no valid session or session factory")
 
+    async def publish(self) -> None:
+        """Commit what :meth:`issue` flushed, when the gateway runs on a caller's own session.
+
+        With a session factory, ``issue`` commits at once. On a request-scoped service it only flushes, and the
+        node's agent -- a different connection -- sees nothing until the request ends: a caller that waits for
+        the answer inside the request must publish the command first.
+        """
+        service = getattr(self, "_direct_service", None)
+        session = getattr(getattr(service, "_dao", None), "session", None)
+        if getattr(self, "_factory", None) is None and session is not None and hasattr(session, "commit"):
+            await session.commit()
+
     async def get_command(self, command_id: uuid.UUID | str) -> InfraNodeCommand | None:
         """Fetch command status in an isolated session."""
         cmd_uuid = command_id if isinstance(command_id, uuid.UUID) else uuid.UUID(str(command_id))
