@@ -27,6 +27,7 @@ nav = [
     { "Mail" = "administer/mail.md" },
     { "Modelle" = "administer/models.md" },
     { "Bereitstellungen" = "administer/deployments.md" },
+    { "Modelle auf einem Mac bereitstellen" = "administer/serve-on-a-mac.md" },
     { "Externe Provider" = "administer/providers.md" },
     { "MCP-Server" = "administer/mcp-servers.md" },
     { "Skills für die Organisation" = "administer/skills.md" },

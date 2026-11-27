@@ -32,6 +32,7 @@ nav = [
     { "Mail" = "administer/mail.md" },
     { "Models" = "administer/models.md" },
     { "Deployments" = "administer/deployments.md" },
+    { "Serve models on a Mac" = "administer/serve-on-a-mac.md" },
     { "Remote providers" = "administer/providers.md" },
     { "MCP servers" = "administer/mcp-servers.md" },
     { "Skills for the organisation" = "administer/skills.md" },

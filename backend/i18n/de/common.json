@@ -3167,7 +3167,8 @@
     "title_label": "Chat-Titel",
     "writing": "Eine Antwort wird geschrieben",
     "ai_notice": "Antworten werden von einer KI erzeugt und können falsch sein. Prüfen Sie Wichtiges.",
-    "unmarked_notice": "Diese Antwort trägt keine Kennzeichnung als KI-erzeugt: Ein Administrator hat dieses Modell ohne sie erlaubt.",
+    "unmarked_notice": "Diese Antwort trägt keine Kennzeichnung als KI-erzeugt: Ein Administrator hat dieses Modell ohne sie erlaubt."
+,
     "project_files": "Dateien",
     "project_files_hint": "Dateien hier gehören zu jedem Chat dieses Projekts. Das Modell liest ihren Text als Kontext.",
     "project_files_add": "Datei hinzufügen",
@@ -5928,5 +5929,37 @@
     "not_reported": "Noch nicht gemeldet",
     "reported": "Gemeldet am {{when}}",
     "copy": "SHA-256 von {{name}} kopieren"
+  },
+  "mac": {
+    "status_title": "Dieser Mac",
+    "runtime_ready": "Die native Laufzeit ist installiert und bereit.",
+    "runtime_missing": "Die native Laufzeit ist noch nicht installiert; sie wird beim ersten Bereitstellen eines Modells geladen.",
+    "sandbox_on": "Sandbox an: Die Modell-Engine kann die eigenen Dateien des Agenten nicht lesen.",
+    "sandbox_off": "Sandbox aus: Die Modell-Engine läuft ohne Sandbox. Schalten Sie sie wieder ein, außer Sie testen.",
+    "sandbox_unknown": "Der Sandbox-Zustand wird von diesem Agenten nicht gemeldet.",
+    "firewall_title": "Anwendungs-Firewall",
+    "firewall_on": "Die Anwendungs-Firewall ist an. Sie kann verhindern, dass das Gateway den Modell-Port erreicht; erlauben Sie eingehende Verbindungen für faden-agent unter Systemeinstellungen, Netzwerk, Firewall.",
+    "firewall_off": "Die Anwendungs-Firewall ist aus.",
+    "firewall_unknown": "Der Firewall-Zustand ist nicht bekannt.",
+    "filevault_on": "FileVault ist an. Nach einem Stromausfall wartet der Mac auf eine Anmeldung, außer Sie starten vorher mit `sudo fdesetup authrestart` neu.",
+    "filevault_off": "FileVault ist aus. Der Mac startet unbeaufsichtigt neu, aber die Platte ist nicht verschlüsselt.",
+    "filevault_unknown": "Der FileVault-Zustand ist nicht bekannt.",
+    "serve_button": "Modelle auf diesem Mac bereitstellen",
+    "serve_hint": "Ein Modell zur Zeit, direkt auf diesem Mac, ohne Cluster.",
+    "serve_failed": "Dieser Mac konnte nicht eingerichtet werden: {{error}}",
+    "serve_done": "Dieser Mac ist bereit: {{name}}.",
+    "fit_title": "Speicher dieses Macs",
+    "fit_working_set": "GPU-Speicher, den der Mac bietet",
+    "fit_estimated": "geschätzt",
+    "fit_reserve": "Für das System reserviert",
+    "fit_weights": "Modellgewichte",
+    "fit_cache": "Cache für Unterhaltungen",
+    "fit_budget": "Dem Modell zugeteilter Speicher",
+    "fit_share": "Anteil am GPU-Speicher",
+    "fit_context": "Kontext",
+    "fit_sequences": "Parallele Unterhaltungen",
+    "fit_too_large": "Dieses Modell passt nicht auf diesen Mac: Es braucht etwa {{needed}}, das Modell darf {{available}} nutzen.",
+    "fit_one_model": "Ein Mac führt ein Modell zur Zeit aus.",
+    "fit_waiting": "Warte darauf, dass der Mac seinen Speicher meldet."
   }
 }
