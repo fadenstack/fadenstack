@@ -426,6 +426,9 @@ class NativeProxy:
                 first = False
             except _Gone:
                 return
+            except _Refused as exc:
+                await self._reply(conn, writer, exc.status, exc.message)
+                return
             except h11.RemoteProtocolError as exc:
                 await self._reply(conn, writer, 431 if "too big" in str(exc).lower() else 400, "malformed request")
                 return
@@ -450,6 +453,7 @@ class NativeProxy:
         lim = self.limits
         loop = asyncio.get_running_loop()
         started: float | None = None
+        raw = b""
         while True:
             ev = conn.next_event()
             if ev is h11.NEED_DATA:
@@ -459,9 +463,16 @@ class NativeProxy:
                 data = await asyncio.wait_for(reader.read(65536), wait)
                 if started is None and data:
                     started = loop.time()
+                raw += data
                 conn.receive_data(data)
                 continue
             if isinstance(ev, h11.Request):
+                # h11 merges identical duplicate Content-Length lines; a proxy must not.
+                if raw.find(b"\r\n\r\n") > lim.max_header_bytes:
+                    raise _Refused(431, "request headers too large")
+                lines = raw.split(b"\r\n\r\n", 1)[0].lower().split(b"\r\n")[1:]
+                if sum(1 for ln in lines if ln.split(b":", 1)[0].strip() == b"content-length") > 1:
+                    raise _Refused(400, "duplicate Content-Length")
                 return ev
             if isinstance(ev, h11.ConnectionClosed) or ev is h11.PAUSED:
                 return None
@@ -593,8 +604,8 @@ class NativeProxy:
                     with contextlib.suppress(BaseException):
                         await relay
                     return False
-                conn.receive_data(data)  # a pipelined request; parsed after this response
-                return await relay
+                await relay  # a pipelined request is not served: this response, then the connection closes
+                return False
             return relay.result()
         finally:
             for task in (relay, watch):

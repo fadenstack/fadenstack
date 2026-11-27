@@ -16,5 +16,13 @@
     "ray_drain",
     "ray_tls",
     "serve_scale"
-  ]
+  ],
+  "linux_static_values": {
+    "model_tls": 1,
+    "ray_tls": 2,
+    "model_download": 1,
+    "command_continuity": 1,
+    "ray_drain": 1,
+    "serve_scale": 1
+  }
 }
