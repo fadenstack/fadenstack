@@ -322,3 +322,13 @@ def test_the_join_child_has_no_controlling_terminal(monkeypatch: pytest.MonkeyPa
     assert seen["stdin"] is ds.subprocess.DEVNULL
     assert seen["user"] == 452 and seen["group"] == 452 and seen["extra_groups"] == []
     assert "stdout" not in seen and "capture_output" not in seen, "the code must reach the terminal"
+
+
+def test_start_forces_the_mac_model_store(on_a_mac: list[str], monkeypatch: pytest.MonkeyPatch) -> None:
+    """A Linux path saved by an old configure must not survive: the service owns layout.models only."""
+    saved: dict[str, str] = {}
+    monkeypatch.setattr(agent_main, "_save_env_file", lambda env: (saved.update(env), Path("/dev/null"))[1])
+    monkeypatch.setenv("FADEN_NODE_AGENT_BACKEND_URL", "http://192.0.2.220:8000")
+    monkeypatch.setenv("FADEN_NODE_AGENT_MODEL_STORE", "/srv/faden/models")
+    agent_main.cmd_start()
+    assert saved["FADEN_NODE_AGENT_MODEL_STORE"].endswith("/var/db/fadenstack/agent/models")
