@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { driverUi, isNativeNode } from "./driverCaps";
+import { driverUi, isMacNode, isNativeNode } from "./driverCaps";
 
 describe("driverUi", () => {
   it("hides Ray-only controls for a standalone environment", () => {
@@ -14,5 +14,16 @@ describe("driverUi", () => {
     expect(isNativeNode({ native_runtime: 1 })).toBe(true);
     expect(isNativeNode({})).toBe(false);
     expect(isNativeNode(undefined)).toBe(false);
+  });
+});
+
+describe("isMacNode", () => {
+  it("is a Mac by its native runtime or its OS, and Linux is not", () => {
+    expect(isMacNode({ native_runtime: 1 })).toBe(true);
+    expect(isMacNode({ os: "macOS-26.1-arm64-arm-64bit" })).toBe(true);
+    expect(isMacNode({ os: "Darwin" })).toBe(true);
+    expect(isMacNode({ os: "Linux-6.8.0-generic-x86_64-with-glibc2.39" })).toBe(false);
+    expect(isMacNode({})).toBe(false);
+    expect(isMacNode(null)).toBe(false);
   });
 });

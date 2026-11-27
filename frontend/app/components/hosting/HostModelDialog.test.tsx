@@ -2,7 +2,7 @@
  * Hosting a model: the fit sizes the copy, the suggested settings fill the
  * engine form, and what is sent is what the operator saw.
  */
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -409,5 +409,89 @@ describe("HostModelDialog", () => {
       topology: { tensor_parallel_size: 2 },
       service: { alias: "my-finetune" },
     });
+  });
+});
+
+
+const MAC: MarketCluster = {
+  environment_id: "33333333-3333-3333-3333-333333333333",
+  name: "studio",
+  status: "ready",
+  machines: [],
+  vllm_version: null,
+  gpu_count: 1,
+  gpu_bytes: 68.7e9,
+  accelerator: "Apple M5 Pro",
+  metal: { working_set_bytes: 55.7e9, unified_bytes: 68.7e9, estimated: false, runtime_version: "0.34.0" },
+};
+
+function macFit(share: number, context: number, seqs: number): Fit {
+  return fit({
+    gpus_per_copy: 1, copies: 1, copies_now: 1, shareable: false, context, max_num_seqs: seqs,
+    suggested_gpu_memory_utilization: share,
+    metal: { working_set_bytes: 55.7e9, estimated: false, reserve_bytes: 4e9, ceiling_bytes: 51e9, budget_bytes: share * 55.7e9, kv_bytes: 1e9 },
+  });
+}
+
+const MAC_DETAIL: MarketDetail = {
+  ...DETAIL,
+  clusters: [MAC],
+  cluster_id: MAC.environment_id,
+  fits: { [MAC.environment_id]: macFit(0.6557, 32768, 8) },
+  suggested: { config: { max_model_len: 32768, max_num_seqs: 8, gpu_memory_utilization: 0.6557 }, reasons: {} },
+  metal_policy: {
+    allowed_keys: ["max_model_len", "max_num_seqs", "gpu_memory_utilization", "dtype", "tool_call_parser"],
+    forced: { enable_prefix_caching: false },
+    tool_parsers: ["hermes"],
+    reasoning_parsers: ["qwen3"],
+  },
+};
+
+describe("HostModelDialog on a Mac", () => {
+  it("re-plans the share when the longest conversation changes, and shows the plan", async () => {
+    vi.spyOn(marketplaceApi, "clusters").mockResolvedValue([MAC]);
+    const detail = vi.spyOn(marketplaceApi, "detail").mockImplementation(async (_repo, _cluster, context) =>
+      context === 8192
+        ? { ...MAC_DETAIL, fits: { [MAC.environment_id]: macFit(0.1234, 8192, 8) } }
+        : MAC_DETAIL,
+    );
+    const host = vi.spyOn(marketplaceApi, "host").mockResolvedValue({
+      deployment_id: "dep-m", model_id: "m-1", download: "kept", download_error: null,
+    });
+    vi.spyOn(inferenceApi, "reconcileDeployment").mockResolvedValue({} as InferenceDeployment);
+    renderDialog({ repoId: "Qwen/Qwen3-0.6B" });
+
+    await userEvent.click(await screen.findByTestId("host-next"));
+    expect(await screen.findByTestId("mac-fit")).toHaveTextContent("66 %");
+    await userEvent.click(within(screen.getByTestId("engine-context").parentElement!).getByRole("combobox"));
+    await userEvent.click(screen.getByRole("option", { name: /^8K/ }));
+
+    await waitFor(() => expect(detail).toHaveBeenCalledWith("Qwen/Qwen3-0.6B", MAC.environment_id, 8192, expect.anything()));
+    await waitFor(() => expect(screen.getByTestId("mac-fit")).toHaveTextContent("12 %"));
+    // The slider text uses the Mac's working set, not its whole memory.
+    expect(screen.getByText(/of the 55\.7 GB this Mac offers/)).toBeInTheDocument();
+    // vLLM's own version is not shown for a Mac; the Mac runtime's is.
+    expect(screen.getByText(/Settings this Mac allows \(\d+, vLLM-Metal 0\.34\.0\)/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId("host-next"));
+    await userEvent.click(screen.getByTestId("host-submit"));
+    await waitFor(() => expect(host).toHaveBeenCalled());
+    expect(host.mock.calls[0][0].engine_config).toMatchObject({ max_model_len: 8192, gpu_memory_utilization: 0.1234 });
+  });
+});
+
+describe("HostModelDialog on Ray", () => {
+  it("keeps the Linux engine form: nothing refused, vLLM's own flag list, no re-plan", async () => {
+    vi.spyOn(marketplaceApi, "clusters").mockResolvedValue([PAIR]);
+    const detail = vi.spyOn(marketplaceApi, "detail").mockResolvedValue({ ...DETAIL, clusters: [PAIR] });
+    renderDialog({ repoId: "Qwen/Qwen3-8B" });
+    await userEvent.click(await screen.findByTestId("host-next"));
+    expect(screen.getByText(/All vLLM settings \(\d+, vLLM /)).toBeInTheDocument();
+    expect(screen.getByLabelText("8-bit context cache")).toBeEnabled();
+    expect(screen.getByLabelText("Skip graph capture")).toBeEnabled();
+    expect(screen.getByTestId("engine-preset-long_context")).toBeEnabled();
+    expect(screen.queryByTestId("mac-fit")).not.toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 400));
+    expect(detail.mock.calls.every((c) => c[3] === undefined)).toBe(true);
   });
 });

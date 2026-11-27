@@ -54,7 +54,7 @@ import FoundVllmCard from "~/pages/admin/nodes/FoundVllmCard";
 import GaugeCard from "~/components/GaugeCard";
 import { DrainPlanDialog } from "../clusters/DrainPlanDialog";
 import { MacServeSection } from "~/components/macs/MacServeSection";
-import { isNativeNode } from "~/lib/driverCaps";
+import { isMacNode, isNativeNode } from "~/lib/driverCaps";
 
 /* ── helpers ────────────────────────────────────────────────────────────── */
 
@@ -887,10 +887,13 @@ faden-agent run`}
       </Stack>
 
       {/* ── vLLM this machine runs that Fadenstack did not start ──── */}
-      <FoundVllmCard
-        nodeId={node.id}
-        reported={"vllm_containers" in ((node.latest_inventory ?? {}) as Record<string, unknown>)}
-      />
+      {/* A Mac runs no Docker containers, so there is nothing to find. */}
+      {!isMacNode({ ...(node.capabilities ?? {}), ...caps }) && (
+        <FoundVllmCard
+          nodeId={node.id}
+          reported={"vllm_containers" in ((node.latest_inventory ?? {}) as Record<string, unknown>)}
+        />
+      )}
 
       {/* ── System Logs ──────────────────────────────────────────── */}
       <Card variant="outlined">

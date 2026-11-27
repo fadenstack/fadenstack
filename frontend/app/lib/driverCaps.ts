@@ -27,3 +27,9 @@ export function driverUi(driver: string | null | undefined): DriverUi {
 export function isNativeNode(capabilities: Record<string, unknown> | undefined | null): boolean {
   return Number(capabilities?.native_runtime ?? 0) > 0;
 }
+
+/** A Mac: the agent says so by its native runtime, or by reporting darwin as its OS. */
+export function isMacNode(capabilities: Record<string, unknown> | undefined | null): boolean {
+  const os = String(capabilities?.os ?? "").toLowerCase();
+  return isNativeNode(capabilities) || os.startsWith("darwin") || os.startsWith("macos");
+}

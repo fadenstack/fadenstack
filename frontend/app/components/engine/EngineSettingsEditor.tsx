@@ -48,6 +48,7 @@ import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import SearchIcon from "@mui/icons-material/Search";
 
 import { auth } from "~/api/auth";
+import type { MetalPolicy } from "~/api/marketplace";
 import {
   CATALOG,
   PRESETS,
@@ -65,6 +66,7 @@ import {
   type HardwareFacts,
   type ModelFacts,
   isSuperuserOnly,
+  presetChanges,
   type PresetId,
 } from "~/lib/engine";
 
@@ -72,6 +74,15 @@ export interface EngineSuggestion {
   config: EngineConfig;
   /** Why each suggested value was chosen (a code the interface words). */
   reasons: Record<string, string>;
+}
+
+/** The Mac the settings are for: what it allows and the memory its share is a fraction of. */
+export interface MacEngineView {
+  policy: MetalPolicy;
+  /** R, Metal's recommended working set: the share is a fraction of this, not of the whole memory. */
+  workingSetBytes?: number | null;
+  /** The Mac runtime's version (vLLM-Metal). */
+  runtimeVersion?: string | null;
 }
 
 export interface EngineSettingsEditorProps {
@@ -85,6 +96,8 @@ export interface EngineSettingsEditorProps {
   disabled?: boolean;
   /** Whether the user may set what only a superuser may; looked up when not given. */
   isSuperuser?: boolean;
+  /** Set when the target is a Mac: the form offers only what vLLM-Metal can run. */
+  mac?: MacEngineView;
 }
 
 /** The memory share a cluster uses when none is chosen (the compiler's default). */
@@ -113,6 +126,7 @@ export function EngineSettingsEditor({
   suggested,
   disabled = false,
   isSuperuser,
+  mac,
 }: EngineSettingsEditorProps) {
   const { t } = useTranslation();
   // Unknown counts as not a superuser: the setting stays locked until the answer is in.
@@ -139,6 +153,23 @@ export function EngineSettingsEditor({
   const reasons = suggested?.reasons ?? {};
   const isEmbedding = (model?.capabilities ?? []).includes("embedding");
   const tp = Math.max(1, hardware?.tensorParallel ?? 1);
+  // On a Mac the backend's policy is the only list: a setting it does not allow is shown off, with why.
+  const macAllowed = mac ? new Set(mac.policy.allowed_keys) : null;
+  const macRefuses = (key: string) => Boolean(macAllowed && (!macAllowed.has(key) || key in mac!.policy.forced));
+  const macNote = (key: string) => (macRefuses(key) ? t(`engine.mac.${key}`) : undefined);
+  const toolParsers = mac ? CATALOG.toolParsers.filter((p) => mac.policy.tool_parsers.includes(p)) : CATALOG.toolParsers;
+  const reasoningParsers = mac
+    ? CATALOG.reasoningParsers.filter((p) => mac.policy.reasoning_parsers.includes(p))
+    : CATALOG.reasoningParsers;
+  /** The setting a preset needs that a Mac refuses, if any. */
+  function presetRefusedBy(id: PresetId): string | null {
+    if (!mac) return null;
+    for (const [key, v] of Object.entries(presetChanges(id, model, hardware))) {
+      if (!macAllowed!.has(key)) return key;
+      if (key in mac.policy.forced && v !== mac.policy.forced[key]) return key;
+    }
+    return null;
+  }
 
   function set(key: string, next: EngineValue | undefined) {
     const copy = { ...value };
@@ -184,7 +215,9 @@ export function EngineSettingsEditor({
   // ── memory share ──
   const defaultShare = target === "cluster" ? CLUSTER_DEFAULT_SHARE : ENGINE_DEFAULT_SHARE;
   const share = Number(value.gpu_memory_utilization) || defaultShare;
-  const shareBytes = hardware?.gpuBytes ? hardware.gpuBytes * share : null;
+  // On a Mac the share is a fraction of the working set R, not of the whole memory.
+  const shareBase = mac ? (mac.workingSetBytes ?? null) : (hardware?.gpuBytes ?? null);
+  const shareBytes = shareBase ? shareBase * share : null;
 
   // ── tools / reasoning ──
   const toolsOn = value.enable_auto_tool_choice === true && Boolean(value.tool_call_parser);
@@ -229,13 +262,26 @@ export function EngineSettingsEditor({
           onChange={(_, next: PresetId | null) => choosePreset(next)}
           sx={{ flexWrap: "wrap" }}
         >
-          {PRESETS.map((id) => (
-            <Tooltip key={id} title={t(`engine.preset.${id}_help`)}>
-              <ToggleButton value={id} data-testid={`engine-preset-${id}`} sx={{ textTransform: "none" }}>
-                {t(`engine.preset.${id}`)}
-              </ToggleButton>
-            </Tooltip>
-          ))}
+          {PRESETS.map((id) => {
+            const refusedBy = presetRefusedBy(id);
+            return (
+              <Tooltip
+                key={id}
+                title={refusedBy ? t("engine.mac.preset", { setting: refusedBy }) : t(`engine.preset.${id}_help`)}
+              >
+                <span>
+                  <ToggleButton
+                    value={id}
+                    disabled={refusedBy !== null}
+                    data-testid={`engine-preset-${id}`}
+                    sx={{ textTransform: "none" }}
+                  >
+                    {t(`engine.preset.${id}`)}
+                  </ToggleButton>
+                </span>
+              </Tooltip>
+            );
+          })}
         </ToggleButtonGroup>
         <Box sx={{ flexGrow: 1 }} />
         <Chip
@@ -326,9 +372,9 @@ export function EngineSettingsEditor({
               chip={suggestionChip("gpu_memory_utilization")}
               help={
                 shareBytes
-                  ? t("engine.memory.help_bytes", {
+                  ? t(mac ? "engine.memory.help_mac" : "engine.memory.help_bytes", {
                       size: formatBytes(shareBytes),
-                      total: formatBytes(hardware?.gpuBytes ?? null),
+                      total: formatBytes(shareBase),
                     })
                   : t("engine.memory.help")
               }
@@ -338,7 +384,7 @@ export function EngineSettingsEditor({
                   size="small"
                   min={0.05}
                   max={0.95}
-                  step={0.05}
+                  step={mac ? 0.01 : 0.05}
                   disabled={disabled}
                   value={share}
                   valueLabelDisplay="auto"
@@ -362,9 +408,10 @@ export function EngineSettingsEditor({
               label={t("engine.kv8.label")}
               chip={suggestionChip("kv_cache_dtype")}
               help={t("engine.kv8.help")}
+              note={macNote("kv_cache_dtype")}
             >
               <Switch
-                disabled={disabled}
+                disabled={disabled || macRefuses("kv_cache_dtype")}
                 checked={value.kv_cache_dtype === "fp8"}
                 onChange={(_, on) => set("kv_cache_dtype", on ? "fp8" : undefined)}
                 slotProps={{ input: { "aria-label": t("engine.kv8.label") } }}
@@ -403,10 +450,12 @@ export function EngineSettingsEditor({
             <TriRow
               label={t("engine.prefix.label")}
               help={t("engine.prefix.help")}
-              value={tri(value.enable_prefix_caching)}
+              value={macRefuses("enable_prefix_caching") ? "off" : tri(value.enable_prefix_caching)}
               disabled={disabled}
               onChange={(v) => set("enable_prefix_caching", v === "auto" ? undefined : v === "on")}
               chip={suggestionChip("enable_prefix_caching")}
+              note={macNote("enable_prefix_caching")}
+              disabledValues={macRefuses("enable_prefix_caching") ? ["auto", "on"] : undefined}
             />
             <TriRow
               label={t("engine.chunked.label")}
@@ -415,6 +464,8 @@ export function EngineSettingsEditor({
               disabled={disabled}
               onChange={(v) => set("enable_chunked_prefill", v === "auto" ? undefined : v === "on")}
               chip={suggestionChip("enable_chunked_prefill")}
+              note={macNote("enable_chunked_prefill")}
+              disabledValues={macRefuses("enable_chunked_prefill") ? ["auto", "on", "off"] : undefined}
             />
           </Section>
         </Grid>
@@ -478,7 +529,7 @@ export function EngineSettingsEditor({
                         onChange={(e) => set("tool_call_parser", e.target.value)}
                         slotProps={{ htmlInput: { "data-testid": "engine-tool-parser" } }}
                       >
-                        {CATALOG.toolParsers.map((p) => (
+                        {toolParsers.map((p) => (
                           <MenuItem key={p} value={p}>
                             {p}
                             {p === suggestedTool ? ` · ${t("engine.suggested")}` : ""}
@@ -492,6 +543,7 @@ export function EngineSettingsEditor({
                   label={t("engine.reasoning.label")}
                   chip={suggestionChip("reasoning_parser")}
                   help={t("engine.reasoning.help")}
+                  note={mac ? t("engine.mac.parsers") : undefined}
                 >
                   <TextField
                     select
@@ -503,7 +555,7 @@ export function EngineSettingsEditor({
                     slotProps={{ select: { displayEmpty: true }, htmlInput: { "data-testid": "engine-reasoning" } }}
                   >
                     <MenuItem value="">{t("engine.reasoning.off")}</MenuItem>
-                    {CATALOG.reasoningParsers.map((p) => (
+                    {reasoningParsers.map((p) => (
                       <MenuItem key={p} value={p}>
                         {p}
                         {p === suggestedReasoning ? ` · ${t("engine.suggested")}` : ""}
@@ -519,9 +571,14 @@ export function EngineSettingsEditor({
         {/* ── Compatibility ──────────────────────────────────────── */}
         <Grid size={{ xs: 12, md: 6 }}>
           <Section title={t("engine.section.compatibility")}>
-            <Row label={t("engine.eager.label")} chip={suggestionChip("enforce_eager")} help={t("engine.eager.help")}>
+            <Row
+              label={t("engine.eager.label")}
+              chip={suggestionChip("enforce_eager")}
+              help={t("engine.eager.help")}
+              note={macNote("enforce_eager")}
+            >
               <Switch
-                disabled={disabled}
+                disabled={disabled || macRefuses("enforce_eager")}
                 checked={value.enforce_eager === true}
                 onChange={(_, on) => set("enforce_eager", on ? true : undefined)}
                 slotProps={{ input: { "aria-label": t("engine.eager.label") } }}
@@ -530,10 +587,10 @@ export function EngineSettingsEditor({
             <Row
               label={t("engine.remote.label")}
               help={model?.needsRemoteCode ? t("engine.remote.help_needed") : t("engine.remote.help")}
-              note={locked("trust_remote_code") ? t("engine.admin_only") : undefined}
+              note={macNote("trust_remote_code") ?? (locked("trust_remote_code") ? t("engine.admin_only") : undefined)}
             >
               <Switch
-                disabled={disabled || locked("trust_remote_code")}
+                disabled={disabled || locked("trust_remote_code") || macRefuses("trust_remote_code")}
                 color="warning"
                 checked={value.trust_remote_code === true}
                 onChange={(_, on) => set("trust_remote_code", on ? true : undefined)}
@@ -548,7 +605,12 @@ export function EngineSettingsEditor({
       <Accordion variant="outlined" disableGutters>
         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
           <Typography variant="subtitle2">
-            {t("engine.all.title", { count: CATALOG.flags.length, version: CATALOG.vllmVersion })}
+            {mac
+              ? t(mac.runtimeVersion ? "engine.all.title_mac" : "engine.all.title_mac_nover", {
+                  count: CATALOG.flags.filter((f) => !f.containerOnly && macAllowed!.has(f.key)).length,
+                  version: mac.runtimeVersion,
+                })
+              : t("engine.all.title", { count: CATALOG.flags.length, version: CATALOG.vllmVersion })}
           </Typography>
         </AccordionSummary>
         <AccordionDetails>
@@ -562,6 +624,7 @@ export function EngineSettingsEditor({
             onSet={set}
             disabled={disabled}
             locked={locked}
+            allowedKeys={macAllowed}
           />
           <Box sx={{ mt: 2 }}>
             <Typography variant="subtitle2" gutterBottom>
@@ -697,7 +760,12 @@ function TriRow({
   onChange,
   disabled,
   chip,
+  note,
+  disabledValues,
 }: {
+  note?: string;
+  /** Choices that cannot be picked (a Mac refuses them). */
+  disabledValues?: Tri[];
   label: string;
   help: string;
   value: Tri;
@@ -707,7 +775,7 @@ function TriRow({
 }) {
   const { t } = useTranslation();
   return (
-    <Row label={label} help={help} chip={chip}>
+    <Row label={label} help={help} chip={chip} note={note}>
       <ToggleButtonGroup
         exclusive
         size="small"
@@ -715,13 +783,13 @@ function TriRow({
         disabled={disabled}
         onChange={(_, v: Tri | null) => v && onChange(v)}
       >
-        <ToggleButton value="auto" sx={{ textTransform: "none" }}>
+        <ToggleButton value="auto" disabled={disabledValues?.includes("auto")} sx={{ textTransform: "none" }}>
           {t("engine.auto")}
         </ToggleButton>
-        <ToggleButton value="on" sx={{ textTransform: "none" }}>
+        <ToggleButton value="on" disabled={disabledValues?.includes("on")} sx={{ textTransform: "none" }}>
           {t("engine.on")}
         </ToggleButton>
-        <ToggleButton value="off" sx={{ textTransform: "none" }}>
+        <ToggleButton value="off" disabled={disabledValues?.includes("off")} sx={{ textTransform: "none" }}>
           {t("engine.off")}
         </ToggleButton>
       </ToggleButtonGroup>
@@ -739,7 +807,9 @@ function AllFlags({
   onSet,
   disabled,
   locked,
+  allowedKeys,
 }: {
+  allowedKeys: Set<string> | null;
   value: EngineConfig;
   target: EngineTarget;
   search: string;
@@ -754,6 +824,7 @@ function AllFlags({
   const q = search.trim().toLowerCase();
   const shown = CATALOG.flags.filter((f) => {
     if (f.containerOnly && target === "cluster") return false;
+    if (allowedKeys && !allowedKeys.has(f.key)) return false;
     if (q) return f.flag.includes(q.replace(/^--/, "")) || (f.help ?? "").toLowerCase().includes(q);
     return !onlyChanged || f.key in value;
   });

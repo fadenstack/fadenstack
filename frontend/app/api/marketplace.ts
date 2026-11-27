@@ -23,6 +23,18 @@ export interface MetalPlan {
   budget_bytes?: number;
   kv_bytes?: number;
   profile?: string;
+  /** The Mac runtime's own version (vLLM-Metal), not the Linux engine's. */
+  runtime_version?: string | null;
+}
+
+/** What the form may offer for a Mac (the backend's `metal_policy.form_policy`). */
+export interface MetalPolicy {
+  /** Engine settings a Mac accepts; every other one is hidden or disabled. */
+  allowed_keys: string[];
+  /** Settings whose only value is fixed (prefix caching stays off). */
+  forced: Record<string, unknown>;
+  tool_parsers: string[];
+  reasoning_parsers: string[];
 }
 
 export interface Fit {
@@ -172,6 +184,8 @@ export interface MarketDetail {
   /** Per cluster; absent from an older backend. */
   compatibility?: Record<string, Compatibility>;
   suggested: { config: EngineConfig; reasons: Record<string, string> };
+  /** Set when the chosen cluster is one Mac. */
+  metal_policy?: MetalPolicy | null;
   recipe?: VllmRecipe | null;
   local: LocalCopy | null;
 }
@@ -308,8 +322,16 @@ export const marketplaceApi = {
   kept() {
     return request<{ items: KeptModel[] }>("/kept");
   },
-  detail(repoId: string, clusterId?: string | null, context?: number | null) {
-    return request<MarketDetail>(`/models/${repoId}${query({ cluster_id: clusterId, context })}`);
+  /** `sequences` and `dtype` only re-plan a Mac (its share follows them); other clusters ignore them. */
+  detail(
+    repoId: string,
+    clusterId?: string | null,
+    context?: number | null,
+    macPlan?: { sequences?: number | null; dtype?: string | null },
+  ) {
+    return request<MarketDetail>(
+      `/models/${repoId}${query({ cluster_id: clusterId, context, sequences: macPlan?.sequences, dtype: macPlan?.dtype })}`,
+    );
   },
   /** Whether this install may generate pictures. The one source of truth for the console. */
   imageGeneration() {
