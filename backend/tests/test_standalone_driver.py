@@ -554,9 +554,15 @@ async def test_a_crashing_engine_backs_off_then_gives_up_until_asked_again(
     assert "stopped 4 times" in dep.phase_message and "Metal out of memory" in dep.phase_message
     assert dep.observed_generation == dep.generation, "parked: out of the reconciler's queue"
 
+    # Giving up still takes down whatever the machine has (a late start), once.
+    teardown = [(s, p) for s, _, p in script.asked if s.startswith("giveup_")]
+    assert [s for s, _ in teardown] == ["giveup_unroute", "giveup_stop"]
+    assert teardown[1][1]["deployment_id"] == str(dep.id)
+
     clock[0] += timedelta(hours=1)
     await reconciliation.reconcile_deployment(ctx, dep)
     assert starts() == 4, "given up: no start without an operator"
+    assert sum(1 for s, _, _ in script.asked if s.startswith("giveup_")) == 2, "sent once"
 
     _queue_for_reconcile(dep)  # the operator's "reconcile"
     await reconciliation.reconcile_deployment(ctx, dep)
@@ -665,10 +671,26 @@ async def test_add_node_still_runs_the_ray_tls_check_for_ray(
         await EnvironmentService(dbsession).add_node(env.id, (await _node(dbsession, GB10)).id)
 
 
-async def test_add_node_refuses_a_driver_it_does_not_know(dbsession: AsyncSession) -> None:
-    env = await _environment(dbsession, driver="exo")
-    with pytest.raises(ConflictError, match="does not know"):
-        await EnvironmentService(dbsession).add_node(env.id, (await _node(dbsession, GB10)).id)
+@pytest.mark.parametrize("driver", ["vllm", "exo", "Ray"])
+async def test_any_other_driver_string_gets_the_ray_tls_check_as_on_0_7_2(
+    dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch, driver: str,
+) -> None:
+    """0.7.2 accepted any driver string and ran the TLS check for all of them; nothing is refused for its key."""
+    from faden_backend.services.inference import ray_tls
+
+    checked: list[Any] = []
+
+    async def refusal(session: Any, environment: Any, node: Any) -> None:
+        checked.append(node.id)
+        return None
+
+    monkeypatch.setattr(ray_tls, "member_refusal", refusal)
+    env = await _environment(dbsession, driver=driver)
+    env.config_json = {"ray_tls": True}
+    await dbsession.flush()
+    node = await _node(dbsession, GB10)
+    await EnvironmentService(dbsession).add_node(env.id, node.id)
+    assert checked == [node.id]
 
 
 async def test_an_offline_mac_degrades_its_environment_and_its_serving_models(
@@ -692,3 +714,64 @@ async def test_an_offline_mac_degrades_its_environment_and_its_serving_models(
     await reconciliation.reconcile_deployment(ctx, dep)
     assert dep.phase == DeploymentPhase.DEGRADED.value
     assert script.asked == []
+
+
+
+# ── a delete on a Mac that is gone for good (round-2 review) ─────────────
+
+
+async def test_a_delete_on_an_offline_mac_can_be_forced_and_is_cleaned_up_on_reconnect(
+    dbsession: AsyncSession, script: Script,
+) -> None:
+    env, mac = await _ready_environment(dbsession)
+    dep = await _deployment(dbsession, env)
+    ctx = _Ctx(dbsession)
+    script.steps.update(stage=StepOutcome("done", {}), start=StepOutcome("done", {}), route=StepOutcome("done", {}))
+    script.status = {"state": "ready"}
+    await reconciliation.reconcile_deployment(ctx, dep)
+    public = dep.observed_status_json["native"]["public_port"]
+    service = DeploymentService(dbsession)
+
+    with pytest.raises(ConflictError, match="Delete it first"):
+        await service.delete(dep.id, force=True)
+    await service.delete(dep.id)
+    await reconciliation.reconcile_deployment(ctx, dep)  # unroute sent; the machine does not answer
+    assert dep.phase == DeploymentPhase.STOPPING.value
+    with pytest.raises(ConflictError, match="still waiting for its machine"):
+        await service.delete(dep.id, force=True)
+
+    mac.status = "offline"
+    await dbsession.flush()
+    await service.delete(dep.id, force=True)
+    dep_id = dep.id
+    result = await reconciliation.reconcile_deployment(ctx, dep)
+    assert result["reason"] == "deleted"
+    await dbsession.flush()
+    assert await dbsession.get(InferenceDeployment, dep_id) is None
+
+    cleanup = env.observed_status_json["native"]["cleanup"]
+    assert cleanup[str(dep_id)]["public_port"] == public
+    script.asked.clear()
+    await reconciliation.reconcile_environment(ctx, env)
+    assert env.status == EnvironmentStatus.DEGRADED
+    assert "Cleanup pending" in env.status_message
+    assert script.asked == [("stage", NodeCommandType.STAGE_NATIVE_RUNTIME.value, script.asked[0][2])], "nothing for the cleanup while offline"
+
+    mac.status = "healthy"
+    await dbsession.flush()
+    script.steps.update(unroute=StepOutcome("done", {}), stop=StepOutcome("done", {}))
+    script.asked.clear()
+    await reconciliation.reconcile_environment(ctx, env)
+    kinds = [(s, p) for s, _, p in script.asked if s in ("unroute", "stop")]
+    assert [s for s, _ in kinds] == ["unroute", "stop"]
+    assert kinds[0][1]["action"] == "remove" and kinds[0][1]["public_port"] == public
+    assert kinds[1][1]["deployment_id"] == str(dep_id)
+    assert env.observed_status_json["native"]["cleanup"] == {}
+    assert env.status == EnvironmentStatus.READY and env.status_message is None
+
+
+async def test_force_delete_is_for_standalone_only(dbsession: AsyncSession) -> None:
+    env = await _environment(dbsession, driver="ray")
+    dep = await _deployment(dbsession, env)
+    with pytest.raises(ConflictError, match="standalone"):
+        await DeploymentService(dbsession).delete(dep.id, force=True)

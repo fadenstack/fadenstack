@@ -51,6 +51,9 @@ PUBLIC_PORT_RANGE = range(8100, 9000)
 MAX_RESTARTS = 3
 RESTART_BACKOFF_SEC = 30
 
+#: How long a delete waits for its machine before an operator may force it.
+FORCE_DELETE_AFTER_SEC = 300
+
 #: How long a machine may take to fetch, verify and start (cold start ~100 s, Gate 0d).
 START_TIMEOUT_SEC = 600
 STOP_TIMEOUT_SEC = 120
@@ -208,7 +211,7 @@ class StandaloneDeploymentManager:
             payload=start_payload, timeout_sec=START_TIMEOUT_SEC,
         )
         if start.failed:
-            self._engine_down(deployment, native, commands, f"did not start: {start.error}")
+            await self._engine_down(deployment, native, commands, node, f"did not start: {start.error}")
             return
         if not start.done:
             self._observe(
@@ -225,8 +228,8 @@ class StandaloneDeploymentManager:
         native["worker"] = status
         if state in ("failed", "stopped"):
             # Gone: started again after a back-off, a few times at most.
-            self._engine_down(
-                deployment, native, commands, f"{state}: {(status or {}).get('last_error') or 'no reason given'}",
+            await self._engine_down(
+                deployment, native, commands, node, f"{state}: {(status or {}).get('last_error') or 'no reason given'}",
             )
             return
         if state != "ready":
@@ -269,8 +272,8 @@ class StandaloneDeploymentManager:
     # Restarts: back off, then give up until someone asks again
     # ------------------------------------------------------------------
 
-    def _engine_down(
-        self, deployment: InferenceDeployment, native: dict[str, Any], commands: NativeCommands, reason: str,
+    async def _engine_down(
+        self, deployment: InferenceDeployment, native: dict[str, Any], commands: NativeCommands, node: Any, reason: str,
     ) -> None:
         """The engine is gone: schedule a restart after a back-off, or give up after the last attempt."""
         commands.forget("start")
@@ -285,6 +288,9 @@ class StandaloneDeploymentManager:
             restarts["gave_up"] = True
             restarts.pop("next_at", None)
             native["restarts"] = restarts
+            # A start that timed out may still come up later: take down whatever
+            # the machine has for it, so nothing is left running unrouted.
+            await self._send_teardown(deployment, native, commands, node)
             self._fail(deployment, self._gave_up_message(restarts), mark_observed=True)
             return
         delay = RESTART_BACKOFF_SEC * 2 ** (restarts["count"] - 1)
@@ -298,17 +304,41 @@ class StandaloneDeploymentManager:
             observed={"reason": "restarting", "restarts": restarts}, mark_observed=False, ready=0, total=1,
         )
 
+    async def _send_teardown(
+        self, deployment: InferenceDeployment, native: dict[str, Any], commands: NativeCommands, node: Any,
+    ) -> None:
+        """Send route remove and stop once, without waiting: best effort on giving up."""
+        public_port = native.get("public_port")
+        if public_port:
+            await commands.step(
+                "giveup_unroute", node_id=node.id, command_type=NodeCommandType.MODEL_TLS_ROUTE.value,
+                payload={
+                    "action": "remove", "public_port": int(public_port),
+                    "owner": str(deployment.id), "generation": int(deployment.generation or 0),
+                },
+                timeout_sec=ROUTE_TIMEOUT_SEC, wait_sec=0,
+            )
+        await commands.step(
+            "giveup_stop", node_id=node.id, command_type=NodeCommandType.STOP_NATIVE_WORKER.value,
+            payload={"deployment_id": str(deployment.id), "grace_s": 30},
+            timeout_sec=STOP_TIMEOUT_SEC, wait_sec=0,
+        )
+
     def _held_back(self, deployment: InferenceDeployment, native: dict[str, Any]) -> bool:
         """Whether this pass must not start the engine: waiting out a back-off, or given up."""
         restarts = native.get("restarts") or {}
         if restarts.get("generation") != int(deployment.generation or 0):
             native.pop("restarts", None)  # a new generation: a fresh start
+            native["commands"].pop("giveup_unroute", None)
+            native["commands"].pop("giveup_stop", None)
             return False
         if restarts.get("gave_up"):
             if (deployment.observed_generation or 0) < (deployment.generation or 0):
                 # Giving up stamped the generation observed; it lags again only
                 # because an operator asked for another try (request_reconcile).
                 native.pop("restarts", None)
+                native["commands"].pop("giveup_unroute", None)
+                native["commands"].pop("giveup_stop", None)
                 return False
             self._fail(deployment, self._gave_up_message(restarts), mark_observed=True)
             return True
@@ -424,6 +454,20 @@ class StandaloneDeploymentManager:
             (DeploymentPhase.DELETED, "Deleted.") if deleting else (DeploymentPhase.STOPPED, "Stopped.")
         )
         machines = await EnvironmentNodeDAO(session).machines(deployment.environment_id)
+        if deleting:
+            native.setdefault("deleting_since", datetime.now(tz=UTC).isoformat())
+            if native.get("force_delete") and machines:
+                # The operator finished a delete its machine could not answer:
+                # the row goes now, and the machine is cleaned up when it is
+                # back (StandaloneEnvironmentManager, ``cleanup``).
+                await self._leave_cleanup(session, deployment, native, machines[0])
+                await self._retire(session, deployment.id)
+                self._observe(
+                    deployment, DeploymentPhase.DELETED,
+                    f"Deleted. Cleanup pending on {machines[0].agent_id or machines[0].host}.",
+                    observed={"reason": "force deleted"}, ready=0,
+                )
+                return
         # ``parked``: taken down for a stopped environment, port kept for the
         # restart. Nothing runs, so nothing is sent again pass after pass.
         started = not native.get("parked") and (
@@ -483,6 +527,30 @@ class StandaloneDeploymentManager:
             deployment, done_phase, done_message,
             observed={"reason": done_phase.value}, ready=0,
         )
+
+    async def _leave_cleanup(
+        self, session: Any, deployment: InferenceDeployment, native: dict[str, Any], node: Any,
+    ) -> None:
+        """Record on the environment what its machine must still take down for *deployment*."""
+        environment = await session.get(InferenceEnvironment, deployment.environment_id)
+        if environment is None:
+            return
+        observed = dict(environment.observed_status_json or {})
+        env_native = dict(observed.get("native") or {})
+        cleanup = dict(env_native.get("cleanup") or {})
+        cleanup[str(deployment.id)] = {
+            "node_id": str(node.id),
+            "deployment_name": deployment.name,
+            "public_port": native.get("public_port"),
+            "since": datetime.now(tz=UTC).isoformat(),
+            "commands": {},
+        }
+        env_native["cleanup"] = cleanup
+        observed["native"] = env_native
+        environment.observed_status_json = observed
+        # The environment's next pass does the clean-up (or says it waits).
+        if (environment.observed_generation or 0) >= (environment.generation or 0):
+            environment.observed_generation = (environment.generation or 0) - 1
 
     async def _retire(self, session: Any, deployment_id: uuid.UUID) -> None:
         dao = EndpointDAO(session)

@@ -423,17 +423,14 @@ class EnvironmentService:
         node_role = _enum(role, EnvironmentNodeRole, what="role")
         control_plane = await self.control_plane_dao.get(environment.control_plane_id)
         driver = getattr(control_plane, "driver", None) or "ray"
-        # Fail closed: only Ray runs its TLS membership check, only standalone
-        # its own; a driver this server does not know adds no machine at all.
-        if driver == "ray":
-            await self._require_ray_tls_member(environment, node_id)
-        elif driver == "standalone":
+        # As 0.7.2 did for every environment: the Ray TLS membership check runs
+        # for every driver -- ``ray`` and any other string an older backend
+        # accepted (its schema's example was ``vllm``) -- except standalone,
+        # which has no Ray and its own admission.
+        if driver == "standalone":
             await self._require_standalone_member(environment, node_id)
         else:
-            raise ConflictError(
-                f"This environment's control plane uses the driver {driver!r}, which this server "
-                "does not know, so no machine can be added to it."
-            )
+            await self._require_ray_tls_member(environment, node_id)
         try:
             member = await self.node_dao.add_node(environment_id, node_id, node_role)
         except IntegrityError as exc:
@@ -807,6 +804,40 @@ class DeploymentService:
         except IntegrityError as exc:
             raise ConflictError(f"deployment name already exists: {name}") from exc
 
+    async def _force_delete(self, deployment: InferenceDeployment) -> None:
+        """Let the reconciler finish a standalone delete whose machine does not answer."""
+        from datetime import UTC, datetime  # noqa: PLC0415
+
+        from faden_backend.services.inference.driver_key import driver_key_for  # noqa: PLC0415
+        from faden_backend.services.inference.drivers.standalone.deployment import (  # noqa: PLC0415
+            FORCE_DELETE_AFTER_SEC,
+        )
+
+        environment = await self.environment_dao.get(deployment.environment_id)
+        if environment is None or await driver_key_for(self.session, environment) != "standalone":
+            raise ConflictError("Only a deployment on a standalone environment can be force-deleted.")
+        if deployment.desired_state != DeploymentDesiredState.DELETED.value:
+            raise ConflictError("Delete it first; force only finishes a delete its machine has not answered.")
+        native = dict((deployment.observed_status_json or {}).get("native") or {})
+        machines = await EnvironmentNodeDAO(self.session).machines(environment.id)
+        offline = any(str(m.status) == "offline" for m in machines)
+        since = native.get("deleting_since")
+        waited = (
+            (datetime.now(tz=UTC) - datetime.fromisoformat(since)).total_seconds() if since else 0.0
+        )
+        if not offline and waited < FORCE_DELETE_AFTER_SEC:
+            raise ConflictError(
+                f"The delete is still waiting for its machine ({int(waited)} s of {FORCE_DELETE_AFTER_SEC} s). "
+                "Force it once the machine is offline or the wait is over."
+            )
+        native["force_delete"] = True
+        observed = dict(deployment.observed_status_json or {})
+        observed["native"] = native
+        deployment.observed_status_json = observed
+        _queue_for_reconcile(deployment)
+        await self.session.flush()
+        wake_reconciler_after_commit(self.session)
+
     async def _admit_standalone(self, environment: InferenceEnvironment, spec: dict[str, Any]) -> None:
         """Refuse, with a sentence, a standalone deployment its machine cannot serve.
 
@@ -980,8 +1011,13 @@ class DeploymentService:
         )
         return await self.get(deployment_id)
 
-    async def delete(self, deployment_id: uuid.UUID) -> None:
+    async def delete(self, deployment_id: uuid.UUID, *, force: bool = False) -> None:
         """Delete a deployment (endpoints are cascade-deleted by the DB).
+
+        *force* finishes a delete already under way whose machine cannot be
+        reached (standalone only): the row goes, and the machine is cleaned up
+        when it reconnects. Refused until the machine is offline or the delete
+        has waited its normal time.
 
         The provider row the deployment owned goes with it. Not a cascade:
         ``llm_providers`` is in a different subsystem and deliberately has no
@@ -998,6 +1034,9 @@ class DeploymentService:
         deployment = await self.dao.get(deployment_id)
         if deployment is None:
             raise NotFoundError("deployment", deployment_id)
+        if force:
+            await self._force_delete(deployment)
+            return
 
         coordinator = InferencePublicationCoordinator(self.session)
         await coordinator.remove_derived_provider(deployment_id)

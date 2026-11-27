@@ -122,12 +122,16 @@ async def update_deployment(
 @router.delete("/{deployment_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_deployment(
     deployment_id: uuid.UUID,
+    force: bool = Query(
+        False,
+        description="Finish a standalone delete whose machine does not answer; it is cleaned up when it reconnects.",
+    ),
     _user: User = Depends(require_permission(_DEP, "delete")),
     service: DeploymentService = Depends(),
 ) -> None:
     """Delete a deployment (endpoints are cascade-deleted by the DB)."""
     try:
-        await service.delete(deployment_id)
+        await service.delete(deployment_id, force=force)
     except InferenceError as exc:
         raise _map_inference_error(exc)
 
