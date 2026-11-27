@@ -58,3 +58,14 @@ def test_gpu_overlay_is_selected_for_every_compose_invocation(tmp_path):
     assert gpu_overlay(env, tmp_path) == overlay
     set_env_values(env, {"FADEN_PII_EXECUTION_PROFILE": "cpu"})
     assert gpu_overlay(env, tmp_path) is None
+
+
+def test_gpu_overlay_takes_paths_given_as_str(tmp_path):
+    # faden dev up passed both as str and crashed with "'str' object has no attribute 'exists'".
+    env = tmp_path / ".env"
+    set_env_values(env, {"FADEN_PII_EXECUTION_PROFILE": "cpu"})
+    assert gpu_overlay(str(env), str(tmp_path)) is None
+    set_env_values(env, {"FADEN_PII_EXECUTION_PROFILE": "gpu-shared"})
+    overlay = tmp_path / "docker-compose.pii-gpu.yaml"
+    overlay.write_text("services: {}")
+    assert gpu_overlay(str(env), str(tmp_path)) == overlay
