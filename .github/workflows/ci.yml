@@ -192,13 +192,20 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
+      # The compat tests run the released 0.2.12 agent, extracted from its tag.
+      - name: Fetch the node-agent-v0.2.12 tag
+        run: git fetch --no-tags --depth=1 origin refs/tags/node-agent-v0.2.12:refs/tags/node-agent-v0.2.12
+        working-directory: .
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: true
           cache-dependency-glob: agent/uv.lock
       # Without the ray-host extra three tests of test_ray_status.py skip themselves (they need ray).
       - run: uv sync --locked --extra dev
+      # A missing tag fails tests/test_compat_0_2_12.py instead of skipping it.
       - run: uv run --no-sync python -m pytest -q
+        env:
+          FADEN_REQUIRE_0_2_12: "1"
 
   mcp:
     needs: changes
