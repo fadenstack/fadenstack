@@ -193,3 +193,69 @@ def test_a_mac_advertises_the_bound_port_and_switch_off_is_honoured() -> None:
         assert head.startswith(b"HTTP/1.1 503"), "no worker running"
     finally:
         svc._metrics_passthrough.stop()  # noqa: SLF001
+
+
+def _idle(port: int, n: int) -> list[socket.socket]:
+    """*n* connections that send nothing: still in the head phase."""
+    socks = [socket.create_connection(("127.0.0.1", port), timeout=5) for _ in range(n)]
+    import time
+
+    time.sleep(0.3)  # let the server accept them
+    return socks
+
+
+def _closed_at_once(s: socket.socket) -> bool:
+    s.settimeout(2)
+    try:
+        return s.recv(1) == b""
+    except (ConnectionError, OSError):
+        return True
+    except TimeoutError:
+        return False
+
+
+def test_the_seventeenth_concurrent_connection_is_closed_at_once_and_a_slot_frees() -> None:
+    up = _Upstream(b"vllm:x 1\n")
+    server = MetricsPassthrough(lambda: up.port, port=0, bind_hosts=("127.0.0.1",), max_per_ip=100)
+    server.start()
+    held: list[socket.socket] = []
+    try:
+        held = _idle(server.port, 16)  # head phase counts
+        extra = _idle(server.port, 1)[0]
+        assert _closed_at_once(extra)
+        extra.close()
+        held.pop().close()  # one finishes
+        import time
+
+        time.sleep(0.3)
+        head, body = _get(server.port, _req())
+        assert head.startswith(b"HTTP/1.1 200") and body == b"vllm:x 1\n"
+    finally:
+        for s in held:
+            s.close()
+        server.stop()
+        up.close()
+
+
+def test_one_address_holds_at_most_four() -> None:
+    up = _Upstream(b"ok\n")
+    server = MetricsPassthrough(lambda: up.port, port=0, bind_hosts=("127.0.0.1",))
+    server.start()
+    held: list[socket.socket] = []
+    try:
+        held = _idle(server.port, 4)
+        fifth = _idle(server.port, 1)[0]
+        assert _closed_at_once(fifth)
+        fifth.close()
+        for s in held:
+            s.close()
+        import time
+
+        time.sleep(0.3)
+        head, _ = _get(server.port, _req())
+        assert head.startswith(b"HTTP/1.1 200")
+    finally:
+        for s in held:
+            s.close()
+        server.stop()
+        up.close()

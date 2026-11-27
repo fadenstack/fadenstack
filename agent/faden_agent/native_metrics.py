@@ -26,6 +26,9 @@ from typing import Any
 log = logging.getLogger(__name__)
 
 DEFAULT_PORT = 9468  # outside the proxy's P (8100-8999) and P+20000 (28100-28999) ranges
+#: The port is unauthenticated and shares the agent's process (its FDs, the control stream): hard caps.
+MAX_CONNECTIONS = 16
+MAX_PER_IP = 4
 _MAX_HEAD = 8192
 _HEAD_TIMEOUT = 10.0
 _CONNECT_TIMEOUT = 3.0
@@ -40,7 +43,12 @@ class MetricsPassthrough:
     def __init__(
         self, port_source: Callable[[], int | None], *, port: int = DEFAULT_PORT,
         bind_hosts: tuple[str, ...] = ("0.0.0.0", "::"),  # noqa: S104 - where the model proxy binds
+        max_connections: int = MAX_CONNECTIONS, max_per_ip: int = MAX_PER_IP,
     ) -> None:
+        self._max = max_connections
+        self._max_ip = max_per_ip
+        self._open = 0  # every accepted connection, from accept to close (head phase included)
+        self._per_ip: dict[str, int] = {}
         self._port_source = port_source
         self._wanted = port
         self._hosts = bind_hosts
@@ -109,6 +117,13 @@ class MetricsPassthrough:
     # ── one connection ──────────────────────────────────────────────
 
     async def _serve(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        peer = writer.get_extra_info("peername") or ("?", 0)
+        ip = str(peer[0])
+        if self._open >= self._max or self._per_ip.get(ip, 0) >= self._max_ip:
+            writer.transport.abort()  # over the cap: closed at once, nothing read
+            return
+        self._open += 1
+        self._per_ip[ip] = self._per_ip.get(ip, 0) + 1
         try:
             await asyncio.wait_for(self._handle(reader, writer), _TOTAL_TIMEOUT)
         except (TimeoutError, ConnectionError, OSError, asyncio.IncompleteReadError, asyncio.LimitOverrunError):
@@ -116,6 +131,11 @@ class MetricsPassthrough:
         except Exception:  # noqa: BLE001 - one bad connection never stops the listener
             log.debug("Metrics pass-through: connection failed", exc_info=True)
         finally:
+            self._open -= 1
+            if self._per_ip[ip] <= 1:
+                del self._per_ip[ip]
+            else:
+                self._per_ip[ip] -= 1
             with contextlib.suppress(Exception):
                 writer.close()
                 await asyncio.wait_for(writer.wait_closed(), 2)
