@@ -1505,6 +1505,11 @@ def _darwin_join_child() -> int:
     return 0 if asyncio.run(_join_flow(config)) else 1
 
 
+_DARWIN_STORE_FORBIDDEN = (
+    "/Users/", "/Library/", "/System/", "/usr/", "/bin/", "/sbin/", "/etc/", "/private/etc/", "/Applications/",
+)
+
+
 def _darwin_model_store(configured: str | None, layout: Any) -> str:
     """The model store a Mac service uses: the configured one when it is safe, else ``layout.models``.
 
@@ -1525,8 +1530,13 @@ def _darwin_model_store(configured: str | None, layout: Any) -> str:
     if not path.is_absolute() or ".." in path.parts:
         return refuse("it is not an absolute path")
     real = path.resolve(strict=False)
-    if str(real).startswith(("/Users/", "/System/", "/usr/", "/bin/", "/sbin/")) or str(real) == "/srv/faden/models":
-        return refuse("it is in a home folder, a protected system path or the Linux default")
+    text = str(real) + "/"
+    if text.startswith(_DARWIN_STORE_FORBIDDEN) or str(real) == "/srv/faden/models":
+        return refuse("it is in a home folder, a protected system path, the agent's own folders or the Linux default")
+    state_dir = Path(layout.state_dir).resolve(strict=False)
+    models = Path(layout.models).resolve(strict=False)
+    if (real == state_dir or state_dir in real.parents) and real != models and models not in real.parents:
+        return refuse("it is inside the agent's state directory (outside its models folder)")
     if not real.is_dir() or path.is_symlink():
         return refuse("it is not an existing directory")
     try:
