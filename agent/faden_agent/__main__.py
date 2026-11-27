@@ -1609,6 +1609,14 @@ def _cmd_status_darwin() -> None:
     print(f"  Build:  {darwin_service.current_build(layout)}")
     print(f"  Config: {layout.env_file}")
     print(f"  Logs:   {layout.log_file}")
+    if state.pid:
+        from faden_agent.power import IdleSleepGuard  # noqa: PLC0415
+
+        holder = IdleSleepGuard.holder_of(state.pid)
+        print(
+            f"  Sleep:  idle sleep prevented (caffeinate PID {holder}); keep this Mac on AC power"
+            if holder else "  Sleep:  idle sleep NOT prevented: this Mac may sleep and drop offline"
+        )
 
 
 def cmd_uninstall() -> None:
