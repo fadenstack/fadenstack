@@ -894,7 +894,8 @@ def stop_native_workers(
     from faden_agent.native import proc as native_proc  # noqa: PLC0415
 
     left: list[str] = []
-    for name, record in _worker_records(layout, uid, say=say):
+    records, known = _worker_records(layout, uid, say=say)
+    for name, record in records:
         shown = name if _SAFE_NAME.fullmatch(name) else repr(name)[:80]
         try:
             native_proc.validate(record)
@@ -910,10 +911,11 @@ def stop_native_workers(
             say(f"  The model worker {shown} still runs (pids {survivors}).")
         elif leader is not None:
             say(f"  Stopped the model worker {shown}.")
-    # Whatever a record did not name (a corrupt or missing record, a helper that
-    # detached): every process of the service user carrying a worker marker.
+    # Whatever a record did not name (a corrupt record, a helper that detached):
+    # every process of the service user carrying the marker of a deployment
+    # this agent has a record file for -- this agent's workers, no one else's.
     try:
-        rest = native_proc.marked(uid=uid, any_marker=True)
+        rest = native_proc.marked(uid=uid, deployments=known) if known else []
         if rest:
             survivors = native_proc.stop_processes(rest, grace_s=grace_s, uid=uid)
             say(f"  Stopped {len(rest) - len(survivors)} more model worker process(es) found by their marker.")
@@ -941,23 +943,29 @@ def _open_dir(name: str, uid: int, *, dir_fd: int | None = None) -> int | None:
     return fd
 
 
-def _worker_records(layout: Layout, uid: int, *, say: Callable[[str], None]) -> list[tuple[str, dict]]:
-    """``(name, record)`` for each readable worker record; nothing raises."""
+def _worker_records(
+    layout: Layout, uid: int, *, say: Callable[[str], None]
+) -> tuple[list[tuple[str, dict]], set[str]]:
+    """``(name, record)`` for each readable worker record, and every deployment with a
+    record file (readable, corrupt or set aside); nothing raises."""
     from faden_agent.native.common import read_json_nofollow  # noqa: PLC0415
 
     out: list[tuple[str, dict]] = []
+    known: set[str] = set()
     fds: list[int] = []
     try:
         fd = _open_dir(str(layout.state_dir), uid)
         for part in ("native", "workers"):
             if fd is None:
-                return out
+                return out, known
             fds.append(fd)
             fd = _open_dir(part, uid, dir_fd=fd)
         if fd is None:
-            return out
+            return out, known
         fds.append(fd)
-        names = sorted(n for n in os.listdir(fd) if n.endswith(".json"))
+        listing = os.listdir(fd)
+        known = {n.split(".json", 1)[0] for n in listing if ".json" in n and not n.startswith(".")}
+        names = sorted(n for n in listing if n.endswith(".json"))
         if len(names) > _MAX_RECORDS:
             say(f"  {len(names)} model worker records; reading the first {_MAX_RECORDS}.")
         for entry in names[:_MAX_RECORDS]:
@@ -971,7 +979,7 @@ def _worker_records(layout: Layout, uid: int, *, say: Callable[[str], None]) -> 
     finally:
         for opened in fds:
             os.close(opened)
-    return out
+    return out, known
 
 
 def uninstall(
