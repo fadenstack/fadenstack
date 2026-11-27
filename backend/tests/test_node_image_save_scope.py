@@ -70,6 +70,7 @@ async def test_a_native_carrier_is_served_only_by_its_pin_to_a_native_machine(
 
     assert await _get(client, ref) == 400, "a tag alone"
     assert await _get_pinned(client, ref, expect_rootfs="sha256:" + "c" * 64) == 409, "another pin"
+    assert await _get_pinned(client, ref, expect_id="sha256:" + "c" * 64) == 409, "another Id pin, alone"
 
     linux = SimpleNamespace(id="n1", capabilities_json={"os": "Linux-6.8", "native_runtime": 0})
     fastapi_app.dependency_overrides[views._authenticate_node] = lambda: linux
@@ -78,6 +79,8 @@ async def test_a_native_carrier_is_served_only_by_its_pin_to_a_native_machine(
     mac = SimpleNamespace(id="n2", capabilities_json={"os": "macOS-26.1-arm64", "native_runtime": 1})
     fastapi_app.dependency_overrides[views._authenticate_node] = lambda: mac
     assert await _get_pinned(client, ref, expect_rootfs=rootfs) == 200
+    served.client.images.inspect = AsyncMock(return_value={"Id": carrier.native.config_digest, "Size": 1})
+    assert await _get_pinned(client, ref, expect_id=carrier.native.config_digest) == 200, "the Id pin, alone"
 
 
 @pytest.mark.anyio()

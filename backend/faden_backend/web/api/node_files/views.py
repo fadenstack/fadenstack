@@ -702,6 +702,13 @@ async def image_save(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"{ref} is pinned to {carrier.native.rootfs_digest}, not {expect_rootfs}.",
             )
+        # An Id pin is checked too, alone or beside the rootfs one: Docker's
+        # classic store reports the config digest, containerd the manifest one.
+        if expect_id and expect_id not in (carrier.native.config_digest, carrier.native.digest):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"{ref} is pinned to {carrier.native.config_digest}, not {expect_id}.",
+            )
         if not (getattr(_node, "capabilities_json", None) or {}).get("native_runtime"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

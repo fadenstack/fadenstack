@@ -896,6 +896,19 @@ _NODE_MOUNT_POINTS: tuple[tuple[str, str, str], ...] = (
 )
 
 
+def platform_reported(node: Any) -> bool:
+    """Whether *node* has said what it is: a CPU architecture, and an OS or a GPU vendor.
+
+    Every agent since the first reports all three (``os``, ``machine``,
+    ``gpu_vendor``); a report without them is one that has not arrived yet.
+    """
+    caps = getattr(node, "capabilities_json", None) or {}
+    gpu = caps.get("gpu") or {}
+    return bool(str(caps.get("machine") or "").strip()) and bool(
+        node_os_name(caps) or gpu.get("vendor") or caps.get("gpu_vendor")
+    )
+
+
 def node_os_name(caps: dict[str, Any]) -> str | None:
     """``darwin``/``linux``/``windows`` from what the agent reported, or ``None``.
 
@@ -986,6 +999,16 @@ class RuntimeBundleRegistry:
             chosen = next((b for b in matches if b.bundle_id == runtime_id), None)
             if chosen is not None:
                 return chosen
+        if not matches and environment is not None and not platform_reported(node):
+            # A machine whose report is empty or incomplete (offline, stale,
+            # just reconnected) keeps the runtime it was started with. Matching
+            # is a placement question; a running cluster is never re-resolved
+            # away -- and torn down -- because its machine has not said again
+            # what it is. A machine with no runtime yet gets nothing here, and
+            # placement says "not reported yet".
+            started = self._bundles.get(str(started_runtimes(environment).get(str(node.id)) or ""))
+            if started is not None and started.driver == driver:
+                return started
         return self.default_among(matches)
 
     def runtimes_for(self, node: InfraNode, *, driver: str = "ray") -> list[RuntimeBundleManifest]:

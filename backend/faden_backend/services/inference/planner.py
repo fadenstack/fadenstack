@@ -637,10 +637,15 @@ class MultiNodeFabricPlanner:
                 node, driver=driver, environment=environment,
             )
             if bundle is None:
+                from faden_backend.services.inference.bundles import platform_reported  # noqa: PLC0415
+
                 machine = str((node.capabilities_json or {}).get("machine") or "unknown")
                 what = "Ray runtime bundle" if driver == "ray" else f"{driver} runtime bundle"
                 results[str(node.id)] = (
                     f"No certified {what} for this platform ({machine})"
+                    if platform_reported(node)
+                    else "This machine has not reported its platform yet (CPU, OS, GPU); "
+                    "it can be placed once its agent has connected and reported"
                 )
                 unresolved.append(node.agent_id or str(node.id))
                 continue
