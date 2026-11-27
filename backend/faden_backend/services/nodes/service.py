@@ -632,6 +632,17 @@ class NodeControlService:
             )
         return failed
 
+    async def stream_session_was_closed(self, *, session: InfraNodeSession) -> bool:
+        """Whether *session* was closed from outside its stream, by the stale-session reaper.
+
+        The reaper ends a session that has been silent past the stale window --
+        a Mac asleep with its socket kept alive does exactly that -- and marks
+        the machine offline. The stream itself may then wake and carry on, on
+        a session the database has already closed.
+        """
+        await self._dao.session.refresh(session, attribute_names=["disconnected_at"])
+        return session.disconnected_at is not None
+
     async def update_stream_offset(self, *, session: InfraNodeSession, offset: int) -> bool:
         if offset <= session.last_rx_offset:
             return False
@@ -679,6 +690,13 @@ class NodeControlService:
         version: str | None = None,
         host: str | None = None,
     ) -> dict[str, Any]:
+        # The stream handler holds *node* for the whole connection, with
+        # expire_on_commit off. Whatever another session wrote meanwhile -- the
+        # stale-session reaper marking it offline, an operator's maintenance or
+        # drain -- that copy never saw. Assigning the status it already holds
+        # is no change to the ORM, so the heartbeat wrote last_seen and left
+        # the row offline for as long as the stream lived. Read them first.
+        await self._dao.session.refresh(node, attribute_names=["status", "maintenance_mode", "draining"])
         if host and host != node.host:
             node.host = host
         if capabilities is not None:
