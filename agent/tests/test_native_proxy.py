@@ -183,6 +183,21 @@ def rig_factory(pki: Pki) -> Any:
         r.close()
 
 
+def read_one(tls: ssl.SSLSocket) -> bytes:
+    """One response with a Content-Length body, read off a keep-alive connection."""
+    data = b""
+    while b"\r\n\r\n" not in data:
+        chunk = tls.recv(4096)
+        if not chunk:
+            return data
+        data += chunk
+    head, _, body = data.partition(b"\r\n\r\n")
+    want = int(head.lower().split(b"content-length:")[1].split(b"\r\n")[0])
+    while len(body) < want:
+        body += tls.recv(4096)
+    return head + b"\r\n\r\n" + body
+
+
 def status(data: bytes) -> int:
     return int(data.split(b" ", 2)[1]) if data.startswith(b"HTTP/") else 0
 
@@ -281,9 +296,9 @@ def test_cl_and_te_together_are_refused(rig_factory: Any) -> None:
     assert status(rig.exchange(req)) == 400 and rig.upstream.requests == []
 
 
-def test_duplicate_content_length_is_refused(rig_factory: Any) -> None:
+def test_differing_content_lengths_are_refused(rig_factory: Any) -> None:
     rig = rig_factory()
-    req = b"POST /v1/completions HTTP/1.1\r\nHost: n\r\nContent-Length: 2\r\nContent-Length: 2\r\n\r\n{}"
+    req = b"POST /v1/completions HTTP/1.1\r\nHost: n\r\nContent-Length: 2\r\nContent-Length: 5\r\n\r\n{}"
     assert status(rig.exchange(req)) == 400 and rig.upstream.requests == []
 
 
@@ -613,3 +628,156 @@ def test_firewall_and_san_drift(pki: Pki, tmp_path: Path) -> None:
         raise OSError("no such tool")
 
     assert model_tls.firewall_state(boom)["state"] == "unknown"
+
+
+# ── review fixes ────────────────────────────────────────────────────────
+
+
+def test_a_flood_of_silent_and_half_open_connections_does_not_stop_the_gateway(rig_factory: Any) -> None:
+    rig = rig_factory(max_preauth=8, max_preauth_per_ip=4, handshake_timeout=2.0)
+    flood = []
+    for i in range(60):
+        s = socket.create_connection(("127.0.0.1", rig.port), timeout=5)
+        if i % 2:
+            s.sendall(b"\x16\x03\x01\x00\x20")  # the start of a ClientHello, never finished
+        flood.append(s)
+    # The gateway shares the attackers' loopback address here, so the per-address cap holds it off until the
+    # short handshake timeout frees the pool; then it must work (a different address would never wait).
+    time.sleep(2.5)
+    assert status(rig.exchange(GET_HEALTH)) == 200
+    for s in flood:
+        s.close()
+
+
+def test_the_pre_auth_pool_is_apart_from_the_authenticated_one(rig_factory: Any) -> None:
+    rig = rig_factory(max_connections=3, max_preauth=40, max_preauth_per_ip=40, handshake_timeout=30.0)
+    flood = [socket.create_connection(("127.0.0.1", rig.port), timeout=5) for _ in range(30)]
+    time.sleep(0.3)
+    assert rig.proxy.connections() == 0  # strangers took no authenticated slot
+    assert status(rig.exchange(GET_HEALTH)) == 200
+    for s in flood:
+        s.close()
+
+
+def test_one_address_cannot_fill_the_pre_auth_pool(rig_factory: Any) -> None:
+    rig = rig_factory(max_preauth=100, max_preauth_per_ip=5, handshake_timeout=30.0)
+    flood = [socket.create_connection(("127.0.0.1", rig.port), timeout=5) for _ in range(12)]
+    time.sleep(0.3)
+    assert rig.proxy._preauth <= 5  # noqa: SLF001
+    for s in flood:
+        s.close()
+
+
+def test_renegotiation_is_off_and_tls_12_is_the_floor(pki: Pki) -> None:
+    ctx = pki.identity().context
+    assert ctx.options & ssl.OP_NO_RENEGOTIATION
+    assert ctx.minimum_version == ssl.TLSVersion.TLSv1_2
+
+
+def test_a_rotation_closes_a_keep_alive_connection_after_its_request(rig_factory: Any, pki: Pki) -> None:
+    rig = rig_factory()
+    tls = rig.connect(pki.gateway)
+    tls.settimeout(5)
+    req = b"GET /health HTTP/1.1\r\nHost: n\r\n\r\n"
+    tls.sendall(req)
+    assert b"200" in read_one(tls)
+    tls.sendall(req)  # still the same identity: kept alive
+    assert b"200" in read_one(tls)
+    rig.proxy.set_identity(pki.identity(pki.server2))
+    tls.sendall(req)  # the current request is answered, then the connection ends
+    assert b"200" in read_one(tls)
+    assert tls.recv(4096) == b""
+
+
+def test_a_connection_that_is_too_old_closes_after_its_request(rig_factory: Any, pki: Pki) -> None:
+    rig = rig_factory(max_lifetime=0.5)
+    tls = rig.connect(pki.gateway)
+    tls.settimeout(5)
+    time.sleep(0.7)
+    tls.sendall(b"GET /health HTTP/1.1\r\nHost: n\r\n\r\n")
+    assert b"200" in read_one(tls)
+    assert tls.recv(4096) == b""
+
+
+def test_a_rotation_to_another_ca_cuts_an_idle_connection(rig_factory: Any, pki: Pki, tmp_path: Path) -> None:
+    rig = rig_factory()
+    tls = rig.connect(pki.gateway)
+    tls.settimeout(5)
+    other = Pki(tmp_path)
+    rig.proxy.set_identity(other.identity())  # a new CA that did not sign the gateway's certificate
+    tls.sendall(b"GET /health HTTP/1.1\r\nHost: n\r\n\r\n")
+    try:
+        data = tls.recv(4096)
+    except (ssl.SSLError, ConnectionError):
+        data = b""
+    assert data == b""
+
+
+def test_the_upstream_is_looked_up_per_request(rig_factory: Any, pki: Pki) -> None:
+    rig = rig_factory()
+    tls = rig.connect(pki.gateway)
+    tls.settimeout(5)
+    req = b"GET /health HTTP/1.1\r\nHost: n\r\n\r\n"
+    tls.sendall(req)
+    assert b"200" in read_one(tls)
+    other = Upstream(_ok)
+    rig.proxy._submit(rig.proxy._apply({rig.port: other.port})).result(5)  # noqa: SLF001
+    tls.sendall(req)
+    assert b"200" in read_one(tls) and len(other.requests) == 1
+    rig.proxy._submit(rig.proxy._apply({})).result(5)  # noqa: SLF001
+    tls.sendall(req)
+    try:
+        data = tls.recv(4096)
+    except (ssl.SSLError, ConnectionError):
+        data = b""
+    assert data == b"" or status(data) == 503
+    other.stop()
+
+
+def test_connection_header_naming_a_framing_header_is_refused(rig_factory: Any) -> None:
+    rig = rig_factory()
+    req = b"POST /v1/completions HTTP/1.1\r\nHost: n\r\nConnection: content-length\r\nContent-Length: 2\r\n\r\n{}"
+    assert status(rig.exchange(req)) == 400 and rig.upstream.requests == []
+
+
+def test_a_trickled_body_hits_the_total_deadline(rig_factory: Any) -> None:
+    rig = rig_factory(body_timeout=5.0, body_total_timeout=1.0)
+    tls = rig.connect(rig.pki.gateway)
+    tls.sendall(b"POST /v1/completions HTTP/1.1\r\nHost: n\r\nContent-Length: 100\r\n\r\n")
+    tls.settimeout(6)
+    start = time.monotonic()
+    try:
+        for _ in range(20):
+            time.sleep(0.4)
+            tls.sendall(b"x")
+    except (ssl.SSLError, ConnectionError, OSError):
+        pass
+    assert time.monotonic() - start < 5
+    assert rig.upstream.requests == []
+
+
+def test_bound_ports_is_a_snapshot(rig_factory: Any) -> None:
+    rig = rig_factory()
+    assert rig.proxy.bound_ports() == [rig.port]
+
+
+@pytest.mark.asyncio
+async def test_an_owned_route_does_not_touch_an_unowned_one_without_adopt(pki: Pki, tmp_path: Path) -> None:
+    tls = _mac_tls(pki, tmp_path)
+    up = Upstream(_ok)
+    p = free_port()
+    try:
+        await tls.ensure_route(p, up.port)  # a legacy route, no owner
+        with pytest.raises(ModelTlsError):
+            await tls.ensure_route(p, up.port, owner="d", generation=1)
+        gone = await tls.remove_route(p, owner="d")
+        assert gone["removed"] is False and tls.routes()
+        assert (await tls.ensure_route(p, up.port, owner="d", generation=1, adopt=True))["protected"]
+        # now owned: the legacy no-owner remove leaves it
+        assert (await tls.remove_route(p))["removed"] is False and tls.routes()
+        assert (await tls.remove_route(p, owner="d"))["removed"] is True
+        await tls.ensure_route(p, up.port)
+        assert (await tls.remove_route(p, owner="d", adopt=True))["removed"] is True
+    finally:
+        tls._backend.proxy.stop()  # noqa: SLF001
+        up.stop()

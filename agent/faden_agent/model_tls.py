@@ -567,11 +567,13 @@ class ModelTls:
 
     async def ensure_route(
         self, public_port: int, internal_port: int, *, owner: str | None = None, generation: int | None = None,
+        adopt: bool = False,
     ) -> dict[str, Any]:
         """Put the proxy in front of ``127.0.0.1:internal_port`` on ``public_port``.
 
         *owner* and *generation* (standalone native routes) are optional: without them this is 0.2.12's
-        behaviour. A port held by another owner, or by a newer generation, is refused.
+        behaviour. A port held by another owner, or by a newer generation, is refused; so is an owned ensure
+        on a legacy route that has no owner, unless *adopt* says to take it over.
         """
         if not self.has_certificate() and self.refresher is not None:
             await self.refresher()
@@ -589,6 +591,8 @@ class ModelTls:
                     raise ModelTlsError(f"Port {public_port} is held by another deployment.")
                 if generation is not None and int(held.get("generation") or 0) > int(generation):
                     raise ModelTlsError(f"Port {public_port} is held by a newer generation of this deployment.")
+            if held is None and owner is not None and public_port in routes and not adopt:
+                raise ModelTlsError(f"Port {public_port} is served by a route that has no owner; it is not taken over.")
             new = routes.get(public_port) is None
             problem = self.port_problem(public_port) if new else None
             if problem:
@@ -648,12 +652,19 @@ class ModelTls:
 
     async def remove_route(
         self, public_port: int, *, owner: str | None = None, generation: int | None = None,
+        adopt: bool = False,
     ) -> dict[str, Any]:
-        """Take a route away; idempotent. With *owner*, only its holder (and not a newer generation) may."""
+        """Take a route away; idempotent. With *owner*, only its holder (and not a newer generation) may,
+        and a legacy route without an owner is left alone unless *adopt*. Without *owner* (0.2.12's form)
+        a route held by an owner is left alone."""
         async with self._lock:
             routes = self.routes()
             owners = self.owners()
             held = owners.get(public_port)
+            if owner is None and held is not None:
+                return {"removed": False, "public_port": public_port, "reason": "held by a deployment"}
+            if owner is not None and held is None and public_port in routes and not adopt:
+                return {"removed": False, "public_port": public_port, "reason": "the route has no owner"}
             if owner is not None and held is not None:
                 if held.get("owner") != owner:
                     return {"removed": False, "public_port": public_port, "reason": "held by another deployment"}

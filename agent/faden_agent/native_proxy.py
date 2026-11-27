@@ -81,14 +81,24 @@ class ProxyLimits:
     max_header_bytes: int = 32 * 1024
     max_headers: int = 100
     max_body_bytes: int = 32 * 1024 * 1024
-    handshake_timeout: float = 10.0
+    #: Before the client has proved who it is: a short handshake, and pools apart from the authenticated one.
+    handshake_timeout: float = 5.0
+    max_preauth: int = 32
+    max_preauth_per_ip: int = 16
     header_timeout: float = 30.0
     idle_timeout: float = 75.0
     body_timeout: float = 75.0
     write_timeout: float = 120.0
     connect_timeout: float = 5.0
+    #: The whole request body, however slowly it trickles (body_timeout bounds each read).
+    body_total_timeout: float = 300.0
+    #: The longest the upstream may stay silent, SSE included: a long generation between tokens is fine, a
+    #: stream silent for an hour is cut. Also the idle-stream cap.
     upstream_read_timeout: float = 3600.0
+    #: Authenticated connections only (the pre-auth pool is separate, so a flood of strangers cannot take these).
     max_connections: int = 256
+    #: A connection is closed after the request in flight once it is this old, or when the certificate or CA rotated.
+    max_lifetime: float = 3600.0
     drain_sec: float = 30.0
 
     @classmethod
@@ -120,7 +130,8 @@ def build_identity(cert: Path, key: Path, trust: Path, client_name: str) -> Iden
     from cryptography import x509  # noqa: PLC0415
 
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2  # 1.3 is negotiated with any client that offers it
+    ctx.options |= ssl.OP_NO_RENEGOTIATION
     ctx.load_cert_chain(str(cert), str(key))
     ctx.load_verify_locations(cafile=str(trust))
     ctx.verify_mode = ssl.CERT_REQUIRED
@@ -202,7 +213,10 @@ class NativeProxy:
         self._thread: threading.Thread | None = None
         self._listeners: dict[int, _Listener] = {}
         self._identity: Identity | None = None
-        self._active = 0
+        self._active = 0  # authenticated connections
+        self._preauth = 0
+        self._preauth_ip: dict[str, int] = {}
+        self._bound: frozenset[int] = frozenset()
         self._ready = threading.Event()
         self._lock = threading.Lock()
 
@@ -250,7 +264,7 @@ class NativeProxy:
     # ── routes ──────────────────────────────────────────────────────
 
     def bound_ports(self) -> list[int]:
-        return sorted(self._listeners)
+        return sorted(self._bound)  # a snapshot published by the proxy loop, safe from any thread
 
     def connections(self) -> int:
         return self._active
@@ -315,9 +329,11 @@ class NativeProxy:
                 await self._close_listener(listener, drain=0)
             raise
         self._listeners.update(new)
+        self._bound = frozenset(self._listeners)
         for public in [p for p in self._listeners if p not in routes]:
             gone = self._listeners.pop(public)
             # Accepting stops now; open streams get up to drain_sec.
+            self._bound = frozenset(self._listeners)
             asyncio.ensure_future(self._close_listener(gone, drain=self.limits.drain_sec))  # noqa: RUF006
 
     async def _close_listener(self, listener: _Listener, *, drain: float) -> None:
@@ -347,6 +363,7 @@ class NativeProxy:
     async def _stop(self) -> None:
         listeners = list(self._listeners.values())
         self._listeners.clear()
+        self._bound = frozenset()
         await asyncio.gather(*(self._close_listener(x, drain=self.limits.drain_sec) for x in listeners))
 
     # ── connections ─────────────────────────────────────────────────
@@ -360,18 +377,13 @@ class NativeProxy:
             task = asyncio.current_task()
             if listener is not None and task is not None:
                 listener.tasks.add(task)
-            self._active += 1
             try:
-                if self._active > self.limits.max_connections:
-                    w.transport.abort()
-                    return
-                await self._connection(r, w, listener.internal if listener else 0)
+                await self._connection(r, w, port)
             except asyncio.CancelledError:
                 raise
             except Exception:  # noqa: BLE001
                 log.debug("Model proxy: connection ended with an error", exc_info=True)
             finally:
-                self._active -= 1
                 if listener is not None and task is not None:
                     listener.tasks.discard(task)
                 with contextlib.suppress(Exception):
@@ -379,43 +391,89 @@ class NativeProxy:
 
         return _Protocol(reader, serve, loop)
 
-    async def _connection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, internal: int) -> None:
+    async def _connection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, port: int) -> None:
+        """Pre-auth pool -> handshake -> certificate check -> authenticated pool -> HTTP."""
         lim = self.limits
         identity = self._identity
-        if identity is None:
-            writer.transport.abort()
-            return
-        sock = writer.get_extra_info("socket")
-        if sock is not None:
-            with contextlib.suppress(OSError):
-                sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         peer = writer.get_extra_info("peername") or ("?", 0)
-        try:
-            await writer.start_tls(identity.context, ssl_handshake_timeout=lim.handshake_timeout)
-        except (ssl.SSLError, OSError, TimeoutError, asyncio.TimeoutError) as exc:
-            log.debug("Model proxy: handshake from %s refused: %s", peer[0], exc)
+        ip = str(peer[0])
+        if identity is None or self._preauth >= lim.max_preauth or self._preauth_ip.get(ip, 0) >= lim.max_preauth_per_ip:
             writer.transport.abort()
             return
-        ssl_obj = writer.get_extra_info("ssl_object")
-        why = client_acceptable(identity, ssl_obj.getpeercert(binary_form=True) if ssl_obj else None)
-        if why:
-            log.warning("Model proxy: %s refused: %s", peer[0], why)
-            writer.transport.abort()
-            return
+        self._preauth += 1
+        self._preauth_ip[ip] = self._preauth_ip.get(ip, 0) + 1
+        pre = True
+
+        def leave_preauth() -> None:
+            nonlocal pre
+            if pre:
+                pre = False
+                self._preauth -= 1
+                left = self._preauth_ip.get(ip, 1) - 1
+                if left > 0:
+                    self._preauth_ip[ip] = left
+                else:
+                    self._preauth_ip.pop(ip, None)
+
+        authed = False
         try:
-            await self._http(reader, writer, str(peer[0]), lambda: self._upstream_port(internal))
+            sock = writer.get_extra_info("socket")
+            if sock is not None:
+                with contextlib.suppress(OSError):
+                    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            try:
+                await writer.start_tls(identity.context, ssl_handshake_timeout=lim.handshake_timeout)
+            except (ssl.SSLError, OSError, TimeoutError, asyncio.TimeoutError) as exc:
+                log.debug("Model proxy: handshake from %s refused: %s", ip, exc)
+                writer.transport.abort()
+                return
+            ssl_obj = writer.get_extra_info("ssl_object")
+            der = ssl_obj.getpeercert(binary_form=True) if ssl_obj else None
+            why = client_acceptable(identity, der)
+            if why:
+                log.warning("Model proxy: %s refused: %s", ip, why)
+                writer.transport.abort()
+                return
+            leave_preauth()
+            if self._active >= lim.max_connections:
+                writer.transport.abort()
+                return
+            self._active += 1
+            authed = True
+            loop = asyncio.get_running_loop()
+            born = loop.time()
+
+            def usable() -> bool:
+                """Before a request: the certificate still passes if the identity rotated."""
+                current = self._identity
+                if current is None:
+                    return False
+                return current is identity or client_acceptable(current, der) is None
+
+            def keeps() -> bool:
+                """After a response: not rotated, not too old."""
+                return self._identity is identity and loop.time() - born < lim.max_lifetime
+
+            def upstream() -> int:
+                listener = self._listeners.get(port)  # the current route table, per request
+                if listener is None:
+                    raise _Refused(503, "this model is no longer published here")
+                return listener.internal
+
+            await self._http(reader, writer, ip, upstream, usable, keeps)
         finally:
+            leave_preauth()
+            if authed:
+                self._active -= 1
             with contextlib.suppress(Exception):
                 writer.close()
                 await asyncio.wait_for(writer.wait_closed(), 3)
-
-    def _upstream_port(self, internal: int) -> int:
-        return internal
 
     # ── HTTP ────────────────────────────────────────────────────────
 
     async def _http(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, peer: str, upstream: Callable[[], int],
+        usable: Callable[[], bool] = lambda: True, keeps: Callable[[], bool] = lambda: True,
     ) -> None:
         lim = self.limits
         conn = h11.Connection(h11.SERVER, max_incomplete_event_size=lim.max_header_bytes)
@@ -436,6 +494,8 @@ class NativeProxy:
                 return
             if req is None:
                 return
+            if not usable():  # the certificate rotated away under an idle keep-alive connection
+                return
             try:
                 keep = await self._exchange(conn, reader, writer, req, peer, upstream())
             except _Refused as exc:
@@ -443,7 +503,7 @@ class NativeProxy:
                 return
             except (_Gone, ConnectionError, TimeoutError, OSError, ssl.SSLError, h11.ProtocolError):
                 return
-            if not keep or conn.our_state is not h11.DONE or conn.their_state is not h11.DONE:
+            if not keep or not keeps() or conn.our_state is not h11.DONE or conn.their_state is not h11.DONE:
                 return
             conn.start_next_cycle()
 
@@ -467,12 +527,9 @@ class NativeProxy:
                 conn.receive_data(data)
                 continue
             if isinstance(ev, h11.Request):
-                # h11 merges identical duplicate Content-Length lines; a proxy must not.
+                # (Duplicate Content-Length: h11 merges identical lines and rejects differing ones.)
                 if raw.find(b"\r\n\r\n") > lim.max_header_bytes:
                     raise _Refused(431, "request headers too large")
-                lines = raw.split(b"\r\n\r\n", 1)[0].lower().split(b"\r\n")[1:]
-                if sum(1 for ln in lines if ln.split(b":", 1)[0].strip() == b"content-length") > 1:
-                    raise _Refused(400, "duplicate Content-Length")
                 return ev
             if isinstance(ev, h11.ConnectionClosed) or ev is h11.PAUSED:
                 return None
@@ -482,6 +539,9 @@ class NativeProxy:
     def _check(req: h11.Request, lim: ProxyLimits) -> None:
         headers = req.headers
         names = [k for k, _ in headers]
+        listed = {t.strip().lower().encode() for k, v in headers if k == b"connection" for t in v.decode("latin-1").split(",")}
+        if listed & {b"content-length", b"host", b"transfer-encoding"}:
+            raise _Refused(400, "Connection lists a framing header")  # would be stripped into a dead connection
         if names.count(b"content-length") > 1:
             raise _Refused(400, "duplicate Content-Length")
         if names.count(b"transfer-encoding") > 1:
@@ -555,8 +615,9 @@ class NativeProxy:
         try:
             uw.write(uconn.send(h11.Request(method=req.method, target=req.target, headers=up_headers)) or b"")
             total = 0
+            deadline = asyncio.get_running_loop().time() + lim.body_total_timeout
             while True:
-                ev = await self._body_event(conn, reader)
+                ev = await self._body_event(conn, reader, deadline)
                 if isinstance(ev, h11.Data):
                     total += len(ev.data)
                     if total > lim.max_body_bytes:
@@ -574,14 +635,17 @@ class NativeProxy:
             with contextlib.suppress(Exception):
                 uw.transport.abort()
 
-    async def _body_event(self, conn: h11.Connection, reader: asyncio.StreamReader) -> Any:
+    async def _body_event(self, conn: h11.Connection, reader: asyncio.StreamReader, deadline: float) -> Any:
         while True:
             try:
                 ev = conn.next_event()
             except h11.RemoteProtocolError as exc:
                 raise _Refused(400, "malformed body") from exc
             if ev is h11.NEED_DATA:
-                data = await asyncio.wait_for(reader.read(65536), self.limits.body_timeout)
+                left = deadline - asyncio.get_running_loop().time()
+                if left <= 0:
+                    raise TimeoutError("the request body took too long")
+                data = await asyncio.wait_for(reader.read(65536), min(self.limits.body_timeout, left))
                 conn.receive_data(data)
                 continue
             if ev is h11.PAUSED:
@@ -608,9 +672,11 @@ class NativeProxy:
                 return False
             return relay.result()
         finally:
-            for task in (relay, watch):
-                if not task.done():
-                    task.cancel()
+            pending = [t for t in (relay, watch) if not t.done()]
+            for task in pending:
+                task.cancel()
+            # Settled before the reader is used again: a cancelled read still holds the reader until it unwinds.
+            await asyncio.gather(*pending, return_exceptions=True)
 
     async def _relay_response(
         self, conn: h11.Connection, writer: asyncio.StreamWriter, uconn: h11.Connection, ureader: asyncio.StreamReader,
@@ -697,6 +763,7 @@ def self_test(limits: ProxyLimits | None = None) -> str | None:
             listener = asyncio.run_coroutine_threadsafe(proxy._bind(0), proxy._loop).result(5)  # type: ignore[arg-type]  # noqa: SLF001
             listener.internal = up_port
             proxy._listeners[listener.port] = listener  # noqa: SLF001
+            proxy._bound = frozenset(proxy._listeners)  # noqa: SLF001
             port = listener.port
 
             def request(client: tuple[str, str] | None, path: str) -> str:

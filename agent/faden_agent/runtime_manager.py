@@ -121,11 +121,14 @@ class RuntimeManager:
         if str(payload.get("action") or "ensure") == "remove":
             owner = payload.get("owner")
             if owner is None:  # 0.2.12's form: unconditional, and the answer it always gave
-                await self._model_tls.remove_route(public)
+                done = await self._model_tls.remove_route(public)
+                if str((done or {}).get("reason", "")).startswith("held"):
+                    return done  # a native deployment's route is not a legacy one to remove
                 return {"removed": True, "public_port": public}
             generation = payload.get("generation")
             return await self._model_tls.remove_route(
                 public, owner=str(owner), generation=int(generation) if generation is not None else None,
+                adopt=bool(payload.get("adopt")),
             )
         owner = payload.get("owner")
         if owner is None:
@@ -134,6 +137,7 @@ class RuntimeManager:
         return await self._model_tls.ensure_route(
             public, int(payload["internal_port"]),
             owner=str(owner), generation=int(generation) if generation is not None else None,
+            adopt=bool(payload.get("adopt")),
         )
 
     async def deploy_workload(
