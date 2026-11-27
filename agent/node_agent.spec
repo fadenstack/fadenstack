@@ -158,7 +158,11 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=sys.platform != "win32",  # strip symbols on Linux/macOS
-    upx=True,
+    # UPX rewrites a Mach-O after it is signed, and Apple Silicon runs no
+    # unsigned code: a packed Mac build is killed at launch. The ad-hoc
+    # signature PyInstaller applies (codesign_identity=None) stays valid only
+    # unpacked. A release identity is A2's.
+    upx=sys.platform != "darwin",
     upx_exclude=[],
     runtime_tmpdir=None,
     console=True,

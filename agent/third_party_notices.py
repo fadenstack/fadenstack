@@ -26,7 +26,10 @@ them, and only those packages are listed: PyInstaller, uv and pip-licenses
 build the binary but are not in it. pip-licenses runs from a venv of its own
 and reads this interpreter's packages, so its own dependencies stay out too.
 
-Linux (Debian) only: the system libraries come from dpkg's database.
+Linux (Debian): the system libraries come from dpkg's database. A macOS
+build (a development build until the release workflow builds one) has no such
+database: its notices say the system libraries are not listed yet, and
+``check`` names the dylibs it carries without failing on them.
 """
 
 from __future__ import annotations
@@ -150,19 +153,25 @@ def write(requirements: Path, out: Path, pip_licenses: str) -> None:
     parts.append(_read(Path(sysconfig.get_path("stdlib")) / "LICENSE.txt"))
 
     parts.append(_heading("3. System libraries"))
-    parts.append(
-        "Shared libraries from the Debian build environment, which Python's\n"
-        "extension modules link against. Their Debian copyright files follow.\n"
-    )
-    for package in DEBIAN_PACKAGES:
-        version = subprocess.run(
-            ["dpkg-query", "--show", "--showformat=${Version}", package],
-            check=True,
-            capture_output=True,
-            encoding="utf-8",
-        ).stdout
-        parts.append(f"\n--- {package} {version} ---\n\n")
-        parts.append(_read(Path("/usr/share/doc", package, "copyright")))
+    if sys.platform == "darwin":
+        parts.append(
+            "Not listed yet for macOS builds. This is a development build; the\n"
+            "dynamic libraries it carries come from the Python build it was made with.\n"
+        )
+    else:
+        parts.append(
+            "Shared libraries from the Debian build environment, which Python's\n"
+            "extension modules link against. Their Debian copyright files follow.\n"
+        )
+        for package in DEBIAN_PACKAGES:
+            version = subprocess.run(
+                ["dpkg-query", "--show", "--showformat=${Version}", package],
+                check=True,
+                capture_output=True,
+                encoding="utf-8",
+            ).stdout
+            parts.append(f"\n--- {package} {version} ---\n\n")
+            parts.append(_read(Path("/usr/share/doc", package, "copyright")))
 
     pyinstaller = metadata.distribution("pyinstaller")
     parts.append(_heading("4. PyInstaller's bootloader"))
@@ -204,6 +213,9 @@ def check(binary: Path, requirements: Path) -> None:
 
     # System libraries sit at the top level; extension modules and what
     # wheels vendor sit under their package, covered by its licence.
+    dylibs = sorted(n for n in archive.toc if "/" not in n and n.endswith(".dylib") and not n.startswith("libpython"))
+    if dylibs:
+        print(f"macOS libraries carried, not yet in the notices: {', '.join(dylibs)}")
     for name in sorted(archive.toc):
         if "/" in name or not re.match(r"lib.+\.so(\.|$)", name):
             continue

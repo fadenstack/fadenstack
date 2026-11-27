@@ -1,5 +1,5 @@
 #!/bin/sh
-# Build the single-file agent for one Linux platform.
+# Build the single-file agent for one Linux platform, or for this Mac.
 #
 # PyInstaller does not cross-compile: a linux-aarch64 build has to happen on
 # linux-aarch64. A container gives that when the host can emulate the target,
@@ -17,6 +17,12 @@
 #   sh build-binary.sh linux-aarch64 --remote admin@spark-2
 #   sh build-binary.sh linux-aarch64 --remote admin@spark-2 \
 #        --ssh-key ~/.ssh/id_dgx_spark
+#   sh build-binary.sh macos-arm64                 # on an Apple Silicon Mac
+#
+# A Mac build runs natively (no container can produce Mach-O) in a throwaway
+# venv from the same hash-checked lock, unpacked (no UPX) and ad-hoc signed,
+# which is what Apple Silicon needs to run it at all. It is a development
+# build: a signed, notarized release is the release workflow's.
 #
 # The result lands in dist/, named the way /api/install/plan expects, with
 # the licences of the third-party software bundled in it beside it:
@@ -40,13 +46,16 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --remote) REMOTE="${2:-}"; shift ;;
     --ssh-key) SSH_KEY="${2:-}"; shift ;;
-    -h|--help) sed -n '2,32p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,38p' "$0"; exit 0 ;;
     -*) echo "Unknown option: $1" >&2; exit 2 ;;
     *) PLATFORM="$1" ;;
   esac
   shift
 done
 
+if [ -z "$PLATFORM" ] && [ "$(uname -s)" = Darwin ]; then
+  PLATFORM="macos-$(uname -m)"
+fi
 if [ -z "$PLATFORM" ]; then
   case "$(uname -m)" in
     x86_64|amd64) PLATFORM="linux-x86_64" ;;
@@ -58,11 +67,54 @@ fi
 case "$PLATFORM" in
   linux-x86_64) DOCKER_PLATFORM="linux/amd64" ;;
   linux-aarch64) DOCKER_PLATFORM="linux/arm64" ;;
+  macos-arm64) DOCKER_PLATFORM="" ;;
   *) echo "Unknown platform: $PLATFORM" >&2; exit 2 ;;
 esac
 
 SRC=$(cd "$(dirname "$0")" && pwd)
 ARTIFACT="faden-agent-$PLATFORM"
+
+# ── a Mac, natively ────────────────────────────────────────────────────────
+
+if [ "$PLATFORM" = macos-arm64 ]; then
+  if [ "$(uname -s)" != Darwin ] || [ "$(uname -m)" != arm64 ]; then
+    echo "ERROR: macos-arm64 builds on an Apple Silicon Mac only (PyInstaller does not cross-compile)." >&2
+    exit 2
+  fi
+  if [ -n "$REMOTE" ]; then
+    echo "ERROR: --remote builds Linux targets; run this on the Mac itself." >&2
+    exit 2
+  fi
+  command -v uv >/dev/null 2>&1 || { echo "ERROR: the Mac build needs uv (https://docs.astral.sh/uv/)." >&2; exit 1; }
+  TOOLS=$(mktemp -d -t faden-build-XXXXXX)
+  trap 'rm -rf "$TOOLS"' EXIT
+  cd "$SRC"
+  # The same steps as the container's, with the tools outside the source tree.
+  uv venv --quiet --python 3.12 "$TOOLS/tools"
+  uv pip install --quiet --no-config --python "$TOOLS/tools/bin/python" pip-licenses==5.5.5
+  uv venv --quiet --python 3.12 "$TOOLS/build"
+  uv export --quiet --frozen --no-dev --no-emit-project --extra build -o "$TOOLS/build-requirements.txt"
+  uv export --quiet --frozen --no-dev --no-emit-project --no-hashes -o "$TOOLS/requirements.txt"
+  # --no-config: uv would otherwise add this project's [tool.uv] constraints, unpinned.
+  uv pip install --quiet --no-config --python "$TOOLS/build/bin/python" --require-hashes -r "$TOOLS/build-requirements.txt"
+  mkdir -p build dist
+  "$TOOLS/build/bin/python" third_party_notices.py write "$TOOLS/requirements.txt" \
+    build/THIRD-PARTY-NOTICES.txt --pip-licenses "$TOOLS/tools/bin/pip-licenses"
+  "$TOOLS/build/bin/pyinstaller" --clean --noconfirm node_agent.spec
+  "$TOOLS/build/bin/python" third_party_notices.py check dist/faden-agent "$TOOLS/requirements.txt"
+  mv dist/faden-agent "dist/$ARTIFACT"
+  cp build/THIRD-PARTY-NOTICES.txt "dist/$ARTIFACT.THIRD-PARTY-NOTICES.txt"
+  # Refuse to hand out what a Mac would not run.
+  file "dist/$ARTIFACT" | grep -q 'Mach-O 64-bit executable arm64' || {
+    echo "ERROR: dist/$ARTIFACT is not an arm64 Mach-O executable." >&2; exit 1; }
+  codesign --verify --strict "dist/$ARTIFACT" || {
+    echo "ERROR: dist/$ARTIFACT carries no valid signature." >&2; exit 1; }
+  "dist/$ARTIFACT" --version
+  echo
+  echo "Built: $SRC/dist/$ARTIFACT (development build, ad-hoc signed)"
+  shasum -a 256 "$SRC/dist/$ARTIFACT"
+  exit 0
+fi
 
 # The build itself, as one string, so the local and remote paths run exactly
 # the same thing. A difference between them would show up as a binary that
