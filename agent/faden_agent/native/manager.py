@@ -126,6 +126,19 @@ class NativeRuntimeManager:
     def _records(self) -> list[dict[str, Any]]:
         return self._scan()[0]
 
+    def model_paths_in_use(self) -> tuple[list[str], int]:
+        """Snapshot paths of workers that may still be reading the model store, and how many records are unreadable.
+
+        Used by ``remove_model``: a model is not removed under a worker that is starting or ready, nor
+        while a record cannot be read (its snapshot is unknown).
+        """
+        good, bad = self._scan()
+        paths = [
+            str((r.get("model") or {}).get("snapshot_path") or "")
+            for r in good if r.get("state") in ("starting", "ready")
+        ]
+        return [p for p in paths if p], len(bad)
+
     def _scan(self) -> tuple[list[dict[str, Any]], list[Path]]:
         """Valid records, and the paths of the ones that are not (reported, never ignored)."""
         good: list[dict[str, Any]] = []

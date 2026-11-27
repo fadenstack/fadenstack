@@ -6,7 +6,10 @@ import asyncio
 import json
 import logging
 import re
+import os
 import shlex
+import shutil
+import stat
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
@@ -465,6 +468,61 @@ class RuntimeManager:
             "total_size": total_size,
             "files_synced": files_synced,
         }
+
+    async def remove_model(
+        self, payload: dict[str, Any], *, in_use: Callable[[], tuple[list[str], int]] | None = None,
+    ) -> dict[str, Any]:
+        """Delete one model (``models--<org>--<name>``) from the store; idempotent.
+
+        Refused while a native worker's snapshot lies inside it. Takes the same lock as a sync,
+        never follows a symlink (``shutil.rmtree`` unlinks them) and stays inside the store.
+        """
+        from faden_agent.model_puller import ModelPullerError, _lock_for_model_dir, _safe_join, _safe_leaf_name  # noqa: PLC0415
+
+        name = str(payload.get("model_dir_name") or "").strip()
+        repo = str(payload.get("hf_repo_id") or "").strip()
+        if not name and repo:
+            name = f"models--{repo.replace('/', '--')}"
+        try:
+            name = _safe_leaf_name(name, field="model_dir_name")
+            if not name.startswith("models--"):
+                raise ModelPullerError(f"model_dir_name {name!r} is not a model folder (models--<org>--<name>)")
+            store = Path(self._model_store_root).resolve(strict=False)
+            model_dir = _safe_join(store, name, field="model_dir_name")
+        except ModelPullerError as exc:
+            raise RuntimeManagerError(str(exc)) from exc
+
+        async with _lock_for_model_dir(model_dir):
+            if in_use is not None:
+                paths, unreadable = in_use()
+                if unreadable:
+                    raise RuntimeManagerError(
+                        f"model_in_use: {unreadable} native worker record(s) cannot be read, so {name} is not removed."
+                    )
+                for path in paths:
+                    resolved = Path(path).resolve(strict=False)
+                    if resolved == model_dir or model_dir in resolved.parents:
+                        raise RuntimeManagerError(f"model_in_use: a native worker is using {path}; stop it first.")
+            locks = store / ".locks" / name
+            freed = 0
+            removed = False
+            if model_dir.is_dir():
+                for root, _dirs, files in os.walk(model_dir, followlinks=False):
+                    for f in files:
+                        try:
+                            st = os.lstat(os.path.join(root, f))
+                        except OSError:
+                            continue
+                        if not stat.S_ISLNK(st.st_mode):
+                            freed += st.st_size
+                shutil.rmtree(model_dir)
+                removed = True
+            if locks.is_dir() and not locks.is_symlink():
+                shutil.rmtree(locks, ignore_errors=True)
+        self._events.add(
+            event_type="model.removed", payload={"model_dir_name": name, "freed_bytes": freed}, correlation_id=name,
+        )
+        return {"removed": removed, "model_dir_name": name, "freed_bytes": freed}
 
     async def _sync_from_hub(
         self,

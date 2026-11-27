@@ -21,6 +21,8 @@ class NodeCommandType(enum.StrEnum):
     RESUME_NODE = "resume_node"
     COLLECT_DIAGNOSTICS = "collect_diagnostics"
     SYNC_MODEL = "sync_model"
+    #: Delete a model from this machine's store. Sent only to agents advertising ``model_remove``.
+    REMOVE_MODEL = "remove_model"
     FETCH_CONTAINER_LOGS = "fetch_container_logs"
     HOST_OP = "host_op"
     SYNC_NODE_PROFILE = "sync_node_profile"

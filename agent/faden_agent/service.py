@@ -504,6 +504,8 @@ class NodeAgentService:
         if result["adopted"] or result["failed"]:
             log.info("Native workers after restart: %s", result)
         static_capabilities.update(manager.capabilities())
+        # Darwin only (a native manager exists only there): the backend sends remove_model only to agents saying so.
+        static_capabilities["model_remove"] = 1
         await manager.refresh_metal()
         self._native = manager
         return manager

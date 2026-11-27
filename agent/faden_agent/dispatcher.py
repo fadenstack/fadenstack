@@ -357,6 +357,12 @@ class CommandDispatcher:
             return await self._runtime.collect_diagnostics()
         if command_type == NodeCommandType.SYNC_MODEL.value:
             return await self._runtime.sync_model(payload, emit_progress=emit_progress)
+        if command_type == NodeCommandType.REMOVE_MODEL.value:
+            # Capability-gated (``model_remove``, advertised only with the native runtime): a machine
+            # without it answers as an unknown command, as 0.2.12 would.
+            if self._native is None:
+                raise RuntimeManagerError("remove_model is not supported on this machine.")
+            return await self._runtime.remove_model(payload, in_use=self._native.model_paths_in_use)
         if command_type == NodeCommandType.CHECK_INTERNET.value:
             from faden_agent.hf_download import check_internet  # noqa: PLC0415
 
