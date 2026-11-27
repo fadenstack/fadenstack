@@ -257,6 +257,8 @@ class TestInstallLineVerification:
             encoding="utf-8", newline="\n",
         )
         curl.chmod(0o755)
+        # Linux whatever runs the test: these are about the digest, not the Mac path.
+        _stub(bin_dir, "uname", 'case "$1" in -s) echo Linux ;; -m) echo x86_64 ;; esac')
         script = tmp_path / "install.sh"
         script.write_text(_script(), encoding="utf-8", newline="\n")
         target = tmp_path / "out" / "faden-agent"
@@ -285,6 +287,235 @@ class TestInstallLineVerification:
         result = self._run(tmp_path, hashlib.sha256(self.GOOD).hexdigest(), self.GOOD)
         assert "Verified." in result.stdout, result.stdout + result.stderr
         assert (tmp_path / "out" / "faden-agent").read_bytes() == self.GOOD
+
+
+def _stub(bin_dir: Path, name: str, body: str) -> None:
+    path = bin_dir / name
+    path.write_text(f"#!/bin/sh\n{body}\n", encoding="utf-8", newline="\n")
+    path.chmod(0o755)
+
+
+# What the script runs besides the stubs, linked into a PATH that has nothing else,
+# so a test can take a hashing tool away.
+_SCRIPT_TOOLS = ("sh", "sed", "tr", "mktemp", "rm", "cat", "dirname", "basename", "chmod",
+                 "mkdir", "install", "printf", "env")
+
+
+@pytest.mark.skipif(shutil.which("sh") is None, reason="no POSIX sh available")
+class TestInstallerOnAMac:
+    """The script as a Mac runs it: uname, sw_vers, id and sysctl are stand-ins.
+
+    Nothing here touches the real machine: the "agent" the script hands over
+    to is a stand-in that records how it was called.
+    """
+
+    AGENT = b"#!/bin/sh\necho \"$@\" > \"$AGENT_ARGS\"\n"
+
+    def _run(
+        self,
+        tmp_path: Path,
+        *,
+        arch: str = "arm64",
+        translated: str = "0",
+        macos: str = "26.1",
+        uid: int = 0,
+        args: tuple[str, ...] = ("--join", ORIGIN),
+        served: bytes | None = None,
+        plan_sha: str | None = None,
+        hashers: dict[str, str] | None = None,
+        isolated_path: bool = False,
+    ) -> subprocess.CompletedProcess[str]:
+        served = self.AGENT if served is None else served
+        plan_sha = hashlib.sha256(self.AGENT).hexdigest() if plan_sha is None else plan_sha
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        (tmp_path / "served").write_bytes(served)
+        (tmp_path / "plan.json").write_text(
+            f'{{"platform": "macos-arm64", "url": "{ORIGIN}/api/install/binary/macos-arm64", '
+            f'"sha256": "{plan_sha}", "source": "checkout"}}',
+            encoding="utf-8", newline="\n",
+        )
+        _stub(bin_dir, "curl",
+              'out=""; url=""\n'
+              'while [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift ;; -*) ;; *) url="$1" ;; esac; shift; done\n'
+              f'echo "$url" >> "{tmp_path.as_posix()}/requests"\n'
+              f'if [ -n "$out" ]; then cat "{tmp_path.as_posix()}/served" > "$out"; '
+              f'else cat "{tmp_path.as_posix()}/plan.json"; fi')
+        _stub(bin_dir, "uname", f'case "$1" in -s) echo Darwin ;; -m) echo {arch} ;; esac')
+        _stub(bin_dir, "sysctl", f"echo {translated}")
+        _stub(bin_dir, "sw_vers", f"echo {macos}")
+        _stub(bin_dir, "id", f'case "$1" in -u) echo {uid} ;; -un) echo tester ;; esac')
+        _stub(bin_dir, "sudo", "echo sudo must not be used >&2; exit 99")
+        for name, body in (hashers or {}).items():
+            _stub(bin_dir, name, body)
+        path = bin_dir.as_posix()
+        if isolated_path:
+            for tool in _SCRIPT_TOOLS:
+                found = shutil.which(tool)
+                if found and not (bin_dir / tool).exists():
+                    (bin_dir / tool).symlink_to(found)
+        else:
+            path = f"{path}{os.pathsep}{os.environ['PATH']}"
+        script = tmp_path / "install.sh"
+        script.write_text(_script(), encoding="utf-8", newline="\n")
+        return subprocess.run(
+            ["sh", str(script), *args], capture_output=True, text=True, timeout=60,
+            env={"PATH": path, "HOME": str(tmp_path), "AGENT_ARGS": str(tmp_path / "agent-args")},
+        )
+
+    @staticmethod
+    def _fetched(tmp_path: Path) -> bool:
+        return (tmp_path / "requests").exists()
+
+    def test_an_intel_mac_is_refused_before_anything_is_downloaded(self, tmp_path: Path) -> None:
+        result = self._run(tmp_path, arch="x86_64")
+        assert result.returncode == 1
+        assert "Intel Mac" in result.stderr and "Apple Silicon" in result.stderr
+        assert not self._fetched(tmp_path)
+
+    def test_an_apple_silicon_shell_under_rosetta_is_not_an_intel_mac(self, tmp_path: Path) -> None:
+        result = self._run(tmp_path, arch="x86_64", translated="1")
+        assert result.returncode == 0, result.stderr
+        assert "platform=darwin-arm64" in (tmp_path / "requests").read_text()
+
+    def test_a_macos_older_than_the_certified_one_is_refused_before_download(self, tmp_path: Path) -> None:
+        result = self._run(tmp_path, macos="15.7.2")
+        assert result.returncode == 1
+        assert f"macOS {install_api.MIN_MACOS_MAJOR} or newer" in result.stderr
+        assert "15.7.2" in result.stderr
+        assert not self._fetched(tmp_path)
+
+    def test_without_root_it_asks_for_sudo_and_never_falls_back_to_a_user_service(
+        self, tmp_path: Path
+    ) -> None:
+        result = self._run(tmp_path, uid=501)
+        assert result.returncode == 1
+        assert "Run this with sudo" in result.stderr
+        assert "sudo must not be used" not in result.stderr
+        assert not self._fetched(tmp_path)
+
+    def test_user_scope_is_refused(self, tmp_path: Path) -> None:
+        result = self._run(tmp_path, args=("--user", "--join", ORIGIN))
+        assert result.returncode == 2
+        assert "not available on a Mac" in result.stderr
+
+    def test_root_hands_the_verified_download_to_the_agent_to_join(self, tmp_path: Path) -> None:
+        result = self._run(tmp_path)
+        assert result.returncode == 0, result.stderr
+        assert "Verified." in result.stdout
+        assert "platform=darwin-arm64" in (tmp_path / "requests").read_text()
+        assert (tmp_path / "agent-args").read_text().split() == ["join", ORIGIN]
+
+    def test_a_token_is_handed_to_start(self, tmp_path: Path) -> None:
+        result = self._run(tmp_path, args=("--backend", ORIGIN, "--token", "tok"))
+        assert result.returncode == 0, result.stderr
+        assert (tmp_path / "agent-args").read_text().split() == ["start"]
+
+    def test_a_download_that_does_not_match_is_never_run(self, tmp_path: Path) -> None:
+        result = self._run(tmp_path, served=b"#!/bin/sh\ntouch \"$AGENT_ARGS\"\n")
+        assert result.returncode == 1
+        assert "does not match the expected SHA-256" in result.stderr
+        assert not (tmp_path / "agent-args").exists()
+
+    def test_a_mac_hashes_with_shasum_not_its_bsd_sha256sum(self, tmp_path: Path) -> None:
+        # macOS's /sbin/sha256sum: other options, other output. It must not be used.
+        result = self._run(tmp_path, hashers={"sha256sum": "echo bsd sha256sum used >&2; exit 64"})
+        assert result.returncode == 0, result.stderr
+        assert "bsd sha256sum used" not in result.stderr
+
+    def test_a_failing_hash_tool_is_a_refusal_not_an_empty_match(self, tmp_path: Path) -> None:
+        # The old pipeline: sha256sum failed, cut exited 0, and the fallback never ran.
+        result = self._run(tmp_path, hashers={"shasum": "echo broken >&2; exit 1"})
+        assert result.returncode == 1
+        assert "shasum -a 256 failed" in result.stderr
+        assert not (tmp_path / "agent-args").exists()
+
+    def test_a_hash_tool_that_prints_no_digest_is_refused(self, tmp_path: Path) -> None:
+        result = self._run(tmp_path, hashers={"shasum": 'echo "not-a-digest  $3"'})
+        assert result.returncode == 1
+        assert "gave no SHA-256" in result.stderr
+
+    def test_no_hash_tool_at_all_is_a_refusal(self, tmp_path: Path) -> None:
+        result = self._run(tmp_path, isolated_path=True)
+        assert result.returncode == 1, result.stdout + result.stderr
+        assert "neither sha256sum nor shasum" in result.stderr
+        assert not (tmp_path / "agent-args").exists()
+
+
+@pytest.mark.skipif(shutil.which("sh") is None, reason="no POSIX sh available")
+class TestHashToolOnLinux:
+    """Linux keeps GNU sha256sum, and falls back to shasum only when it is missing."""
+
+    def _hash_block(self, tmp_path: Path, tools: dict[str, str]) -> subprocess.CompletedProcess[str]:
+        script = _script()
+        block = script[script.index('echo "  Checking it is'):script.index('echo "  Verified."')]
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        for tool in _SCRIPT_TOOLS:
+            found = shutil.which(tool)
+            if found:
+                (bin_dir / tool).symlink_to(found)
+        for name, body in tools.items():
+            _stub(bin_dir, name, body)
+        (tmp_path / "faden-agent").write_bytes(b"x")
+        harness = tmp_path / "h.sh"
+        harness.write_text(
+            f'set -eu\nOS=linux\nTMP="{tmp_path.as_posix()}"\nSHA={"ab" * 32}\n{block}echo VERIFIED\n',
+            newline="\n",
+        )
+        return subprocess.run(["sh", str(harness)], capture_output=True, text=True, timeout=30,
+                              env={"PATH": bin_dir.as_posix()})
+
+    def test_gnu_sha256sum_is_used_when_present(self, tmp_path: Path) -> None:
+        result = self._hash_block(tmp_path, {"sha256sum": f'echo "{"ab" * 32}  $1"',
+                                             "shasum": "exit 1"})
+        assert "VERIFIED" in result.stdout, result.stderr
+
+    def test_shasum_is_the_fallback(self, tmp_path: Path) -> None:
+        result = self._hash_block(tmp_path, {"shasum": f'echo "{"ab" * 32}  $3"'})
+        assert "VERIFIED" in result.stdout, result.stderr
+
+
+@pytest.mark.anyio()
+async def test_a_release_backend_offers_no_mac_build_until_one_is_pinned(
+    client: AsyncClient, fastapi_app: FastAPI, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path, pinned: dict[str, str],
+) -> None:
+    """The checkout source is a developer's build: an installed backend never hands one out.
+
+    Until A2 pins a signed Mac release, a backend that is not a checkout says it
+    has nothing to verify -- even holding a stray copy of the file.
+    """
+    assert "macos-arm64" not in pinned
+    stray = tmp_path / "faden-agent-macos-arm64"
+    stray.write_bytes(b"somebody's Mac build")
+    monkeypatch.setattr(install_api, "local_binary", lambda _build: stray)
+    monkeypatch.setattr(install_api, "_source_checkout_binary_dir", lambda: None)
+    body = await _plan(client, "darwin-arm64")
+    assert body["platform"] == "macos-arm64"
+    assert body["url"] is None and body["sha256"] is None
+    assert "pins no agent" in str(body["reason"])
+    assert (await client.get("/api/install/binary/macos-arm64")).status_code == 404
+
+
+@pytest.mark.anyio()
+async def test_a_checkout_serves_its_own_mac_build_with_its_digest(
+    client: AsyncClient, fastapi_app: FastAPI, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    """How a development Mac build reaches the installer before A2: verified all the same."""
+    binary = tmp_path / "faden-agent-macos-arm64"
+    binary.write_bytes(b"agent built on a Mac just now")
+    monkeypatch.setattr(install_api, "local_binary", lambda _build: binary)
+    monkeypatch.setattr(install_api, "_source_checkout_binary_dir", lambda: tmp_path)
+    body = await _plan(client, "darwin-arm64")
+    assert body["source"] == "checkout"
+    assert body["sha256"] == hashlib.sha256(binary.read_bytes()).hexdigest()
+
+
+@pytest.mark.anyio()
+async def test_an_intel_mac_has_no_build(client: AsyncClient, fastapi_app: FastAPI) -> None:
+    body = await _plan(client, "darwin-x86_64")
+    assert body["url"] is None and body["sha256"] is None
 
 
 @pytest.mark.anyio()
@@ -438,7 +669,7 @@ class TestBinaryResolution:
 
         assert install_api.local_binary("linux-aarch64") is not None
         assert install_api.local_binary("linux-x86_64") is not None
-        assert install_api.local_binary("macos-universal") is None
+        assert install_api.local_binary("macos-arm64") is None
 
     def test_the_checkout_path_points_at_the_agents_real_build_output(self) -> None:
         """Guards the parents[5] hop: a moved module breaks this silently."""

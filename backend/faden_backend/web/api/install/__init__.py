@@ -88,9 +88,13 @@ PLATFORMS = {
     "linux-arm64": "linux-aarch64",
     "linux-x86_64": "linux-x86_64",
     "linux-amd64": "linux-x86_64",
-    "darwin-arm64": "macos-universal",
-    "darwin-x86_64": "macos-universal",
+    # Apple Silicon only. Intel Macs are refused by the script itself, before
+    # it asks for a plan, so they get a reason rather than "no build".
+    "darwin-arm64": "macos-arm64",
 }
+
+#: The oldest macOS the agent is certified on (Apple Silicon, macOS 26 and 27).
+MIN_MACOS_MAJOR = 26
 
 
 def _source_checkout_binary_dir() -> Path | None:
@@ -343,6 +347,9 @@ def render_installer(origin: str) -> str:
 # Run it as root and the agent becomes a system service. Run it as yourself,
 # without passwordless sudo, and it installs into ~/.local/bin and runs as a
 # systemd user service -- no password asked for at any point.
+#
+# On a Mac (Apple Silicon, macOS {MIN_MACOS_MAJOR} or newer) it must run with sudo: the agent
+# becomes a system LaunchDaemon under its own hidden account, _fadenagent.
 
 set -eu
 
@@ -366,7 +373,7 @@ while [ $# -gt 0 ]; do
     --install-path) INSTALL_PATH="$2"; INSTALL_PATH_SET=1; shift ;;
     --user) FORCE_USER=1 ;;
     --ca-file) CA_FILE="$2"; shift ;;
-    -h|--help) sed -n '2,25p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,23p' "$0"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
   shift
@@ -395,6 +402,40 @@ fetch() {{
   esac
 }}
 
+# -- which machine ----------------------------------------------------------
+# Known before anything else, so a machine that cannot run the agent is told
+# so before it is asked for a password or downloads anything.
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+ARCH=$(uname -m)
+if [ "$OS" = darwin ]; then
+  # A shell under Rosetta reports x86_64 on an Apple Silicon Mac.
+  if [ "$ARCH" = x86_64 ] && [ "$(sysctl -n sysctl.proc_translated 2>/dev/null || echo 0)" = 1 ]; then
+    ARCH=arm64
+  fi
+  if [ "$ARCH" != arm64 ]; then
+    echo "ERROR: this is an Intel Mac. The Fadenstack agent needs a Mac with Apple Silicon." >&2
+    exit 1
+  fi
+  MACOS=$(sw_vers -productVersion 2>/dev/null || echo 0)
+  MACOS_MAJOR=${{MACOS%%.*}}
+  case "$MACOS_MAJOR" in ''|*[!0-9]*) MACOS_MAJOR=0 ;; esac
+  if [ "$MACOS_MAJOR" -lt {MIN_MACOS_MAJOR} ]; then
+    echo "ERROR: this Mac runs macOS $MACOS. The Fadenstack agent needs macOS {MIN_MACOS_MAJOR} or newer." >&2
+    exit 1
+  fi
+  # A Mac's agent is always a system service under its own account: there is
+  # no per-user variant to fall back to.
+  if [ "$(id -u)" -ne 0 ]; then
+    echo "ERROR: on a Mac the agent installs as a system service. Run this with sudo:" >&2
+    echo "       sudo sh $0 ..." >&2
+    exit 1
+  fi
+  if [ "$FORCE_USER" = 1 ] || [ "$INSTALL_PATH_SET" = 1 ]; then
+    echo "ERROR: --user and --install-path are not available on a Mac." >&2
+    exit 2
+  fi
+fi
+
 # -- with what privilege ----------------------------------------------------
 # Decided once, up front, rather than discovered halfway: a run that could not
 # get root used to install the binary and then die writing the service unit,
@@ -412,8 +453,6 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 # -- which build do we need -------------------------------------------------
-OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-ARCH=$(uname -m)
 PLATFORM_KEY="${{OS}}-${{ARCH}}"
 
 echo "  Machine:  $PLATFORM_KEY"
@@ -480,8 +519,33 @@ if [ "${{#SHA}}" -ne 64 ]; then
   exit 1
 fi
 echo "  Checking it is the build this backend expects..."
-ACTUAL=$(sha256sum "$TMP/faden-agent" 2>/dev/null | cut -d' ' -f1) \\
-  || ACTUAL=$(shasum -a 256 "$TMP/faden-agent" | cut -d' ' -f1)
+# The tool is chosen before anything is hashed, and its own exit status is the
+# one checked: piped into cut, a failing sha256sum used to read as success.
+# macOS has a BSD sha256sum with other options, so a Mac uses shasum.
+if [ "$OS" != darwin ] && command -v sha256sum >/dev/null 2>&1; then
+  HASH="sha256sum"
+elif command -v shasum >/dev/null 2>&1; then
+  HASH="shasum -a 256"
+else
+  echo "ERROR: neither sha256sum nor shasum is installed, so the agent cannot be verified." >&2
+  echo "       Refusing to install." >&2
+  exit 1
+fi
+if ! HASHED=$($HASH "$TMP/faden-agent"); then
+  echo "ERROR: $HASH failed, so the agent cannot be verified. Refusing to install." >&2
+  exit 1
+fi
+ACTUAL=${{HASHED%% *}}
+SHA=$(printf '%s' "$SHA" | tr '[:upper:]' '[:lower:]')
+case "$ACTUAL" in
+  *[!0-9a-f]*|"")
+    echo "ERROR: $HASH gave no SHA-256 ($HASHED). Refusing to install." >&2
+    exit 1 ;;
+esac
+if [ "${{#ACTUAL}}" -ne 64 ]; then
+  echo "ERROR: $HASH gave no SHA-256 ($HASHED). Refusing to install." >&2
+  exit 1
+fi
 if [ "$ACTUAL" != "$SHA" ]; then
   echo "ERROR: the downloaded agent does not match the expected SHA-256; nothing was installed." >&2
   echo "       expected $SHA" >&2
@@ -491,6 +555,26 @@ fi
 echo "  Verified."
 
 # -- install ----------------------------------------------------------------
+# A Mac's agent places itself: it copies this verified file into
+# /Library/Fadenstack/agent/<version>/, checks the copy against it, and links
+# /usr/local/bin/faden-agent to it, so the command and the service are always
+# the same build. Run as root (checked above), straight from the download.
+if [ "$OS" = darwin ]; then
+  chmod 0755 "$TMP/faden-agent"
+  set --
+  if [ -n "$CA_FILE" ]; then
+    set -- --ca-file "$CA_FILE"
+  fi
+  if [ "$MODE" = "token" ]; then
+    FADEN_NODE_AGENT_BACKEND_URL="$BACKEND" \\
+    FADEN_NODE_AGENT_ENROLLMENT_TOKEN="$TOKEN" \\
+      "$TMP/faden-agent" start "$@"
+  else
+    "$TMP/faden-agent" join "$@" "$BACKEND"
+  fi
+  exit 0
+fi
+
 # Two forms, because the enrol path below passes the configuration through the
 # environment: sudo needs -E to keep it, and running as root must not be handed
 # a bare "-E" to execute. It was, and every token enrolment run as root -- the
