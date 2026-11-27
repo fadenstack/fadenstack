@@ -354,16 +354,20 @@ async def reconcile_environment(
         # The cluster went down, or came back: its models have to find out.
         await _requeue_deployments(context, environment)
 
-    # Copy what the cluster says about each machine onto the machine's own
-    # row.  Without this the membership table and the topology picture have
-    # nothing to colour by, and every node reads "not reporting" on a cluster
-    # that is serving.
-    await _sync_member_status(context, environment)
+    # The two steps below read a Ray cluster's observation (its node records
+    # and metrics endpoints). Another driver writes its members' status
+    # itself and has no Ray metrics to scrape.
+    if getattr(driver, "key", None) == "ray":
+        # Copy what the cluster says about each machine onto the machine's own
+        # row.  Without this the membership table and the topology picture have
+        # nothing to colour by, and every node reads "not reporting" on a cluster
+        # that is serving.
+        await _sync_member_status(context, environment)
 
-    # Hand this cluster's metrics endpoints to Prometheus.  The reconcile just
-    # refreshed them, and they are per node -- a cluster that gained a machine
-    # gains a scrape target here rather than whenever someone notices.
-    await _sync_prometheus_targets(context, environment)
+        # Hand this cluster's metrics endpoints to Prometheus.  The reconcile just
+        # refreshed them, and they are per node -- a cluster that gained a machine
+        # gains a scrape target here rather than whenever someone notices.
+        await _sync_prometheus_targets(context, environment, driver)
 
     return {
         "id": str(environment.id),
@@ -514,7 +518,7 @@ async def _sync_member_status(
 
 
 async def _sync_prometheus_targets(
-    context: ReconciliationContext, environment: InferenceEnvironment
+    context: ReconciliationContext, environment: InferenceEnvironment, driver: Any = None
 ) -> None:
     """Register the environment's Ray metrics endpoints for file_sd discovery.
 
@@ -547,8 +551,8 @@ async def _sync_prometheus_targets(
         if not raw_targets:
             return
 
-        driver_cls = registry.get("ray")
-        driver = driver_cls() if driver_cls is not None else None
+        # The environment's own driver (resolved from its control plane by
+        # the caller), not a hardcoded one.
         if driver is None or not hasattr(driver, "_scrape_targets"):
             return
 
