@@ -552,7 +552,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "(sum(rate(ray_serve_num_http_requests_total{route=~\".*/v1/chat/completions\",status_code=~\"2..\",runtime_name=\"__RUNTIME_NAME__\"}[1m])) or (0 * sum(rate({__name__=~\"vllm:generation_tokens_total|ray_vllm_generation_tokens_total\",runtime_name=\"__RUNTIME_NAME__\"}[5m]))))",
+          "expr": "(sum(rate(ray_serve_num_http_requests_total{route=~\".*/v1/chat/completions\",status_code=~\"2..\",runtime_name=\"__RUNTIME_NAME__\"}[1m])) or sum(rate(vllm:request_success_total{runtime_name=\"__RUNTIME_NAME__\"}[1m])) or (0 * sum(rate({__name__=~\"vllm:generation_tokens_total|ray_vllm_generation_tokens_total\",runtime_name=\"__RUNTIME_NAME__\"}[5m]))))",
           "refId": "A",
           "legendFormat": "2xx req/s"
         },

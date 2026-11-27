@@ -7,7 +7,7 @@ from typing import Any
 from faden_backend.services.inference.capabilities import CapabilityDocument
 from faden_backend.services.inference.drivers.standalone.deployment import StandaloneDeploymentManager
 from faden_backend.services.inference.drivers.standalone.environment import StandaloneEnvironmentManager
-from faden_backend.services.inference.observability import LogPage, LogSource, ObservabilityUnsupported
+from faden_backend.services.inference.observability import LogPage, LogSource
 
 
 class StandaloneDriver:
@@ -77,7 +77,12 @@ class StandaloneDriver:
         return LogPage(source=source, node_id=str(node.id), lines=lines, next_cursor=answer.get("cursor"))
 
     async def deployment_metrics(self, session: Any, deployment: Any, **_: Any) -> Any:
-        raise ObservabilityUnsupported(self.key, "deployment_metrics")
+        """The deployment's scrape target (the Mac's metrics port) and state, as the Ray driver's shape."""
+        from faden_backend.services.inference.drivers.standalone import metrics  # noqa: PLC0415
+
+        return await metrics.deployment_metrics(session, deployment)
 
     async def environment_metrics(self, session: Any, environment: Any, **_: Any) -> Any:
-        raise ObservabilityUnsupported(self.key, "environment_metrics")
+        from faden_backend.services.inference.drivers.standalone import metrics  # noqa: PLC0415
+
+        return await metrics.environment_metrics(session, environment)
