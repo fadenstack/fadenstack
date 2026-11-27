@@ -368,6 +368,12 @@ async def reconcile_environment(
         # refreshed them, and they are per node -- a cluster that gained a machine
         # gains a scrape target here rather than whenever someone notices.
         await _sync_prometheus_targets(context, environment, driver)
+    elif getattr(driver, "key", None) == "standalone":
+        from faden_backend.services.inference.drivers.standalone.metrics import (  # noqa: PLC0415
+            sync_native_targets,
+        )
+
+        await sync_native_targets(context.session, environment)
 
     return {
         "id": str(environment.id),
@@ -594,6 +600,7 @@ async def reconcile_deployment(
     returns.  Per-resource errors are isolated by the caller.
     """
     driver_cls: Any = None
+    env: Any = None
     env_id = getattr(deployment, "environment_id", None)
     cp_id = None
     if env_id is not None:
@@ -626,6 +633,15 @@ async def reconcile_deployment(
     if _accepts_param(mgr.reconcile_deployment, "node_control"):
         mgr_kwargs["node_control"] = _node_control_or_none(context)
     await mgr.reconcile_deployment(context.session, deployment, **mgr_kwargs)
+
+    # A Mac's metrics target follows its deployment: it appears once the engine
+    # serves and goes on stop or delete (the environment pass repeats this).
+    if getattr(driver, "key", None) == "standalone" and env is not None:
+        from faden_backend.services.inference.drivers.standalone.metrics import (  # noqa: PLC0415
+            sync_native_targets,
+        )
+
+        await sync_native_targets(context.session, env)
 
     # Generic inference publication reconciliation (Phase 5).
     #

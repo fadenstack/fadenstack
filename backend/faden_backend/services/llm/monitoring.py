@@ -662,6 +662,7 @@ class MonitoringProvisioner:
         environment_id: uuid.UUID | str,
         environment_name: str,
         targets: list[dict[str, Any]],
+        job: str = "ray",
     ) -> int:
         """Replace this Ray cluster's scrape targets in ``targets.json``.
 
@@ -693,7 +694,7 @@ class MonitoringProvisioner:
                         # `job` overrides the scrape_config's name, which keeps
                         # Ray metrics distinguishable from legacy runtimes in
                         # every query without a second scrape job.
-                        "job": "ray",
+                        "job": job,
                         "environment_id": env_key,
                         "environment_name": environment_name,
                         # The dashboard template filters on ``runtime_name``
@@ -712,6 +713,27 @@ class MonitoringProvisioner:
         _atomic_write_json_inplace(self._targets_file, kept)
         self._schedule_reload()
         return len([t for t in kept if t.get("labels", {}).get("environment_id") == env_key])
+
+    async def sync_native_targets(
+        self,
+        *,
+        environment_id: uuid.UUID | str,
+        environment_name: str,
+        targets: list[dict[str, Any]],
+    ) -> int:
+        """Replace a standalone (Mac) environment's scrape target in ``targets.json``.
+
+        The same file, labels and ``llm-runtimes`` job as the Ray targets; only
+        ``job`` differs (``native``). The address is the Mac's metrics-only
+        pass-through (``native_metrics.port`` in the agent's capabilities).
+        """
+        return await self.sync_ray_targets(
+            environment_id=environment_id, environment_name=environment_name, targets=targets, job="native",
+        )
+
+    async def remove_native_targets(self, environment_id: uuid.UUID | str) -> int:
+        """Stop scraping a standalone environment (stopped, deleted, or its Mac gone); the dashboard stays."""
+        return await self.remove_ray_targets(environment_id)
 
     async def remove_ray_targets(
         self, environment_id: uuid.UUID | str, *, drop_dashboard: bool = False
