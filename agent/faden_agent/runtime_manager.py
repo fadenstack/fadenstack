@@ -477,7 +477,9 @@ class RuntimeManager:
         Refused while a native worker's snapshot lies inside it. Takes the same lock as a sync,
         never follows a symlink (``shutil.rmtree`` unlinks them) and stays inside the store.
         """
-        from faden_agent.model_puller import ModelPullerError, _lock_for_model_dir, _safe_join, _safe_leaf_name  # noqa: PLC0415
+        from faden_agent.model_puller import (  # noqa: PLC0415
+            ModelPullerError, _lock_for_model_dir, _safe_join, _safe_leaf_name, is_within,
+        )
 
         name = str(payload.get("model_dir_name") or "").strip()
         repo = str(payload.get("hf_repo_id") or "").strip()
@@ -488,10 +490,14 @@ class RuntimeManager:
             if not name.startswith("models--"):
                 raise ModelPullerError(f"model_dir_name {name!r} is not a model folder (models--<org>--<name>)")
             store = Path(self._model_store_root).resolve(strict=False)
+            # The literal entry: a link standing in for a model folder is refused, never followed.
+            if (store / name).is_symlink():
+                raise ModelPullerError(f"{store / name} is a symlink; refusing to remove through it")
             model_dir = _safe_join(store, name, field="model_dir_name")
-        except ModelPullerError as exc:
+        except (ModelPullerError, ValueError) as exc:
             raise RuntimeManagerError(str(exc)) from exc
 
+        # The same lock a sync and a native worker start take, so nothing starts or copies meanwhile.
         async with _lock_for_model_dir(model_dir):
             if in_use is not None:
                 paths, unreadable = in_use()
@@ -500,10 +506,9 @@ class RuntimeManager:
                         f"model_in_use: {unreadable} native worker record(s) cannot be read, so {name} is not removed."
                     )
                 for path in paths:
-                    resolved = Path(path).resolve(strict=False)
-                    if resolved == model_dir or model_dir in resolved.parents:
+                    if not path.startswith("/") or is_within(path, model_dir):
                         raise RuntimeManagerError(f"model_in_use: a native worker is using {path}; stop it first.")
-            locks = store / ".locks" / name
+            locks = store / ".locks"
             freed = 0
             removed = False
             if model_dir.is_dir():
@@ -517,8 +522,8 @@ class RuntimeManager:
                             freed += st.st_size
                 shutil.rmtree(model_dir)
                 removed = True
-            if locks.is_dir() and not locks.is_symlink():
-                shutil.rmtree(locks, ignore_errors=True)
+            if not locks.is_symlink() and (locks / name).is_dir() and not (locks / name).is_symlink():
+                shutil.rmtree(locks / name, ignore_errors=True)
         self._events.add(
             event_type="model.removed", payload={"model_dir_name": name, "freed_bytes": freed}, correlation_id=name,
         )

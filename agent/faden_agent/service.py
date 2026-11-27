@@ -487,6 +487,7 @@ class NodeAgentService:
             manager = NativeRuntimeManager(
                 paths=NativePaths.for_state_path(self._config.state_path),
                 fetch_tar=_fetch_tar,
+                model_root=Path(self._config.model_store_root),
                 max_workers=self._config.native_max_workers,
                 sandbox=self._config.native_sandbox,
                 sandbox_config_error=self._config.native_sandbox_error,

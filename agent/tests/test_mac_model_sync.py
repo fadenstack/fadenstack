@@ -278,7 +278,7 @@ async def test_remove_model_never_follows_symlinks_out_of_the_store(tmp_path: Pa
     assert (outside / "keep.txt").read_text() == "keep"
     # the model folder itself being a link out of the store is refused, and its target untouched
     (store / "models--org--link").symlink_to(outside)
-    with pytest.raises(RuntimeManagerError, match="outside"):
+    with pytest.raises(RuntimeManagerError, match="symlink"):
         await _manager(store).remove_model({"model_dir_name": "models--org--link"})
     assert (outside / "keep.txt").exists()
 
@@ -319,5 +319,147 @@ def test_native_manager_reports_snapshots_in_use(tmp_path: Path) -> None:
         {"state": "starting", "model": {"snapshot_path": "/m/b"}},
         {"state": "stopped", "model": {"snapshot_path": "/m/c"}},
         {"state": "failed", "model": {"snapshot_path": "/m/d"}},
-    ], [Path("bad.json")]))
+    ], [Path("bad.json")]), _leader=lambda _r: None)
     assert NativeRuntimeManager.model_paths_in_use(mgr) == (["/m/a", "/m/b"], 1)  # type: ignore[arg-type]
+
+
+# ── review fixes: case variants, locks, aliases, store choice ────────────────
+
+CASE_INSENSITIVE = not (Path("/tmp/.Case-Probe-x").exists() or True) and False
+
+
+def test_lock_and_keys_fold_case_and_var_aliases_on_a_mac(tmp_path: Path, mac: None) -> None:
+    a = tmp_path / "models--Org--x"
+    b = tmp_path / "MODELS--org--X"
+    assert model_puller.canonical_key(a) == model_puller.canonical_key(b)
+    assert model_puller._lock_for_model_dir(a) is model_puller._lock_for_model_dir(b)
+    assert model_puller.is_within(b / "snapshots" / COMMIT, a)
+    assert not model_puller.is_within(tmp_path / "models--Org--xy", a)
+    assert model_puller.canonical_key("/var/db/x") == model_puller.canonical_key("/private/var/db/x")
+
+
+def test_keys_stay_case_sensitive_off_a_mac(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(model_puller, "_darwin", lambda: False)
+    assert model_puller.canonical_key(tmp_path / "A") != model_puller.canonical_key(tmp_path / "a")
+
+
+@pytest.mark.asyncio()
+async def test_remove_is_refused_for_a_case_variant_of_a_model_in_use(tmp_path: Path, mac: None) -> None:
+    store = tmp_path / "models"
+    base = _populate(store, "models--Org--x")
+    snap = str(base / "snapshots" / COMMIT)
+    with pytest.raises(RuntimeManagerError, match="model_in_use"):
+        await _manager(store).remove_model({"model_dir_name": "models--org--x"}, in_use=lambda: ([snap], 0))
+    assert base.exists()
+
+
+@pytest.mark.asyncio()
+async def test_remove_is_refused_through_a_var_alias_and_for_relative_paths(tmp_path: Path, mac: None) -> None:
+    store = tmp_path / "models"
+    base = _populate(store)
+    alias = str(base / "snapshots" / COMMIT).replace(str(tmp_path), "/private" + str(tmp_path) if not str(tmp_path).startswith("/private") else str(tmp_path), 1)
+    with pytest.raises(RuntimeManagerError, match="model_in_use"):
+        await _manager(store).remove_model({"model_dir_name": DIR}, in_use=lambda: ([alias], 0))
+    with pytest.raises(RuntimeManagerError, match="model_in_use"):
+        await _manager(store).remove_model({"model_dir_name": DIR}, in_use=lambda: (["snapshots/x"], 0))
+    assert base.exists()
+
+
+@pytest.mark.asyncio()
+async def test_remove_refuses_in_store_symlinks_nul_and_a_symlinked_locks_dir(tmp_path: Path) -> None:
+    store = tmp_path / "models"
+    _populate(store, "models--org--b")
+    (store / "models--org--a").symlink_to("models--org--b")
+    with pytest.raises(RuntimeManagerError, match="symlink"):
+        await _manager(store).remove_model({"model_dir_name": "models--org--a"})
+    assert (store / "models--org--b" / "blobs" / "h1").exists()
+    with pytest.raises(RuntimeManagerError):
+        await _manager(store).remove_model({"model_dir_name": "models--org\x00x"})
+    # a symlinked .locks is not followed
+    victim = tmp_path / "victim"
+    (victim / "models--org--b").mkdir(parents=True)
+    import shutil
+
+    shutil.rmtree(store / ".locks")
+    (store / ".locks").symlink_to(victim)
+    await _manager(store).remove_model({"model_dir_name": "models--org--b"})
+    assert (victim / "models--org--b").exists()
+
+
+@pytest.mark.asyncio()
+async def test_concurrent_syncs_of_case_variants_do_not_clean_each_others_partials(tmp_path: Path, mac: None) -> None:
+    import asyncio
+
+    data_a, data_b = b"a" * 64, b"b" * 64
+    ha, hb = hashlib.sha256(data_a).hexdigest(), hashlib.sha256(data_b).hexdigest()
+    (tmp_path / "models--Org--x" / "blobs").mkdir(parents=True)
+    (tmp_path / "models--Org--x" / "blobs" / f"{hb}.part").write_bytes(data_b[:10])
+    gate = asyncio.Event()
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        name = request.url.path.rsplit("/", 1)[-1]
+        await asyncio.sleep(0.05)
+        gate.set()
+        return httpx.Response(200, content={ha: data_a, hb: data_b}[name])
+
+    ma = _manifest({ha: data_a}, {"a": ha}) | {"model_dir_name": "models--Org--x"}
+    mb = _manifest({hb: data_b}, {"b": hb}) | {"model_dir_name": "models--org--x"}
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://b") as client:
+        await asyncio.gather(*(
+            pull_model(client=client, credential="t", model_sync=m, model_store_root=str(tmp_path)) for m in (ma, mb)
+        ))
+    # serialised by one lock: both finished, neither failed on a file the other removed
+
+
+def test_the_native_start_takes_the_models_lock() -> None:
+    import inspect
+
+    from faden_agent.native.manager import NativeRuntimeManager
+
+    assert "_lock_for_model_dir(model_dir)" in inspect.getsource(NativeRuntimeManager.start_native_worker)
+
+
+def test_in_use_counts_every_live_state(tmp_path: Path) -> None:
+    from faden_agent.native.manager import NativeRuntimeManager
+
+    recs = [{"state": s, "model": {"snapshot_path": f"/m/{s}"}} for s in ("ready", "starting", "stopping", "weird", "stopped", "failed")]
+    mgr = SimpleNamespace(_scan=lambda: (recs, []), _leader=lambda r: object() if r["state"] == "failed" else None)
+    paths, bad = NativeRuntimeManager.model_paths_in_use(mgr)  # type: ignore[arg-type]
+    assert sorted(paths) == ["/m/failed", "/m/ready", "/m/starting", "/m/stopping", "/m/weird"] and bad == 0
+    mgr2 = SimpleNamespace(_scan=lambda: (recs, []), _leader=lambda r: None)
+    assert "/m/failed" not in NativeRuntimeManager.model_paths_in_use(mgr2)[0]  # type: ignore[arg-type]
+
+
+# ── configured store on a Mac ────────────────────────────────────────────────
+
+def _layout(tmp_path: Path) -> Any:
+    return SimpleNamespace(models=tmp_path / "var-db" / "models")
+
+
+def test_a_configured_external_store_is_honoured_when_safe(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    import pwd
+
+    from faden_agent import __main__ as m
+
+    ext = tmp_path / "vol" / "models"
+    ext.mkdir(parents=True)
+    ext.chmod(0o700)
+    monkeypatch.setattr(pwd, "getpwnam", lambda _n: SimpleNamespace(pw_uid=os.getuid()))
+    assert m._darwin_model_store(str(ext), _layout(tmp_path)) == str(ext.resolve())
+    ext.chmod(0o755)
+    assert m._darwin_model_store(str(ext), _layout(tmp_path)) == str(_layout(tmp_path).models)
+    assert "WARNING" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("bad", ["/srv/faden/models", "relative/dir", "/Users/someone/models", "/System/x", "/nonexistent/zzz"])
+def test_an_unsafe_configured_store_is_replaced_loudly(tmp_path: Path, capsys: pytest.CaptureFixture[str], bad: str) -> None:
+    from faden_agent import __main__ as m
+
+    assert m._darwin_model_store(bad, _layout(tmp_path)) == str(_layout(tmp_path).models)
+    assert "WARNING" in capsys.readouterr().out
+
+
+def test_an_unset_store_is_the_layout_default(tmp_path: Path) -> None:
+    from faden_agent import __main__ as m
+
+    assert m._darwin_model_store(None, _layout(tmp_path)) == str(_layout(tmp_path).models)

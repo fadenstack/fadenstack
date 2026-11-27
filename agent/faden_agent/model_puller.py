@@ -43,8 +43,29 @@ _CONTENT_RANGE_RE = re.compile(r"^bytes (\d+)-(\d+)/(\d+|\*)$")
 _MODEL_PULL_LOCKS: dict[str, asyncio.Lock] = {}
 
 
+def canonical_key(path: str | Path) -> str:
+    """One name for one directory: realpath (so /var and /private/var agree), case- and Unicode-folded on a Mac.
+
+    APFS is case-insensitive by default, and ``Path.resolve`` does not fold case, so ``models--Org--x`` and
+    ``models--org--x`` are one directory that the lock table and the in-use check must see as one. Folding
+    on a case-sensitive volume only makes them more careful (more locking, more refusals).
+    """
+    text = str(Path(path).resolve(strict=False))
+    if _darwin():
+        import unicodedata  # noqa: PLC0415
+
+        text = unicodedata.normalize("NFD", text).casefold()
+    return text
+
+
+def is_within(path: str | Path, directory: str | Path) -> bool:
+    """*path* is *directory* or below it, compared by canonical key."""
+    a, b = canonical_key(path), canonical_key(directory)
+    return a == b or a.startswith(b.rstrip("/") + "/")
+
+
 def _lock_for_model_dir(model_dir: Path) -> asyncio.Lock:
-    key = str(model_dir.resolve(strict=False))
+    key = canonical_key(model_dir)
     lock = _MODEL_PULL_LOCKS.get(key)
     if lock is None:
         lock = asyncio.Lock()

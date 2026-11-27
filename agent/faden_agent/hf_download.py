@@ -169,6 +169,12 @@ def _adopt_files(hf_cache: Path, model_dir: Path, commit: str, siblings: list[An
             adopt_blob(source, model_dir / "blobs" / source.name)
 
 
+def _lfs_sha256(sibling: Any) -> str:
+    lfs = getattr(sibling, "lfs", None)
+    value = lfs.get("sha256") if isinstance(lfs, dict) else getattr(lfs, "sha256", None)
+    return str(value or "")
+
+
 def _keep_xet_cache_in_store(cache_dir: str) -> None:
     """Xet's chunk cache defaults to $HOME (the state dir): keep it in the store, on the preflighted volume."""
     target = str(Path(cache_dir) / ".cache" / "xet")
@@ -234,7 +240,11 @@ def download_model(
             link = snapshot / sibling.rfilename
             if link.is_file():
                 have += size
-        partial = sum(p.stat().st_size for p in blobs.glob("*.incomplete")) if blobs.is_dir() else 0
+        # Partial downloads count only for files this download wants (an LFS file's blob is named by its sha256).
+        wanted_blobs = tuple(_lfs_sha256(sb) for sb in siblings)
+        partial = sum(
+            p.stat().st_size for p in blobs.glob("*.incomplete") if any(w and p.name.startswith(w) for w in wanted_blobs)
+        ) if blobs.is_dir() else 0
         preflight_space(Path(cache_dir), max(0, total - have - partial))
 
     done = 0
