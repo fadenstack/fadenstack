@@ -231,7 +231,9 @@ export function GuideRunner({ guideId, isSuperuser, onEnd }: GuideRunnerProps) {
   // While a step shows: move on when the person has acted, stop when its target goes away.
   useEffect(() => {
     if (!step || !shown) return;
-    let at: { top: number; left: number } | null = null;
+    // Where Joyride drew the cut-out, so a move before the first tick counts too.
+    const drawn = findVisible(step.target)?.getBoundingClientRect();
+    let at: { top: number; left: number } | null = drawn ? { top: drawn.top, left: drawn.left } : null;
     const timer = window.setInterval(() => {
       if (step.action && nextStep && findVisible(nextStep.target)) {
         window.clearInterval(timer);
