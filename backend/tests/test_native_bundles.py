@@ -149,13 +149,19 @@ def test_digests_are_checked() -> None:
 
 
 def test_a_ray_bundle_still_needs_its_ray_and_cuda_versions() -> None:
-    ray = RuntimeBundleManifest(
-        bundle_id="r", display_name="r",
-        container=bundles.ContainerSpec(image="ghcr.io/x/y:1", digest=D),
-        compatibility_matrix=CompatibilityMatrix(vllm_version="0.31.0"),
-    )
-    with pytest.raises(BundleValidationError, match="ray_version, cuda_version"):
-        RuntimeBundleRegistry.validate_bundle(ray)
+    """Refused when it is read, not only when it is registered (review #8)."""
+    with pytest.raises(ValidationError, match="ray_version, cuda_version"):
+        RuntimeBundleManifest(
+            bundle_id="r", display_name="r",
+            container=bundles.ContainerSpec(image="ghcr.io/x/y:1", digest=D),
+            compatibility_matrix=CompatibilityMatrix(vllm_version="0.31.0"),
+        )
+    with pytest.raises(ValidationError, match="cuda_version"):
+        RuntimeBundleManifest(
+            bundle_id="r", display_name="r",
+            container=bundles.ContainerSpec(image="ghcr.io/x/y:1", digest=D),
+            compatibility_matrix=CompatibilityMatrix(vllm_version="0.31.0", ray_version="2.58.0"),
+        )
 
 
 def test_the_shipped_ray_catalogue_is_unchanged() -> None:
@@ -211,11 +217,29 @@ def test_an_x86_machine_resolves_as_before(registry: RuntimeBundleRegistry) -> N
     assert registry.resolve_for_node(x86, driver="standalone") is None
 
 
-def test_a_linux_machine_that_reports_no_vendor_or_os_still_matches_ray(registry: RuntimeBundleRegistry) -> None:
-    """Older agents: no gpu_vendor, no os. The nvidia/linux fallback is kept for Ray bundles."""
-    legacy = node(machine="x86_64", gpu={"devices": [{"compute_capability": "8.6"}]})
-    assert registry.resolve_for_node(legacy, driver="ray") is not None
-    assert registry.resolve_for_node(legacy, driver="standalone") is None
+def test_a_linux_machine_that_reports_no_vendor_still_matches_ray(registry: RuntimeBundleRegistry) -> None:
+    """The nvidia fallback is kept for a machine that says it runs Linux."""
+    linux = node(os="Linux-6.8.0-x86_64-with-glibc2.39", machine="x86_64", gpu={"devices": [{"compute_capability": "8.6"}]})
+    assert registry.resolve_for_node(linux, driver="ray") is not None
+    assert registry.resolve_for_node(linux, driver="standalone") is None
+
+
+def test_a_machine_with_a_reported_vendor_and_no_os_still_matches_ray(registry: RuntimeBundleRegistry) -> None:
+    x86 = node(machine="x86_64", gpu={"vendor": "nvidia", "devices": [{"compute_capability": "8.6"}]})
+    assert registry.resolve_for_node(x86, driver="ray") is not None
+
+
+@pytest.mark.parametrize("machine", ["arm64", "aarch64", "x86_64"])
+def test_a_machine_that_reports_neither_os_nor_vendor_gets_no_runtime(
+    registry: RuntimeBundleRegistry, machine: str,
+) -> None:
+    """Review #4: a Mac whose GPU collector failed reports ``arm64`` alone; it must not get the GB10 container."""
+    blind = node(machine=machine)
+    assert registry.resolve_for_node(blind, driver="ray") is None
+    assert registry.resolve_for_node(blind, driver="standalone") is None
+    gb10 = next(b for b in registry.bundles_for_driver("ray") if "gb10" in b.bundle_id)
+    ok, reason = registry.validate_node_compatibility(gb10, blind)
+    assert not ok and "neither a Linux OS nor its GPU vendor" in reason
 
 
 def test_a_windows_machine_running_linux_containers_keeps_matching_ray(registry: RuntimeBundleRegistry) -> None:

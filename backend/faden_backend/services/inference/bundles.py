@@ -388,6 +388,14 @@ class RuntimeBundleManifest(BaseModel):
     def _one_artifact(self) -> "RuntimeBundleManifest":
         if (self.container is None) == (self.native is None):
             raise ValueError(f"bundle {self.bundle_id}: exactly one of container and native is required")
+        if self.container is not None and self.driver == "ray":
+            # Required at parse time, as they were before the native kind made
+            # them optional: a Ray container bundle without them is malformed
+            # wherever it is read from, not only when it is registered.
+            matrix = self.compatibility_matrix
+            missing = [n for n in ("ray_version", "cuda_version") if not str(getattr(matrix, n)).strip()]
+            if missing:
+                raise ValueError(f"bundle {self.bundle_id}: a Ray bundle needs compatibility_matrix.{', '.join(missing)}")
         if self.native is not None:
             target = self.target_architecture
             explicit = target.model_fields_set
@@ -1101,11 +1109,19 @@ class RuntimeBundleRegistry:
                     f"node reports {have or 'no version'}"
                 )
 
-        # Check GPU vendor. A darwin bundle takes only a vendor the machine
-        # reported; the nvidia fallback is for Linux machines that predate it.
+        # Check GPU vendor. A vendor the machine did not report is assumed to
+        # be nvidia only on a machine that says it runs Linux: every agent
+        # since the first (March 2026) reports ``os`` and ``gpu_vendor``, so a
+        # machine with neither is one whose report failed -- a Mac whose GPU
+        # collector broke reports ``arm64`` and nothing else, and the
+        # fallback used to hand it the GB10 CUDA container.
         reported_vendor = gpu_info.get("vendor") or caps.get("gpu_vendor")
-        if bundle_os == "darwin" and not reported_vendor:
-            return False, "Incompatible GPU vendor: the machine has not reported its GPU vendor"
+        if not reported_vendor:
+            if node_os != "linux":
+                return False, (
+                    "Unknown machine: it has reported neither a Linux OS nor its GPU vendor, "
+                    "so no runtime can be chosen for it. Check its agent, then let it report again."
+                )
         vendor = (reported_vendor or "nvidia").lower()
         if vendor != bundle.target_architecture.accelerator.vendor.lower():
             return False, (
