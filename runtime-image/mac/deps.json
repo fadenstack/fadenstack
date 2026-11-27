@@ -1,0 +1,87 @@
+{
+  "release_tag": "mac-runtime-deps-1",
+  "repository": "fadenstack/fadenstack",
+  "note": "Off-PyPI wheels of the Mac runtime lock, mirrored as release assets. The build fetches only these, by sha256. Regenerate with collect_deps.py --pin; publish with publish_deps.sh.",
+  "wheels": [
+    {
+      "name": "torch",
+      "version": "2.16.0.dev20261013",
+      "file": "torch-2.16.0.dev20261013-cp312-cp312-macosx_14_0_arm64.whl",
+      "source": {
+        "kind": "url",
+        "url": "https://download.pytorch.org/whl/nightly/cpu/torch-2.16.0.dev20261013-cp312-cp312-macosx_14_0_arm64.whl"
+      },
+      "asset": "torch-2.16.0.dev20261013-cp312-cp312-macosx_14_0_arm64.whl",
+      "sha256": "a7c6eb42cac8d7843adeca4006913c9f1cbab3c460df45bea1dfbfdbf0e30689"
+    },
+    {
+      "name": "torchaudio",
+      "version": "2.11.0.dev20261013",
+      "file": "torchaudio-2.11.0.dev20261013-py3-none-macosx_14_0_arm64.whl",
+      "source": {
+        "kind": "url",
+        "url": "https://download.pytorch.org/whl/nightly/cpu/torchaudio-2.11.0.dev20261013-py3-none-macosx_14_0_arm64.whl"
+      },
+      "asset": "torchaudio-2.11.0.dev20261013-py3-none-macosx_14_0_arm64.whl",
+      "sha256": "8eb35354159b99b4afd6a06f5ee2d5d9c7e0513cc9bd403a3b77a0795795bb56"
+    },
+    {
+      "name": "torchvision",
+      "version": "0.30.0.dev20261013",
+      "file": "torchvision-0.30.0.dev20261013-py3-none-macosx_14_0_arm64.whl",
+      "source": {
+        "kind": "url",
+        "url": "https://download.pytorch.org/whl/nightly/cpu/torchvision-0.30.0.dev20261013-py3-none-macosx_14_0_arm64.whl"
+      },
+      "asset": "torchvision-0.30.0.dev20261013-py3-none-macosx_14_0_arm64.whl",
+      "sha256": "a43130ec5f8371ec85b98307416b66149849e24a5a17be3b2ce1fce0dde394b4"
+    },
+    {
+      "name": "vllm",
+      "version": "0.34.0+cpu",
+      "file": "vllm-0.34.0+cpu-cp38-abi3-macosx_11_0_arm64.whl",
+      "source": {
+        "kind": "url",
+        "url": "https://github.com/vllm-project/vllm/releases/download/v0.34.0/vllm-0.34.0%2Bcpu-cp38-abi3-macosx_11_0_arm64.whl"
+      },
+      "asset": "vllm-0.34.0_plus_cpu-cp38-abi3-macosx_11_0_arm64.whl",
+      "sha256": "cd0abe2a9d698bc0bef36ac9aa38da34307c53572ddee60ca35faef280af99d2"
+    },
+    {
+      "name": "vllm-metal",
+      "version": "0.34.0",
+      "file": "vllm_metal-0.34.0-cp312-cp312-macosx_15_0_arm64.whl",
+      "source": {
+        "kind": "local",
+        "path": "/Users/Shared/fadenstack-gate0d/wheels/vllm_metal-0.34.0-cp312-cp312-macosx_15_0_arm64.whl",
+        "provenance": "Gate 0d: rezipped from the uv cache of vllm-metal install.sh --stable (RECORD intact); the certified build"
+      },
+      "asset": "vllm_metal-0.34.0-cp312-cp312-macosx_15_0_arm64.whl",
+      "sha256": "da724f7546b4b5b90f623985f145e4b2f9d2dce6e2f121917afe3d836428ca76"
+    },
+    {
+      "name": "mlx-lm",
+      "version": "0.32.3.dev12+g4cfc64784",
+      "file": "mlx_lm-0.32.3.dev12+g4cfc64784-py3-none-any.whl",
+      "source": {
+        "kind": "git",
+        "repo": "https://github.com/ml-explore/mlx-lm",
+        "commit": "4cfc6478473b0668ede3eb0cc93f2a9181a15052"
+      },
+      "asset": "mlx_lm-0.32.3.dev12_plus_g4cfc64784-py3-none-any.whl",
+      "sha256": "1bfbde187eda370d341ab224669132e4b619baeaba23a21a0f3f735777fb4107"
+    },
+    {
+      "name": "mlx-vlm",
+      "version": "0.7.11",
+      "file": "mlx_vlm-0.7.11-py3-none-any.whl",
+      "source": {
+        "kind": "git",
+        "repo": "https://github.com/Blaizzy/mlx-vlm",
+        "commit": "b7bec926d061b6fd8935b244eb3e76435aa04514"
+      },
+      "asset": "mlx_vlm-0.7.11-py3-none-any.whl",
+      "sha256": "cb883ee9456ee18e81b6ae4f912ef21073013fbf9a28c00e758add1c7bb1b1d2"
+    }
+  ]
+}

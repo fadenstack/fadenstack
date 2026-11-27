@@ -7,6 +7,7 @@ anyone with a node credential -- the backend's own, a database's.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -42,8 +43,44 @@ async def _get(client: AsyncClient, ref: str) -> int:
 
 @pytest.mark.anyio()
 async def test_a_catalogue_image_is_served(client: AsyncClient, served: MagicMock) -> None:
-    bundle = default_bundle_registry.list_bundles()[0]
-    assert await _get(client, bundle.container.image) == 200
+    for bundle in default_bundle_registry.bundles_for_driver("ray"):
+        assert await _get(client, bundle.artifact_ref) == 200, bundle.bundle_id
+
+
+def _carrier() -> Any:
+    return next(b for b in default_bundle_registry.list_bundles() if b.native is not None)
+
+
+async def _get_pinned(client: AsyncClient, ref: str, **params: str) -> int:
+    name, _, tag = ref.rpartition(":")
+    r = await client.get("/api/node-files/images/save", params={"image": name, "tag": tag, **params})
+    return r.status_code
+
+
+@pytest.mark.anyio()
+async def test_a_native_carrier_is_served_only_by_its_pin_to_a_native_machine(
+    client: AsyncClient, served: MagicMock, fastapi_app: FastAPI,
+) -> None:
+    """Review: a carrier is never fetched by tag alone, nor by a machine that cannot run it."""
+    carrier = _carrier()
+    ref = carrier.artifact_ref
+    rootfs = carrier.native.rootfs_digest
+    layer = carrier.native.layer_digest
+    served.client.images.inspect = AsyncMock(return_value={"Id": "sha256:" + "b" * 64, "Size": 1, "RootFS": {"Layers": [layer]}})
+
+    assert await _get(client, ref) == 400, "a tag alone"
+    assert await _get_pinned(client, ref, expect_rootfs="sha256:" + "c" * 64) == 409, "another pin"
+    assert await _get_pinned(client, ref, expect_id="sha256:" + "c" * 64) == 409, "another Id pin, alone"
+
+    linux = SimpleNamespace(id="n1", capabilities_json={"os": "Linux-6.8", "native_runtime": 0})
+    fastapi_app.dependency_overrides[views._authenticate_node] = lambda: linux
+    assert await _get_pinned(client, ref, expect_rootfs=rootfs) == 403, "a machine without native runtimes"
+
+    mac = SimpleNamespace(id="n2", capabilities_json={"os": "macOS-26.1-arm64", "native_runtime": 1})
+    fastapi_app.dependency_overrides[views._authenticate_node] = lambda: mac
+    assert await _get_pinned(client, ref, expect_rootfs=rootfs) == 200
+    served.client.images.inspect = AsyncMock(return_value={"Id": carrier.native.config_digest, "Size": 1})
+    assert await _get_pinned(client, ref, expect_id=carrier.native.config_digest) == 200, "the Id pin, alone"
 
 
 @pytest.mark.anyio()

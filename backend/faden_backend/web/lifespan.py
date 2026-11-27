@@ -710,19 +710,25 @@ async def _prepare_runtime_image_exports(app: FastAPI) -> None:
     docker = getattr(app.state, "docker", None)
     held: dict[str, tuple[str, str, int]] = {}  # runtime id -> (ref, image id, size)
     for bundle in registry.list_bundles():
-        ref = bundle.container.image
+        ref = bundle.artifact_ref
         try:
             info = await docker.client.images.inspect(ref)
         except Exception:  # noqa: BLE001 - not held here; nodes get a 404 as before
             log.info("Runtime image %s is not on this server; nothing to export", ref)
             continue
         image_id = str(info.get("Id") or "")
-        if image_id != bundle.container.digest:
+        pinned = image_id == bundle.artifact_digest
+        if not pinned and bundle.native is not None:
+            # A native carrier is pinned by content: Docker's containerd store
+            # reports the manifest digest as its Id, the classic store the config.
+            layers = [str(x) for x in ((info.get("RootFS") or {}).get("Layers") or [])]
+            pinned = bool(layers) and bundles.compute_rootfs_digest(layers) == bundle.native.rootfs_digest
+        if not pinned:
             # The catalogue pins another build. Serving this one would only be
             # refused by every node, so do not spend the disk on exporting it.
             log.warning(
                 "Runtime image %s here is %s but the catalogue pins %s; not exporting",
-                ref, image_id, bundle.container.digest,
+                ref, image_id, bundle.artifact_digest,
             )
             continue
         held[bundle.bundle_id] = (ref, image_id, int(info.get("Size") or 0))

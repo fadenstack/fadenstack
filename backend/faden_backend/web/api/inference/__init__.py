@@ -1,6 +1,7 @@
 """Inference API route module - aggregates control-plane, environment, and deployment routes."""
 
 import uuid
+from typing import Any
 
 from fastapi import APIRouter, Depends, Query
 
@@ -91,17 +92,24 @@ async def list_runtime_bundles(
     # Resolve once per node rather than once per (bundle, node): resolution
     # picks a winner among the bundles that fit, so asking bundle by bundle
     # cannot see the answer.
-    resolved = {
-        node.id: default_bundle_registry.resolve_for_node(node, driver="ray")
-        for node in nodes
-    }
+    #
+    # Each bundle is asked about under its own driver: a node's Ray runtime
+    # and its standalone (native) runtime are separate answers, and a Mac has
+    # only the second.
+    resolved: dict[tuple[uuid.UUID, str], Any] = {}
+
+    def _chosen(node: Any, driver: str) -> Any:
+        key = (node.id, driver)
+        if key not in resolved:
+            resolved[key] = default_bundle_registry.resolve_for_node(node, driver=driver)
+        return resolved[key]
 
     result: list[RuntimeBundleDTO] = []
     for bundle in default_bundle_registry.list_bundles():
         compatible: list[uuid.UUID] = []
         incompatible: dict[str, str] = {}
         for node in nodes:
-            chosen = resolved.get(node.id)
+            chosen = _chosen(node, bundle.driver)
             if chosen is not None and chosen.bundle_id == bundle.bundle_id:
                 compatible.append(node.id)
                 continue
@@ -130,7 +138,7 @@ async def list_runtime_bundles(
                 bundle_id=bundle.bundle_id,
                 display_name=bundle.display_name,
                 description=bundle.description,
-                image=bundle.container.image,
+                image=bundle.artifact_ref,
                 cpu_architecture=bundle.target_architecture.cpu,
                 accelerator_vendor=bundle.target_architecture.accelerator.vendor,
                 runtime_version=bundle.compatibility_matrix.ray_version,

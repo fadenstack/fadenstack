@@ -70,8 +70,16 @@ async def cluster_hardware(session: Any) -> list[ClusterHardware]:
 
     from faden_backend.services.marketplace.compat import RuntimeSupport  # noqa: PLC0415
 
+    from faden_backend.services.inference.driver_key import (  # noqa: PLC0415
+        DEFAULT_DRIVER,
+        driver_keys_by_control_plane,
+    )
+
+    drivers = await driver_keys_by_control_plane(session)
+
     clusters: list[ClusterHardware] = []
     for env in environments:
+        driver = drivers.get(getattr(env, "control_plane_id", None), DEFAULT_DRIVER)
         machines: list[Machine] = []
         version: str | None = None
         support: RuntimeSupport | None = None
@@ -88,7 +96,7 @@ async def cluster_hardware(session: Any) -> list[ClusterHardware]:
             if version is None:
                 try:
                     bundle = default_bundle_registry.resolve_for_node(
-                        node, driver="ray", environment=env,
+                        node, driver=driver, environment=env,
                     )
                     version = bundle.compatibility_matrix.vllm_version if bundle is not None else None
                     if bundle is not None:

@@ -35,7 +35,7 @@ def test_every_image_the_product_runs_is_a_reference() -> None:
     images = [
         settings.default_vllm_image, settings.default_vllm_rocm_image,
         settings.default_vllm_nvidia_arm_image, settings.default_vllm_legacy_image,
-        *(bundle.container.image for bundle in default_bundle_registry.list_bundles()),
+        *(bundle.artifact_ref for bundle in default_bundle_registry.list_bundles()),
         "localhost:5000/faden/ray-vllm-gb10:ray2.58", f"ghcr.io/fadenstack/runtime@{DIGEST}",
         f"vllm/vllm-openai:v0.6.6@{DIGEST}",
     ]

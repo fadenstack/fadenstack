@@ -60,7 +60,7 @@ def _offered(bundle: RuntimeBundleManifest, *, default: bool) -> dict[str, Any]:
     """A runtime, in the runtime list's words (``RuntimeBundleDTO``)."""
     return {
         "bundle_id": bundle.bundle_id,
-        "image": bundle.container.image,
+        "image": bundle.artifact_ref,
         "runtime_version": bundle.compatibility_matrix.ray_version,
         "vllm_version": bundle.compatibility_matrix.vllm_version,
         "certification_status": bundle.certification.status,

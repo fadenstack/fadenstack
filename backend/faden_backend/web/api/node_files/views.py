@@ -622,6 +622,14 @@ def _with_tag(ref: str) -> str:
     return ref if ":" in last else f"{ref}:latest"
 
 
+def _native_carrier(ref: str) -> Any:
+    """The catalogue's native runtime whose carrier image is *ref* (``name:tag``), if any."""
+    return next(
+        (b for b in default_bundle_registry.list_bundles() if b.native is not None and _with_tag(b.artifact_ref) == ref),
+        None,
+    )
+
+
 async def _images_a_node_may_fetch(session: AsyncSession) -> set[str]:
     """Every image a machine can be told to run, as ``name:tag``.
 
@@ -630,7 +638,9 @@ async def _images_a_node_may_fetch(session: AsyncSession) -> set[str]:
     in the console. The model-TLS proxy image is matched by its repository
     (:data:`_MODEL_TLS_IMAGE_REPO`).
     """
-    refs = {b.container.image for b in default_bundle_registry.list_bundles()}
+    # A native runtime's carrier image counts too: the agent fetches it here
+    # and extracts it rather than running it (bundles.NativeRuntimeSpec).
+    refs = {b.artifact_ref for b in default_bundle_registry.list_bundles()}
     refs.update((
         settings.default_vllm_image,
         settings.default_vllm_rocm_image,
@@ -677,6 +687,33 @@ async def image_save(
         raise HTTPException(status_code=400, detail="Invalid image reference.")
     if image != _MODEL_TLS_IMAGE_REPO and ref not in await _images_a_node_may_fetch(session):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Image {ref} is not one a machine may fetch.")
+    carrier = _native_carrier(ref)
+    if carrier is not None:
+        # A native runtime is fetched by its pin, never by a tag alone, and only
+        # by a machine that runs native runtimes: a tag can be moved on this
+        # server, and the 2 GB export is of no use to anyone else.
+        if not (expect_rootfs or expect_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"{ref} is a native runtime: ask for it by its pin (expect_rootfs or expect_id).",
+            )
+        if expect_rootfs and expect_rootfs != carrier.native.rootfs_digest:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"{ref} is pinned to {carrier.native.rootfs_digest}, not {expect_rootfs}.",
+            )
+        # An Id pin is checked too, alone or beside the rootfs one: Docker's
+        # classic store reports the config digest, containerd the manifest one.
+        if expect_id and expect_id not in (carrier.native.config_digest, carrier.native.digest):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"{ref} is pinned to {carrier.native.config_digest}, not {expect_id}.",
+            )
+        if not (getattr(_node, "capabilities_json", None) or {}).get("native_runtime"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"{ref} is a native runtime, and this machine does not run native runtimes.",
+            )
 
     docker: DockerService = request.app.state.docker
 

@@ -573,7 +573,9 @@ class MultiNodeFabricPlanner:
             else "No eligible nodes available"
         )
 
-        runtime = self._runtime_readiness(env, nodes)
+        from faden_backend.services.inference.driver_key import driver_key_for  # noqa: PLC0415
+
+        runtime = self._runtime_readiness(env, nodes, driver=await driver_key_for(self.session, env))
         if not runtime.compatible:
             # A warning, not a blocker, deliberately.  Binding a fabric and
             # starting a runtime are separate steps: the network can be
@@ -607,7 +609,7 @@ class MultiNodeFabricPlanner:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _runtime_readiness(environment: Any, nodes: list[InfraNode]) -> RuntimeReadiness:
+    def _runtime_readiness(environment: Any, nodes: list[InfraNode], *, driver: str = "ray") -> RuntimeReadiness:
         """Resolve a runtime bundle for each member node.
 
         Derived from the machines, never pinned on the cluster. A bundle is an
@@ -632,18 +634,24 @@ class MultiNodeFabricPlanner:
         unresolved: list[str] = []
         for node in nodes:
             bundle = default_bundle_registry.resolve_for_node(
-                node, driver="ray", environment=environment,
+                node, driver=driver, environment=environment,
             )
             if bundle is None:
+                from faden_backend.services.inference.bundles import platform_reported  # noqa: PLC0415
+
                 machine = str((node.capabilities_json or {}).get("machine") or "unknown")
+                what = "Ray runtime bundle" if driver == "ray" else f"{driver} runtime bundle"
                 results[str(node.id)] = (
-                    f"No certified Ray runtime bundle for this platform ({machine})"
+                    f"No certified {what} for this platform ({machine})"
+                    if platform_reported(node)
+                    else "This machine has not reported its platform yet (CPU, OS, GPU); "
+                    "it can be placed once its agent has connected and reported"
                 )
                 unresolved.append(node.agent_id or str(node.id))
                 continue
             node_bundles[str(node.id)] = bundle.bundle_id
             results[str(node.id)] = (
-                f"{bundle.bundle_id} (image {bundle.container.image})"
+                f"{bundle.bundle_id} (image {bundle.artifact_ref})"
             )
 
         if unresolved:

@@ -103,6 +103,21 @@ class NodeCommandType(enum.StrEnum):
     # --- Can this machine download models itself? (agent 0.2.2) ---
     CHECK_INTERNET = "check_internet"
 
+    # --- Native runtime, standalone driver (a Mac; agents with native_runtime >= 1) ---
+    #: Fetch the runtime's carrier image through /images/save, verify it and
+    #: extract it as the service user. Idempotent by layer digest.
+    STAGE_NATIVE_RUNTIME = "stage_native_runtime"
+    #: Which runtimes are staged and which engines run.
+    NATIVE_RUNTIME_STATUS = "native_runtime_status"
+    #: Start one engine for a deployment on 127.0.0.1:<internal port>.
+    START_NATIVE_WORKER = "start_native_worker"
+    #: Where one deployment's engine stands (starting, ready, failed, stopped).
+    NATIVE_WORKER_STATUS = "native_worker_status"
+    #: Stop a deployment's engine and its whole process tree.
+    STOP_NATIVE_WORKER = "stop_native_worker"
+    #: A page of a deployment's engine log.
+    NATIVE_WORKER_LOGS = "native_worker_logs"
+
 
 class InfraNodeProfile(Base):
     """Reusable profile with platform-specific sub-configs for nodes."""
