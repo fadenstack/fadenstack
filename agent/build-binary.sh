@@ -119,9 +119,11 @@ if [ "$PLATFORM" = macos-arm64 ]; then
   trap 'rm -rf "$TOOLS"' EXIT
   cd "$SRC"
   # The same steps as the container's, with the tools outside the source tree.
-  uv venv --quiet --python 3.12 "$TOOLS/tools"
+  # uv's own Python (python-build-standalone) and nothing else: a system or
+  # Homebrew 3.12 links other libraries than the notices name.
+  uv venv --quiet --managed-python --python 3.12 "$TOOLS/tools"
   uv pip install --quiet --no-config --python "$TOOLS/tools/bin/python" pip-licenses==5.5.5
-  uv venv --quiet --python 3.12 "$TOOLS/build"
+  uv venv --quiet --managed-python --python 3.12 "$TOOLS/build"
   uv export --quiet --frozen --no-dev --no-emit-project --extra build -o "$TOOLS/build-requirements.txt"
   uv export --quiet --frozen --no-dev --no-emit-project --no-hashes -o "$TOOLS/requirements.txt"
   # --no-config: uv would otherwise add this project's [tool.uv] constraints, unpinned.
@@ -141,6 +143,10 @@ if [ "$PLATFORM" = macos-arm64 ]; then
   if [ "$SIGNING" != adhoc ]; then
     codesign --display --verbose=2 "dist/$ARTIFACT" 2>&1 | grep -q 'flags=.*runtime' || {
       echo "ERROR: dist/$ARTIFACT is not signed with the hardened runtime." >&2; exit 1; }
+  fi
+  if [ "$SIGNING" = developer-id ]; then
+    # The Developer ID and team it claims, not merely a valid signature.
+    sh "$SRC/macos-package.sh" verify "dist/$ARTIFACT"
   fi
   # Starting it unpacks and loads every bundled library: under the hardened
   # runtime, this is where a missing entitlement shows.

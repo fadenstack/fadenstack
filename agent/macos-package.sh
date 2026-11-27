@@ -3,11 +3,13 @@
 # its notarization. build-binary.sh makes and signs the binary itself
 # (FADEN_MAC_SIGNING); this takes it from dist/.
 #
-#   sh macos-package.sh secrets            # which developer-id inputs are missing (exit 1 if any)
+#   sh macos-package.sh secrets            # the developer-id inputs: 0 all set and well-formed,
+#                                          #   1 none set, 3 some set or malformed (never ad hoc)
 #   sh macos-package.sh keychain           # CI: an ephemeral keychain holding the Developer ID identities
+#   sh macos-package.sh verify BINARY      # signed by FADEN_MAC_CODESIGN_IDENTITY's Developer ID and team
 #   sh macos-package.sh pkg [--unsigned]   # dist/faden-agent-macos-arm64.pkg
 #   sh macos-package.sh notarize           # notarytool, staple, validate, Gatekeeper's assessment
-#   sh macos-package.sh keychain-delete    # CI: remove the ephemeral keychain
+#   sh macos-package.sh cleanup            # CI, always: remove the keychain and the notary key
 #
 # Inputs (the release workflow's secrets; nothing here has a default):
 #   FADEN_MAC_CODESIGN_IDENTITY   "Developer ID Application: <name> (<team>)"
@@ -34,7 +36,10 @@ BIN="$SRC/dist/$ARTIFACT"
 PKG="$SRC/dist/$ARTIFACT.pkg"
 PKG_ID="com.fadenstack.agent.pkg"
 STAGING="Library/Fadenstack/staging"
-KEYCHAIN="${FADEN_MAC_KEYCHAIN:-${RUNNER_TEMP:-${TMPDIR:-/tmp}}/faden-signing.keychain-db}"
+WORK="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
+KEYCHAIN="${FADEN_MAC_KEYCHAIN:-$WORK/faden-signing.keychain-db}"
+#: The App Store Connect key, while notarize runs; cleanup removes it whatever happened.
+NOTARY_KEY="$WORK/faden-notary.p8"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
@@ -57,13 +62,50 @@ need() {
 
 ALL_INPUTS="FADEN_MAC_CODESIGN_IDENTITY FADEN_MAC_INSTALLER_IDENTITY APPLE_CERTIFICATES_P12_BASE64 APPLE_CERTIFICATES_P12_PASSWORD APPLE_NOTARY_KEY_ID APPLE_NOTARY_ISSUER_ID APPLE_NOTARY_KEY_P8_BASE64"
 
+# The team in "Developer ID Application: Name (TEAMID)".
+team_of() {
+  printf '%s' "$1" | sed -n 's/.*(\([A-Z0-9]\{10\}\))$/\1/p'
+}
+
 cmd_secrets() {
   gaps=$(missing $ALL_INPUTS)
-  if [ -n "$gaps" ]; then
-    echo "developer-id: missing $(echo $gaps | sed 's/ /, /g')"
+  if [ "$(echo $gaps)" = "$(echo $ALL_INPUTS)" ]; then
+    echo "developer-id: no Apple signing inputs are set"
     exit 1
   fi
-  echo "developer-id: all inputs present"
+  if [ -n "$gaps" ]; then
+    # Some but not all: a typo or a forgotten secret, never a choice of ad hoc.
+    echo "developer-id: incomplete, missing $(echo $gaps | sed 's/ /, /g')"
+    exit 3
+  fi
+  bad=""
+  case "$FADEN_MAC_CODESIGN_IDENTITY" in "Developer ID Application: "*) ;; *) bad="$bad FADEN_MAC_CODESIGN_IDENTITY" ;; esac
+  case "$FADEN_MAC_INSTALLER_IDENTITY" in "Developer ID Installer: "*) ;; *) bad="$bad FADEN_MAC_INSTALLER_IDENTITY" ;; esac
+  app_team=$(team_of "$FADEN_MAC_CODESIGN_IDENTITY")
+  [ -n "$app_team" ] || bad="$bad FADEN_MAC_CODESIGN_IDENTITY(team)"
+  [ "$app_team" = "$(team_of "$FADEN_MAC_INSTALLER_IDENTITY")" ] || bad="$bad FADEN_MAC_INSTALLER_IDENTITY(team)"
+  if [ -n "$bad" ]; then
+    echo "developer-id: malformed:$bad (expected \"Developer ID Application|Installer: <name> (<TEAMID>)\", one team)"
+    exit 3
+  fi
+  echo "developer-id: all inputs present, team $app_team"
+}
+
+# A release binary carries the Developer ID it claims, of its team, under the
+# hardened runtime: --verify and the runtime flag alone pass for ad hoc too.
+cmd_verify() {
+  bin=${1:-}
+  [ -f "$bin" ] || die "verify needs the binary to check."
+  need FADEN_MAC_CODESIGN_IDENTITY
+  team=$(team_of "$FADEN_MAC_CODESIGN_IDENTITY")
+  [ -n "$team" ] || die "FADEN_MAC_CODESIGN_IDENTITY names no team: $FADEN_MAC_CODESIGN_IDENTITY"
+  codesign --verify --strict "$bin" || die "$bin carries no valid signature."
+  info=$(codesign --display --verbose=2 "$bin" 2>&1) || die "codesign cannot read $bin's signature."
+  printf '%s\n' "$info" | grep -qx "Authority=$FADEN_MAC_CODESIGN_IDENTITY" \
+    || die "$bin is not signed by \"$FADEN_MAC_CODESIGN_IDENTITY\"."
+  printf '%s\n' "$info" | grep -qx "TeamIdentifier=$team" || die "$bin's TeamIdentifier is not $team."
+  printf '%s\n' "$info" | grep -q 'flags=.*runtime' || die "$bin is not signed with the hardened runtime."
+  echo "verified: $bin, $FADEN_MAC_CODESIGN_IDENTITY"
 }
 
 cmd_keychain() {
@@ -74,7 +116,8 @@ cmd_keychain() {
   trap 'rm -f "$p12"' EXIT
   printf '%s' "$APPLE_CERTIFICATES_P12_BASE64" | base64 -D > "$p12"
   security create-keychain -p "$pass" "$KEYCHAIN"
-  security set-keychain-settings -lut 3600 "$KEYCHAIN"
+  # Long enough to outlast notarize's 30-minute wait after the build.
+  security set-keychain-settings -lut 7200 "$KEYCHAIN"
   security unlock-keychain -p "$pass" "$KEYCHAIN"
   security import "$p12" -k "$KEYCHAIN" -P "$APPLE_CERTIFICATES_P12_PASSWORD" \
     -T /usr/bin/codesign -T /usr/bin/productbuild -T /usr/bin/productsign
@@ -88,8 +131,9 @@ cmd_keychain() {
   echo "keychain: $KEYCHAIN"
 }
 
-cmd_keychain_delete() {
+cmd_cleanup() {
   security delete-keychain "$KEYCHAIN" 2>/dev/null || true
+  rm -f "$NOTARY_KEY"
 }
 
 cmd_pkg() {
@@ -153,9 +197,9 @@ cmd_notarize() {
   [ -f "$PKG" ] || die "$PKG is missing: run pkg first."
   pkgutil --check-signature "$PKG" | grep -q 'Developer ID Installer' \
     || die "$PKG is not signed with a Developer ID Installer identity; notarizing it would fail."
-  key=$(mktemp -t faden-notary).p8
+  key=$NOTARY_KEY
   trap 'rm -f "$key"' EXIT
-  printf '%s' "$APPLE_NOTARY_KEY_P8_BASE64" | base64 -D > "$key"
+  (umask 077 && printf '%s' "$APPLE_NOTARY_KEY_P8_BASE64" | base64 -D > "$key")
   xcrun notarytool submit "$PKG" --key "$key" --key-id "$APPLE_NOTARY_KEY_ID" \
     --issuer "$APPLE_NOTARY_ISSUER_ID" --wait --timeout 30m --output-format json > "$SRC/dist/notary.json"
   status=$(sed -n 's/.*"status" *: *"\([^"]*\)".*/\1/p' "$SRC/dist/notary.json")
@@ -176,9 +220,10 @@ cmd_notarize() {
 case "${1:-}" in
   secrets) cmd_secrets ;;
   keychain) cmd_keychain ;;
-  keychain-delete) cmd_keychain_delete ;;
+  cleanup|keychain-delete) cmd_cleanup ;;
+  verify) shift; cmd_verify "$@" ;;
   pkg) shift; cmd_pkg "$@" ;;
   notarize) cmd_notarize ;;
-  -h|--help|"") sed -n '2,29p' "$0" ;;
-  *) die "unknown command $1 (secrets, keychain, pkg, notarize, keychain-delete)" ;;
+  -h|--help|"") sed -n "2,$(($(grep -n '^set -eu' "$0" | head -1 | cut -d: -f1) - 1))p" "$0" ;;
+  *) die "unknown command $1 (secrets, keychain, verify, pkg, notarize, cleanup)" ;;
 esac

@@ -42,16 +42,96 @@ def _run(script: Path, *args: str, env: dict[str, str] | None = None) -> subproc
     )
 
 
-def test_secrets_names_every_missing_input() -> None:
+APP = "Developer ID Application: Fadenstack Test (ABCDE12345)"
+INSTALLER = "Developer ID Installer: Fadenstack Test (ABCDE12345)"
+WELL_FORMED = {**dict.fromkeys(SECRETS, "x"), "FADEN_MAC_CODESIGN_IDENTITY": APP,
+               "FADEN_MAC_INSTALLER_IDENTITY": INSTALLER}
+
+
+def test_secrets_with_none_set_is_exit_1() -> None:
     result = _run(PACKAGE, "secrets")
     assert result.returncode == 1
-    for name in SECRETS:
-        assert name in result.stdout
+    assert "no Apple signing inputs" in result.stdout
 
 
-def test_secrets_passes_when_all_are_set() -> None:
-    result = _run(PACKAGE, "secrets", env=_env(**dict.fromkeys(SECRETS, "x")))
+def test_secrets_passes_when_all_are_set_and_well_formed() -> None:
+    result = _run(PACKAGE, "secrets", env=_env(**WELL_FORMED))
     assert result.returncode == 0, result.stdout
+    assert "team ABCDE12345" in result.stdout
+
+
+@pytest.mark.parametrize("dropped", SECRETS)
+def test_a_partial_set_is_exit_3_naming_what_is_missing(dropped: str) -> None:
+    # A typo or a forgotten secret must fail the release, never fall back to ad hoc.
+    env = _env(**{k: v for k, v in WELL_FORMED.items() if k != dropped})
+    result = _run(PACKAGE, "secrets", env=env)
+    assert result.returncode == 3
+    assert dropped in result.stdout
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"FADEN_MAC_CODESIGN_IDENTITY": "Apple Development: Someone (ABCDE12345)"},
+        {"FADEN_MAC_INSTALLER_IDENTITY": "Developer ID Application: Fadenstack Test (ABCDE12345)"},
+        {"FADEN_MAC_INSTALLER_IDENTITY": "Developer ID Installer: Fadenstack Test (ZZZZZ99999)"},
+        {"FADEN_MAC_CODESIGN_IDENTITY": "Developer ID Application: no team"},
+    ],
+)
+def test_a_misnamed_identity_is_exit_3(override: dict[str, str]) -> None:
+    result = _run(PACKAGE, "secrets", env=_env(**{**WELL_FORMED, **override}))
+    assert result.returncode == 3
+    assert "malformed" in result.stdout
+
+
+def _fake_codesign(tmp_path: Path, display: str) -> dict[str, str]:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (tmp_path / "display.txt").write_text(display)
+    tool = bin_dir / "codesign"
+    tool.write_text(f'#!/bin/sh\ncase " $* " in *" --display "*) cat "{tmp_path}/display.txt" >&2 ;; esac\nexit 0\n')
+    tool.chmod(0o755)
+    (tmp_path / "agent").write_bytes(b"x")
+    return _env(PATH=f"{bin_dir}{os.pathsep}{os.environ['PATH']}", FADEN_MAC_CODESIGN_IDENTITY=APP)
+
+
+DEVELOPER_ID = f"""Executable=/x
+CodeDirectory v=20500 size=1 flags=0x10000(runtime) hashes=1+7 location=embedded
+Authority={APP}
+Authority=Developer ID Certification Authority
+Authority=Apple Root CA
+TeamIdentifier=ABCDE12345
+"""
+
+
+def test_verify_accepts_the_developer_id_and_team(tmp_path: Path) -> None:
+    env = _fake_codesign(tmp_path, DEVELOPER_ID)
+    result = _run(PACKAGE, "verify", str(tmp_path / "agent"), env=env)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize(
+    ("display", "why"),
+    [
+        ("CodeDirectory v=20500 flags=0x10002(adhoc,runtime)\nSignature=adhoc\nTeamIdentifier=not set\n",
+         "is not signed by"),
+        (DEVELOPER_ID.replace("TeamIdentifier=ABCDE12345", "TeamIdentifier=ZZZZZ99999"), "TeamIdentifier"),
+        (DEVELOPER_ID.replace("flags=0x10000(runtime)", "flags=0x0(none)"), "hardened runtime"),
+    ],
+)
+def test_verify_refuses_anything_else(tmp_path: Path, display: str, why: str) -> None:
+    env = _fake_codesign(tmp_path, display)
+    result = _run(PACKAGE, "verify", str(tmp_path / "agent"), env=env)
+    assert result.returncode == 1
+    assert why in result.stderr
+
+
+def test_cleanup_removes_the_notary_key(tmp_path: Path) -> None:
+    key = tmp_path / "faden-notary.p8"
+    key.write_text("secret")
+    result = _run(PACKAGE, "cleanup", env=_env(RUNNER_TEMP=str(tmp_path), FADEN_MAC_KEYCHAIN=str(tmp_path / "k")))
+    assert result.returncode == 0, result.stderr
+    assert not key.exists()
 
 
 def test_signed_pkg_needs_the_installer_identity() -> None:
@@ -70,7 +150,7 @@ def test_notarize_needs_the_api_key() -> None:
 
 def test_keychain_refuses_outside_ci() -> None:
     # It rewrites the keychain search list: only on a throwaway runner.
-    result = _run(PACKAGE, "keychain", env=_env(**dict.fromkeys(SECRETS, "x")))
+    result = _run(PACKAGE, "keychain", env=_env(**WELL_FORMED))
     assert result.returncode == 1
     assert "CI=true" in result.stderr
 
