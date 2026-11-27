@@ -83,7 +83,7 @@ class ProxyLimits:
     max_body_bytes: int = 32 * 1024 * 1024
     #: Before the client has proved who it is: a short handshake, and pools apart from the authenticated one.
     handshake_timeout: float = 5.0
-    max_preauth: int = 32
+    max_preauth: int = 256
     max_preauth_per_ip: int = 16
     header_timeout: float = 30.0
     idle_timeout: float = 75.0
@@ -214,9 +214,12 @@ class NativeProxy:
         self._listeners: dict[int, _Listener] = {}
         self._identity: Identity | None = None
         self._active = 0  # authenticated connections
-        self._preauth = 0
-        self._preauth_ip: dict[str, int] = {}
+        #: Connections that have not finished proving who they are, oldest first: key -> (writer, address).
+        self._pre: dict[int, tuple[asyncio.StreamWriter, str]] = {}
+        self._pre_seq = 0
         self._bound: frozenset[int] = frozenset()
+        #: Tests only: names the address a connection counts as coming from.
+        self._peer_address: Callable[[asyncio.StreamWriter], str] | None = None
         self._ready = threading.Event()
         self._lock = threading.Lock()
 
@@ -391,29 +394,41 @@ class NativeProxy:
 
         return _Protocol(reader, serve, loop)
 
+    def _evict(self, match: Callable[[str], bool]) -> None:
+        for key, (w, a) in list(self._pre.items()):  # insertion order: oldest first
+            if match(a):
+                self._pre.pop(key, None)
+                w.transport.abort()
+                return
+        raise RuntimeError("nothing to evict")  # pragma: no cover - the caller counted something
+
     async def _connection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, port: int) -> None:
         """Pre-auth pool -> handshake -> certificate check -> authenticated pool -> HTTP."""
         lim = self.limits
         identity = self._identity
         peer = writer.get_extra_info("peername") or ("?", 0)
         ip = str(peer[0])
-        if identity is None or self._preauth >= lim.max_preauth or self._preauth_ip.get(ip, 0) >= lim.max_preauth_per_ip:
+        if self._peer_address is not None:  # tests stand in for other addresses
+            ip = self._peer_address(writer)
+        if identity is None:
             writer.transport.abort()
             return
-        self._preauth += 1
-        self._preauth_ip[ip] = self._preauth_ip.get(ip, 0) + 1
+        # A full pool, or a full share for this address, makes room by dropping the OLDEST connection that is
+        # still unproven (never an authenticated one), so a flood cannot keep the gateway out.
+        while sum(1 for _, a in self._pre.values() if a == ip) >= lim.max_preauth_per_ip:
+            self._evict(lambda a: a == ip)
+        while len(self._pre) >= lim.max_preauth:
+            self._evict(lambda _a: True)
+        self._pre_seq += 1
+        key = self._pre_seq
+        self._pre[key] = (writer, ip)
         pre = True
 
         def leave_preauth() -> None:
             nonlocal pre
             if pre:
                 pre = False
-                self._preauth -= 1
-                left = self._preauth_ip.get(ip, 1) - 1
-                if left > 0:
-                    self._preauth_ip[ip] = left
-                else:
-                    self._preauth_ip.pop(ip, None)
+                self._pre.pop(key, None)
 
         authed = False
         try:
@@ -432,6 +447,9 @@ class NativeProxy:
             why = client_acceptable(identity, der)
             if why:
                 log.warning("Model proxy: %s refused: %s", ip, why)
+                writer.transport.abort()
+                return
+            if key not in self._pre:  # evicted by newer arrivals while the handshake finished
                 writer.transport.abort()
                 return
             leave_preauth()

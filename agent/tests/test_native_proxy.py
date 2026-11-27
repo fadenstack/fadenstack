@@ -634,16 +634,16 @@ def test_firewall_and_san_drift(pki: Pki, tmp_path: Path) -> None:
 
 
 def test_a_flood_of_silent_and_half_open_connections_does_not_stop_the_gateway(rig_factory: Any) -> None:
-    rig = rig_factory(max_preauth=8, max_preauth_per_ip=4, handshake_timeout=2.0)
+    rig = rig_factory(max_preauth=8, max_preauth_per_ip=4, handshake_timeout=30.0)
     flood = []
     for i in range(60):
         s = socket.create_connection(("127.0.0.1", rig.port), timeout=5)
         if i % 2:
             s.sendall(b"\x16\x03\x01\x00\x20")  # the start of a ClientHello, never finished
         flood.append(s)
-    # The gateway shares the attackers' loopback address here, so the per-address cap holds it off until the
-    # short handshake timeout frees the pool; then it must work (a different address would never wait).
-    time.sleep(2.5)
+        time.sleep(0.005)
+    time.sleep(0.3)
+    # The gateway shares the attackers' address and the pool is full: it evicts the oldest stranger.
     assert status(rig.exchange(GET_HEALTH)) == 200
     for s in flood:
         s.close()
@@ -659,11 +659,39 @@ def test_the_pre_auth_pool_is_apart_from_the_authenticated_one(rig_factory: Any)
         s.close()
 
 
+def test_a_full_pool_from_several_addresses_still_lets_the_gateway_in(rig_factory: Any) -> None:
+    rig = rig_factory(max_preauth=12, max_preauth_per_ip=4, handshake_timeout=30.0)
+    rig.proxy._peer_address = lambda w: f"10.0.0.{w.get_extra_info('peername')[1] % 3}"  # noqa: SLF001
+    flood = [socket.create_connection(("127.0.0.1", rig.port), timeout=5) for _ in range(40)]
+    time.sleep(0.5)
+    assert len(rig.proxy._pre) <= 12  # noqa: SLF001
+    assert status(rig.exchange(GET_HEALTH)) == 200
+    for s in flood:
+        s.close()
+
+
+def test_eviction_takes_the_oldest_unproven_connection(rig_factory: Any) -> None:
+    rig = rig_factory(max_preauth=3, max_preauth_per_ip=10, handshake_timeout=30.0)
+    first = socket.create_connection(("127.0.0.1", rig.port), timeout=5)
+    time.sleep(0.1)
+    rest = [socket.create_connection(("127.0.0.1", rig.port), timeout=5) for _ in range(2)]
+    time.sleep(0.2)
+    extra = socket.create_connection(("127.0.0.1", rig.port), timeout=5)  # the pool is full: the first goes
+    time.sleep(0.3)
+    first.settimeout(3)
+    assert first.recv(10) == b""  # evicted: closed by the proxy
+    rest[0].settimeout(0.3)
+    with pytest.raises(TimeoutError):
+        rest[0].recv(10)  # the younger ones are still waiting
+    for s in (*rest, extra):
+        s.close()
+
+
 def test_one_address_cannot_fill_the_pre_auth_pool(rig_factory: Any) -> None:
     rig = rig_factory(max_preauth=100, max_preauth_per_ip=5, handshake_timeout=30.0)
     flood = [socket.create_connection(("127.0.0.1", rig.port), timeout=5) for _ in range(12)]
     time.sleep(0.3)
-    assert rig.proxy._preauth <= 5  # noqa: SLF001
+    assert len(rig.proxy._pre) <= 5  # noqa: SLF001
     for s in flood:
         s.close()
 
@@ -781,3 +809,24 @@ async def test_an_owned_route_does_not_touch_an_unowned_one_without_adopt(pki: P
     finally:
         tls._backend.proxy.stop()  # noqa: SLF001
         up.stop()
+
+
+@pytest.mark.asyncio
+async def test_an_equal_generation_cannot_move_the_target(pki: Pki, tmp_path: Path) -> None:
+    tls = _mac_tls(pki, tmp_path)
+    up, other = Upstream(_ok), Upstream(_ok)
+    p = free_port()
+    try:
+        await tls.ensure_route(p, up.port, owner="d", generation=3)
+        assert (await tls.ensure_route(p, up.port, owner="d", generation=3))["protected"]  # same target: fine
+        with pytest.raises(ModelTlsError):
+            await tls.ensure_route(p, other.port, owner="d", generation=3)
+        with pytest.raises(ModelTlsError):
+            await tls.ensure_route(p, other.port, owner="d", generation=2)
+        assert tls.routes() == {p: up.port}
+        assert (await tls.ensure_route(p, other.port, owner="d", generation=4))["internal_port"] == other.port
+        assert (await tls.ensure_route(p, up.port, owner="d", generation=4, adopt=True))["internal_port"] == up.port
+    finally:
+        tls._backend.proxy.stop()  # noqa: SLF001
+        up.stop()
+        other.stop()

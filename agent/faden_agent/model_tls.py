@@ -591,6 +591,11 @@ class ModelTls:
                     raise ModelTlsError(f"Port {public_port} is held by another deployment.")
                 if generation is not None and int(held.get("generation") or 0) > int(generation):
                     raise ModelTlsError(f"Port {public_port} is held by a newer generation of this deployment.")
+                if (
+                    not adopt and routes.get(public_port) not in (None, internal_port)
+                    and int(held.get("generation") or 0) == int(generation or 0)
+                ):
+                    raise ModelTlsError(f"Port {public_port}: only a newer generation may change the target.")
             if held is None and owner is not None and public_port in routes and not adopt:
                 raise ModelTlsError(f"Port {public_port} is served by a route that has no owner; it is not taken over.")
             new = routes.get(public_port) is None
