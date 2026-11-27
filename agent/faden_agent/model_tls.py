@@ -34,6 +34,8 @@ import logging
 import os
 import platform
 import socket
+import subprocess
+import sys
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -67,6 +69,8 @@ CERT_FILE = "machine.crt"
 TRUST_FILE = "trust.pem"
 CONF_FILE = "nginx.conf"
 ROUTES_FILE = "routes.json"
+#: Who holds each route (``{port: {owner, generation}}``); beside ``routes.json`` so its format is unchanged.
+OWNERS_FILE = "route-owners.json"
 
 
 class ModelTlsError(RuntimeError):
@@ -212,6 +216,159 @@ def _read_cert(pem: bytes) -> _Held | None:
     return _Held(not_after=cert.not_valid_after_utc, names=names, issuer_key_id=issuer)
 
 
+class ProxyBackend:
+    """What serves the routes: ``apply`` makes the proxy serve ``routes()``, ``confirm`` waits for it, ``drop`` ends it."""
+
+    name = "base"
+    #: Whether the agent must start the routes itself at startup (nginx outlives the agent; a native proxy does not).
+    restores = False
+
+    async def apply(self, *, force_reload: bool = False) -> None:
+        raise NotImplementedError
+
+    async def confirm(self, ports: list[int]) -> None:
+        raise NotImplementedError
+
+    async def drop(self) -> None:
+        raise NotImplementedError
+
+    def status(self) -> dict[str, Any]:
+        return {}
+
+
+class ContainerNginx(ProxyBackend):
+    """Linux: the pinned nginx container. Today's code, which stays in :class:`ModelTls`."""
+
+    name = "nginx"
+
+    def __init__(self, tls: ModelTls) -> None:
+        self._tls = tls
+
+    async def apply(self, *, force_reload: bool = False) -> None:
+        await self._tls._apply_nginx(force_reload=force_reload)  # noqa: SLF001
+
+    async def confirm(self, ports: list[int]) -> None:
+        await self._tls._confirm_nginx(ports)  # noqa: SLF001
+
+    async def drop(self) -> None:
+        await self._tls._drop_container()  # noqa: SLF001
+
+
+def firewall_state(runner: Callable[[], str] | None = None) -> dict[str, Any]:
+    """The macOS application firewall: ``{"state": "on"|"off"|"unknown", "detail": ...}``."""
+
+    def _run() -> str:
+        out = subprocess.run(  # noqa: S603
+            ["/usr/libexec/ApplicationFirewall/socketfilterfw", "--getglobalstate"],  # noqa: S607
+            capture_output=True, text=True, timeout=5, check=False,
+        )
+        return (out.stdout or out.stderr).strip()
+
+    try:
+        text = (runner or _run)()
+    except (OSError, subprocess.SubprocessError) as exc:
+        return {"state": "unknown", "detail": str(exc)[:200]}
+    low = text.lower()
+    state = "on" if ("enabled" in low or "state = 1" in low or "state = 2" in low) else (
+        "off" if ("disabled" in low or "state = 0" in low) else "unknown")
+    return {"state": state, "detail": text[:200]}
+
+
+def local_addresses() -> set[str]:
+    import psutil  # noqa: PLC0415
+
+    return {a.address.split("%")[0] for addrs in psutil.net_if_addrs().values() for a in addrs}
+
+
+class NativeBackend(ProxyBackend):
+    """A Mac: the in-agent asyncio proxy (``native_proxy.py``), on its own thread."""
+
+    name = "native"
+    restores = True
+
+    def __init__(self, tls: ModelTls, proxy: Any = None, *, firewall: Callable[[], dict[str, Any]] | None = None) -> None:
+        from faden_agent.native_proxy import NativeProxy  # noqa: PLC0415
+
+        self._tls = tls
+        self.proxy = proxy or NativeProxy()
+        self._firewall_fn = firewall or firewall_state
+        self._firewall: dict[str, Any] | None = None
+        self._warned = False
+
+    def _identity(self) -> None:
+        from faden_agent.native_proxy import build_identity  # noqa: PLC0415
+
+        t = self._tls
+        identity = build_identity(t._path(CERT_FILE), t._path(KEY_FILE), t._path(TRUST_FILE), t.client_name)  # noqa: SLF001
+        held = self.proxy.identity
+        if held is None or held.fingerprint != identity.fingerprint:
+            self.proxy.set_identity(identity)  # new handshakes only; open streams keep theirs
+            log.info("Model TLS: the native proxy uses the current certificate")
+
+    async def apply(self, *, force_reload: bool = False) -> None:
+        from faden_agent.native_proxy import ProxyError  # noqa: PLC0415
+
+        try:
+            await asyncio.to_thread(self._identity)
+            await self.proxy.apply(self._tls.routes())
+        except ProxyError as exc:
+            self._tls.last_error = str(exc)[-300:]
+            raise ModelTlsError(f"The model-TLS proxy does not serve this port: {exc}") from exc
+        except OSError as exc:
+            self._tls.last_error = str(exc)[-300:]
+            raise ModelTlsError(f"The model-TLS proxy could not start: {exc}") from exc
+        self._tls.last_error = None
+
+    async def confirm(self, ports: list[int]) -> None:
+        missing = [p for p in ports if p not in self.proxy.bound_ports()]
+        if missing:
+            raise ModelTlsError(f"The model-TLS proxy does not serve port {', '.join(map(str, missing))}.")
+
+    async def drop(self) -> None:
+        await self.proxy.apply({})
+        log.info("Model TLS: no model left behind the proxy")
+
+    async def check_firewall(self) -> dict[str, Any]:
+        self._firewall = await asyncio.to_thread(self._firewall_fn)
+        if self._firewall["state"] == "on" and not self._warned:
+            self._warned = True
+            log.warning(
+                "The macOS application firewall is on: it may block the model-TLS port for this agent; "
+                "allow incoming connections for it (see the Mac install notes).",
+            )
+        return self._firewall
+
+    def status(self) -> dict[str, Any]:
+        held = self._tls.held_names()
+        local = None
+        try:
+            local = local_addresses()
+        except Exception:  # noqa: BLE001
+            pass
+        drift = [n for n in held if _is_ip(n) and local is not None and n not in local]
+        if drift and not getattr(self, "_drift_logged", False):
+            self._drift_logged = True
+            log.warning("Model TLS: the certificate names %s, which no interface holds any more", ", ".join(drift))
+        return {
+            "backend": "native",
+            "running": self.proxy.running(),
+            "ports": self.proxy.bound_ports(),
+            "connections": self.proxy.connections(),
+            "san_drift": drift,
+            "firewall": self._firewall or {"state": "unchecked"},
+        }
+
+
+def _is_ip(value: str) -> bool:
+    import ipaddress  # noqa: PLC0415
+
+    try:
+        ipaddress.ip_address(value)
+    except ValueError:
+        return False
+    return True
+
+
 class ModelTls:
     """This machine's certificate and its model-TLS proxy."""
 
@@ -223,7 +380,10 @@ class ModelTls:
         host_directory: str | None = None,
         image_loader: Callable[..., Awaitable[Any]] | None = None,
         now: Callable[[], datetime] | None = None,
+        backend: ProxyBackend | None = None,
     ) -> None:
+        #: nginx in a container on Linux; the in-agent proxy on a Mac.
+        self._backend: ProxyBackend = backend or (NativeBackend(self) if sys.platform == "darwin" else ContainerNginx(self))
         self._runtime = runtime
         self._dir = Path(directory)
         #: The same directory as the container runtime's host sees it (the agent may itself run in a container).
@@ -260,6 +420,35 @@ class ModelTls:
     def _save_routes(self, routes: dict[int, int]) -> None:
         self._dir.mkdir(parents=True, exist_ok=True)
         _write(self._path(ROUTES_FILE), json.dumps({str(k): v for k, v in sorted(routes.items())}).encode(), mode=0o644)
+
+    def owners(self) -> dict[int, dict[str, Any]]:
+        try:
+            raw = json.loads(self._path(OWNERS_FILE).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {}
+        return {int(k): dict(v) for k, v in (raw or {}).items() if isinstance(v, dict)}
+
+    def _save_owners(self, owners: dict[int, dict[str, Any]]) -> None:
+        if not owners and not self._path(OWNERS_FILE).is_file():
+            return
+        self._dir.mkdir(parents=True, exist_ok=True)
+        _write(self._path(OWNERS_FILE), json.dumps({str(k): v for k, v in sorted(owners.items())}).encode(), mode=0o644)
+
+    def held_names(self) -> list[str]:
+        path = self._path(CERT_FILE)
+        held = _read_cert(path.read_bytes()) if path.is_file() else None
+        return held.names if held else []
+
+    async def restore(self) -> None:
+        """At startup: serve the stored routes again, when the backend does not outlive the agent (a Mac)."""
+        if not self._backend.restores or not self.routes() or not self.has_certificate():
+            return
+        async with self._lock:
+            try:
+                await self._backend.apply()
+            except Exception as exc:  # noqa: BLE001 - the minute's refresh tries again
+                self.last_error = str(exc)[-300:]
+                log.warning("Model TLS: stored routes not restored: %s", exc)
 
     def has_certificate(self) -> bool:
         return all(self._path(n).is_file() for n in (KEY_FILE, CERT_FILE, TRUST_FILE))
@@ -376,8 +565,16 @@ class ModelTls:
             )
         return None
 
-    async def ensure_route(self, public_port: int, internal_port: int) -> dict[str, Any]:
-        """Put the proxy in front of ``127.0.0.1:internal_port`` on ``public_port``."""
+    async def ensure_route(
+        self, public_port: int, internal_port: int, *, owner: str | None = None, generation: int | None = None,
+        adopt: bool = False,
+    ) -> dict[str, Any]:
+        """Put the proxy in front of ``127.0.0.1:internal_port`` on ``public_port``.
+
+        *owner* and *generation* (standalone native routes) are optional: without them this is 0.2.12's
+        behaviour. A port held by another owner, or by a newer generation, is refused; so is an owned ensure
+        on a legacy route that has no owner, unless *adopt* says to take it over.
+        """
         if not self.has_certificate() and self.refresher is not None:
             await self.refresher()
         if not self.has_certificate():
@@ -387,13 +584,31 @@ class ModelTls:
             )
         async with self._lock:
             routes = self.routes()
+            owners = self.owners()
+            held = owners.get(public_port)
+            if held is not None:
+                if owner is None or held.get("owner") != owner:
+                    raise ModelTlsError(f"Port {public_port} is held by another deployment.")
+                if generation is not None and int(held.get("generation") or 0) > int(generation):
+                    raise ModelTlsError(f"Port {public_port} is held by a newer generation of this deployment.")
+                if (
+                    not adopt and routes.get(public_port) not in (None, internal_port)
+                    and int(held.get("generation") or 0) == int(generation or 0)
+                ):
+                    raise ModelTlsError(f"Port {public_port}: only a newer generation may change the target.")
+            if held is None and owner is not None and public_port in routes and not adopt:
+                raise ModelTlsError(f"Port {public_port} is served by a route that has no owner; it is not taken over.")
             new = routes.get(public_port) is None
             problem = self.port_problem(public_port) if new else None
             if problem:
                 raise ModelTlsError(problem)
+            before_owner = owners.get(public_port)
             if routes.get(public_port) != internal_port:
                 routes[public_port] = internal_port
                 self._save_routes(routes)
+            if owner is not None:
+                owners[public_port] = {"owner": owner, "generation": int(generation or 0)}
+                self._save_owners(owners)
             try:
                 await self._apply()
                 await self._confirm([public_port])
@@ -401,14 +616,23 @@ class ModelTls:
                 if new:  # not served: not kept, so nothing is published on it
                     routes.pop(public_port, None)
                     self._save_routes(routes)
+                    if owner is not None:
+                        if before_owner is None:
+                            owners.pop(public_port, None)
+                        else:
+                            owners[public_port] = before_owner
+                        self._save_owners(owners)
                     try:
-                        await self._apply() if routes else await self._drop_container()
+                        await self._apply() if routes else await self._backend.drop()
                     except Exception:  # noqa: BLE001 - the original error is the one to report
                         log.exception("Model TLS: could not undo the route for port %s", public_port)
                 raise
         return {"protected": True, "public_port": public_port, "internal_port": internal_port}
 
     async def _confirm(self, ports: list[int]) -> None:
+        await self._backend.confirm(ports)
+
+    async def _confirm_nginx(self, ports: list[int]) -> None:
         """nginx answers on every port in *ports*, or the reason it does not."""
         waited = 0.0
         missing = list(ports)
@@ -431,22 +655,48 @@ class ModelTls:
         if await self._runtime.exists(CONTAINER):
             await self._runtime.remove(CONTAINER)
 
-    async def remove_route(self, public_port: int) -> None:
+    async def remove_route(
+        self, public_port: int, *, owner: str | None = None, generation: int | None = None,
+        adopt: bool = False,
+    ) -> dict[str, Any]:
+        """Take a route away; idempotent. With *owner*, only its holder (and not a newer generation) may,
+        and a legacy route without an owner is left alone unless *adopt*. Without *owner* (0.2.12's form)
+        a route held by an owner is left alone."""
         async with self._lock:
             routes = self.routes()
+            owners = self.owners()
+            held = owners.get(public_port)
+            if owner is None and held is not None:
+                return {"removed": False, "public_port": public_port, "reason": "held by a deployment"}
+            if owner is not None and held is None and public_port in routes and not adopt:
+                return {"removed": False, "public_port": public_port, "reason": "the route has no owner"}
+            if owner is not None and held is not None:
+                if held.get("owner") != owner:
+                    return {"removed": False, "public_port": public_port, "reason": "held by another deployment"}
+                if generation is not None and int(held.get("generation") or 0) > int(generation):
+                    return {"removed": False, "public_port": public_port, "reason": "a newer generation holds it"}
             if routes.pop(public_port, None) is None:
-                return
+                if held is not None and (owner is None or held.get("owner") == owner):
+                    owners.pop(public_port, None)
+                    self._save_owners(owners)
+                return {"removed": False, "public_port": public_port, "reason": "no such route"}
             self._save_routes(routes)
+            if owners.pop(public_port, None) is not None:
+                self._save_owners(owners)
             if routes:
                 await self._apply()
-            elif await self._runtime.exists(CONTAINER):
-                await self._drop_container()
+            else:
+                await self._backend.drop()
                 log.info("Model TLS: no model left behind the proxy; removed it")
+            return {"removed": True, "public_port": public_port}
 
     def _ipv6(self) -> bool:
         return Path("/proc/net/if_inet6").is_file()
 
     async def _apply(self, *, force_reload: bool = False) -> None:
+        await self._backend.apply(force_reload=force_reload)
+
+    async def _apply_nginx(self, *, force_reload: bool = False) -> None:
         """Write the configuration and make the container serve it."""
         routes = self.routes()
         conf = render_conf(routes, client_name=self.client_name, ipv6=self._ipv6()).encode()
@@ -535,7 +785,8 @@ class ModelTls:
 
     def status(self) -> dict[str, Any]:
         held = _read_cert(self._path(CERT_FILE).read_bytes()) if self._path(CERT_FILE).is_file() else None
-        return {
+        extra = self._backend.status()
+        return {**({"proxy": extra} if extra else {}),
             "enabled": self.enabled,
             "certificate_not_after": held.not_after.isoformat() if held else None,
             "names": held.names if held else [],

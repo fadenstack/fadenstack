@@ -326,7 +326,9 @@ class NativeRuntimeManager:
         # The model's lock (the one a sync and remove_model take) is held while the worker starts and its
         # record is saved, so a removal either sees the worker or finishes before it begins.
         model_dir = self._model_root.resolve(strict=False) / spec.snapshot.relative_to(self._model_root.resolve(strict=False)).parts[0]
-        async with self._lock, _lock_for_model_dir(model_dir):
+        # Model lock first, then the manager lock: a long sync of this model must never hold the manager
+        # lock, or a stop (of any deployment) would wait for the whole copy.
+        async with _lock_for_model_dir(model_dir), self._lock:
             current = self._record(spec.deployment_id)
             if current and current.get("state") in LIVE and self._leader(current) is not None:
                 runtime = self._newest_runtime(spec.bundle_id, spec.layer_digest)

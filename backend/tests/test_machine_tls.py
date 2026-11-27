@@ -214,3 +214,36 @@ async def test_a_restore_without_the_master_key_replaces_the_ca(dbsession: Async
     assert len(bundle) == 1
     reasons = [r.reason for r in (await dbsession.execute(select(MachineCA))).scalars().all()]
     assert "unreadable" in reasons
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(("endpoint", "probed"), [
+    ("https://10.0.0.5:8000/v1", "https://10.0.0.5:8000/health"),
+    ("https://10.0.0.5:8000/v1/", "https://10.0.0.5:8000/health"),
+    ("https://10.0.0.5:8000", "https://10.0.0.5:8000/health"),
+])
+async def test_the_health_probe_does_not_ask_under_v1(monkeypatch: pytest.MonkeyPatch, endpoint: str, probed: str) -> None:
+    """vLLM serves /health at the root; a published URL ends in /v1."""
+    import httpx  # noqa: PLC0415
+
+    from faden_backend.services.llm.service import LLMService  # noqa: PLC0415
+    from faden_backend.services.machine_tls import store  # noqa: PLC0415
+
+    seen: list[str] = []
+
+    class _Client:
+        def __init__(self, **_: object) -> None: ...
+        async def __aenter__(self) -> _Client:
+            return self
+        async def __aexit__(self, *_: object) -> None: ...
+        async def get(self, url: str) -> httpx.Response:
+            seen.append(url)
+            return httpx.Response(200)
+
+    async def _ctx(*_a: object, **_k: object) -> object:
+        return object()
+
+    monkeypatch.setattr(store, "client_context", _ctx)
+    monkeypatch.setattr(httpx, "AsyncClient", _Client)
+    health = await LLMService._machine_tls_health(None, endpoint)  # noqa: SLF001
+    assert health.healthy and seen == [probed]

@@ -25,6 +25,11 @@ from tests.native_fakes import build_runtime, carrier, layer_from_dir
 
 pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="POSIX process groups")
 
+#: This run's deployment ids. Workers are found by an environment marker naming the
+#: deployment, so two suites running at once (other worktrees) must never share one.
+RUN = f"{os.getpid()}-{os.urandom(3).hex()}"
+DEP = f"dep-1-{RUN}"
+DEP2 = f"dep-2-{RUN}"
 BUNDLE = "faden-native-vllm-metal-darwin-arm64-vllm0.34.0"
 
 
@@ -38,6 +43,10 @@ def _free_port() -> int:
 def _fake_env_keys(monkeypatch: pytest.MonkeyPatch) -> None:
     # The fake's own switches, beside the production allowlist.
     monkeypatch.setattr(workers, "ENV_ALLOWED", workers.ENV_ALLOWED | {"VLLM_FAKE_MODE", "VLLM_FAKE_SETSID"})
+    # A marker of this run's own: suites in other worktrees (on older code) sweep
+    # every FADEN_NATIVE_WORKER process of this user, and would end this run's fakes.
+    monkeypatch.setattr(workers, "MARKER_ENV", f"FADEN_NATIVE_WORKER_T{RUN.replace('-', '_')}")
+    monkeypatch.setattr(procs, "MARKER_ENV", workers.MARKER_ENV)
 
 
 @pytest.fixture()
@@ -76,7 +85,7 @@ def _manager(paths: NativePaths, models: Path, **kw) -> NativeRuntimeManager:
 
 def _payload(snap: Path, port: int, **kw) -> dict:
     payload = {
-        "deployment_id": "dep-1", "generation": 1, "bundle_id": BUNDLE,
+        "deployment_id": DEP, "generation": 1, "bundle_id": BUNDLE,
         "model": {"name": "Qwen/Qwen3-0.6B", "snapshot_path": str(snap)},
         "served_model_name": "qwen3-0.6b", "port": port, "host": "127.0.0.1",
         "gpu_memory_utilization": 0.5, "max_model_len": 4096, "extra_args": ["--max-num-seqs", "8"], "env": {},
@@ -85,20 +94,35 @@ def _payload(snap: Path, port: int, **kw) -> dict:
     return payload
 
 
-async def _settle(manager: NativeRuntimeManager, deployment_id: str = "dep-1", timeout: float = 20) -> dict:
+#: How long a test waits for the fake runtime to get somewhere. Generous on purpose:
+#: under load (several suites at once) a Python start alone can take seconds. The
+#: waits poll, so a fast machine never waits this long.
+WAIT_S = 30.0
+
+
+async def _until(condition, timeout: float = WAIT_S, interval: float = 0.02) -> bool:
+    deadline = time.monotonic() + timeout
+    while not condition():
+        if time.monotonic() >= deadline:
+            return False
+        await asyncio.sleep(interval)
+    return True
+
+
+async def _settle(manager: NativeRuntimeManager, deployment_id: str = DEP, timeout: float = WAIT_S) -> dict:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         status = await manager.native_worker_status({"deployment_id": deployment_id})
         if status["state"] != "starting":
             return status
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.02)
     raise AssertionError("worker never left starting")
 
 
-async def _settle_state(manager: NativeRuntimeManager, state: str, timeout: float = 20) -> dict:
+async def _settle_state(manager: NativeRuntimeManager, state: str, timeout: float = WAIT_S) -> dict:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        status = await manager.native_worker_status({"deployment_id": "dep-1"})
+        status = await manager.native_worker_status({"deployment_id": DEP})
         if status["state"] == state:
             return status
         await asyncio.sleep(0.05)
@@ -106,10 +130,10 @@ async def _settle_state(manager: NativeRuntimeManager, state: str, timeout: floa
 
 
 def _kids(paths: NativePaths, port: int) -> list[int]:
-    deadline = time.monotonic() + 10
+    deadline = time.monotonic() + WAIT_S
     path = paths.home / f"kids-{port}.txt"
     while not path.exists() and time.monotonic() < deadline:
-        time.sleep(0.05)
+        time.sleep(0.02)
     return [int(p) for p in path.read_text().split()]
 
 
@@ -135,25 +159,25 @@ async def test_start_ready_logs_and_stop_takes_the_whole_tree(env) -> None:
     kids = _kids(paths, port)
     assert os.getpgid(started["pid"]) == started["pid"]  # its own session and group
 
-    record = json.loads(paths.worker_record("dep-1").read_text())
+    record = json.loads(paths.worker_record(DEP).read_text())
     assert record["v"] == 1 and record["pgid"] == record["pid"] and record["state"] == "ready"
     assert record["cmd_sha256"] == procs.cmd_hash(record["argv"])
     assert procs.matching(record) is not None
 
-    logs = await manager.native_worker_logs({"deployment_id": "dep-1", "tail": 50})
+    logs = await manager.native_worker_logs({"deployment_id": DEP, "tail": 50})
     assert any(line.startswith("faden: NOFILE soft=") for line in logs["lines"])
     assert any("fake vllm starting" in line for line in logs["lines"])
-    more = await manager.native_worker_logs({"deployment_id": "dep-1", "tail": 50, "cursor": logs["cursor"]})
+    more = await manager.native_worker_logs({"deployment_id": DEP, "tail": 50, "cursor": logs["cursor"]})
     assert more["lines"] == []
 
     # Same deployment and generation: the running one.
     again = await manager.start_native_worker(_payload(snap, port))
     assert again["existing"] and again["pid"] == started["pid"]
 
-    stopped = await manager.stop_native_worker({"deployment_id": "dep-1", "grace_s": 1})
+    stopped = await manager.stop_native_worker({"deployment_id": DEP, "grace_s": 1})
     assert stopped["stopped"]
     assert _gone([started["pid"], *kids])  # including the child that ignores SIGTERM
-    status = await manager.native_worker_status({"deployment_id": "dep-1"})
+    status = await manager.native_worker_status({"deployment_id": DEP})
     assert status["state"] == "stopped"
     await manager.close()
 
@@ -172,12 +196,12 @@ async def test_the_worker_sees_none_of_the_agents_secrets(env, monkeypatch: pyte
     text = json.dumps(seen)
     for secret in ("enroll-secret-123", "hf_secret_456", "aws-secret-789"):
         assert secret not in text
-    assert [k for k in seen if k.startswith("FADEN_")] == ["FADEN_NATIVE_WORKER"]
-    assert seen["FADEN_NATIVE_WORKER"] == "dep-1:1"  # the marker, nothing of the agent's
+    assert [k for k in seen if k.startswith("FADEN_")] == [workers.MARKER_ENV]
+    assert seen[workers.MARKER_ENV] == f"{DEP}:1"  # the marker, nothing of the agent's
     assert seen["HF_HUB_OFFLINE"] == "1" and seen["HOME"] == str(paths.home)
-    assert seen["TMPDIR"].startswith(str(paths.root / "tmp" / "dep-1"))
+    assert seen["TMPDIR"].startswith(str(paths.root / "tmp" / DEP))
     assert seen["VLLM_LOGGING_LEVEL"] == "DEBUG"
-    await manager.stop_native_worker({"deployment_id": "dep-1", "grace_s": 1})
+    await manager.stop_native_worker({"deployment_id": DEP, "grace_s": 1})
     await manager.close()
 
 
@@ -199,13 +223,16 @@ async def test_never_ready_times_out_and_is_stopped(env, monkeypatch: pytest.Mon
     manager = _manager(paths, models)
     port = _free_port()
     started = await manager.start_native_worker(_payload(snap, port, env={"VLLM_FAKE_MODE": "never"}))
-    kids = _kids(paths, port)
-    status = await _settle(manager, timeout=30)
+    status = await _settle(manager)
     assert status["state"] == "failed" and "not ready after 1 s" in status["last_error"]
-    deadline = time.monotonic() + 15  # the reason is recorded before the stop finishes
-    while not _gone([started["pid"], *kids]) and time.monotonic() < deadline:
-        await asyncio.sleep(0.1)
-    assert _gone([started["pid"], *kids])
+    # Under load the 1 s may pass before the fake has started its children, so they
+    # are not awaited; whatever it did start must be gone once the stop finishes
+    # (the reason is recorded before the stop).
+    def nothing_left() -> bool:
+        kids_file = paths.home / f"kids-{port}.txt"
+        kids = [int(p) for p in kids_file.read_text().split()] if kids_file.exists() else []
+        return _gone([started["pid"], *kids]) and not procs.marked(uid=os.getuid(), prefix=f"{DEP}:")
+    assert await _until(nothing_left)
     await manager.close()
 
 
@@ -216,9 +243,9 @@ async def test_one_worker_per_mac_and_generations(env) -> None:
     port = _free_port()
     await manager.start_native_worker(_payload(snap, port))
     with pytest.raises(NativeError) as err:
-        await manager.start_native_worker(_payload(snap, _free_port(), deployment_id="dep-2"))
+        await manager.start_native_worker(_payload(snap, _free_port(), deployment_id=DEP2))
     assert err.value.error_code == "worker_exists" and "at most 1" in str(err.value)
-    await manager.stop_native_worker({"deployment_id": "dep-1", "grace_s": 1})
+    await manager.stop_native_worker({"deployment_id": DEP, "grace_s": 1})
     await manager.close()
 
 
@@ -236,13 +263,13 @@ async def test_a_new_generation_or_changed_payload_restarts(env) -> None:
     assert second["pid"] != first["pid"] and not second.get("existing")
     assert _gone([first["pid"], *old_kids])
     assert (await _settle(manager))["state"] == "ready"
-    record = json.loads(paths.worker_record("dep-1").read_text())
+    record = json.loads(paths.worker_record(DEP).read_text())
     assert record["generation"] == 2 and record["model"]["name"] == "Qwen/Qwen3-0.6B"
     # Same generation, a changed argument: a restart too.
     _kids(paths, port)
     third = await manager.start_native_worker(_payload(snap, port, generation=2, extra_args=["--max-num-seqs", "4"]))
     assert third["pid"] != second["pid"]
-    await manager.stop_native_worker({"deployment_id": "dep-1", "grace_s": 1})
+    await manager.stop_native_worker({"deployment_id": DEP, "grace_s": 1})
     await manager.close()
 
 
@@ -257,11 +284,11 @@ async def test_agent_restart_adopts_a_live_worker(env) -> None:
 
     second = _manager(paths, models)
     result = await second.reconcile()
-    assert result == {"adopted": ["dep-1"], "failed": []}
-    status = await second.native_worker_status({"deployment_id": "dep-1"})
+    assert result == {"adopted": [DEP], "failed": []}
+    status = await second.native_worker_status({"deployment_id": DEP})
     assert status["state"] == "ready" and status["pid"] == started["pid"]
     kids = _kids(paths, port)
-    await second.stop_native_worker({"deployment_id": "dep-1", "grace_s": 1})
+    await second.stop_native_worker({"deployment_id": DEP, "grace_s": 1})
     assert _gone([started["pid"], *kids])
     await second.close()
 
@@ -279,12 +306,12 @@ async def test_a_stale_record_never_signals_a_process_that_reused_its_pid(env) -
     # The recorded number now names an unrelated group leader of the same user.
     stranger = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"], start_new_session=True)
     try:
-        record = json.loads(paths.worker_record("dep-1").read_text())
+        record = json.loads(paths.worker_record(DEP).read_text())
         record.update(pid=stranger.pid, pgid=stranger.pid)  # started_at and cmd stay the worker's
-        paths.worker_record("dep-1").write_text(json.dumps(record))
+        paths.worker_record(DEP).write_text(json.dumps(record))
 
         second = _manager(paths, models)
-        assert await second.reconcile() == {"adopted": [], "failed": ["dep-1"]}
+        assert await second.reconcile() == {"adopted": [], "failed": [DEP]}
         assert stranger.poll() is None  # untouched
         assert _gone(kids)  # the recorded children, verified by creation time, are not
         await second.close()
@@ -303,14 +330,14 @@ async def test_a_setsid_helper_that_outlives_the_leader_is_stopped(env) -> None:
     kids = _kids(paths, port)
     helper = kids[-1]
     assert os.getpgid(helper) == helper != started["pid"]  # its own session
-    deadline = time.monotonic() + 10
-    while helper not in {e["pid"] for e in json.loads(paths.worker_record("dep-1").read_text()).get("family", [])}:
+    deadline = time.monotonic() + WAIT_S
+    while helper not in {e["pid"] for e in json.loads(paths.worker_record(DEP).read_text()).get("family", [])}:
         assert time.monotonic() < deadline, "the helper was never recorded"
         await asyncio.sleep(0.05)
     os.kill(started["pid"], signal.SIGKILL)
     status = await _settle_state(manager, "failed")
     assert status["state"] == "failed"
-    deadline = time.monotonic() + 10
+    deadline = time.monotonic() + WAIT_S
     while not _gone(kids) and time.monotonic() < deadline:
         await asyncio.sleep(0.1)
     assert _gone(kids)  # including the setsid helper
@@ -337,10 +364,10 @@ async def test_agent_restart_marks_a_dead_worker_failed(env) -> None:
     kids = _kids(paths, port)
     await first.close()
     os.kill(started["pid"], signal.SIGKILL)
-    await asyncio.sleep(0.2)
+    assert await _until(lambda: _gone([started["pid"]]))
 
     second = _manager(paths, models)
-    assert (await second.reconcile())["failed"] == ["dep-1"]
+    assert (await second.reconcile())["failed"] == [DEP]
     assert _gone(kids)  # its orphaned children too
     await second.close()
 
@@ -382,7 +409,7 @@ async def test_root_stop_ends_verified_workers_and_skips_every_forged_record(tmp
     kids = _kids(paths, port)
     await manager.close()
     me = psutil.Process()
-    good = json.loads(paths.worker_record("dep-1").read_text())
+    good = json.loads(paths.worker_record(DEP).read_text())
     workers_dir = paths.workers
     # Forged: names sorting before the real one, so they are read first.
     for name, change in BAD_RECORDS.items():
@@ -394,8 +421,8 @@ async def test_root_stop_ends_verified_workers_and_skips_every_forged_record(tmp
         **good, "deployment_id": "a-self", "pid": me.pid, "pgid": me.pid, "started_at": me.create_time(),
     }))
     (workers_dir / "a-\x1b[31mred.json").write_text(json.dumps({**good, "state": "ready", "started_at": "x"}))
-    os.symlink(paths.worker_record("dep-1"), workers_dir / "a-symlink.json")
-    os.link(paths.worker_record("dep-1"), tmp_path / "hardlink-of-dep-1")  # dep-1 itself now has 2 links
+    os.symlink(paths.worker_record(DEP), workers_dir / "a-symlink.json")
+    os.link(paths.worker_record(DEP), tmp_path / "hardlink-of-dep-1")  # dep-1 itself now has 2 links
     os.mkfifo(workers_dir / "a-fifo.json")
 
     said: list[str] = []
@@ -419,7 +446,7 @@ def test_root_reads_nothing_through_a_symlinked_native_dir(tmp_path: Path) -> No
     (elsewhere / "x.json").write_text(json.dumps({"state": "ready", "pid": os.getpid()}))
     os.symlink(tmp_path / "elsewhere", layout.state_dir / "native")
     said: list[str] = []
-    assert ds._worker_records(layout, os.getuid(), say=said.append) == []
+    assert ds._worker_records(layout, os.getuid(), say=said.append) == ([], set())
 
 
 def test_a_record_of_another_owner_is_not_read(tmp_path: Path) -> None:
@@ -530,8 +557,8 @@ async def test_the_sandboxed_worker_cannot_read_or_write_the_agents_state(env) -
         await manager.start_native_worker(_payload(snap, port))
         assert (await _settle(manager))["state"] == "ready"
         probe = json.loads((paths.home / f"probe-{port}.json").read_text())
-        record = json.loads(paths.worker_record("dep-1").read_text())
-        await manager.stop_native_worker({"deployment_id": "dep-1", "grace_s": 1})
+        record = json.loads(paths.worker_record(DEP).read_text())
+        await manager.stop_native_worker({"deployment_id": DEP, "grace_s": 1})
         await manager.close()
         if sandbox:
             assert record["sandboxed"] is True and record["argv"][0] == "/usr/bin/sandbox-exec"
@@ -572,11 +599,11 @@ async def test_a_corrupt_record_hides_nothing(tmp_path: Path, env) -> None:
     assert (await _settle(manager))["state"] == "ready"
     kids = _kids(paths, port)
     await manager.close()
-    paths.worker_record("dep-1").write_text("{corrupt")
+    paths.worker_record(DEP).write_text("{corrupt")
 
     second = _manager(paths, models)
     status = await second.native_runtime_status({})
-    assert {"deployment_id": "dep-1", "state": "unknown_record", "path": str(paths.worker_record("dep-1"))} in status["workers"]
+    assert {"deployment_id": DEP, "state": "unknown_record", "path": str(paths.worker_record(DEP))} in status["workers"]
     said: list[str] = []
     assert ds.stop_native_workers(layout, os.getuid(), say=said.append, grace_s=1) == []
     assert any("found by their marker" in s for s in said), said
@@ -592,12 +619,12 @@ async def test_the_agent_stops_a_worker_whose_record_is_corrupt(env) -> None:
     assert (await _settle(manager))["state"] == "ready"
     kids = _kids(paths, port)
     await manager.close()
-    paths.worker_record("dep-1").write_text("[]")
+    paths.worker_record(DEP).write_text("[]")
     second = _manager(paths, models)
-    result = await second.stop_native_worker({"deployment_id": "dep-1", "grace_s": 1})
+    result = await second.stop_native_worker({"deployment_id": DEP, "grace_s": 1})
     assert result["ok"] and _gone([started["pid"], *kids])
-    assert not paths.worker_record("dep-1").exists()  # set aside as .corrupt-<time>
-    assert list(paths.workers.glob("dep-1.json.corrupt-*"))
+    assert not paths.worker_record(DEP).exists()  # set aside as .corrupt-<time>
+    assert list(paths.workers.glob(f"{DEP}.json.corrupt-*"))
 
 
 @pytest.mark.asyncio
@@ -610,9 +637,9 @@ async def test_stop_is_idempotent_for_a_deployment_not_running(env) -> None:
     }
     await manager.start_native_worker(_payload(snap, _free_port()))
     assert (await _settle(manager))["state"] == "ready"
-    first = await manager.stop_native_worker({"deployment_id": "dep-1", "grace_s": 1})
+    first = await manager.stop_native_worker({"deployment_id": DEP, "grace_s": 1})
     assert first["stopped"] is True
-    again = await manager.stop_native_worker({"deployment_id": "dep-1", "grace_s": 1})
+    again = await manager.stop_native_worker({"deployment_id": DEP, "grace_s": 1})
     assert again["ok"] and again["stopped"] is False and again["reason"] == "not running"
     await manager.close()
 
@@ -629,8 +656,8 @@ async def test_after_a_restart_the_cleanup_stop_ends_an_adopted_worker(env) -> N
     kids = _kids(paths, port)
     await first.close()
     second = _manager(paths, models)
-    assert (await second.reconcile())["adopted"] == ["dep-1"]
-    result = await second.stop_native_worker({"deployment_id": "dep-1", "grace_s": 1})
+    assert (await second.reconcile())["adopted"] == [DEP]
+    result = await second.stop_native_worker({"deployment_id": DEP, "grace_s": 1})
     assert result["ok"] and result["stopped"] is True
     assert _gone([started["pid"], *kids])
     assert (await second.stop_native_worker({"deployment_id": "unknown-dep", "grace_s": 30}))["reason"] == "not running"
@@ -648,14 +675,14 @@ async def test_a_helper_detaching_after_the_leader_dies_is_found_by_its_marker(e
     kids = _kids(paths, port)
     os.kill(started["pid"], signal.SIGKILL)
     late_file = paths.home / f"late-{port}.txt"
-    deadline = time.monotonic() + 10
+    deadline = time.monotonic() + WAIT_S
     while not late_file.exists() or not late_file.read_text():
         assert time.monotonic() < deadline
         await asyncio.sleep(0.02)
     late = int(late_file.read_text())
     assert os.getpgid(late) == late
     await _settle_state(manager, "failed")
-    result = await manager.stop_native_worker({"deployment_id": "dep-1", "grace_s": 1})
+    result = await manager.stop_native_worker({"deployment_id": DEP, "grace_s": 1})
     assert result["ok"]
     assert _gone([started["pid"], *kids, late])
     await manager.close()
@@ -687,8 +714,8 @@ async def test_without_sandbox_exec_starts_are_refused_unless_disabled(env, monk
     deliberate = _manager(paths, models, sandbox=False)
     await deliberate.start_native_worker(_payload(snap, _free_port()))
     assert (await _settle(deliberate))["state"] == "ready"
-    assert json.loads(paths.worker_record("dep-1").read_text())["sandboxed"] is False
-    await deliberate.stop_native_worker({"deployment_id": "dep-1", "grace_s": 1})
+    assert json.loads(paths.worker_record(DEP).read_text())["sandboxed"] is False
+    await deliberate.stop_native_worker({"deployment_id": DEP, "grace_s": 1})
     await deliberate.close()
 
 
@@ -706,6 +733,14 @@ async def test_an_unknown_sandbox_setting_refuses_starts(env) -> None:
     await manager.close()
 
 
+def test_the_production_marker_name() -> None:
+    # The fixture renames it per run; the name the agent ships is this one.
+    import inspect
+
+    for module in (workers, procs):
+        assert 'MARKER_ENV = "FADEN_NATIVE_WORKER"' in inspect.getsource(module)
+
+
 @pytest.mark.parametrize(
     ("sent", "expected"),
     [(None, "default"), (120, 120), (90.5, 90), (5, 60), (99_999, 3600), ("600", 600)],
@@ -718,10 +753,10 @@ async def test_the_backend_may_set_the_readiness_deadline(env, sent, expected) -
     if sent is not None:
         payload["start_timeout_s"] = sent
     await manager.start_native_worker(payload)
-    record = json.loads(paths.worker_record("dep-1").read_text())
+    record = json.loads(paths.worker_record(DEP).read_text())
     want = workers.ready_timeout(workers.snapshot_bytes(snap)) if expected == "default" else expected
     assert record["timeout_s"] == want
-    await manager.stop_native_worker({"deployment_id": "dep-1", "grace_s": 1})
+    await manager.stop_native_worker({"deployment_id": DEP, "grace_s": 1})
     await manager.close()
 
 

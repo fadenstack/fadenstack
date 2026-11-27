@@ -12,6 +12,7 @@ image with this configuration is part of the model-TLS end-to-end kit.)
 from __future__ import annotations
 
 import json
+import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -130,6 +131,12 @@ class _Runtime:
         return 0, self.log_text
 
     log_text = ""
+
+
+@pytest.fixture(autouse=True)
+def _linux(monkeypatch: pytest.MonkeyPatch) -> None:
+    """These tests cover the container nginx backend, which is what Linux uses (on a Mac, test_native_proxy.py)."""
+    monkeypatch.setattr(sys, "platform", "linux")
 
 
 @pytest.fixture
