@@ -739,3 +739,35 @@ def test_the_production_marker_name() -> None:
 
     for module in (workers, procs):
         assert 'MARKER_ENV = "FADEN_NATIVE_WORKER"' in inspect.getsource(module)
+
+
+@pytest.mark.parametrize(
+    ("sent", "expected"),
+    [(None, "default"), (120, 120), (90.5, 90), (5, 60), (99_999, 3600), ("600", 600)],
+)
+@pytest.mark.asyncio
+async def test_the_backend_may_set_the_readiness_deadline(env, sent, expected) -> None:
+    paths, models, snap = env
+    manager = _manager(paths, models)
+    payload = _payload(snap, _free_port())
+    if sent is not None:
+        payload["start_timeout_s"] = sent
+    await manager.start_native_worker(payload)
+    record = json.loads(paths.worker_record(DEP).read_text())
+    want = workers.ready_timeout(workers.snapshot_bytes(snap)) if expected == "default" else expected
+    assert record["timeout_s"] == want
+    await manager.stop_native_worker({"deployment_id": DEP, "grace_s": 1})
+    await manager.close()
+
+
+@pytest.mark.parametrize("bad", ["soon", True, float("nan"), [60]])
+@pytest.mark.asyncio
+async def test_a_bad_readiness_deadline_is_refused(env, bad) -> None:
+    paths, models, snap = env
+    manager = _manager(paths, models)
+    payload = _payload(snap, _free_port())
+    payload["start_timeout_s"] = bad
+    with pytest.raises(NativeError) as err:
+        await manager.start_native_worker(payload)
+    assert err.value.error_code == "invalid_payload" and "start_timeout_s" in str(err.value)
+    await manager.close()

@@ -17,6 +17,8 @@ from faden_agent.native.common import NativeError, NativePaths, check_id
 SHIM = 'echo "faden: NOFILE soft=$(ulimit -n) hard=$(ulimit -Hn)"; exec "$@"'
 
 MAX_UTILIZATION = 0.95
+#: An optional backend-sent readiness deadline is clamped into this range.
+START_TIMEOUT_RANGE = (60, 3600)
 LOG_MAX_BYTES = 20 << 20
 
 #: extra_args the backend may pass, with the value each takes (None: a switch).
@@ -63,6 +65,8 @@ class WorkerSpec:
     env: dict[str, str] = field(default_factory=dict)
     #: The backend's model id, Hub repo and revision, kept in the record for the operator.
     model_info: dict[str, str | None] = field(default_factory=dict)
+    #: The backend's readiness deadline, already clamped; None: :func:`ready_timeout`.
+    start_timeout_s: int | None = None
 
 
 def _int(value: Any, what: str, lo: int, hi: int) -> int:
@@ -193,7 +197,24 @@ def parse_spec(payload: dict[str, Any], *, model_root: Path) -> WorkerSpec:
         env=check_env(payload.get("env")),
         model_info={k: (str(model[k])[:256] if model.get(k) is not None else None)
                     for k in ("id", "hf_repo_id", "revision")},
+        start_timeout_s=_start_timeout(payload.get("start_timeout_s")),
     )
+
+
+def _start_timeout(value: Any) -> int | None:
+    """Optional (C3); absent or null keeps the size-based default, out of range is clamped."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise NativeError("start_timeout_s must be a number of seconds")
+    try:
+        seconds = float(value)
+    except (TypeError, ValueError) as exc:
+        raise NativeError("start_timeout_s must be a number of seconds") from exc
+    if seconds != seconds:  # NaN
+        raise NativeError("start_timeout_s must be a number of seconds")
+    lo, hi = START_TIMEOUT_RANGE
+    return int(min(max(seconds, lo), hi))
 
 
 def vllm_args(spec: WorkerSpec, venv: Path) -> list[str]:

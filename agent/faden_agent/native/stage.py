@@ -24,6 +24,7 @@ import secrets
 import shutil
 import tarfile
 import time
+import zlib
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -44,6 +45,7 @@ MAX_UNPACKED = 64 << 30
 #: ... but never less than this (a small layer's tar padding compresses far better).
 MIN_LIMIT = 256 << 20
 _CHUNK = 1 << 20
+_ZSTD_MAGIC = b"\x28\xb5\x2f\xfd"
 
 
 def _unsafe(message: str) -> NativeError:
@@ -137,7 +139,10 @@ class _Capped:
         self.sha = hashlib.sha256()
 
     def read(self, size: int = -1) -> bytes:
-        data = self._raw.read(size if size is not None and size >= 0 else _CHUNK)
+        try:
+            data = self._raw.read(size if size is not None and size >= 0 else _CHUNK)
+        except (OSError, EOFError, zlib.error) as exc:  # gzip.BadGzipFile is an OSError
+            raise NativeError(f"the layer is not a valid gzip stream: {exc}", code="invalid_image") from exc
         self.count += len(data)
         if self.count > self._limit:
             raise _unsafe(f"the layer unpacks to more than {self._limit} bytes")
@@ -149,9 +154,17 @@ class _Capped:
 def _layer_stream(outer: tarfile.TarFile, member: tarfile.TarInfo, limit: int) -> Iterator[_Capped]:
     handle = outer.extractfile(member)
     assert handle is not None
-    head = handle.read(2)
+    # docker save hands the layer over as stored: plain (classic store) or
+    # gzip (containerd store). The diff_id is over the plain tar either way.
+    head = handle.read(4)
     handle.seek(0)
-    raw: IO[bytes] = gzip.GzipFile(fileobj=handle, mode="rb") if head == b"\x1f\x8b" else handle  # type: ignore[assignment]
+    if head.startswith(_ZSTD_MAGIC):
+        raise NativeError(
+            "the runtime layer is zstd-compressed, which this agent cannot unpack; "
+            "publish the carrier with a gzip layer",
+            code="invalid_image",
+        )
+    raw: IO[bytes] = gzip.GzipFile(fileobj=handle, mode="rb") if head[:2] == b"\x1f\x8b" else handle  # type: ignore[assignment]
     try:
         yield _Capped(raw, limit)
     finally:
@@ -220,6 +233,13 @@ def extract_layer(stream: IO[bytes], dest: Path, *, limit: int) -> int:
     links: list[str] = []
     total = 0
     count = 0
+    try:
+        return _extract(stream, dest, limit=limit, files=files, links=links, total=total, count=count)
+    except tarfile.TarError as exc:
+        raise NativeError(f"the layer is not a valid tar: {exc}", code="invalid_image") from exc
+
+
+def _extract(stream: IO[bytes], dest: Path, *, limit: int, files: set[str], links: list[str], total: int, count: int) -> int:
     with tarfile.open(fileobj=stream, mode="r|") as layer:
         for member in layer:
             count += 1
@@ -407,6 +427,9 @@ def stage_from_tar(
         os.rename(staging, final)
         fsync_dir(bundle_dir)
         return final
+    except tarfile.TarError as exc:  # the downloaded image tar itself
+        shutil.rmtree(staging, ignore_errors=True)
+        raise NativeError(f"the runtime image is not a valid docker-save tar: {exc}", code="invalid_image") from exc
     except BaseException:
         shutil.rmtree(staging, ignore_errors=True)
         raise

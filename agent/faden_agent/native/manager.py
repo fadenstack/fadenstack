@@ -410,7 +410,7 @@ class NativeRuntimeManager:
                           "bytes": size},
                 "runtime_root": str(runtime / "runtime"),
                 "log_path": str(log_path),
-                "timeout_s": workers.ready_timeout(size),
+                "timeout_s": spec.start_timeout_s or workers.ready_timeout(size),
                 "state": "starting",
                 "ready_at": None,
                 "exit_code": None,
