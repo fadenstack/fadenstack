@@ -1179,6 +1179,11 @@ async def _drain_commands(
     await session.commit()
 
 
+#: Close code for a stream whose session the stale-session reaper ended
+#: (beside 4401 unauthorised and 4408 idle timeout).
+STREAM_SESSION_REAPED = 4410
+
+
 @router.websocket("/nodes/stream")
 async def system_node_stream(websocket: WebSocket) -> None:
     """Persistent outbound stream channel used by node agents."""
@@ -1198,6 +1203,8 @@ async def system_node_stream(websocket: WebSocket) -> None:
         gateway_sync=getattr(getattr(websocket.app.state, "llm_service", None), "gateway_sync", None),
     )
     stream_session = None
+    # Set when the reaper already ended this session: its close is done.
+    reaped = False
     try:
         node, credential = await service.authenticate_agent(
             authorization=websocket.headers.get("authorization"),
@@ -1314,6 +1321,17 @@ async def system_node_stream(websocket: WebSocket) -> None:
                     continue
 
             message_type = str(payload.get("type") or "").strip().lower()
+            if message_type == "heartbeat" and await service.stream_session_was_closed(session=stream_session):
+                # Reaped while silent: this connection's session is over. Close
+                # it so the agent reconnects into a fresh one -- every agent
+                # reconnects on any close -- rather than heartbeat on a session
+                # the backend counts as gone, on a machine it counts as offline.
+                logging.getLogger(__name__).info(
+                    "Node agent %s heartbeated on a session closed as stale; closing its stream.", _node_id,
+                )
+                await websocket.close(code=STREAM_SESSION_REAPED, reason="Session closed as stale; reconnect")
+                reaped = True
+                break
             if message_type == "heartbeat":
                 status_value = str(payload.get("status") or "healthy")
                 capabilities_payload = payload.get("capabilities")
@@ -1389,7 +1407,7 @@ async def system_node_stream(websocket: WebSocket) -> None:
         # stays queued and goes out in ``hello_ack`` when the agent comes
         # back.  Dropping the event just stops the map growing forever.
         get_command_notifier().forget(_node_id)
-        if stream_session is not None:
+        if stream_session is not None and not reaped:
             try:
                 await service.close_stream_session(session=stream_session)
                 await session.commit()
