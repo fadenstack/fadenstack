@@ -218,6 +218,7 @@ def test_every_requirement_in_the_shipped_lock_is_hashed() -> None:
 def test_the_build_installs_with_require_hashes_and_no_other_index() -> None:
     script = (MAC / "build_mac_runtime.sh").read_text()
     assert "--require-hashes" in script
+    assert "--no-build" in script
     assert "--index-url https://pypi.org/simple" in script
     for banned in ("extra-index-url", "unsafe-best-match", "download.pytorch.org", "git+"):
         assert banned not in script, banned

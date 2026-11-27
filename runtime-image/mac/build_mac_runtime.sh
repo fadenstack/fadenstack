@@ -78,7 +78,8 @@ sed "s#@WHEELS@#$(cd "$WHEELS" && pwd)#" "$HERE/requirements-lock.txt" > "$LOCK"
 # index; everything else is a verified local wheel.
 # --require-hashes: every line carries its sha256 (hash_lock.py), and a file
 # whose hash is not listed, or a line without one, fails the build.
-uv pip install --python "$RT/venv/bin/python" --no-deps --require-hashes \
+# --no-build: wheels only; nothing is ever built from an sdist at install time.
+uv pip install --python "$RT/venv/bin/python" --no-deps --require-hashes --no-build \
   --index-url https://pypi.org/simple \
   -r "$LOCK"
 

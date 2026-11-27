@@ -57,9 +57,20 @@ python collect_deps.py /tmp/mac-deps          # fetch, build from git, verify ag
 6. After review, run `./publish_deps.sh /tmp/mac-deps`. Then the CI build (`mac-runtime-release.yml`) can run.
 
 ## Building
-```sh
-# CI and a cold machine: wheels from the mirror release
-runtime-image/mac/build_mac_runtime.sh --out /tmp/macbuild
-# Before the mirror is published: the same wheels from a local collection (still checked by sha256)
-runtime-image/mac/build_mac_runtime.sh --out /tmp/macbuild --deps /tmp/mac-deps
-```
+There are two paths, and both install exactly the pinned files.
+
+1. **With the mirror published** (CI, a cold machine, the release): the
+   off-PyPI wheels are downloaded from `mac-runtime-deps-1`.
+   ```sh
+   runtime-image/mac/build_mac_runtime.sh --out /tmp/macbuild
+   ```
+2. **Before the mirror is published** (e.g. the lab merge): the same wheels from
+   a local collection. Each file is still checked against its `deps.json`
+   sha256, so it is the same build.
+   ```sh
+   python runtime-image/mac/collect_deps.py /tmp/mac-deps   # once; verifies every pin
+   runtime-image/mac/build_mac_runtime.sh --out /tmp/macbuild --deps /tmp/mac-deps
+   ```
+
+Either way the install is `--require-hashes --no-build`: wheels only, never an
+sdist built at install time.
