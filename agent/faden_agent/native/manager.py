@@ -29,6 +29,7 @@ from typing import Any
 import httpx
 import psutil
 
+from faden_agent.model_puller import _lock_for_model_dir
 from faden_agent.native import proc as procs
 from faden_agent.native import sandbox as sandboxing
 from faden_agent.native import stage as staging
@@ -125,6 +126,21 @@ class NativeRuntimeManager:
 
     def _records(self) -> list[dict[str, Any]]:
         return self._scan()[0]
+
+    def model_paths_in_use(self) -> tuple[list[str], int]:
+        """Snapshot paths a worker may still be reading, and how many records are unreadable.
+
+        Every record that is not stopped counts, and a failed one only while its process lives; a
+        record without an absolute path is returned as it is (the caller refuses it).
+        """
+        good, bad = self._scan()
+        paths = []
+        for r in good:
+            state = r.get("state")
+            if state == "stopped" or (state == "failed" and self._leader(r) is None):
+                continue
+            paths.append(str((r.get("model") or {}).get("snapshot_path") or "?"))
+        return paths, len(bad)
 
     def _scan(self) -> tuple[list[dict[str, Any]], list[Path]]:
         """Valid records, and the paths of the ones that are not (reported, never ignored)."""
@@ -307,7 +323,10 @@ class NativeRuntimeManager:
                 "unsandboxed deliberately.",
                 code="sandbox_unavailable",
             )
-        async with self._lock:
+        # The model's lock (the one a sync and remove_model take) is held while the worker starts and its
+        # record is saved, so a removal either sees the worker or finishes before it begins.
+        model_dir = self._model_root.resolve(strict=False) / spec.snapshot.relative_to(self._model_root.resolve(strict=False)).parts[0]
+        async with self._lock, _lock_for_model_dir(model_dir):
             current = self._record(spec.deployment_id)
             if current and current.get("state") in LIVE and self._leader(current) is not None:
                 runtime = self._newest_runtime(spec.bundle_id, spec.layer_digest)

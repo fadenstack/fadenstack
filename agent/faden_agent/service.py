@@ -487,6 +487,7 @@ class NodeAgentService:
             manager = NativeRuntimeManager(
                 paths=NativePaths.for_state_path(self._config.state_path),
                 fetch_tar=_fetch_tar,
+                model_root=Path(self._config.model_store_root),
                 max_workers=self._config.native_max_workers,
                 sandbox=self._config.native_sandbox,
                 sandbox_config_error=self._config.native_sandbox_error,
@@ -504,6 +505,8 @@ class NodeAgentService:
         if result["adopted"] or result["failed"]:
             log.info("Native workers after restart: %s", result)
         static_capabilities.update(manager.capabilities())
+        # Darwin only (a native manager exists only there): the backend sends remove_model only to agents saying so.
+        static_capabilities["model_remove"] = 1
         await manager.refresh_metal()
         self._native = manager
         return manager

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 import threading
 import time
 from collections.abc import Callable
@@ -101,6 +102,13 @@ def store_problem(cache_dir: str, hf_repo_id: str | None = None) -> str | None:
         candidates += [root / folder / part for part in ("blobs", "refs", "snapshots")]
     for path in candidates:
         if path.exists() and not os.access(path, os.W_OK | os.X_OK):
+            if sys.platform == "darwin":
+                # The service has no $USER, and root must not chown inside the service's own
+                # directory (a hard-link risk): starting the service again re-hands the store.
+                return (
+                    f"{path} belongs to {_owner(path)} and the agent (the _fadenagent service user) cannot write to it. "
+                    "Fix it on the machine by running 'sudo faden-agent start', which hands the model store back to the service."
+                )
             user = os.environ.get("USER") or "the agent's user"
             return (
                 f"{path} belongs to {_owner(path)} and the agent (running as {user}) cannot write to it. "
@@ -161,6 +169,21 @@ def _adopt_files(hf_cache: Path, model_dir: Path, commit: str, siblings: list[An
             adopt_blob(source, model_dir / "blobs" / source.name)
 
 
+def _lfs_sha256(sibling: Any) -> str:
+    lfs = getattr(sibling, "lfs", None)
+    value = lfs.get("sha256") if isinstance(lfs, dict) else getattr(lfs, "sha256", None)
+    return str(value or "")
+
+
+def _keep_xet_cache_in_store(cache_dir: str) -> None:
+    """Xet's chunk cache defaults to $HOME (the state dir): keep it in the store, on the preflighted volume."""
+    target = str(Path(cache_dir) / ".cache" / "xet")
+    os.environ["HF_XET_CACHE"] = target
+    constants = sys.modules.get("huggingface_hub.constants")
+    if constants is not None and hasattr(constants, "HF_XET_CACHE"):
+        constants.HF_XET_CACHE = target  # already imported: its value was read at import time
+
+
 def download_model(
     *,
     hf_repo_id: str,
@@ -182,6 +205,8 @@ def download_model(
     (*machine_hf_cache*) already holds at that commit is linked into the store
     first, so it is neither downloaded nor kept twice.
     """
+    if sys.platform == "darwin":
+        _keep_xet_cache_in_store(cache_dir)
     from huggingface_hub import HfApi, hf_hub_download  # noqa: PLC0415
 
     wanted_revision = revision or "main"
@@ -203,6 +228,24 @@ def download_model(
 
     if machine_hf_cache:
         _adopt_files(Path(machine_hf_cache), model_dir, commit, siblings)
+
+    if sys.platform == "darwin":
+        from faden_agent.model_puller import preflight_space  # noqa: PLC0415
+
+        have = 0
+        # What is missing: the files not yet in the commit's snapshot, less partial downloads.
+        snapshot = model_dir / "snapshots" / commit
+        for sibling in siblings:
+            size = int(getattr(sibling, "size", 0) or 0)
+            link = snapshot / sibling.rfilename
+            if link.is_file():
+                have += size
+        # Partial downloads count only for files this download wants (an LFS file's blob is named by its sha256).
+        wanted_blobs = tuple(_lfs_sha256(sb) for sb in siblings)
+        partial = sum(
+            p.stat().st_size for p in blobs.glob("*.incomplete") if any(w and p.name.startswith(w) for w in wanted_blobs)
+        ) if blobs.is_dir() else 0
+        preflight_space(Path(cache_dir), max(0, total - have - partial))
 
     done = 0
     current = ""
