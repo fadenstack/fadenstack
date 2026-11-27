@@ -21,7 +21,7 @@ import psutil
 
 from faden_agent import __version__
 from faden_agent.config import AgentConfig, _default_state_path
-from faden_agent import server_trust
+from faden_agent import darwin_service, server_trust
 from faden_agent.service import NodeAgentService
 from faden_agent.single_instance import AlreadyRunningError, SingleInstanceLock
 
@@ -37,6 +37,8 @@ _SHELL_NAMES = frozenset({
     "cmd", "cmd.exe", "powershell", "powershell.exe", "pwsh", "pwsh.exe",
 })
 _IS_WINDOWS = platform.system() == "Windows"
+#: A Mac runs the agent as a system LaunchDaemon under its own account (darwin_service).
+_IS_DARWIN = platform.system() == "Darwin"
 _ENV_PREFIX = "FADEN_NODE_AGENT_"
 
 # Someone has to walk to a browser and click, so wait in human time.
@@ -61,6 +63,8 @@ def _env_file_path() -> Path:
     """
     if _IS_WINDOWS:
         return _WIN_ENV_FILE
+    if _IS_DARWIN:
+        return darwin_service.Layout().env_file
     if os.getuid() == 0:  # type: ignore[attr-defined]
         return _LINUX_SYSTEM_ENV_FILE
     if _LINUX_SYSTEM_ENV_FILE.exists() and os.access(_LINUX_SYSTEM_ENV_FILE, os.W_OK):
@@ -69,9 +73,21 @@ def _env_file_path() -> Path:
 
 
 def _configure_logging(level: str) -> None:
+    # A Mac's service writes its own log file (launchd never rotates one), and a
+    # WatchedFileHandler reopens it after newsyslog has moved it aside.
+    log_file = os.environ.get(f"{_ENV_PREFIX}LOG_FILE")
+    handlers: list[logging.Handler] | None = None
+    if log_file:
+        from logging.handlers import WatchedFileHandler  # noqa: PLC0415
+
+        try:
+            handlers = [WatchedFileHandler(log_file, encoding="utf-8")]
+        except OSError:
+            handlers = None
     logging.basicConfig(
         level=getattr(logging, level.upper(), logging.INFO),
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+        handlers=handlers,
     )
     # httpx logs every request at INFO. The log forwarder pushes to Loki every
     # few seconds, so each push wrote a line that the next push shipped to
@@ -175,6 +191,8 @@ def _load_env_file() -> dict[str, str]:
     """
     if _IS_WINDOWS:
         return _parse_env_file(_WIN_ENV_FILE)
+    if _IS_DARWIN:
+        return _parse_env_file(darwin_service.Layout().env_file)
     # System-wide first, then overlay user-local
     merged = _parse_env_file(_LINUX_SYSTEM_ENV_FILE)
     merged.update(_parse_env_file(_LINUX_USER_ENV_FILE))
@@ -210,6 +228,9 @@ def _save_env_file(env: dict[str, str]) -> Path:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
         return path
+    if _IS_DARWIN:
+        _require_darwin_root()
+        return darwin_service.write_env_file(darwin_service.Runner(), darwin_service.Layout(), content)
 
     # Linux — try direct write first
     try:
@@ -1183,6 +1204,10 @@ def cmd_join(backend_url: str | None, user: bool | None = None, ca_file: str | N
     certificate of its own making (the installer's ``--ca-file``).
     """
     _banner()
+    if _IS_DARWIN:
+        # Before the config is built and the join is filed: the pending request
+        # and the credential must land where the service will read them.
+        _darwin_prepare(user)
     if ca_file:
         _install_ca_file(ca_file)
 
@@ -1292,6 +1317,9 @@ def cmd_start(user: bool | None = None, ca_file: str | None = None) -> None:
     ``user`` picks a ``systemd --user`` unit (no privilege needed) over the
     system unit; ``None`` decides from what this machine allows.
     """
+    if _IS_DARWIN:
+        _cmd_start_darwin(user, ca_file)
+        return
     if ca_file:
         _install_ca_file(ca_file)
     _load_env_into_process()
@@ -1315,6 +1343,111 @@ def cmd_start(user: bool | None = None, ca_file: str | None = None) -> None:
         _cmd_start_linux_user(agent_bin, env_lines)
     else:
         _cmd_start_linux(agent_bin, env_lines)
+
+
+# -- macOS: a system LaunchDaemon under its own account ------------------------
+
+
+def _require_darwin_root() -> None:
+    if os.geteuid() != 0:
+        _err("On a Mac the agent is a system service: run this with sudo.")
+        sys.exit(1)
+
+
+def _darwin_prepare(user: bool | None) -> darwin_service.Identity:
+    """The account, the directories and a proven-writable state dir; the paths into the environment."""
+    if user:
+        _err("--user is not available on a Mac: the agent runs as a system service.")
+        sys.exit(2)
+    _require_darwin_root()
+    runner, layout = darwin_service.Runner(), darwin_service.Layout()
+    try:
+        identity = darwin_service.ensure_account(runner, layout, _AGENT_VERSION)
+        darwin_service.prepare_files(runner, layout, identity)
+        darwin_service.probe_state_dir(runner, layout, identity)
+    except darwin_service.DarwinServiceError as exc:
+        _err(str(exc))
+        sys.exit(1)
+    # The Mac's own places, whatever a root shell's defaults would have been.
+    os.environ[f"{_ENV_PREFIX}STATE_PATH"] = str(layout.state_file)
+    os.environ[f"{_ENV_PREFIX}MODEL_STORE"] = str(layout.models)
+    _kv("Service account", f"{identity.name} ({identity.uid})")
+    return identity
+
+
+def _cmd_start_darwin(user: bool | None, ca_file: str | None) -> None:
+    identity = _darwin_prepare(user)
+    if ca_file:
+        _install_ca_file(ca_file)
+    _load_env_into_process()
+    # What the service will read: the saved settings plus any given in this
+    # run's environment (the installer's token path passes them that way).
+    env = dict(line.split("=", 1) for line in _collect_env_lines())
+    layout = darwin_service.Layout()
+    env[f"{_ENV_PREFIX}STATE_PATH"] = str(layout.state_file)
+    env[f"{_ENV_PREFIX}MODEL_STORE"] = env.get(f"{_ENV_PREFIX}MODEL_STORE") or str(layout.models)
+    if not env.get(f"{_ENV_PREFIX}BACKEND_URL"):
+        _err("BACKEND_URL is not set. Run 'sudo faden-agent join <backend>' first.")
+        sys.exit(1)
+    _save_env_file(env)
+
+    source = darwin_service.running_binary()
+    if source is None:
+        _err("A Mac service runs the built agent (faden-agent-macos-arm64), not a source install.")
+        sys.exit(1)
+    try:
+        darwin_service.activate(
+            darwin_service.Runner(), layout, identity, source, _AGENT_VERSION, say=print,
+        )
+    except darwin_service.DarwinServiceError as exc:
+        _err(str(exc))
+        sys.exit(1)
+    print(f"\n  {SERVICE_NAME} runs as the system service {darwin_service.LABEL} ({identity.name}).")
+    print(f"  Logs:    {layout.log_file}")
+    print("  Status:  sudo faden-agent status")
+    print("  Stop:    sudo faden-agent stop")
+    print("  Note:    with FileVault on, after an unplanned restart the agent starts only once")
+    print("           someone unlocks the disk. Restart on purpose with: sudo fdesetup authrestart")
+
+
+def _cmd_stop_darwin() -> None:
+    _require_darwin_root()
+    try:
+        was = darwin_service.stop(darwin_service.Runner(), darwin_service.Layout())
+    except darwin_service.DarwinServiceError as exc:
+        _err(str(exc))
+        sys.exit(1)
+    print(f"{SERVICE_NAME} service stopped and removed." if was else f"{SERVICE_NAME} service was not running.")
+
+
+def _cmd_status_darwin() -> None:
+    state = darwin_service.job_state(darwin_service.Runner())
+    if not state.loaded:
+        print(f"{SERVICE_NAME} is not installed as a service ({darwin_service.LABEL}).")
+        sys.exit(3)
+    if state.pid:
+        print(f"{SERVICE_NAME} is running (PID {state.pid}, runs {state.runs}).")
+    else:
+        print(f"{SERVICE_NAME} is loaded but not running (last exit {state.last_exit}).")
+    layout = darwin_service.Layout()
+    print(f"  Build:  {darwin_service.current_build(layout)}")
+    print(f"  Config: {layout.env_file}")
+    print(f"  Logs:   {layout.log_file}")
+
+
+def cmd_uninstall() -> None:
+    """macOS: remove the service, its account, its state and logs."""
+    if not _IS_DARWIN:
+        _err("uninstall is for macOS. On Linux: faden-agent stop, then remove the binary.")
+        sys.exit(2)
+    _require_darwin_root()
+    try:
+        darwin_service.uninstall(darwin_service.Runner(), darwin_service.Layout(), say=print)
+    except darwin_service.DarwinServiceError as exc:
+        _err(str(exc))
+        sys.exit(1)
+    print(f"{SERVICE_NAME} is uninstalled; its state and enrollment credential are deleted.")
+    print("  Remove this machine from Fadenstack too: Machines, the machine, Remove.")
 
 
 # -- the service without root --------------------------------------------------
@@ -1660,6 +1793,8 @@ def cmd_stop() -> None:
     """Stop and remove the faden-agent background service."""
     if _IS_WINDOWS:
         _cmd_stop_windows()
+    elif _IS_DARWIN:
+        _cmd_stop_darwin()
     else:
         _cmd_stop_linux()
 
@@ -1700,6 +1835,8 @@ def cmd_status() -> None:
     """Show service status."""
     if _IS_WINDOWS:
         _cmd_status_windows()
+    elif _IS_DARWIN:
+        _cmd_status_darwin()
     else:
         _cmd_status_linux()
 
@@ -1723,6 +1860,8 @@ def _cmd_status_windows() -> None:
 
 def cmd_run() -> None:
     """Run the agent in the foreground (load env file first)."""
+    if _IS_DARWIN:
+        darwin_service.raise_open_file_limit()
     _load_env_into_process()
     asyncio.run(_run())
 
@@ -1817,6 +1956,7 @@ def main() -> None:
         prog="faden-agent",
         description="Fadenstack node agent — host-side execution bridge.",
     )
+    parser.add_argument("--version", action="version", version=f"faden-agent {_AGENT_VERSION}")
     sub = parser.add_subparsers(dest="command")
     p_configure = sub.add_parser("configure", help="Interactive configuration wizard (or --set KEY=VALUE)")
     p_configure.add_argument(
@@ -1867,6 +2007,10 @@ def main() -> None:
     )
     sub.add_parser("stop", help="Stop and remove the background service")
     sub.add_parser("status", help="Show background service status")
+    sub.add_parser(
+        "uninstall",
+        help="macOS: remove the service, its account, state and logs",
+    )
     p_license = sub.add_parser("license", help="Show licence and attribution for this build")
     p_license.add_argument(
         "--third-party",
@@ -1899,6 +2043,8 @@ def main() -> None:
         cmd_stop()
     elif args.command == "status":
         cmd_status()
+    elif args.command == "uninstall":
+        cmd_uninstall()
     elif args.command == "license":
         cmd_license(third_party=args.third_party)
 
