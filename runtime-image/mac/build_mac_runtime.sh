@@ -2,12 +2,17 @@
 # Build the Fadenstack Mac runtime (vLLM-Metal) as a relocatable tree and pack it
 # into an OCI carrier image. Runs on an Apple Silicon Mac, locally or in CI.
 #
-#   build_mac_runtime.sh [--out DIR] [--wheels DIR] [--tag TAG] [--load]
+#   build_mac_runtime.sh [--out DIR] [--deps DIR] [--tag TAG] [--load]
 #
 #   --out     work and output directory (default: ./build)
-#   --wheels  directory holding vllm_metal-*.whl (the lock points at it)
+#   --deps    a directory of the mirrored wheels to use before downloading
+#             (e.g. collect_deps.py output); each is still checked by sha256
 #   --tag     image tag (default: vllm0.34.0-metal0.34.0-1)
 #   --load    also `docker load` the OCI tar into the local Docker (never pushes)
+#
+# Sources: PyPI by exact version, and the wheels in deps.json only from the
+# mac-runtime-deps-<n> prerelease on fadenstack/fadenstack, verified by sha256
+# (fetch_deps.py). No nightly index, git remote or other release is read.
 #
 # Never pushes. The release workflow pushes the OCI tar it produces.
 #
@@ -19,7 +24,7 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 OUT="$PWD/build"
-WHEELS=""
+DEPS=""
 TAG="vllm0.34.0-metal0.34.0-1"
 REPO="ghcr.io/fadenstack/mac-runtime-arm64"
 LOAD=0
@@ -28,7 +33,7 @@ PYTHON_VERSION="3.12.12"
 while [ $# -gt 0 ]; do
   case "$1" in
     --out) OUT="$2"; shift 2 ;;
-    --wheels) WHEELS="$2"; shift 2 ;;
+    --deps) DEPS="$2"; shift 2 ;;
     --tag) TAG="$2"; shift 2 ;;
     --load) LOAD=1; shift ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
@@ -36,7 +41,6 @@ while [ $# -gt 0 ]; do
 done
 
 [ "$(uname -s)/$(uname -m)" = "Darwin/arm64" ] || { echo "needs an Apple Silicon Mac" >&2; exit 2; }
-[ -n "$WHEELS" ] && [ -d "$WHEELS" ] || { echo "--wheels DIR (with vllm_metal-*.whl) is required" >&2; exit 2; }
 command -v uv >/dev/null || { echo "uv is required" >&2; exit 2; }
 
 STAGE="$OUT/stage"
@@ -57,6 +61,10 @@ uv python install "$PYTHON_VERSION"
 PY="$(uv python find "$PYTHON_VERSION")"
 case "$PY" in "$RT/python/"*) ;; *) echo "python resolved outside the stage: $PY" >&2; exit 1 ;; esac
 
+echo "== mirrored wheels (sha256-pinned)"
+WHEELS="$OUT/wheels"
+"$PY" -I "$HERE/fetch_deps.py" "$WHEELS" ${DEPS:+--from "$DEPS"}
+
 echo "== venv"
 uv venv --relocatable --seed --python "$PY" "$RT/venv"
 # The interpreter symlink must be relative, or the tree does not move.
@@ -66,16 +74,18 @@ echo "== install from the lock"
 LOCK="$OUT/requirements-lock.resolved.txt"
 sed "s#@WHEELS@#$(cd "$WHEELS" && pwd)#" "$HERE/requirements-lock.txt" > "$LOCK"
 # --no-deps: vllm 0.34.0+cpu pins torch==2.14.0 while the lock carries the 2.16
-# nightly vllm-metal was certified with (Gate 0d provenance).
-uv pip install --python "$RT/venv/bin/python" --no-deps \
-  --extra-index-url https://download.pytorch.org/whl/nightly/cpu \
-  --index-strategy unsafe-best-match \
+# nightly vllm-metal was certified with (Gate 0d provenance). PyPI is the only
+# index; everything else is a verified local wheel.
+# --require-hashes: every line carries its sha256 (hash_lock.py), and a file
+# whose hash is not listed, or a line without one, fails the build.
+uv pip install --python "$RT/venv/bin/python" --no-deps --require-hashes \
+  --index-url https://pypi.org/simple \
   -r "$LOCK"
 
 echo "== lock check"
 uv pip freeze --python "$RT/venv/bin/python" | sort > "$OUT/freeze.txt"
-grep -v '^\s*#' "$LOCK" | grep -v '^\s*$' | sed 's/ *#.*//' | sort > "$OUT/lock.sorted"
-if ! diff -u <(sed 's#file://.*/vllm_metal#vllm_metal#' "$OUT/lock.sorted") <(sed 's#file://.*/vllm_metal#vllm_metal#' "$OUT/freeze.txt") > "$OUT/lock.diff"; then
+"$PY" -I "$HERE/fetch_deps.py" --print-requirements --lock "$LOCK" "$OUT" | sort > "$OUT/lock.sorted"
+if ! diff -u <(sed -e 's#file://.*/#file:///#' -e 's/%2B/+/g' "$OUT/lock.sorted") <(sed -e 's#file://.*/#file:///#' -e 's/%2B/+/g' "$OUT/freeze.txt") > "$OUT/lock.diff"; then
   echo "installed set differs from the lock:" >&2; cat "$OUT/lock.diff" >&2; exit 1
 fi
 

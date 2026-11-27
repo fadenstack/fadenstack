@@ -131,3 +131,93 @@ def test_pack_refuses_a_tree_without_its_manifest(tmp_path: Path) -> None:
     (stage / "runtime" / "RUNTIME-MANIFEST.json").unlink()
     with pytest.raises(SystemExit):
         packer.pack(stage, tmp_path / "x.tar", "r:t")
+
+
+# ── the dependency mirror ────────────────────────────────────────────────
+
+fetcher = _load("fetch_deps")
+
+
+def _pins() -> dict:
+    return json.loads((MAC / "deps.json").read_text())
+
+
+def test_the_shipped_lock_builds_from_pypi_and_the_mirror_alone() -> None:
+    assert fetcher.check_lock((MAC / "requirements-lock.txt").read_text(), _pins()) == []
+
+
+def test_every_mirrored_wheel_is_pinned_and_named_safely() -> None:
+    pins = _pins()
+    assert pins["release_tag"].startswith("mac-runtime-deps-")
+    for wheel in pins["wheels"]:
+        assert len(wheel["sha256"] or "") == 64, wheel["name"]
+        assert "+" not in wheel["asset"]
+        assert fetcher.asset_url(pins, wheel).startswith(
+            f"https://github.com/fadenstack/fadenstack/releases/download/{pins['release_tag']}/"
+        )
+
+
+@pytest.mark.parametrize(
+    ("line", "words"),
+    [
+        ("mlx-lm @ git+https://github.com/ml-explore/mlx-lm@4cfc647", "neither a PyPI pin"),
+        ("torch==2.16.0.dev20261013", "nightly"),
+        ("vllm @ https://github.com/vllm-project/vllm/releases/download/v0.34.0/x.whl", "neither a PyPI pin"),
+        ("--extra-index-url https://download.pytorch.org/whl/nightly/cpu", "options are not allowed"),
+        ("foo @ file://@WHEELS@/foo-1-py3-none-any.whl", "not pinned in deps.json"),
+    ],
+)
+def test_the_lock_refuses_anything_from_outside_the_mirror(line: str, words: str) -> None:
+    lock = (MAC / "requirements-lock.txt").read_text() + line + "\n"
+    problems = fetcher.check_lock(lock, _pins())
+    assert any(words in p for p in problems), problems
+
+
+def test_a_pin_the_lock_does_not_use_is_reported() -> None:
+    lock = "\n".join(l for l in (MAC / "requirements-lock.txt").read_text().splitlines() if not l.startswith("vllm-metal"))
+    assert any("pins vllm-metal but the lock does not use it" in p for p in fetcher.check_lock(lock, _pins()))
+
+
+def test_a_wheel_is_taken_only_with_its_pinned_sha256(tmp_path: Path) -> None:
+    good = tmp_path / "src" / "a-1-py3-none-any.whl"
+    good.parent.mkdir()
+    good.write_bytes(b"wheel")
+    pins = {
+        "repository": "fadenstack/fadenstack", "release_tag": "mac-runtime-deps-1",
+        "wheels": [{"name": "a", "file": good.name, "asset": good.name, "sha256": fetcher.sha256(good)}],
+    }
+    fetcher.fetch(tmp_path / "out", source=good.parent, pins=pins)
+    assert (tmp_path / "out" / good.name).read_bytes() == b"wheel"
+
+    good.write_bytes(b"tampered")
+    (tmp_path / "out" / good.name).unlink()
+    with pytest.raises(SystemExit, match="refusing it"):
+        fetcher.fetch(tmp_path / "out", source=good.parent, pins=pins)
+    assert not (tmp_path / "out" / good.name).exists()
+
+
+def test_a_lock_line_without_a_hash_fails_the_check() -> None:
+    lock = (MAC / "requirements-lock.txt").read_text() + "six==1.17.0\n"
+    assert any("six==1.17.0 has no --hash" in p for p in fetcher.check_lock(lock, _pins()))
+
+
+def test_a_mirrored_wheel_with_another_hash_fails_the_check() -> None:
+    text = (MAC / "requirements-lock.txt").read_text()
+    pin = next(w for w in _pins()["wheels"] if w["name"] == "torch")["sha256"]
+    tampered = text.replace(pin, "0" * 64, 1)
+    assert any("is not its deps.json pin" in p for p in fetcher.check_lock(tampered, _pins()))
+
+
+def test_every_requirement_in_the_shipped_lock_is_hashed() -> None:
+    entries = fetcher.parse_lock((MAC / "requirements-lock.txt").read_text())
+    assert len(entries) > 150
+    assert all(hashes for _, _, hashes in entries)
+    assert all(len(h) == 64 for _, _, hashes in entries for h in hashes)
+
+
+def test_the_build_installs_with_require_hashes_and_no_other_index() -> None:
+    script = (MAC / "build_mac_runtime.sh").read_text()
+    assert "--require-hashes" in script
+    assert "--index-url https://pypi.org/simple" in script
+    for banned in ("extra-index-url", "unsafe-best-match", "download.pytorch.org", "git+"):
+        assert banned not in script, banned

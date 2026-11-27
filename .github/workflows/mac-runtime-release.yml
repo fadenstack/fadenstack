@@ -13,6 +13,10 @@
 # runtime-image/runtime-manifest-darwin-arm64-vllm-metal<v>.json so the backend
 # catalogue pins exactly this artifact.
 #
+# Dependencies: PyPI by exact version, plus the wheels pinned in
+# runtime-image/mac/deps.json, fetched from the mac-runtime-deps-<n>
+# prerelease (published once with collect_deps.py + publish_deps.sh).
+#
 # Runner: an Apple Silicon macOS runner (macOS 26, the bundle's minimum).
 # Override with the repository variable MAC_RUNTIME_RUNNER.
 
@@ -25,14 +29,6 @@ on:
         description: "Image tag (e.g. vllm0.34.0-metal0.34.0-1)"
         required: true
         default: vllm0.34.0-metal0.34.0-1
-        type: string
-      vllm_metal_wheel_url:
-        description: "URL of the vllm_metal 0.34.0 cp312 macOS arm64 wheel the lock was certified with"
-        required: true
-        type: string
-      vllm_metal_wheel_sha256:
-        description: "sha256 of that wheel"
-        required: true
         type: string
       push:
         description: "Push to GHCR (off: build and validate only)"
@@ -72,21 +68,14 @@ jobs:
           major="$(sw_vers -productVersion | cut -d. -f1)"
           test "$major" -ge 26 || { echo "macOS $major is below the bundle minimum 26"; exit 1; }
 
-      - name: Fetch the vllm-metal wheel
-        env:
-          URL: ${{ inputs.vllm_metal_wheel_url }}
-          SHA: ${{ inputs.vllm_metal_wheel_sha256 }}
-        run: |
-          mkdir -p "$RUNNER_TEMP/wheels"
-          curl -fsSL "$URL" -o "$RUNNER_TEMP/wheels/vllm_metal-0.34.0-cp312-cp312-macosx_15_0_arm64.whl"
-          echo "$SHA  $RUNNER_TEMP/wheels/vllm_metal-0.34.0-cp312-cp312-macosx_15_0_arm64.whl" | shasum -a 256 -c -
-
       - name: Build, patch, smoke-test and pack
         env:
           TAG: ${{ inputs.tag }}
         run: |
           export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
-          runtime-image/mac/build_mac_runtime.sh --out "$RUNNER_TEMP/build" --wheels "$RUNNER_TEMP/wheels" --tag "$TAG"
+          # Off-PyPI wheels come only from the mac-runtime-deps prerelease, by sha256
+          # (runtime-image/mac/deps.json); no nightly index or git remote is read.
+          runtime-image/mac/build_mac_runtime.sh --out "$RUNNER_TEMP/build" --tag "$TAG"
           cat "$RUNNER_TEMP/build/digests.json" >> "$GITHUB_STEP_SUMMARY"
 
       - uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
