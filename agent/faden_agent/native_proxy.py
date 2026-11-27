@@ -206,9 +206,12 @@ class _Listener:
 class NativeProxy:
     """The proxy: one listener per public port, on its own thread and loop."""
 
-    def __init__(self, limits: ProxyLimits | None = None, *, bind_hosts: tuple[str, ...] = ("0.0.0.0", "::")) -> None:  # noqa: S104
+    def __init__(self, limits: ProxyLimits | None = None, *, bind_hosts: tuple[str, ...] = ("0.0.0.0", "::"),  # noqa: S104
+                 refusal_level: int = logging.WARNING) -> None:
         self.limits = limits or ProxyLimits.from_env()
         self._bind_hosts = bind_hosts
+        #: Refusals are WARNINGs; the self-test refuses strangers on purpose and logs them quieter.
+        self._refusal_level = refusal_level
         self._loop: asyncio.AbstractEventLoop | None = None
         self._thread: threading.Thread | None = None
         self._listeners: dict[int, _Listener] = {}
@@ -446,7 +449,7 @@ class NativeProxy:
             der = ssl_obj.getpeercert(binary_form=True) if ssl_obj else None
             why = client_acceptable(identity, der)
             if why:
-                log.warning("Model proxy: %s refused: %s", ip, why)
+                log.log(self._refusal_level, "Model proxy: %s refused: %s", ip, why)
                 writer.transport.abort()
                 return
             if key not in self._pre:  # evicted by newer arrivals while the handshake finished
@@ -747,7 +750,7 @@ def self_test(limits: ProxyLimits | None = None) -> str | None:
 
     from faden_agent import pki_util  # noqa: PLC0415
 
-    proxy = NativeProxy(limits or ProxyLimits(), bind_hosts=("127.0.0.1",))
+    proxy = NativeProxy(limits or ProxyLimits(), bind_hosts=("127.0.0.1",), refusal_level=logging.DEBUG)
     upstream_server: list[Any] = []
     try:
         ca_key, ca = pki_util.make_ca()
@@ -807,6 +810,7 @@ def self_test(limits: ProxyLimits | None = None) -> str | None:
                     continue
                 if "200" in reply:
                     return "a client that is not the gateway was let through"
+        log.info("Model proxy self-test passed")
         return None
     except Exception as exc:  # noqa: BLE001 - any failure means the proxy cannot be trusted
         return f"{type(exc).__name__}: {exc}"

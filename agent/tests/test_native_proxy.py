@@ -830,3 +830,20 @@ async def test_an_equal_generation_cannot_move_the_target(pki: Pki, tmp_path: Pa
         tls._backend.proxy.stop()  # noqa: SLF001
         up.stop()
         other.stop()
+
+
+def test_the_self_test_logs_no_warning_but_one_info_line(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level("DEBUG", logger="faden_agent.native_proxy"):
+        assert self_test() is None
+    assert not [r for r in caplog.records if r.levelname in ("WARNING", "ERROR")]
+    assert [r.getMessage() for r in caplog.records if r.levelno == 20] == ["Model proxy self-test passed"]
+
+
+def test_a_real_refusal_still_logs_a_warning(rig_factory: Any, pki: Pki, caplog: pytest.LogCaptureFixture) -> None:
+    rig = rig_factory()
+    with caplog.at_level("DEBUG", logger="faden_agent.native_proxy"):
+        assert rig.exchange(GET_HEALTH, pki.wrong_cn) == b""
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline and not any(r.levelname == "WARNING" for r in caplog.records):
+            time.sleep(0.05)
+    assert any(r.levelname == "WARNING" and "refused" in r.getMessage() for r in caplog.records)
