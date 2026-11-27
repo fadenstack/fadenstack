@@ -145,7 +145,8 @@ def test_the_new_agent_keeps_every_command_type_of_0_2_12(old_agent: Path) -> No
     old_types = set(_enum_values(old_agent / "faden_agent" / "models.py"))
     new_types = {c.value for c in NodeCommandType}
     assert old_types <= new_types, f"removed: {sorted(old_types - new_types)}"
-    assert new_types - old_types == NATIVE, "a new command type needs a compat decision (COMPAT DESIGN row 1)"
+    # remove_model (track M): capability-gated (`model_remove`, Mac agents only; COMPAT M-1).
+    assert new_types - old_types == NATIVE | {"remove_model"}, "a new command type needs a compat decision (COMPAT DESIGN row 1)"
 
 
 def _enum_values(path: Path) -> list[str]:

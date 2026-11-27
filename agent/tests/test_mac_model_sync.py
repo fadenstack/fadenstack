@@ -433,7 +433,7 @@ def test_in_use_counts_every_live_state(tmp_path: Path) -> None:
 # ── configured store on a Mac ────────────────────────────────────────────────
 
 def _layout(tmp_path: Path) -> Any:
-    return SimpleNamespace(models=tmp_path / "var-db" / "models")
+    return SimpleNamespace(models=tmp_path / "var-db" / "models", state_dir=tmp_path / "var-db")
 
 
 def test_a_configured_external_store_is_honoured_when_safe(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
@@ -451,7 +451,7 @@ def test_a_configured_external_store_is_honoured_when_safe(tmp_path: Path, monke
     assert "WARNING" in capsys.readouterr().out
 
 
-@pytest.mark.parametrize("bad", ["/srv/faden/models", "relative/dir", "/Users/someone/models", "/System/x", "/nonexistent/zzz"])
+@pytest.mark.parametrize("bad", ["/srv/faden/models", "relative/dir", "/Users/someone/models", "/System/x", "/nonexistent/zzz", "/Library/Fadenstack/m", "/Library/x", "/usr/local/m", "/bin/m", "/sbin/m", "/etc/m", "/private/etc/m", "/Applications/m"])
 def test_an_unsafe_configured_store_is_replaced_loudly(tmp_path: Path, capsys: pytest.CaptureFixture[str], bad: str) -> None:
     from faden_agent import __main__ as m
 
@@ -463,3 +463,57 @@ def test_an_unset_store_is_the_layout_default(tmp_path: Path) -> None:
     from faden_agent import __main__ as m
 
     assert m._darwin_model_store(None, _layout(tmp_path)) == str(_layout(tmp_path).models)
+
+
+def test_a_store_inside_the_state_dir_outside_models_is_refused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    import pwd
+
+    from faden_agent import __main__ as m
+
+    layout = _layout(tmp_path)
+    monkeypatch.setattr(pwd, "getpwnam", lambda _n: SimpleNamespace(pw_uid=os.getuid()))
+    native = layout.state_dir / "native"
+    native.mkdir(parents=True)
+    native.chmod(0o700)
+    assert m._darwin_model_store(str(native), layout) == str(layout.models)
+    assert "WARNING" in capsys.readouterr().out
+    sub = layout.models / "extra"
+    sub.mkdir(parents=True)
+    sub.chmod(0o700)
+    assert m._darwin_model_store(str(sub), layout) == str(sub.resolve())  # under models/: allowed
+
+
+@pytest.mark.asyncio()
+async def test_a_stop_is_not_blocked_by_a_sync_holding_the_model_lock(tmp_path: Path) -> None:
+    """A start waits on the model's lock (a long sync) without holding the manager lock."""
+    import asyncio
+
+    from faden_agent.native.manager import NativeRuntimeManager
+
+    root = tmp_path / "models"
+    snap = root / DIR / "snapshots" / COMMIT
+    snap.mkdir(parents=True)
+    spec = SimpleNamespace(snapshot=snap.resolve())
+    mgr = SimpleNamespace(
+        _model_root=root, _sandbox_config_error=None, _sandbox_wanted=False, _sandbox_available=True,
+        _lock=asyncio.Lock(),
+    )
+    from faden_agent.native import manager as nm
+
+    orig = nm.workers.parse_spec
+    nm.workers.parse_spec = lambda payload, model_root: spec  # type: ignore[assignment]
+    try:
+        sync_lock = model_puller._lock_for_model_dir(root / DIR)
+        await sync_lock.acquire()  # a sync of this model is running
+        start = asyncio.create_task(NativeRuntimeManager.start_native_worker(mgr, {}))  # type: ignore[arg-type]
+        await asyncio.sleep(0.05)
+        assert not start.done()
+        # The manager lock is free: a stop (which takes it) completes meanwhile.
+        await asyncio.wait_for(mgr._lock.acquire(), timeout=1)
+        mgr._lock.release()
+        start.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await start
+        sync_lock.release()
+    finally:
+        nm.workers.parse_spec = orig  # type: ignore[assignment]
