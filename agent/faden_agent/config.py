@@ -167,6 +167,8 @@ class AgentConfig:
     #: How many native (vLLM-Metal) workers a Mac runs at once; 0.7.3's
     #: platform profile is one managed chat deployment per Mac.
     native_max_workers: int = 1
+    #: The Mac's metrics-only pass-through port (native_metrics.py); 0 turns it off.
+    native_metrics_port: int = 9468
     #: Run native workers under sandbox-exec, denied the agent's state
     #: (credential, env file, model-TLS key). Off only to diagnose Metal.
     native_sandbox: bool = True
@@ -253,6 +255,7 @@ class AgentConfig:
             container_runtime=os.getenv("FADEN_NODE_AGENT_CONTAINER_RUNTIME", "auto").strip().lower() or "auto",
             image_download_dir=os.getenv("FADEN_NODE_AGENT_IMAGE_DOWNLOAD_DIR", ""),
             native_max_workers=_env_count("FADEN_NODE_AGENT_NATIVE_MAX_WORKERS", 1),
+            native_metrics_port=_env_count("FADEN_NODE_AGENT_NATIVE_METRICS_PORT", 9468, lo=0, hi=65535),
             native_sandbox=_env_strict_switch("FADEN_NODE_AGENT_NATIVE_SANDBOX", True)[0],
             native_sandbox_error=_env_strict_switch("FADEN_NODE_AGENT_NATIVE_SANDBOX", True)[1],
             prevent_idle_sleep=_env_strict_switch("FADEN_NODE_AGENT_PREVENT_IDLE_SLEEP", True)[0],

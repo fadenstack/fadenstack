@@ -159,6 +159,8 @@ class NodeAgentService:
         self._ray_manager: Any = None  # typed import is local (optional dep)
         #: The native vLLM-Metal runtime (native/manager.py), on a Mac only.
         self._native: Any = None
+        #: The Mac's GET /metrics pass-through (native_metrics.py).
+        self._metrics_passthrough: Any = None
         #: macOS: the idle-sleep guard (power.py).
         self._power: Any = None
         self._model_tls: ModelTls | None = None
@@ -190,6 +192,7 @@ class NodeAgentService:
         )
         add_agent_capabilities(static_capabilities)
         native_manager = await self._start_native(static_capabilities)
+        self._start_native_metrics(static_capabilities)
         if sys.platform == "darwin":
             # Read-only facts for the console's Mac card; a Mac only (Linux keys stay as 0.2.12's).
             static_capabilities["mac_status"] = await collect_mac_status()
@@ -508,6 +511,24 @@ class NodeAgentService:
         )
         await self._power.start()
 
+    def _start_native_metrics(self, static_capabilities: dict[str, Any]) -> None:
+        """Darwin only: the metrics-only pass-through, advertised as ``native_metrics: {port}`` once it is bound."""
+        if self._native is None or not self._config.native_metrics_port or self._metrics_passthrough is not None:
+            return
+        from faden_agent.native_metrics import MetricsPassthrough, worker_port  # noqa: PLC0415
+
+        native = self._native
+        server = MetricsPassthrough(lambda: worker_port(native), port=self._config.native_metrics_port)
+        try:
+            server.start()
+        except OSError as exc:
+            log.error("The metrics pass-through could not bind port %s; native_metrics is not advertised: %s",
+                      self._config.native_metrics_port, exc)
+            return
+        self._metrics_passthrough = server
+        static_capabilities["native_metrics"] = {"port": server.port}
+        log.info("Metrics pass-through on port %s", server.port)
+
     async def _start_native(self, static_capabilities: dict[str, Any]) -> Any:
         """On a Mac: the native vLLM-Metal runtime, its workers adopted before any command arrives.
 
@@ -581,6 +602,8 @@ class NodeAgentService:
         if proxy is not None:
             # Open streams get up to 30 s (inside the LaunchDaemon's ExitTimeOut 45); an upgrade drops the rest.
             await asyncio.to_thread(proxy.stop)
+        if self._metrics_passthrough is not None:
+            await asyncio.to_thread(self._metrics_passthrough.stop)
         if self._power is not None:
             await self._power.stop()
         if self._native is not None:
