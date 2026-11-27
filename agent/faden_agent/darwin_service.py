@@ -32,6 +32,7 @@ not writable by group or others.
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 import plistlib
 import re
@@ -822,7 +823,12 @@ def activate(
         say("  Waiting for the service to settle...")
         ok, why = wait_healthy(runner, sleep=sleep, clock=clock)
     if ok:
-        prune_builds(layout, [name, previous] if previous else [name])
+        # Only a change of build prunes (an upgrade, or a first install that finds
+        # a build an interrupted run staged), and it keeps this build and the one
+        # before it. A restart of the same build (stop, then start) keeps every
+        # build, so the rollback target an upgrade left behind survives it.
+        if previous != name:
+            prune_builds(layout, [name, previous] if previous else [name])
         say(f"  Service {LABEL} {why}.")
         return
 
@@ -945,14 +951,36 @@ def running_binary() -> Path | None:
     return None
 
 
-def raise_open_file_limit(target: int = 65536) -> None:
-    """launchd gives a job soft 256 / hard unlimited; raise the soft limit here, not in the plist."""
+def _limit_text(value: int, infinity: int) -> str:
+    return "unlimited" if value == infinity else str(value)
+
+
+def raise_open_file_limit(target: int = 65536) -> tuple[int, str]:
+    """launchd gives a job soft 256 / hard unlimited; raise the soft limit here, not in the plist.
+
+    Returns the log level and the line to log once logging is set up, because
+    ``launchctl procinfo`` does not show another process's limits: the agent's
+    own log is where an admin sees what it runs with.
+    """
     try:
         import resource  # noqa: PLC0415 - POSIX only
-
+    except ImportError as exc:
+        return logging.WARNING, f"Open-file limit not raised: {exc}"
+    inf = resource.RLIM_INFINITY
+    try:
         soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
-        want = target if hard == resource.RLIM_INFINITY else min(target, hard)
-        if soft < want:
-            resource.setrlimit(resource.RLIMIT_NOFILE, (want, hard))
-    except (ImportError, ValueError, OSError):
-        pass
+    except (ValueError, OSError) as exc:
+        return logging.WARNING, f"Open-file limit not raised: could not read it ({exc})"
+    want = target if hard == inf else min(target, hard)
+    if soft >= want:
+        return logging.INFO, f"Open-file limit: soft {_limit_text(soft, inf)}, hard {_limit_text(hard, inf)}"
+    try:
+        resource.setrlimit(resource.RLIMIT_NOFILE, (want, hard))
+    except (ValueError, OSError) as exc:
+        return logging.WARNING, (
+            f"Open-file limit not raised: soft {_limit_text(soft, inf)} to {want} failed ({exc}); "
+            f"hard {_limit_text(hard, inf)}"
+        )
+    return logging.INFO, (
+        f"Open-file limit: soft {want} (raised from {_limit_text(soft, inf)}), hard {_limit_text(hard, inf)}"
+    )

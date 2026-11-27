@@ -663,6 +663,24 @@ class TestActivation:
         kept = sorted(p.name for p in layout.builds.iterdir() if p.name != "current")
         assert kept == sorted(names[1:])
 
+    def test_a_restart_of_the_same_build_keeps_the_rollback_target(
+        self, mac: FakeMac, layout: Layout, tmp_path: Path
+    ) -> None:
+        # Live run on .22: upgrade kept two builds, then stop + start pruned the older one.
+        identity = _ready(mac, layout)
+        clock = Clock()
+        quiet = {"say": lambda _m: None, "sleep": clock.sleep, "clock": clock}
+        ds.activate(mac, layout, identity, _binary(tmp_path, b"old"), VERSION, **quiet)
+        old = ds.current_build(layout)
+        new_source = _binary(tmp_path, b"new build")
+        ds.activate(mac, layout, identity, new_source, VERSION, **quiet)
+        new = ds.current_build(layout)
+        assert ds.stop(mac, layout)
+        ds.activate(mac, layout, identity, new_source, VERSION, **quiet)
+        kept = sorted(p.name for p in layout.builds.iterdir() if p.name != "current")
+        assert kept == sorted([old, new])
+        assert ds.current_build(layout) == new
+
 
 class TestHealth:
     def _state(self, mac: FakeMac, script: list[tuple[int | None, int, int | None]]):  # noqa: ANN202
@@ -943,3 +961,47 @@ class TestResumingAnInterruptedInstall:
         before = layout.marker.read_text()
         ds.ensure_account(mac, layout, VERSION, environ={})
         assert layout.marker.read_text() == before
+
+
+class TestOpenFileLimit:
+    """``launchctl procinfo`` cannot show it, so the agent's log says it (live run on .22)."""
+
+    @pytest.fixture
+    def limits(self, monkeypatch: pytest.MonkeyPatch) -> dict:
+        import resource
+
+        state: dict = {"now": (256, resource.RLIM_INFINITY), "fail": None}
+
+        def getrlimit(_which: int) -> tuple[int, int]:
+            return state["now"]
+
+        def setrlimit(_which: int, value: tuple[int, int]) -> None:
+            if state["fail"]:
+                raise state["fail"]
+            state["now"] = value
+
+        monkeypatch.setattr(resource, "getrlimit", getrlimit)
+        monkeypatch.setattr(resource, "setrlimit", setrlimit)
+        return state
+
+    def test_a_raise_is_one_info_line(self, limits: dict) -> None:
+        import logging
+
+        level, line = ds.raise_open_file_limit()
+        assert level == logging.INFO
+        assert line == "Open-file limit: soft 65536 (raised from 256), hard unlimited"
+        assert limits["now"][0] == 65536
+
+    def test_a_high_enough_limit_is_reported_as_it_is(self, limits: dict) -> None:
+        import logging
+
+        limits["now"] = (70000, 100000)
+        assert ds.raise_open_file_limit() == (logging.INFO, "Open-file limit: soft 70000, hard 100000")
+
+    def test_a_refused_raise_is_a_warning(self, limits: dict) -> None:
+        import logging
+
+        limits["fail"] = ValueError("not allowed")
+        level, line = ds.raise_open_file_limit()
+        assert level == logging.WARNING
+        assert line.startswith("Open-file limit not raised: soft 256 to 65536 failed (not allowed)")

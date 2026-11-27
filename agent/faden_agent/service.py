@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import errno
+import socket
 import time
 import logging
 from pathlib import Path
@@ -11,8 +13,9 @@ from collections.abc import Callable
 from typing import Any
 
 import psutil
+import httpx
 from httpx import HTTPStatusError
-from websockets.exceptions import InvalidStatus
+from websockets.exceptions import ConnectionClosedError, InvalidStatus
 
 from faden_agent.backend_client import BackendClient
 from faden_agent.config import AgentConfig, detect_hf_cache
@@ -41,6 +44,51 @@ log = logging.getLogger(__name__)
 #: comes from: a new one has to be here before the backend switches to it.
 TRUST_REFRESH_SEC = 60.0
 _REDIRECT_STATUSES = {301, 302, 303, 307, 308}
+
+#: A socket error the network gives while it is coming up or going away.
+_TRANSIENT_ERRNOS = {
+    errno.ENETUNREACH: "network is unreachable",
+    errno.ENETDOWN: "network is down",
+    errno.EHOSTUNREACH: "host is unreachable",
+    errno.EHOSTDOWN: "host is down",
+    errno.ECONNREFUSED: "connection refused",
+    errno.ECONNRESET: "connection reset",
+    errno.ECONNABORTED: "connection aborted",
+    errno.ETIMEDOUT: "connection timed out",
+}
+
+
+def transient_reason(exc: BaseException) -> str | None:
+    """Why the stream dropped, when it is the network's ordinary weather; else None.
+
+    The network not up yet at boot (a Mac's agent starts before Wi-Fi), a DNS
+    failure, a refused or reset connection, a timeout, or a websocket closed
+    without a close frame (a sleep, a backend restart). The loop retries all of
+    them; a traceback for one only reads like a fault.
+    """
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, ConnectionClosedError) and current.rcvd is None and current.sent is None:
+            return "the connection closed without a close frame"
+        if isinstance(current, socket.gaierror):
+            return f"the backend's name could not be resolved ({current})"
+        if isinstance(current, (TimeoutError, httpx.TimeoutException)):
+            return f"timed out ({current})" if str(current) else "timed out"
+        if isinstance(current, OSError) and current.errno in _TRANSIENT_ERRNOS:
+            return f"{_TRANSIENT_ERRNOS[current.errno]} ({current})"
+        current = current.__cause__ or current.__context__
+    return None
+
+
+def log_stream_failure(exc: BaseException, retry_in: float) -> None:
+    """One WARNING line for an expected network failure, ERROR and the traceback for anything else."""
+    reason = transient_reason(exc)
+    if reason is None:
+        log.error("Node stream loop failed.", exc_info=exc)
+    else:
+        log.warning("Node stream unavailable: %s; retrying in %.0f s.", reason, retry_in)
 
 
 class NodeAgentService:
@@ -345,8 +393,8 @@ class NodeAgentService:
                 # should not be silently retried forever.
                 log.error("Fatal agent error: %s", exc)
                 raise
-            except Exception:
-                log.exception("Node stream loop failed.")
+            except Exception as exc:
+                log_stream_failure(exc, backoff)
                 if await self._follow_to_https():
                     backoff = self._config.reconnect_min_sec
                     continue

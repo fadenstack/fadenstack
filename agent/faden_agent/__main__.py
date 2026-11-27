@@ -108,10 +108,13 @@ def _inject_env_file() -> None:
             os.environ[key] = value
 
 
-async def _run() -> None:
+async def _run(note: tuple[int, str] | None = None) -> None:
     _inject_env_file()
     config = AgentConfig.from_env()
     _configure_logging(config.log_level)
+    if note is not None:
+        # Said once logging is set up (e.g. the Mac's raised open-file limit).
+        logging.getLogger("faden_agent").log(*note)
 
     # Refuse to be the second agent on this node.  Two of them enrol as the
     # same machine and hold two streams; the backend then dispatches commands
@@ -1939,10 +1942,9 @@ def _cmd_status_windows() -> None:
 
 def cmd_run() -> None:
     """Run the agent in the foreground (load env file first)."""
-    if _IS_DARWIN:
-        darwin_service.raise_open_file_limit()
+    note = darwin_service.raise_open_file_limit() if _IS_DARWIN else None
     _load_env_into_process()
-    asyncio.run(_run())
+    asyncio.run(_run(note))
 
 
 def cmd_scan() -> None:
