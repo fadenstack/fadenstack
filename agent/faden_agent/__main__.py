@@ -1096,8 +1096,17 @@ def cmd_init() -> None:
     print("\n  Host initialisation complete.")
 
 
+class _MembershipUnknown(Exception):
+    """Whether this machine is still a member could not be settled (backend unreachable, 5xx, ...)."""
+
+
 async def _existing_membership(config: AgentConfig) -> dict | None:
-    """The fleet membership this machine already has, if its credential still works."""
+    """The fleet membership this machine already has, if its credential still works.
+
+    Returns the membership (a member), or ``None`` when it is definitively not a
+    member: no credential in the state, or the backend answered 401/403/404.
+    Raises ``_MembershipUnknown`` when that cannot be told (network or other error).
+    """
     from faden_agent.backend_client import BackendClient  # noqa: PLC0415
     from faden_agent.state_store import StateStore  # noqa: PLC0415
 
@@ -1110,10 +1119,19 @@ async def _existing_membership(config: AgentConfig) -> dict | None:
     client = BackendClient(config)
     try:
         return await client.whoami(credential=credential)
-    except Exception:  # noqa: BLE001 - unreachable: let the join report it
-        return None
+    except Exception as exc:  # noqa: BLE001 - unreachable: let the join report it
+        raise _MembershipUnknown(str(exc)) from exc
     finally:
         await client.close()
+
+
+def _membership_outcome(config: AgentConfig) -> tuple[str, dict | None]:
+    """``("member", info)``, ``("not_member", None)`` or ``("unknown", None)``."""
+    try:
+        member = asyncio.run(_existing_membership(config))
+    except _MembershipUnknown:
+        return "unknown", None
+    return ("member", member) if member is not None else ("not_member", None)
 
 
 async def _join_flow(config: AgentConfig) -> bool:
@@ -1306,13 +1324,22 @@ def cmd_join(backend_url: str | None, user: bool | None = None, ca_file: str | N
     # install line again is how an operator updates the agent, and it used to
     # file a fresh join request for a machine already in the fleet -- one
     # more thing to approve, for nothing.
-    member = asyncio.run(_existing_membership(config))
-    if member is not None:
+    outcome, member = _membership_outcome(config)
+    if outcome == "member":
         _section("Already a member")
-        _ok(f"This machine is '{member.get('agent_id')}' on {backend}; nothing to approve.")
+        _ok(f"This machine is '{(member or {}).get('agent_id')}' on {backend}; nothing to approve.")
         _section("Starting the agent")
         cmd_start(user=user)
         return
+
+    if outcome == "not_member":
+        # A service from the machine's earlier membership may still be running
+        # with the old credential in memory; it would write it back over the
+        # new one the join is about to save. Stop it first (a no-op when none
+        # is installed). When membership is merely unknown the agent may be
+        # healthy, so it is left alone and the join reports the problem.
+        _section("Stopping the previous agent")
+        cmd_stop()
 
     if not asyncio.run(_join_flow(config)):
         sys.exit(1)
@@ -1439,6 +1466,10 @@ def _darwin_prepare(user: bool | None) -> darwin_service.Identity:
 _DARWIN_JOIN_CHILD = "FADEN_AGENT_DARWIN_JOIN_AS_SERVICE"
 #: The join child's exit status for "already a member": start, nothing to approve.
 _DARWIN_JOIN_MEMBER = 3
+#: Set (with _DARWIN_JOIN_CHILD) to run only the membership check; the exit status says which.
+_DARWIN_JOIN_CHECK = "FADEN_AGENT_DARWIN_JOIN_CHECK"
+_DARWIN_JOIN_NOT_MEMBER = 4
+_DARWIN_JOIN_UNKNOWN = 5
 
 
 def _darwin_join(
@@ -1473,12 +1504,29 @@ def _darwin_join(
     for key in ("LANG", "LC_ALL", "TERM", "NO_COLOR"):
         if key in os.environ:
             env[key] = os.environ[key]
-    rc = runner.call(
-        [str(darwin_service.staged_binary(layout, name)), "join"],
-        uid=identity.uid, gid=identity.gid, env=env, cwd=str(layout.state_dir),
-    )
-    if rc not in (0, _DARWIN_JOIN_MEMBER):
-        sys.exit(rc or 1)
+    child = [str(darwin_service.staged_binary(layout, name)), "join"]
+
+    def run_child(extra: dict[str, str]) -> int:
+        return runner.call(
+            child, uid=identity.uid, gid=identity.gid, env={**env, **extra}, cwd=str(layout.state_dir),
+        )
+
+    # Phase 1: the service account checks membership (root must not read its files).
+    check = run_child({_DARWIN_JOIN_CHECK: "1"})
+    if check != _DARWIN_JOIN_MEMBER:
+        if check == _DARWIN_JOIN_NOT_MEMBER:
+            # Definitively not a member: the old service may still hold the
+            # deleted node's credential and would write it over the new one.
+            _section("Stopping the previous agent")
+            try:
+                darwin_service.bootout(runner)
+            except darwin_service.DarwinServiceError as exc:
+                _err(str(exc))
+                sys.exit(1)
+        # Not a member, or unknown (left running; the join reports the problem).
+        rc = run_child({})
+        if rc not in (0, _DARWIN_JOIN_MEMBER):
+            sys.exit(rc or 1)
 
     env_file = _load_env_file()
     env_file[f"{_ENV_PREFIX}BACKEND_URL"] = backend
@@ -1497,11 +1545,13 @@ def _darwin_join_child() -> int:
         _err("This step runs as the service account, not as root.")
         return 2
     config = AgentConfig.from_env()
-    member = asyncio.run(_existing_membership(config))
-    if member is not None:
+    outcome, member = _membership_outcome(config)
+    if outcome == "member":
         _section("Already a member")
-        _ok(f"This machine is '{member.get('agent_id')}' on {config.backend_url}; nothing to approve.")
+        _ok(f"This machine is '{(member or {}).get('agent_id')}' on {config.backend_url}; nothing to approve.")
         return _DARWIN_JOIN_MEMBER
+    if os.environ.get(_DARWIN_JOIN_CHECK) == "1":
+        return _DARWIN_JOIN_NOT_MEMBER if outcome == "not_member" else _DARWIN_JOIN_UNKNOWN
     return 0 if asyncio.run(_join_flow(config)) else 1
 
 

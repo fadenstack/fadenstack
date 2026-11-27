@@ -86,6 +86,7 @@ def test_join_on_a_new_machine_still_asks(monkeypatch: pytest.MonkeyPatch) -> No
 
     monkeypatch.setattr(agent_main, "_existing_membership", not_member)
     monkeypatch.setattr(agent_main, "_join_flow", join)
+    monkeypatch.setattr(agent_main, "cmd_stop", lambda: None)
     monkeypatch.setattr(agent_main, "cmd_start", lambda user=None: None)
     monkeypatch.setattr(agent_main, "_banner", lambda: None)
     monkeypatch.setattr(agent_main, "_save_env_file", lambda env: None)
@@ -93,3 +94,70 @@ def test_join_on_a_new_machine_still_asks(monkeypatch: pytest.MonkeyPatch) -> No
     agent_main.cmd_join("http://192.0.2.220:8000", user=True)
 
     assert joined == [True]
+
+
+def _wire(monkeypatch: pytest.MonkeyPatch, membership: Any) -> list[str]:
+    events: list[str] = []
+
+    async def check(_config: Any) -> dict | None:
+        return membership()
+
+    async def join(_config: Any) -> bool:
+        events.append("join")
+        return True
+
+    monkeypatch.setattr(agent_main, "_existing_membership", check)
+    monkeypatch.setattr(agent_main, "_join_flow", join)
+    monkeypatch.setattr(agent_main, "cmd_stop", lambda: events.append("stop"))
+    monkeypatch.setattr(agent_main, "cmd_start", lambda user=None: events.append("start"))
+    monkeypatch.setattr(agent_main, "_banner", lambda: None)
+    monkeypatch.setattr(agent_main, "_save_env_file", lambda env: None)
+    return events
+
+
+def test_not_a_member_stops_the_old_service_before_the_join(monkeypatch: pytest.MonkeyPatch) -> None:
+    events = _wire(monkeypatch, lambda: None)
+    agent_main.cmd_join("http://192.0.2.220:8000", user=True)
+    assert events == ["stop", "join", "start"]
+
+
+def test_unknown_membership_does_not_stop_a_possibly_healthy_agent(monkeypatch: pytest.MonkeyPatch) -> None:
+    def unreachable() -> None:
+        raise agent_main._MembershipUnknown("connection refused")
+
+    events = _wire(monkeypatch, unreachable)
+    agent_main.cmd_join("http://192.0.2.220:8000", user=True)
+    assert events == ["join", "start"]
+
+
+def test_a_member_is_neither_stopped_nor_rejoined(monkeypatch: pytest.MonkeyPatch) -> None:
+    events = _wire(monkeypatch, lambda: {"agent_id": "gpu-01"})
+    agent_main.cmd_join("http://192.0.2.220:8000", user=True)
+    assert events == ["start"]
+
+
+@pytest.mark.asyncio
+async def test_existing_membership_tells_unreachable_from_revoked(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    from faden_agent.state_store import StateStore
+
+    class _Cfg:
+        state_path = tmp_path / "state.json"
+        backend_url = "http://backend"
+
+    store = StateStore(_Cfg.state_path)
+    # no credential: definitively not a member
+    assert await agent_main._existing_membership(_Cfg()) is None  # type: ignore[arg-type]
+    store.state.credential = "cred"
+    store.save()
+
+    class _Client:
+        def __init__(self, _config: Any) -> None: ...
+        async def whoami(self, *, credential: str) -> dict | None:
+            raise httpx.ConnectError("down")
+        async def close(self) -> None: ...
+
+    monkeypatch.setattr("faden_agent.backend_client.BackendClient", _Client)
+    with pytest.raises(agent_main._MembershipUnknown):
+        await agent_main._existing_membership(_Cfg())  # type: ignore[arg-type]
