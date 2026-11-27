@@ -40,6 +40,14 @@ import Stepper from "@mui/material/Stepper";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 
+const RAY_DRIVER = "ray";
+
+/** A machine that serves on its own (a Mac with a native runtime) cannot join a Ray cluster. */
+function isStandaloneOnly(node: ManagedNode): boolean {
+  const caps = (node.capabilities ?? {}) as Record<string, unknown>;
+  return Number(caps.native_runtime ?? 0) > 0;
+}
+
 const STEPS = ["name", "machines", "network"] as const;
 
 export interface CreateClusterWizardProps {
@@ -59,6 +67,7 @@ export function CreateClusterWizard({
   onCreated,
 }: CreateClusterWizardProps) {
   const { t } = useTranslation();
+  nodes = nodes.filter((n) => !isStandaloneOnly(n));
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
@@ -151,16 +160,20 @@ export function CreateClusterWizard({
   /** Reuse a control plane if one exists; otherwise make one silently. */
   async function ensureControlPlane(): Promise<string> {
     const existing = await inferenceApi.listControlPlanes();
-    const usable = existing.find((cp) => cp.enabled) ?? existing[0];
+    // A cluster is a Ray cluster: never bind it to another driver's plane (a
+    // standalone Mac environment has one), and never take whatever driver
+    // happens to be listed first.
+    const rays = existing.filter((cp) => cp.driver === RAY_DRIVER);
+    const usable = rays.find((cp) => cp.enabled) ?? rays[0];
     if (usable) return usable.id;
 
     const drivers = await inferenceApi.listDrivers().catch(() => [] as string[]);
-    if (drivers.length === 0) {
+    if (!drivers.includes(RAY_DRIVER)) {
       throw new Error(t("clusters.create.no_driver"));
     }
     const created = await inferenceApi.createControlPlane({
       name: "default",
-      driver: drivers[0],
+      driver: RAY_DRIVER,
       description: t("clusters.create.control_plane_description"),
     });
     return created.id;
