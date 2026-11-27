@@ -6,11 +6,11 @@
   "native": {
     "kind": "python-venv",
     "oci_image": "ghcr.io/fadenstack/mac-runtime-arm64:vllm0.34.0-metal0.34.0-1",
-    "digest": "sha256:c031be20197e04578239a37c38da917b1175e402e5deeb1d072d0a324eb2cfcf",
-    "config_digest": "sha256:7da5ed9c07502516abd3dbaf0754de2d44b7433e6f2a1daecad4e8b7d93e1005",
-    "layer_digest": "sha256:e879e127827e11a68bd46d3bfcee6194e458e36f2a9b2c54ee288b2898a6387e",
-    "rootfs_digest": "sha256:47dc43a76d7737f8d08b637e4723d2e1328dafb7bb3dd5c25d13d9e02704e99e",
-    "size_bytes": 591633289,
+    "digest": "sha256:cffdbf42987a3863a24296ae7a14ae12864ad35562d6df8c6189920d52e548cf",
+    "config_digest": "sha256:869d90bfb3d4f3844df791913acf75810a9cfc3685813fb5e9d16ac5584d5494",
+    "layer_digest": "sha256:3ec621d251a5fa13ee147c7f4bab02aad94c4d9ce8bc01c9356711bfed66af10",
+    "rootfs_digest": "sha256:ec889e68956f1957834152dac38e7e9548fe1370dd374e3ad07280d88ca1c1de",
+    "size_bytes": 591633190,
     "interpreter": {
       "abi": "cp312",
       "implementation": "cpython",
@@ -35,7 +35,7 @@
     "pyvenv_home_rewrite": true
   },
   "unpacked_size_bytes": 2158704640,
-  "lock_sha256": "cbc914a00c775d022fe895bce3d77b20f79bf6e44ba4e2b8bc6f30fba2d3d8eb",
+  "lock_sha256": "f640edd8b97d0e4aae99e09016a6787ca970e233e5bbd9f4e1bcc85d678c0a51",
   "target_hardware": {
     "platform": "Apple Silicon Mac",
     "gpu": "Apple (Metal)",
@@ -54,7 +54,7 @@
     "overall_status": "uncertified",
     "channel": "stable",
     "hardware_target": "Apple Silicon (macOS 26)",
-    "timestamp": "2026-11-27T20:25:15+00:00",
+    "timestamp": "2026-11-27T21:04:31+00:00",
     "checks": [
       {
         "name": "import vllm, vllm_metal, mlx",
