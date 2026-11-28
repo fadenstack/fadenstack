@@ -16,6 +16,7 @@ _AGENT_LOG_LIMIT = 2000
 # Fetch this many times *tail* so that dropping probe noise still leaves *tail* real lines.
 _OVER_FETCH = 4
 # uvicorn access lines for the Prometheus scrape and the readiness/health probes, every 15 s or so.
+# Mirrored by `_PROBE_ACCESS` in agent/faden_agent/native/worker.py (newer agents pre-filter); keep in sync.
 # Only a *successful* GET is noise; a 4xx/5xx on these paths means the engine is unwell and is kept.
 _PROBE_ACCESS = re.compile(r'"GET /(?:metrics|health)(?:\?\S*)? HTTP/\d(?:\.\d)?" [23]\d\d\b')
 

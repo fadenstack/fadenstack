@@ -807,3 +807,47 @@ def test_the_sandbox_profile_allows_exactly_the_short_tmp_dir(tmp_path: Path) ->
     text = sandboxing.profile(denied=[paths.root], readable=[], writable=[paths.home, paths.tmp(DEP)])
     assert f'(subpath "{paths.tmp(DEP)}")' in text.replace("(allow file-write* ", "(").replace("\n", "")
     assert str(paths.root / "tmp") not in text
+
+
+_PROBE = 'INFO:     127.0.0.1:52344 - "GET /metrics HTTP/1.1" 200 OK\n'
+
+
+def test_read_logs_tail_skips_trailing_probe_lines(tmp_path: Path) -> None:
+    log = tmp_path / "w.log"
+    log.write_text("".join(f"real {i}\n" for i in range(5)) + _PROBE * 5000)
+    lines, cursor = workers.read_logs(log, tail=3, cursor=None)
+    assert lines == ["real 2", "real 3", "real 4"]
+    assert cursor == str(log.stat().st_size)
+
+
+def test_read_logs_keeps_failing_probe_lines(tmp_path: Path) -> None:
+    log = tmp_path / "w.log"
+    bad = 'INFO:     127.0.0.1:1 - "GET /health HTTP/1.1" 500 Internal Server Error'
+    log.write_text("a\n" + bad + "\n" + _PROBE * 3)
+    assert workers.read_logs(log, tail=10, cursor=None)[0] == ["a", bad]
+
+
+def test_read_logs_follow_skips_probes_but_advances_cursor(tmp_path: Path) -> None:
+    log = tmp_path / "w.log"
+    log.write_text("one\n" + _PROBE)
+    _, cursor = workers.read_logs(log, tail=10, cursor=None)
+    with log.open("a") as handle:
+        handle.write(_PROBE + "two\n" + _PROBE + "partial")
+    lines, cursor2 = workers.read_logs(log, tail=10, cursor=cursor)
+    assert lines == ["two"]
+    assert int(cursor2) == log.stat().st_size - len("partial")
+
+
+def test_tail_real_lines_across_chunk_boundaries(tmp_path: Path) -> None:
+    log = tmp_path / "w.log"
+    rows = [f"line {i} " + "x" * 90 for i in range(3000)]  # several 64 KiB chunks
+    log.write_text("\n".join(rows))  # no trailing newline
+    assert workers.tail_real_lines(log, 2500) == rows[-2500:]
+    assert workers.tail_real_lines(log, 99999) == rows
+
+
+def test_tail_real_lines_budget_exhausted_returns_what_it_found(tmp_path: Path) -> None:
+    log = tmp_path / "w.log"
+    log.write_text("real\n" + _PROBE * 5000)
+    assert workers.tail_real_lines(log, 5, budget=64 << 10) == []
+    assert workers.tail_real_lines(tmp_path / "missing.log", 5) == []

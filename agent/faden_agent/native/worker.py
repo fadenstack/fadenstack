@@ -334,6 +334,44 @@ def last_error(path: Path) -> str | None:
     return text[-4000:] or None
 
 
+# Mirror of `_PROBE_ACCESS` in backend/faden_backend/services/inference/drivers/standalone/driver.py:
+# successful uvicorn access lines for the Prometheus scrape and health probes. Keep the two in sync.
+_PROBE_ACCESS = re.compile(r'"GET /(?:metrics|health)(?:\?\S*)? HTTP/\d(?:\.\d)?" [23]\d\d\b')
+
+_TAIL_CHUNK = 64 << 10
+_TAIL_BUDGET = 8 << 20
+
+
+def tail_real_lines(path: Path, count: int, *, budget: int = _TAIL_BUDGET) -> list[str]:
+    """The last *count* non-probe lines, reading backward in chunks within *budget* bytes."""
+    kept: list[str] = []
+    try:
+        with path.open("rb") as handle:
+            pos = handle.seek(0, os.SEEK_END)
+            floor = max(0, pos - budget)
+            carry = b""  # start of the line cut by the chunk boundary
+            while pos > floor and len(kept) < count:
+                start = max(floor, pos - _TAIL_CHUNK)
+                handle.seek(start)
+                data = handle.read(pos - start) + carry
+                pos = start
+                parts = data.split(b"\n")
+                if pos > 0:
+                    carry, parts = parts[0], parts[1:]  # first part may be partial
+                else:
+                    carry = b""
+                for raw in reversed(parts):
+                    line = raw.decode("utf-8", "replace").rstrip("\r")
+                    if raw and not _PROBE_ACCESS.search(line):
+                        kept.append(line)
+                        if len(kept) >= count:
+                            break
+    except OSError:
+        return []
+    kept.reverse()
+    return kept
+
+
 def read_logs(path: Path, *, tail: int, cursor: str | None) -> tuple[list[str], str]:
     """From the byte offset *cursor* (new lines only), else the last *tail* lines."""
     tail = max(1, min(int(tail or 200), 2000))
@@ -350,5 +388,6 @@ def read_logs(path: Path, *, tail: int, cursor: str | None) -> tuple[list[str], 
             data = handle.read(4 << 20)
         end = data.rfind(b"\n") + 1  # whole lines only; the rest comes next time
         lines = data[:end].decode("utf-8", "replace").splitlines()
+        lines = [line for line in lines if not _PROBE_ACCESS.search(line)]
         return lines[-tail:], str(offset + end)
-    return tail_lines(path, tail), str(size)
+    return tail_real_lines(path, tail), str(size)
