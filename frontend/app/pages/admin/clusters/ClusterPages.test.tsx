@@ -5,7 +5,7 @@
  * so the assertions are mostly about the next-step banner being right and the
  * machinery having moved out of the way — not about pixels.
  */
-import { screen, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -125,6 +125,19 @@ describe("ClusterDetailPage", () => {
     expect(within(picture).getByText("gpu-01")).toBeInTheDocument();
     // The link an operator cares about, drawn on the edge.
     expect(within(picture).getByText(/roce · 200 Gb\/s/)).toBeInTheDocument();
+  });
+
+  it("marks a standalone (Mac) cluster experimental beside its title, and a Ray one not", async () => {
+    vi.spyOn(inferenceApi, "getControlPlane").mockResolvedValue({ ...controlPlane, driver: "ray" });
+    await renderDetail();
+    await screen.findByText("Add machines");
+    expect(screen.queryByTestId("experimental-chip")).not.toBeInTheDocument();
+    cleanup();
+    vi.spyOn(inferenceApi, "getControlPlane").mockResolvedValue({ ...controlPlane, driver: "standalone" });
+    renderPage(<ClusterDetailPage />, { path: "/admin/clusters/:id", initialPath: `/admin/clusters/${ENV_ID}` });
+    const heading = await screen.findByRole("heading", { name: "dgx-pair" });
+    const chip = await screen.findByTestId("experimental-chip");
+    expect(heading.parentElement).toContainElement(chip);
   });
 
   it("renders the page before the slow calls have answered", async () => {
