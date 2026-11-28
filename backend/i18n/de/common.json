@@ -4277,6 +4277,7 @@
       "detail_too_large": "Braucht etwa {{needed}}; der Cluster hat insgesamt {{total}}.",
       "note": {
         "kv_estimated": "Die Größe des Kontext-Caches ist geschätzt.",
+        "too_little_memory": "Ein Mac braucht mindestens {{min}} GB Speicher, um ein Modell bereitzustellen.",
         "context_over_model_max": "Der gewünschte Kontext ist länger, als das Modell unterstützt."
       }
     },
@@ -5974,6 +5975,8 @@
     "copy": "SHA-256 von {{name}} kopieren"
   },
   "mac": {
+    "experimental": "Experimentell",
+    "experimental_help": "Das Bereitstellen auf einem Mac ist neu in dieser Version. Es funktioniert, aber rechnen Sie mit Änderungen; melden Sie Probleme.",
     "status_title": "Mac-Rechner",
     "runtime_ready": "Die native Laufzeit ist installiert und bereit.",
     "runtime_missing": "Die native Laufzeit ist noch nicht installiert; sie wird beim ersten Bereitstellen eines Modells geladen.",
@@ -5987,8 +5990,7 @@
     "filevault_on": "FileVault ist an. Nach einem Stromausfall wartet der Mac auf eine Anmeldung, außer Sie starten vorher mit `sudo fdesetup authrestart` neu.",
     "filevault_off": "FileVault ist aus. Der Mac startet unbeaufsichtigt neu, aber die Platte ist nicht verschlüsselt.",
     "filevault_unknown": "Der FileVault-Zustand ist nicht bekannt.",
-    "serve_button": "Modelle auf {{name}} bereitstellen",
-    "default_name": "dem Mac",
+    "serve_button": "Modelle bereitstellen",
     "serve_hint": "Ein Modell zur Zeit, direkt auf dem Mac, ohne Cluster.",
     "serve_failed": "Der Mac konnte nicht eingerichtet werden: {{error}}",
     "serve_done": "{{name}} ist bereit.",

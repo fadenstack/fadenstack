@@ -4277,6 +4277,7 @@
       "detail_too_large": "Demande environ {{needed}} ; le cluster dispose de {{total}} au total.",
       "note": {
         "kv_estimated": "La taille du cache de contexte est une estimation.",
+        "too_little_memory": "Un Mac a besoin d'au moins {{min}} Go de mémoire pour héberger un modèle.",
         "context_over_model_max": "Le contexte demandé est plus long que ce que le modèle prend en charge."
       }
     },
@@ -5974,6 +5975,8 @@
     "copy": "Copier le SHA-256 de {{name}}"
   },
   "mac": {
+    "experimental": "Expérimental",
+    "experimental_help": "Servir sur un Mac est nouveau dans cette version. Cela fonctionne, mais attendez-vous à des changements ; signalez les problèmes.",
     "status_title": "Machine Mac",
     "runtime_ready": "Le runtime natif est installé et prêt.",
     "runtime_missing": "Le runtime natif n'est pas encore installé ; il est récupéré au premier déploiement d'un modèle.",
@@ -5987,8 +5990,7 @@
     "filevault_on": "FileVault est activé. Après une coupure de courant, le Mac attend une ouverture de session, sauf si vous le redémarrez d'abord avec `sudo fdesetup authrestart`.",
     "filevault_off": "FileVault est désactivé. Le Mac redémarre sans surveillance, mais son disque n'est pas chiffré.",
     "filevault_unknown": "L'état de FileVault est inconnu.",
-    "serve_button": "Servir des modèles sur {{name}}",
-    "default_name": "le Mac",
+    "serve_button": "Servir des modèles",
     "serve_hint": "Un modèle à la fois, sur le Mac lui-même, sans cluster.",
     "serve_failed": "Impossible de configurer le Mac : {{error}}",
     "serve_done": "{{name}} est prêt.",

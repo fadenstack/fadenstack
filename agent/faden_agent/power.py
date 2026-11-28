@@ -32,6 +32,11 @@ RESTART_MIN_S = 10.0
 CHECK_EVERY_S = 5.0
 
 
+def _is_holder(cmdline: list[str], watched: set[int]) -> bool:
+    return cmdline[:3] == [CAFFEINATE, "-i", "-w"] and len(cmdline) == 4 and cmdline[3].isdigit() \
+        and int(cmdline[3]) in watched
+
+
 class IdleSleepGuard:
     def __init__(
         self,
@@ -128,20 +133,47 @@ class IdleSleepGuard:
                 proc.wait()
 
     @staticmethod
-    def holder_of(agent_pid: int) -> int | None:
-        """The ``caffeinate -i -w <agent_pid>`` keeping that agent's Mac awake, if any."""
+    def find_holder(agent_pid: int) -> tuple[int | None, bool]:
+        """``(caffeinate pid or None, conclusive)``.
+
+        Run without root, psutil cannot read the command line of a process another user owns (the agent runs
+        as ``_fadenagent``): it answers ``AccessDenied``, which ``process_iter`` turns into ``None``. Then
+        ``ps`` is asked, which may read it; when neither can, the answer is inconclusive, never "no".
+        """
         import psutil  # noqa: PLC0415
 
         # A packaged (onefile) agent is two processes: the pid launchd knows is the
         # bootloader, and the Python agent that starts caffeinate is its child.
-        procs = list(psutil.process_iter(["pid", "ppid", "cmdline"]))
+        procs = list(psutil.process_iter(["pid", "ppid", "name", "cmdline"]))
         watched = {agent_pid} | {p.info["pid"] for p in procs if p.info.get("ppid") == agent_pid}
+        unreadable = False
         for proc in procs:
-            cmdline = proc.info.get("cmdline") or []
-            if cmdline[:3] == [CAFFEINATE, "-i", "-w"] and len(cmdline) == 4 and cmdline[3].isdigit() \
-                    and int(cmdline[3]) in watched:
-                return proc.info["pid"]
-        return None
+            cmdline = proc.info.get("cmdline")
+            if cmdline is None:
+                unreadable = unreadable or proc.info.get("name") == "caffeinate"
+                continue
+            if _is_holder(cmdline, watched):
+                return proc.info["pid"], True
+        if not unreadable:
+            return None, True
+        # psutil saw a caffeinate it could not read: ask ps.
+        try:
+            out = subprocess.run(  # noqa: S603 - fixed argv
+                ["/bin/ps", "-axo", "pid=,command="], capture_output=True, text=True, timeout=10, check=True,
+            ).stdout
+        except (OSError, subprocess.SubprocessError):
+            return None, False
+        for line in out.splitlines():
+            pid_text, _, command = line.strip().partition(" ")
+            if pid_text.isdigit() and _is_holder(command.split(), watched):
+                return int(pid_text), True
+        # ps answered but showed no caffeinate command at all: it hides them too.
+        return None, "caffeinate" not in out
+
+    @staticmethod
+    def holder_of(agent_pid: int) -> int | None:
+        """The ``caffeinate -i -w <agent_pid>`` keeping that agent's Mac awake, if any."""
+        return IdleSleepGuard.find_holder(agent_pid)[0]
 
     @staticmethod
     def on_battery() -> bool | None:

@@ -1662,12 +1662,16 @@ def _cmd_status_darwin() -> None:
     if state.pid:
         from faden_agent.power import IdleSleepGuard  # noqa: PLC0415
 
-        holder = IdleSleepGuard.holder_of(state.pid)
-        print(
-            f"  Sleep:  idle sleep prevented (caffeinate PID {holder}); keep this Mac on AC power"
-            if holder else "  Sleep:  idle sleep NOT prevented: this Mac may sleep and drop offline"
-        )
+        print(_sleep_line(*IdleSleepGuard.find_holder(state.pid)))
     _print_firewall_advice(layout)
+
+
+def _sleep_line(holder: int | None, conclusive: bool) -> str:
+    if holder:
+        return f"  Sleep:  idle sleep prevented (caffeinate PID {holder}); keep this Mac on AC power"
+    if not conclusive:
+        return "  Sleep:  could not check without root (the agent's processes are not visible): run with sudo to check"
+    return "  Sleep:  idle sleep NOT prevented: this Mac may sleep and drop offline"
 
 
 def _print_firewall_advice(layout: darwin_service.Layout) -> None:
@@ -1679,6 +1683,8 @@ def _print_firewall_advice(layout: darwin_service.Layout) -> None:
         status = asyncio.run(mac_status.collect(binary))
     except Exception:  # noqa: BLE001 - a status line never fails the command
         return
+    for line in mac_status.remote_login_advice(status):
+        print(f"  {line}" if not line.startswith("  ") else f" {line}")
     for line in mac_status.firewall_advice(status.get("firewall") or {}, binary):
         print(f"  {line}" if not line.startswith("  ") else f" {line}")
 

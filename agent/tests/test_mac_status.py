@@ -103,3 +103,57 @@ async def test_collect_reports_whether_the_agent_binary_is_allowed(monkeypatch: 
     out = await mac_status.collect("/b")
     assert out["firewall"]["agent_allowed"] is False
     assert any(a[-2:] == ("--getappblocked", "/b") for a in calls)
+
+
+def test_parse_ssh_listener() -> None:
+    from faden_agent import mac_status
+
+    on = "Proto Recv-Q\ntcp4       0      0  *.22                   *.*                    LISTEN     \ntcp4  0  0  *.8100  *.*  LISTEN\n"
+    off = "Proto Recv-Q\ntcp4       0      0  *.8100                 *.*                    LISTEN     \ntcp4 0 0 1.2.3.4.5022 1.2.3.4.1 ESTABLISHED\n"
+    assert mac_status.parse_ssh_listener(on) is True
+    assert mac_status.parse_ssh_listener(off) is False
+    assert mac_status.parse_ssh_listener(None) is None and mac_status.parse_ssh_listener("") is None
+
+
+def test_remote_login_advice_only_when_known_off_with_filevault() -> None:
+    from faden_agent import mac_status
+
+    warn = mac_status.remote_login_advice({"filevault": True, "remote_login": False})
+    assert len(warn) == 3 and "waits for a local unlock" in warn[0] and "fdesetup authrestart" in warn[1]
+    for status in ({"filevault": True, "remote_login": True}, {"filevault": True, "remote_login": None},
+                   {"filevault": False, "remote_login": False}, {"filevault": None, "remote_login": False}, {}):
+        assert mac_status.remote_login_advice(status) == []
+
+
+@pytest.mark.asyncio
+async def test_remote_login_detection(monkeypatch: pytest.MonkeyPatch) -> None:
+    from faden_agent import mac_status
+
+    async def fake_run(*argv):
+        return "Proto\ntcp4 0 0 *.22 *.* LISTEN\n"
+
+    monkeypatch.setattr(mac_status, "_run", fake_run)
+    assert await mac_status.remote_login() is True
+
+    async def no_listener(*argv):
+        return "Proto\ntcp4 0 0 *.8100 *.* LISTEN\n"
+
+    async def not_found(*argv):
+        return 113, 'Could not find service "com.openssh.sshd" in domain for system'
+
+    monkeypatch.setattr(mac_status, "_run", no_listener)
+    monkeypatch.setattr(mac_status, "_run_any", not_found)
+    assert await mac_status.remote_login() is False
+
+    async def odd(*argv):
+        return 1, "something else"
+
+    monkeypatch.setattr(mac_status, "_run_any", odd)
+    assert await mac_status.remote_login() is None
+
+    async def empty_listing(*argv):
+        return None  # netstat hid the sockets (seen under some binaries): launchd still decides
+
+    monkeypatch.setattr(mac_status, "_run", empty_listing)
+    monkeypatch.setattr(mac_status, "_run_any", not_found)
+    assert await mac_status.remote_login() is False

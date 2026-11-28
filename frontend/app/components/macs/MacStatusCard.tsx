@@ -27,6 +27,8 @@ import { useTranslation } from "react-i18next";
 
 import { formatBytes } from "~/lib/engine";
 
+import { ExperimentalChip } from "./ExperimentalChip";
+
 export interface MacStatus {
   filevault?: boolean | null;
   firewall?: { enabled?: boolean | null; stealth?: boolean | null; block_all?: boolean | null } | null;
@@ -134,6 +136,7 @@ export function MacStatusCard({
             <Typography variant="subtitle2" sx={{ mr: 0.5 }}>
               {name || t("mac.status_title")}
             </Typography>
+            <ExperimentalChip />
             {items.map((i) => (
               <StatusChip key={i.id} item={i} />
             ))}

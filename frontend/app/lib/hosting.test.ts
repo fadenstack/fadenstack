@@ -7,6 +7,7 @@ import {
   buildSpec,
   defaultGpuChoice,
   deployableModels,
+  fitDetail,
   fitSummary,
   formatParams,
   gpuChoices,
@@ -192,5 +193,15 @@ describe("words", () => {
     expect(formatParams(30.5, 3.3)).toBe("31B · 3.3B active");
     expect(formatParams(0.6)).toBe("600M");
     expect(formatParams(null)).toBeNull();
+  });
+});
+
+describe("fitDetail for a Mac with too little memory", () => {
+  it("names the minimum the backend reports", () => {
+    const fit = {
+      status: "too_large", notes: ["too_little_memory"], copies: 0, copies_now: 0, gpus_per_copy: null,
+      metal: { working_set_bytes: 12 * 2 ** 30, estimated: false, min_unified_bytes: 24 * 2 ** 30 },
+    } as unknown as Fit;
+    expect(fitDetail(fit)).toContain("at least 24 GB of memory");
   });
 });

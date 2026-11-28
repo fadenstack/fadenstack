@@ -14,6 +14,7 @@ import { useNavigate, useParams } from "react-router";
 
 import { inferenceApi } from "~/api/inference";
 import type { ControlPlane } from "~/api/inference";
+import { ExperimentalChip } from "~/components/macs/ExperimentalChip";
 import { MacStatusCard } from "~/components/macs/MacStatusCard";
 import { driverUi } from "~/lib/driverCaps";
 import type {
@@ -385,6 +386,7 @@ export default function ClusterDetailPage() {
         <Typography variant="h6" sx={{ flexGrow: 1 }}>
           {cluster.name}
         </Typography>
+        {standalone && <ExperimentalChip />}
         <Chip
           size="small"
           label={clusterStatusLabel(clusterShownStatus(cluster))}

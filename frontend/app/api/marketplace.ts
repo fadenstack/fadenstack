@@ -23,6 +23,8 @@ export interface MetalPlan {
   budget_bytes?: number;
   kv_bytes?: number;
   profile?: string;
+  /** Set when the Mac has too little memory: the least a Mac needs to host a model. */
+  min_unified_bytes?: number;
   /** The Mac runtime's own version (vLLM-Metal), not the Linux engine's. */
   runtime_version?: string | null;
 }

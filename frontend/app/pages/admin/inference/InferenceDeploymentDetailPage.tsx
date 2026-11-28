@@ -38,6 +38,7 @@ import { models as modelsApi, type Model } from "~/api/llm";
 import { nodesApi, type ManagedNode } from "~/api/nodes";
 import { FormDialog } from "~/components/FormDialog";
 import LogViewer, { LOG_LEVELS, type LogLevel } from "~/components/logs/LogViewer";
+import { ExperimentalChip } from "~/components/macs/ExperimentalChip";
 import { STANDALONE_DRIVER } from "~/lib/driverCaps";
 import { useAsyncData } from "~/lib/useAsyncData";
 
@@ -776,6 +777,7 @@ export default function InferenceDeploymentDetailPage() {
         <Typography variant="h6" sx={{ flexGrow: 1 }}>
           {deployment.name}
         </Typography>
+        {standalone && <ExperimentalChip />}
         <Button
           size="small"
           startIcon={<TuneIcon />}

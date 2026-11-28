@@ -107,6 +107,9 @@ Auf einem Mac brauchen alle Agent-Befehle, die den Dienst ändern, `sudo`: `sudo
 die Protokolle entfernt. Zum Aktualisieren führen Sie die Installationszeile erneut aus: Läuft der neue Agent nicht
 stabil, kehrt der Mac zum vorherigen zurück.
 
+Zu einem Mac mini als dauerhaft laufendem Knoten (FileVault, Energieeinstellungen, Netzwerk, Modellspeicher) siehe
+[Modelle auf einem Mac bereitstellen](../administer/serve-on-a-mac.md#a-mac-mini-as-a-dedicated-node).
+
 ### Ohne jede Maschine zu genehmigen {#without-approving-each-machine}
 
 Für Ansible, cloud-init, Image-Builds oder viele Maschinen auf einmal:

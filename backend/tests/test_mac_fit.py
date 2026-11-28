@@ -68,7 +68,9 @@ def test_a_model_that_does_not_fit_is_refused_with_the_figures() -> None:
 
 
 def test_a_small_mac_is_refused() -> None:
-    assert fit_mod.plan_metal(qwen06(), metal(16)).notes == ["too_little_memory"]
+    fit = fit_mod.plan_metal(qwen06(), metal(16))
+    assert fit.notes == ["too_little_memory"]
+    assert fit.metal["min_unified_bytes"] == fit_mod.METAL_MIN_UNIFIED_BYTES == 24 * GiB
 
 
 def test_no_reported_memory_means_no_plan() -> None:
