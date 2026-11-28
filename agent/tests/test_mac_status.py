@@ -68,3 +68,38 @@ async def test_the_status_is_refreshed(monkeypatch: pytest.MonkeyPatch) -> None:
     await asyncio.sleep(0.1)
     task.cancel()
     assert target["mac_status"] in ({"filevault": True}, {"filevault": False})
+
+
+def test_app_incoming_is_parsed_from_getappblocked() -> None:
+    assert mac_status.parse_app_incoming("Incoming connection to /x/faden-agent is permitted.") is True
+    assert mac_status.parse_app_incoming("Incoming connection to /x/faden-agent is blocked.") is False
+    assert mac_status.parse_app_incoming("") is None
+
+
+def test_firewall_advice_names_the_exact_commands_only_when_needed() -> None:
+    binary = "/Library/Fadenstack/agent/0.0.0-abc/faden-agent"
+    assert mac_status.firewall_advice({"enabled": False}, binary) == []
+    assert mac_status.firewall_advice({"enabled": None}, binary) == []
+    assert mac_status.firewall_advice({"enabled": True, "agent_allowed": True}, binary) == []
+    blocked = "\n".join(mac_status.firewall_advice({"enabled": True, "agent_allowed": False}, binary))
+    assert "blocks incoming" in blocked
+    assert f"--add {binary}" in blocked and f"--unblockapp {binary}" in blocked
+    unknown = "\n".join(mac_status.firewall_advice({"enabled": True, "agent_allowed": None}, binary))
+    assert "may block" in unknown
+    block_all = "\n".join(mac_status.firewall_advice({"enabled": True, "block_all": True}, binary))
+    assert "Block all incoming" in block_all and "sudo" not in block_all
+
+
+@pytest.mark.anyio
+async def test_collect_reports_whether_the_agent_binary_is_allowed(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(mac_status.sys, "platform", "darwin")
+    calls: list[tuple[str, ...]] = []
+
+    async def fake_run(*argv: str) -> str | None:
+        calls.append(argv)
+        return "Incoming connection to /b is blocked." if "--getappblocked" in argv else None
+
+    monkeypatch.setattr(mac_status, "_run", fake_run)
+    out = await mac_status.collect("/b")
+    assert out["firewall"]["agent_allowed"] is False
+    assert any(a[-2:] == ("--getappblocked", "/b") for a in calls)

@@ -1667,6 +1667,20 @@ def _cmd_status_darwin() -> None:
             f"  Sleep:  idle sleep prevented (caffeinate PID {holder}); keep this Mac on AC power"
             if holder else "  Sleep:  idle sleep NOT prevented: this Mac may sleep and drop offline"
         )
+    _print_firewall_advice(layout)
+
+
+def _print_firewall_advice(layout: darwin_service.Layout) -> None:
+    """Warn when the application firewall may stop a remote gateway or Prometheus reaching this Mac."""
+    from faden_agent import mac_status  # noqa: PLC0415
+
+    binary = os.path.realpath(layout.current_binary)
+    try:
+        status = asyncio.run(mac_status.collect(binary))
+    except Exception:  # noqa: BLE001 - a status line never fails the command
+        return
+    for line in mac_status.firewall_advice(status.get("firewall") or {}, binary):
+        print(f"  {line}" if not line.startswith("  ") else f" {line}")
 
 
 def cmd_uninstall() -> None:

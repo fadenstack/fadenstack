@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import os
 import re
 import sys
 from typing import Any
@@ -87,24 +88,81 @@ def parse_block_all(text: str | None) -> bool | None:
     return None
 
 
-async def collect() -> dict[str, Any]:
-    """The Mac's FileVault and firewall state; an empty dict off macOS."""
+def parse_app_incoming(text: str | None) -> bool | None:
+    """``socketfilterfw --getappblocked <path>``: "Incoming connection to <path> is permitted." / "... is blocked"."""
+    if not text:
+        return None
+    lowered = text.lower()
+    if "is permitted" in lowered:
+        return True
+    if "is blocked" in lowered:
+        return False
+    return None
+
+
+async def app_incoming(path: str) -> bool | None:
+    """Whether the application firewall lets *path* accept incoming connections (``None``: unknown).
+
+    Read-only and answered to an unprivileged user. A launchd daemon cannot
+    answer the firewall's "accept incoming connections?" dialog, so an
+    unlisted binary that the firewall does not allow by itself stays blocked.
+    """
+    return parse_app_incoming(await _run(_SOCKETFILTERFW, "--getappblocked", path))
+
+
+def own_binary() -> str | None:
+    """The packaged agent's real executable path (what the firewall keys on); ``None`` from source."""
+    if not getattr(sys, "frozen", False):
+        return None
+    return os.path.realpath(sys.executable)
+
+
+async def collect(binary: str | None = None) -> dict[str, Any]:
+    """The Mac's FileVault and firewall state; an empty dict off macOS.
+
+    *binary* is the agent's own executable: the firewall decides per
+    program, so "the firewall is on" alone does not say whether the model
+    port and the metrics port are reachable.
+    """
     if sys.platform != "darwin":
         return {}
-    vault, state, stealth, block_all = await asyncio.gather(
+    binary = binary or own_binary()
+    vault, state, stealth, block_all, app = await asyncio.gather(
         _run(_FDESETUP, "status"),
         _run(_SOCKETFILTERFW, "--getglobalstate"),
         _run(_SOCKETFILTERFW, "--getstealthmode"),
         _run(_SOCKETFILTERFW, "--getblockall"),
+        app_incoming(binary) if binary else asyncio.sleep(0),
     )
-    return {
-        "filevault": parse_filevault(vault),
-        "firewall": {
-            "enabled": parse_firewall(state),
-            "stealth": parse_stealth(stealth),
-            "block_all": parse_block_all(block_all),
-        },
+    firewall: dict[str, Any] = {
+        "enabled": parse_firewall(state),
+        "stealth": parse_stealth(stealth),
+        "block_all": parse_block_all(block_all),
     }
+    if binary:
+        firewall["agent_allowed"] = app
+    return {"filevault": parse_filevault(vault), "firewall": firewall}
+
+
+def firewall_advice(firewall: dict[str, Any], binary: str) -> list[str]:
+    """What an operator should read when the firewall may stop the gateway or Prometheus; empty when fine."""
+    if firewall.get("enabled") is not True:
+        return []
+    fw = "/usr/libexec/ApplicationFirewall/socketfilterfw"
+    if firewall.get("block_all") is True:
+        return [
+            "Firewall: ON with \"Block all incoming connections\": the gateway and Prometheus cannot reach this Mac.",
+            "  Turn that option off in System Settings > Network > Firewall > Options.",
+        ]
+    if firewall.get("agent_allowed") is True:
+        return []
+    verdict = "blocks" if firewall.get("agent_allowed") is False else "may block"
+    return [
+        f"Firewall: ON, and it {verdict} incoming connections to the agent (model port 8100-8999, metrics 9468).",
+        "  A remote gateway or Prometheus will time out; this Mac then looks offline for serving.",
+        "  Allow it once per build (a new build has a new path), as an administrator:",
+        f"    sudo {fw} --add {binary} && sudo {fw} --unblockapp {binary}",
+    ]
 
 
 #: How often the state is read again: FileVault and the firewall change while the agent runs.
