@@ -18,7 +18,7 @@ a Mac does not do.
 ## Set the Mac up
 
 1. Open the Mac under **AI Infrastructure → Machines**.
-2. Select **Serve models on this Mac**. This creates an environment for this Mac alone and opens it. Doing it again
+2. Select **Serve models**. This creates an environment for this Mac alone and opens it. Doing it again
    opens the same environment.
 3. Deploy a model as usual (see [Deployments](deployments.md)). The first deployment fetches the runtime to the Mac,
    which takes a few minutes.
@@ -58,9 +58,9 @@ then on it can run headless.
 
 A Mac needs at least 24 GB of unified memory to host a model. The base Mac mini has 16 GB and cannot; the console
 then says it needs at least 24 GB of memory. Choose 24 GB or more when you buy. How much of that memory the model
-may use is described under [Memory](#memory-share) below.
+may use is described under [Memory](#memory-share) above.
 
-### FileVault and unattended restarts
+### FileVault and unattended restarts {#filevault-and-unattended-restarts}
 
 With FileVault on, a Mac that restarts after a power cut or an automatic macOS update stops at the unlock screen.
 The disk is locked, so the agent does not start and the machine stays offline until someone unlocks it. You have

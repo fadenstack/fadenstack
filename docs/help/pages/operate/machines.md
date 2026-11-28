@@ -95,6 +95,9 @@ On a Mac every agent command that changes the service needs `sudo`: `sudo faden-
 the state and the logs. To update it, run the install line again: when the new agent does not keep running, the
 Mac goes back to the one before.
 
+For a Mac mini as an always-on node (FileVault, power settings, network, model store), see
+[Serve models on a Mac](../administer/serve-on-a-mac.md#a-mac-mini-as-a-dedicated-node).
+
 ### Without approving each machine
 
 For Ansible, cloud-init, image builds or many machines at once:
