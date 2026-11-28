@@ -9,9 +9,10 @@ from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
+from sqlalchemy.exc import TimeoutError as PoolTimeoutError
 
 from faden_gateway.log import configure_logging
-from faden_gateway.services.gateway.errors import GatewayError, error_from, unreadable_request
+from faden_gateway.services.gateway.errors import GatewayError, error_from, error_response, unreadable_request
 from faden_gateway.settings import settings
 from faden_gateway.web.api.router import api_router, public_router
 from faden_gateway.web.lifespan import lifespan_setup
@@ -57,6 +58,20 @@ def get_app() -> FastAPI:
     async def gateway_error_handler(request: Request, exc: GatewayError) -> Response:
         del request
         return error_from(exc)
+
+    @app.exception_handler(PoolTimeoutError)
+    async def database_busy_handler(request: Request, exc: PoolTimeoutError) -> Response:
+        # Every database connection stayed taken for the pool's whole timeout: the gateway is over
+        # capacity (a burst of long streamed requests, 2026-11-28), not broken. Say so, as 503.
+        del request
+        logging.getLogger(__name__).warning("Database pool exhausted: %s", exc)
+        return error_response(
+            status_code=503,
+            message="The gateway is at capacity right now. Try again in a moment.",
+            error_type="server_error",
+            code="gateway_overloaded",
+            headers={"Retry-After": "5"},
+        )
 
     @app.exception_handler(RequestValidationError)
     async def unreadable_request_handler(request: Request, exc: RequestValidationError) -> Response:
