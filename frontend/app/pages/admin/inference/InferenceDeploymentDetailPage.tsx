@@ -30,6 +30,7 @@ import type {
   EnvironmentNode,
   InferenceDeployment,
   InferenceEndpoint,
+  ControlPlane,
   InferenceEnvironment,
   LogPage,
 } from "~/api/inference";
@@ -37,6 +38,7 @@ import { models as modelsApi, type Model } from "~/api/llm";
 import { nodesApi, type ManagedNode } from "~/api/nodes";
 import { FormDialog } from "~/components/FormDialog";
 import LogViewer, { LOG_LEVELS, type LogLevel } from "~/components/logs/LogViewer";
+import { STANDALONE_DRIVER } from "~/lib/driverCaps";
 import { useAsyncData } from "~/lib/useAsyncData";
 
 import Alert from "@mui/material/Alert";
@@ -395,6 +397,14 @@ export default function InferenceDeploymentDetailPage() {
     [envId],
     { initialValue: null as InferenceEnvironment | null },
   );
+  // The driver decides how a machine is described: a Mac (standalone) has no Ray and no head.
+  const controlPlaneId = environmentLoad.data?.control_plane_id ?? null;
+  const controlPlaneLoad = useAsyncData(
+    () => (controlPlaneId ? inferenceApi.getControlPlane(controlPlaneId) : Promise.resolve(null)),
+    [controlPlaneId],
+    { initialValue: null as ControlPlane | null },
+  );
+  const standalone = controlPlaneLoad.data?.driver === STANDALONE_DRIVER;
   const membersLoad = useAsyncData(
     () => (envId ? inferenceApi.listEnvironmentNodes(envId) : Promise.resolve([])),
     [envId],
@@ -994,8 +1004,8 @@ export default function InferenceDeploymentDetailPage() {
               <TableHead>
                 <TableRow>
                   <TableCell>{t("inference.detail.col_machine")}</TableCell>
-                  <TableCell>{t("inference.detail.col_role")}</TableCell>
-                  <TableCell>{t("inference.detail.col_ray_status")}</TableCell>
+                  {!standalone && <TableCell>{t("inference.detail.col_role")}</TableCell>}
+                  <TableCell>{t(standalone ? "inference.detail.col_status" : "inference.detail.col_ray_status")}</TableCell>
                   <TableCell>{t("clusters.detail.joined")}</TableCell>
                 </TableRow>
               </TableHead>
@@ -1009,13 +1019,15 @@ export default function InferenceDeploymentDetailPage() {
                         </Link>
                       </Tooltip>
                     </TableCell>
-                    <TableCell>
-                      <Chip
-                        size="small"
-                        label={roleLabel(member.role)}
-                        color={member.role === "head" ? "primary" : "default"}
-                      />
-                    </TableCell>
+                    {!standalone && (
+                      <TableCell>
+                        <Chip
+                          size="small"
+                          label={roleLabel(member.role)}
+                          color={member.role === "head" ? "primary" : "default"}
+                        />
+                      </TableCell>
+                    )}
                     <TableCell>{member.member_status ?? t("clusters.unknown_machine")}</TableCell>
                     <TableCell>{formatTimestamp(member.joined_at)}</TableCell>
                   </TableRow>

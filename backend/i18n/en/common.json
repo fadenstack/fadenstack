@@ -3434,7 +3434,8 @@
       "stopping": {
         "title_one": "Stopping {{name}}",
         "title_many": "Stopping {{count}} deployments",
-        "detail": "Ray Serve is letting the copies go. A large model can take a few minutes to free its GPU."
+        "detail": "Ray Serve is letting the copies go. A large model can take a few minutes to free its GPU.",
+        "detail_standalone": "The Mac is stopping the model and freeing its memory."
       },
       "failed": {
         "title_one": "{{count}} deployment failed to start",
@@ -3616,7 +3617,8 @@
       "remove_message": "{{name}} will leave the cluster. Its share of any running model stops.",
       "page_title": "Cluster",
       "stop_confirm": "Stop cluster",
-      "stop_warning": "Stop {{name}}? Every model on it stops serving until you start the cluster again. Its machines and network are kept."
+      "stop_warning": "Stop {{name}}? Every model on it stops serving until you start the cluster again. Its machines and network are kept.",
+      "accelerators_in_use": "Accelerators in use"
     },
     "stray": {
       "title": "Models running here without a deployment",
@@ -3751,6 +3753,12 @@
       "machine_line": "{{host}} · GPUs: {{count}}",
       "checked": "Each machine is checked first: it must reach the head on the cluster's network ({{network}}).",
       "add": "Add ({{count}})"
+    },
+    "wiring_standalone": {
+      "gateway": "Gateway",
+      "engine": "vLLM-Metal",
+      "no_model": "No model yet",
+      "help": "A Mac serves alone, one model at a time. Requests reach it through the gateway."
     }
   },
   "inference": {
@@ -3871,7 +3879,8 @@
       "share_memory": "The engine takes {{percent}} % of each accelerator's memory.",
       "share_restarts": "Changing the share restarts every copy. The model is unavailable until they are back.",
       "show_in_logs": "Show the errors",
-      "at_api": "At the API"
+      "at_api": "At the API",
+      "col_status": "Status"
     },
     "engine": {
       "title": "Engine settings",
