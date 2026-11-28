@@ -2,12 +2,26 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from faden_backend.services.inference.capabilities import CapabilityDocument
 from faden_backend.services.inference.drivers.standalone.deployment import StandaloneDeploymentManager
 from faden_backend.services.inference.drivers.standalone.environment import StandaloneEnvironmentManager
 from faden_backend.services.inference.observability import LogPage, LogSource
+
+
+# The agent's own cap on one ``native_worker_logs`` read (``worker.read_logs``).
+_AGENT_LOG_LIMIT = 2000
+# Fetch this many times *tail* so that dropping probe noise still leaves *tail* real lines.
+_OVER_FETCH = 4
+# uvicorn access lines for the Prometheus scrape and the readiness/health probes, every 15 s or so.
+# Only a *successful* GET is noise; a 4xx/5xx on these paths means the engine is unwell and is kept.
+_PROBE_ACCESS = re.compile(r'"GET /(?:metrics|health)(?:\?\S*)? HTTP/\d(?:\.\d)?" [23]\d\d\b')
+
+
+def _is_probe_noise(line: str) -> bool:
+    return bool(_PROBE_ACCESS.search(line))
 
 
 class StandaloneDriver:
@@ -63,7 +77,7 @@ class StandaloneDriver:
         answer = await NativeCommands(node_control, {}, owner=f"deployment:{deployment.id}").ask(
             node_id=node.id,
             command_type=NodeCommandType.NATIVE_WORKER_LOGS.value,
-            payload={"deployment_id": str(deployment.id), "tail": int(tail), "cursor": cursor},
+            payload={"deployment_id": str(deployment.id), "tail": min(max(int(tail), 1) * _OVER_FETCH, _AGENT_LOG_LIMIT), "cursor": cursor},
         )
         if answer is None:
             return LogPage(source=source, node_id=str(node.id), detail="The machine did not answer in time.")
@@ -72,7 +86,8 @@ class StandaloneDriver:
                            detail=f"The machine could not read the engine's log: {answer.get('error') or 'unknown error'}")
         lines = [
             LogLine(message=str(line), host=node.host, source="engine")
-            for line in (answer.get("lines") or [])
+            for line in [str(raw) for raw in (answer.get("lines") or [])
+                         if not _is_probe_noise(str(raw))][-max(int(tail), 1):]
         ]
         return LogPage(source=source, node_id=str(node.id), lines=lines, next_cursor=answer.get("cursor"))
 

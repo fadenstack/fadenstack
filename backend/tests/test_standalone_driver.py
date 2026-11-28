@@ -816,3 +816,37 @@ async def test_the_stage_payload_carries_the_unpacked_size_when_the_manifest_has
     await reconciliation.reconcile_environment(_Ctx(dbsession), env)
     payload = next(p for s, _, p in script.asked if s == "stage")
     assert payload["unpacked_size_bytes"] == 2_158_704_640
+
+
+SCRAPE = 'INFO:     127.0.0.1:50290 - "GET /metrics HTTP/1.1" 200 OK'
+
+
+async def test_the_engine_log_drops_scrape_and_probe_lines_and_keeps_the_rest(
+    dbsession: AsyncSession, script: Script,
+) -> None:
+    env, _mac = await _ready_environment(dbsession)
+    dep = await _deployment(dbsession, env)
+    driver = registry.get("standalone")()
+    real = ["faden: starting", "WARNING: slow step", 'INFO:     127.0.0.1:1 - "POST /v1/chat HTTP/1.1" 200 OK',
+            'INFO:     127.0.0.1:2 - "GET /metrics HTTP/1.1" 500 Internal Server Error']
+    health = 'INFO:     127.0.0.1:3 - "GET /health HTTP/1.1" 200 OK'
+    script.status = {"ok": True, "lines": [*real[:2], *([SCRAPE, health] * 20), *real[2:]], "cursor": "42"}
+    page = await driver.logs(dbsession, dep, source="engine", tail=3, node_control=object())
+    assert [line.message for line in page.lines] == real[1:]  # last 3 real lines, in order
+    assert script.asked[-1][2]["tail"] == 12  # asked for more than tail, to have enough left after filtering
+
+    await driver.logs(dbsession, dep, source="engine", tail=1000, node_control=object())
+    assert script.asked[-1][2]["tail"] == 2000  # never above what the agent allows
+
+
+async def test_a_page_of_only_scrape_lines_is_empty_and_the_cursor_still_advances(
+    dbsession: AsyncSession, script: Script,
+) -> None:
+    env, _mac = await _ready_environment(dbsession)
+    dep = await _deployment(dbsession, env)
+    driver = registry.get("standalone")()
+    script.status = {"ok": True, "lines": [SCRAPE] * 5, "cursor": "777"}
+    page = await driver.logs(dbsession, dep, source="engine", tail=5, cursor="700", node_control=object())
+    assert page.lines == [] and page.detail in (None, "")
+    assert page.next_cursor == "777"
+    assert script.asked[-1][2]["cursor"] == "700"
