@@ -3167,8 +3167,7 @@
     "title_label": "聊天标题",
     "writing": "正在编写回复",
     "ai_notice": "回答由人工智能生成，可能有误。请核实重要信息。",
-    "unmarked_notice": "此回答不带表明其为 AI 生成的标识：管理员允许该模型在没有标识的情况下回答。"
-,
+    "unmarked_notice": "此回答不带表明其为 AI 生成的标识：管理员允许该模型在没有标识的情况下回答。",
     "project_files": "文件",
     "project_files_hint": "此处的文件会随本项目的每个聊天一起提供。模型会把其中的文字作为上下文来读取。",
     "project_files_add": "添加文件",
@@ -5973,6 +5972,21 @@
     "fit_sequences": "并行对话数",
     "fit_too_large": "该模型无法放入这台 Mac：约需 {{needed}}，模型最多可用 {{available}}。",
     "fit_one_model": "一台 Mac 一次运行一个模型。",
-    "fit_waiting": "正在等待 Mac 报告其内存。"
+    "fit_waiting": "正在等待 Mac 报告其内存。",
+    "chip_runtime_ready": "运行时就绪",
+    "chip_runtime_missing": "尚无运行时",
+    "chip_sandbox_on": "沙盒已开",
+    "chip_sandbox_off": "沙盒已关",
+    "chip_sandbox_unknown": "沙盒未知",
+    "chip_firewall_on": "防火墙已开",
+    "chip_firewall_off": "防火墙已关",
+    "chip_firewall_unknown": "防火墙未知",
+    "chip_filevault_on": "FileVault 已开",
+    "chip_filevault_off": "FileVault 已关",
+    "chip_filevault_unknown": "FileVault 未知",
+    "chip_memory": "{{size}} GPU 内存",
+    "memory_help": "macOS 允许模型在这台 Mac 上使用的 GPU 内存。",
+    "details_show": "详情",
+    "details_hide": "收起详情"
   }
 }

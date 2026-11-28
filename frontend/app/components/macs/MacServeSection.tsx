@@ -6,7 +6,7 @@
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
-import Typography from "@mui/material/Typography";
+import Tooltip from "@mui/material/Tooltip";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
@@ -49,18 +49,27 @@ export function MacServeSection({
   }
 
   return (
-    <Stack spacing={1.5} data-testid="mac-serve">
-      <MacStatusCard capabilities={capabilities} />
-      {mayServe && (
-      <Stack direction="row" spacing={2} alignItems="center">
-        <Button variant="contained" disabled={busy} onClick={() => void serve()} data-testid="mac-serve-button">
-          {t("mac.serve_button")}
-        </Button>
-        <Typography variant="body2" color="text.secondary">
-          {t("mac.serve_hint")}
-        </Typography>
-      </Stack>
-      )}
+    <Stack spacing={1} data-testid="mac-serve">
+      <MacStatusCard
+        capabilities={capabilities}
+        action={
+          mayServe ? (
+            <Tooltip title={t("mac.serve_hint")} arrow>
+              <span>
+                <Button
+                  size="small"
+                  variant="contained"
+                  disabled={busy}
+                  onClick={() => void serve()}
+                  data-testid="mac-serve-button"
+                >
+                  {t("mac.serve_button")}
+                </Button>
+              </span>
+            </Tooltip>
+          ) : undefined
+        }
+      />
       {error && <Alert severity="error">{error}</Alert>}
     </Stack>
   );

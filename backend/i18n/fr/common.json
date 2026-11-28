@@ -2841,8 +2841,7 @@
     "title_label": "Titre du chat",
     "writing": "Une réponse est en cours de rédaction",
     "ai_notice": "Les réponses sont générées par une IA et peuvent être erronées. Vérifiez l'essentiel.",
-    "unmarked_notice": "Cette réponse ne porte aucune marque la signalant comme générée par l'IA : un administrateur a autorisé ce modèle sans marquage."
-,
+    "unmarked_notice": "Cette réponse ne porte aucune marque la signalant comme générée par l'IA : un administrateur a autorisé ce modèle sans marquage.",
     "project_files": "Fichiers",
     "project_files_hint": "Les fichiers d’ici accompagnent chaque conversation de ce projet. Le modèle lit leur texte comme contexte.",
     "project_files_add": "Ajouter un fichier",
@@ -5973,6 +5972,21 @@
     "fit_sequences": "Conversations en parallèle",
     "fit_too_large": "Ce modèle ne tient pas sur ce Mac : il faut environ {{needed}} et le modèle peut utiliser {{available}}.",
     "fit_one_model": "Un Mac exécute un modèle à la fois.",
-    "fit_waiting": "En attente que le Mac signale sa mémoire."
+    "fit_waiting": "En attente que le Mac signale sa mémoire.",
+    "chip_runtime_ready": "Runtime prêt",
+    "chip_runtime_missing": "Pas encore de runtime",
+    "chip_sandbox_on": "Sandbox active",
+    "chip_sandbox_off": "Sandbox inactive",
+    "chip_sandbox_unknown": "Sandbox inconnue",
+    "chip_firewall_on": "Pare-feu actif",
+    "chip_firewall_off": "Pare-feu inactif",
+    "chip_firewall_unknown": "Pare-feu inconnu",
+    "chip_filevault_on": "FileVault actif",
+    "chip_filevault_off": "FileVault inactif",
+    "chip_filevault_unknown": "FileVault inconnu",
+    "chip_memory": "{{size}} de mémoire GPU",
+    "memory_help": "Mémoire GPU que macOS laisse au modèle sur ce Mac.",
+    "details_show": "Détails",
+    "details_hide": "Masquer les détails"
   }
 }

@@ -3167,8 +3167,7 @@
     "title_label": "Chat-Titel",
     "writing": "Eine Antwort wird geschrieben",
     "ai_notice": "Antworten werden von einer KI erzeugt und können falsch sein. Prüfen Sie Wichtiges.",
-    "unmarked_notice": "Diese Antwort trägt keine Kennzeichnung als KI-erzeugt: Ein Administrator hat dieses Modell ohne sie erlaubt."
-,
+    "unmarked_notice": "Diese Antwort trägt keine Kennzeichnung als KI-erzeugt: Ein Administrator hat dieses Modell ohne sie erlaubt.",
     "project_files": "Dateien",
     "project_files_hint": "Dateien hier gehören zu jedem Chat dieses Projekts. Das Modell liest ihren Text als Kontext.",
     "project_files_add": "Datei hinzufügen",
@@ -5973,6 +5972,21 @@
     "fit_sequences": "Parallele Unterhaltungen",
     "fit_too_large": "Dieses Modell passt nicht auf diesen Mac: Es braucht etwa {{needed}}, das Modell darf {{available}} nutzen.",
     "fit_one_model": "Ein Mac führt ein Modell zur Zeit aus.",
-    "fit_waiting": "Warte darauf, dass der Mac seinen Speicher meldet."
+    "fit_waiting": "Warte darauf, dass der Mac seinen Speicher meldet.",
+    "chip_runtime_ready": "Runtime bereit",
+    "chip_runtime_missing": "Noch keine Runtime",
+    "chip_sandbox_on": "Sandbox an",
+    "chip_sandbox_off": "Sandbox aus",
+    "chip_sandbox_unknown": "Sandbox unbekannt",
+    "chip_firewall_on": "Firewall an",
+    "chip_firewall_off": "Firewall aus",
+    "chip_firewall_unknown": "Firewall unbekannt",
+    "chip_filevault_on": "FileVault an",
+    "chip_filevault_off": "FileVault aus",
+    "chip_filevault_unknown": "FileVault unbekannt",
+    "chip_memory": "{{size}} GPU-Speicher",
+    "memory_help": "GPU-Speicher, den macOS dem Modell auf diesem Mac erlaubt.",
+    "details_show": "Details",
+    "details_hide": "Details ausblenden"
   }
 }
