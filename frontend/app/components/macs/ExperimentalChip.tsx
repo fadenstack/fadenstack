@@ -16,6 +16,7 @@ export function ExperimentalChip() {
         variant="outlined"
         color="warning"
         label={t("mac.experimental")}
+        sx={{ height: 22, fontSize: "0.75rem", flexShrink: 0 }}
         tabIndex={0}
         role="img"
         aria-label={`${t("mac.experimental")}. ${t("mac.experimental_help")}`}

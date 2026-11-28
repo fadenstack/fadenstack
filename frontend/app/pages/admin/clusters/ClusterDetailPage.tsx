@@ -383,10 +383,10 @@ export default function ClusterDetailPage() {
         <Button size="small" startIcon={<ArrowBackIcon />} onClick={() => navigate("/admin/clusters")}>
           {t("clusters.list.title")}
         </Button>
-        <Typography variant="h6" sx={{ flexGrow: 1 }}>
-          {cluster.name}
-        </Typography>
-        {standalone && <ExperimentalChip />}
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ flexGrow: 1, minWidth: 0 }}>
+          <Typography variant="h6">{cluster.name}</Typography>
+          {standalone && <ExperimentalChip />}
+        </Stack>
         <Chip
           size="small"
           label={clusterStatusLabel(clusterShownStatus(cluster))}

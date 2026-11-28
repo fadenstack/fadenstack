@@ -774,10 +774,10 @@ export default function InferenceDeploymentDetailPage() {
         >
           {t("clusters.deployments.title")}
         </Button>
-        <Typography variant="h6" sx={{ flexGrow: 1 }}>
-          {deployment.name}
-        </Typography>
-        {standalone && <ExperimentalChip />}
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ flexGrow: 1, minWidth: 0 }}>
+          <Typography variant="h6">{deployment.name}</Typography>
+          {standalone && <ExperimentalChip />}
+        </Stack>
         <Button
           size="small"
           startIcon={<TuneIcon />}

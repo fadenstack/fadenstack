@@ -33,9 +33,9 @@ describe("MacStatusCard", () => {
     expect(screen.queryByTestId("mac-filevault-warning")).not.toBeInTheDocument();
   });
 
-  it("marks the Mac experimental", () => {
+  it("leaves the Experimental chip to the page header", () => {
     render(<MacStatusCard capabilities={{}} />);
-    expect(screen.getByTestId("experimental-chip")).toHaveTextContent("Experimental");
+    expect(screen.queryByTestId("experimental-chip")).not.toBeInTheDocument();
   });
 
   it("keeps the full sentences under Details", async () => {

@@ -82,7 +82,9 @@ describe("InferenceDeploymentDetailPage", () => {
     vi.spyOn(inferenceApi, "getControlPlane").mockResolvedValue({ ...controlPlane, driver: "standalone" });
     const { unmount } = renderPage(<InferenceDeploymentDetailPage />, { path: ROUTE, initialPath: URL });
     await screen.findByRole("heading", { name: "qwen-serve" });
-    expect(await screen.findByTestId("experimental-chip")).toHaveTextContent("Experimental");
+    const chip = await screen.findByTestId("experimental-chip");
+    expect(chip).toHaveTextContent("Experimental");
+    expect(screen.getByRole("heading", { name: "qwen-serve" }).parentElement).toContainElement(chip);
     unmount();
     vi.spyOn(inferenceApi, "getControlPlane").mockResolvedValue({ ...controlPlane, driver: "ray" });
     await renderDetail();

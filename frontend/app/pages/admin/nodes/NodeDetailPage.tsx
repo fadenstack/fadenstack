@@ -53,6 +53,7 @@ import FoundVllmCard from "~/pages/admin/nodes/FoundVllmCard";
 
 import GaugeCard from "~/components/GaugeCard";
 import { DrainPlanDialog } from "../clusters/DrainPlanDialog";
+import { ExperimentalChip } from "~/components/macs/ExperimentalChip";
 import { MacServeSection } from "~/components/macs/MacServeSection";
 import { isMacNode, isNativeNode } from "~/lib/driverCaps";
 
@@ -488,6 +489,7 @@ export default function NodeDetailPage() {
                 color={statusColor(node.status)}
                 label={node.status}
               />
+              {isNativeNode({ ...(node.capabilities ?? {}), ...caps }) && <ExperimentalChip />}
               {node.maintenance_mode && (
                 <Chip
                   size="small"
