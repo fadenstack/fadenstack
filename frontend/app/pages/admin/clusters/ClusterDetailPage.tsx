@@ -472,6 +472,7 @@ export default function ClusterDetailPage() {
 
       {macNode && (
         <MacStatusCard
+          name={hostOf(macNode.node_id)}
           capabilities={
             (data.nodes.find((n) => n.id === macNode.node_id)?.capabilities ?? {}) as Record<string, unknown>
           }
@@ -691,7 +692,7 @@ export default function ClusterDetailPage() {
                   <TableCell>{t("clusters.deployments.col_name")}</TableCell>
                   <TableCell>{t("clusters.deployments.col_model")}</TableCell>
                   <TableCell>{t("clusters.deployments.col_state")}</TableCell>
-                  <TableCell align="right">{t("clusters.deployments.col_copies")}</TableCell>
+                  <TableCell align="right">{t(standalone ? "clusters.deployments.col_ready" : "clusters.deployments.col_copies")}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -715,7 +716,9 @@ export default function ClusterDetailPage() {
                       />
                     </TableCell>
                     <TableCell align="right">
-                      {deployment.ready_replicas} / {copiesWanted(deployment)}
+                      {standalone
+                        ? t(deployment.ready_replicas > 0 ? "clusters.deployments.ready_yes" : "clusters.deployments.ready_no")
+                        : `${deployment.ready_replicas} / ${copiesWanted(deployment)}`}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -727,7 +730,7 @@ export default function ClusterDetailPage() {
       </Card>
 
       {/* --- how the gateway reaches its models ----------------------------- */}
-      <ModelTrafficCard environmentId={id!} onMoved={() => void deployments.refresh()} />
+      <ModelTrafficCard environmentId={id!} standalone={standalone} onMoved={() => void deployments.refresh()} />
 
       {/* --- what its machines run ------------------------------------------ */}
       <RuntimeCard environmentId={id!} onSwitched={() => void deployments.refresh()} />
@@ -736,7 +739,7 @@ export default function ClusterDetailPage() {
       <RayTlsCard environmentId={id!} onSwitched={() => void deployments.refresh()} />
 
       {/* --- where its machines get models ----------------------------------- */}
-      <ModelDownloadsCard environmentId={id!} />
+      <ModelDownloadsCard environmentId={id!} standalone={standalone} />
 
       {/* --- models it runs that no deployment here owns ------------------- */}
       {/* Both: taking over can add the model to the catalogue, and without

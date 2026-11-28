@@ -74,8 +74,11 @@ function StatusChip({ item }: { item: Item }) {
 export function MacStatusCard({
   capabilities,
   action,
+  name,
 }: {
   capabilities: Record<string, unknown> | null | undefined;
+  /** The machine's name. The console is rarely on the Mac, so it is never "this" Mac. */
+  name?: string;
   /** The Mac's main action (serve), shown at the end of the row. */
   action?: ReactNode;
 }) {
@@ -129,7 +132,7 @@ export function MacStatusCard({
         <Stack direction="row" alignItems="center" spacing={1} useFlexGap flexWrap="wrap">
           <Stack direction="row" alignItems="center" spacing={1} useFlexGap flexWrap="wrap" sx={{ flex: "1 1 0", minWidth: 0 }}>
             <Typography variant="subtitle2" sx={{ mr: 0.5 }}>
-              {t("mac.status_title")}
+              {name || t("mac.status_title")}
             </Typography>
             {items.map((i) => (
               <StatusChip key={i.id} item={i} />

@@ -469,9 +469,9 @@ describe("HostModelDialog on a Mac", () => {
     await waitFor(() => expect(detail).toHaveBeenCalledWith("Qwen/Qwen3-0.6B", MAC.environment_id, 8192, expect.anything()));
     await waitFor(() => expect(screen.getByTestId("mac-fit")).toHaveTextContent("12 %"));
     // The slider text uses the Mac's working set, not its whole memory.
-    expect(screen.getByText(/of the 55\.7 GB this Mac offers/)).toBeInTheDocument();
+    expect(screen.getByText(/of the 55\.7 GB the Mac offers/)).toBeInTheDocument();
     // vLLM's own version is not shown for a Mac; the Mac runtime's is.
-    expect(screen.getByText(/Settings this Mac allows \(\d+, vLLM-Metal 0\.34\.0\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Settings the Mac allows \(\d+, vLLM-Metal 0\.34\.0\)/)).toBeInTheDocument();
 
     await userEvent.click(screen.getByTestId("host-next"));
     await userEvent.click(screen.getByTestId("host-submit"));

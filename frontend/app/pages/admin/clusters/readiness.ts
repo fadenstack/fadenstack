@@ -173,7 +173,11 @@ export function clusterReadiness(
     return {
       stage: "starting",
       title: i18n.t("clusters.next.starting.title"),
-      detail: reported ?? i18n.t("clusters.next.starting.detail", { count: members.length }),
+      detail:
+        reported ??
+        (needsNetwork
+          ? i18n.t("clusters.next.starting.detail", { count: members.length })
+          : i18n.t("clusters.next.starting.detail_standalone")),
       tone: "progress",
       progressPct: cluster.progress?.progress_pct ?? null,
     };
@@ -199,7 +203,7 @@ export function clusterReadiness(
         pending.length === 1
           ? i18n.t("clusters.next.deploying.title_one", { name: names })
           : i18n.t("clusters.next.deploying.title_many", { count: pending.length }),
-      detail: i18n.t("clusters.next.deploying.detail"),
+      detail: i18n.t(needsNetwork ? "clusters.next.deploying.detail" : "clusters.next.deploying.detail_standalone"),
       tone: "progress",
     };
   }
@@ -242,10 +246,15 @@ export function clusterReadiness(
   return {
     stage: "serving",
     title: i18n.t("clusters.next.serving.title"),
-    detail: i18n.t("clusters.next.serving.detail", {
-      deployments: i18n.t("clusters.deployment_count", { count: active.length }),
-      replicas: i18n.t("clusters.replica_count", { count: ready }),
-    }),
+    // A Mac runs one model on one machine: no copies to count.
+    detail: needsNetwork
+      ? i18n.t("clusters.next.serving.detail", {
+          deployments: i18n.t("clusters.deployment_count", { count: active.length }),
+          replicas: i18n.t("clusters.replica_count", { count: ready }),
+        })
+      : i18n.t("clusters.next.serving.detail_standalone", {
+          deployments: i18n.t("clusters.deployment_count", { count: active.length }),
+        }),
     tone: "success",
   };
 }

@@ -74,7 +74,7 @@ describe("MacFitPanel", () => {
 
   it("refuses a model that does not fit, with the figures", () => {
     render(<MacFitPanel fit={fit({ status: "too_large", needed_bytes_per_gpu: 90 * GIB })} />);
-    expect(screen.getByTestId("mac-fit-too-large")).toHaveTextContent("does not fit this Mac");
+    expect(screen.getByTestId("mac-fit-too-large")).toHaveTextContent("does not fit the Mac");
   });
 
   it("shows nothing for a cluster that is not a Mac", () => {

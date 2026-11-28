@@ -881,8 +881,12 @@ export default function InferenceDeploymentDetailPage() {
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <LabeledValue
-                label={t("inference.detail.copies")}
-                value={`${deployment.ready_replicas} / ${copiesWanted(deployment)}`}
+                label={standalone ? t("clusters.deployments.col_ready") : t("inference.detail.copies")}
+                value={
+                  standalone
+                    ? t(deployment.ready_replicas > 0 ? "clusters.deployments.ready_yes" : "clusters.deployments.ready_no")
+                    : `${deployment.ready_replicas} / ${copiesWanted(deployment)}`
+                }
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -1076,7 +1080,7 @@ export default function InferenceDeploymentDetailPage() {
                   color={artifacts.all_ready ? "success" : "warning"}
                   label={
                     artifacts.all_ready
-                      ? t("inference.detail.files_everywhere")
+                      ? t(standalone ? "inference.detail.files_everywhere_standalone" : "inference.detail.files_everywhere")
                       : t("inference.detail.files_on_some", {
                           ready: artifacts.ready_node_ids.length,
                           total: artifactRows.length,
@@ -1147,7 +1151,7 @@ export default function InferenceDeploymentDetailPage() {
           </Typography>
           {data.endpoints.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
-              {t("inference.detail.no_endpoint")}
+              {t(standalone ? "inference.detail.no_endpoint_standalone" : "inference.detail.no_endpoint")}
             </Typography>
           ) : (
             <Table size="small">
@@ -1202,7 +1206,7 @@ export default function InferenceDeploymentDetailPage() {
               <Grid container spacing={2}>
                 <Grid size={{ xs: 6, md: 3 }}>
                   <LabeledValue
-                    label={t("inference.detail.application")}
+                    label={t(standalone ? "inference.detail.application_standalone" : "inference.detail.application")}
                     value={data.metrics.app_name ?? t("inference.detail.not_applied")}
                     mono
                   />
@@ -1215,8 +1219,12 @@ export default function InferenceDeploymentDetailPage() {
                 </Grid>
                 <Grid size={{ xs: 6, md: 3 }}>
                   <LabeledValue
-                    label={t("inference.detail.copies_ready")}
-                    value={`${data.metrics.replicas_ready} / ${data.metrics.replicas_total}`}
+                    label={standalone ? t("clusters.deployments.col_ready") : t("inference.detail.copies_ready")}
+                    value={
+                      standalone
+                        ? t(data.metrics.replicas_ready > 0 ? "clusters.deployments.ready_yes" : "clusters.deployments.ready_no")
+                        : `${data.metrics.replicas_ready} / ${data.metrics.replicas_total}`
+                    }
                   />
                 </Grid>
                 <Grid size={{ xs: 6, md: 3 }}>

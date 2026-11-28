@@ -559,10 +559,12 @@ export function HostModelDialog({
                 <Stack spacing={0.75}>
                   <SummaryRow label={t("hosting.summary.model")} value={repo ?? kept?.display_name ?? "—"} />
                   <SummaryRow label={t("hosting.summary.cluster")} value={chosen?.name ?? "—"} />
-                  <SummaryRow
-                    label={t("hosting.summary.size")}
-                    value={`${t("hosting.copies_value", { count: copies })} × ${gpuChoiceLabel(gpus, chosen?.accelerator)}`}
-                  />
+                  {!isMac && (
+                    <SummaryRow
+                      label={t("hosting.summary.size")}
+                      value={`${t("hosting.copies_value", { count: copies })} × ${gpuChoiceLabel(gpus, chosen?.accelerator)}`}
+                    />
+                  )}
                   {offerMachine && machine && <SummaryRow label={t("hosting.machine_label")} value={machine} />}
                   <SummaryRow
                     label={t("hosting.summary.settings")}
@@ -593,12 +595,12 @@ export function HostModelDialog({
               {willDownload && (
                 <Alert severity="info" data-testid="host-download-note">
                   {downloadBytes
-                    ? t("hosting.download_note_size", { size: formatBytes(downloadBytes) })
-                    : t("hosting.download_note")}
+                    ? t(isMac ? "hosting.download_note_size_mac" : "hosting.download_note_size", { size: formatBytes(downloadBytes) })
+                    : t(isMac ? "hosting.download_note_mac" : "hosting.download_note")}
                 </Alert>
               )}
               {!willDownload && <Alert severity="success">{t("hosting.kept_note")}</Alert>}
-              {fit && fit.status === "fits" && copies > fit.copies_now && (
+              {!isMac && fit && fit.status === "fits" && copies > fit.copies_now && (
                 <Alert severity="warning">{t("hosting.busy_warning", { count: fit.copies_now })}</Alert>
               )}
             </Stack>
@@ -820,7 +822,8 @@ function WhereStep({
       </Stack>
       {detailState === "loading" && <LinearProgress />}
 
-      {chosen && choices.length > 0 && (
+      {/* A Mac runs one model on its one machine: no size per copy, no copies to pick. */}
+      {chosen && choices.length > 0 && !chosen.metal && (
         <Stack spacing={1.5}>
           <Typography variant="subtitle2">{t("hosting.size_title")}</Typography>
           <ToggleButtonGroup
