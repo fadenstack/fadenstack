@@ -212,7 +212,7 @@ export function clusterReadiness(
         stopping.length === 1
           ? i18n.t("clusters.next.stopping.title_one", { name: stopping[0].name })
           : i18n.t("clusters.next.stopping.title_many", { count: stopping.length }),
-      detail: i18n.t("clusters.next.stopping.detail"),
+      detail: i18n.t(needsNetwork ? "clusters.next.stopping.detail" : "clusters.next.stopping.detail_standalone"),
       tone: "progress",
     };
   }

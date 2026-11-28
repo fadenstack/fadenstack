@@ -3436,7 +3436,8 @@
       "stopping": {
         "title_one": "Arrêt de {{name}}",
         "title_many": "Arrêt de {{count}} déploiements",
-        "detail": "Ray Serve libère les copies. Un grand modèle peut mettre quelques minutes à libérer son GPU."
+        "detail": "Ray Serve libère les copies. Un grand modèle peut mettre quelques minutes à libérer son GPU.",
+        "detail_standalone": "Le Mac arrête le modèle et libère sa mémoire."
       },
       "failed": {
         "title_one": "{{count}} déploiement n'a pas pu démarrer",
@@ -3618,7 +3619,8 @@
       "remove_message": "{{name}} quittera le cluster. Sa part de tout modèle en cours s'arrête.",
       "page_title": "Cluster",
       "stop_confirm": "Arrêter le cluster",
-      "stop_warning": "Arrêter {{name}} ? Tous ses modèles cessent de répondre jusqu'à ce que vous redémarriez le cluster. Les machines et le réseau sont conservés."
+      "stop_warning": "Arrêter {{name}} ? Tous ses modèles cessent de répondre jusqu'à ce que vous redémarriez le cluster. Les machines et le réseau sont conservés.",
+      "accelerators_in_use": "Accélérateurs utilisés"
     },
     "stray": {
       "title": "Modèles qui tournent ici sans déploiement",
@@ -3753,6 +3755,12 @@
       "machine_line": "{{host}} · GPU : {{count}}",
       "checked": "Chaque machine est d'abord vérifiée : elle doit joindre le nœud principal sur le réseau du cluster ({{network}}).",
       "add": "Ajouter ({{count}})"
+    },
+    "wiring_standalone": {
+      "gateway": "Passerelle",
+      "engine": "vLLM-Metal",
+      "no_model": "Pas encore de modèle",
+      "help": "Un Mac sert seul, un modèle à la fois. Les requêtes l'atteignent par la passerelle."
     }
   },
   "inference": {
@@ -3873,7 +3881,8 @@
       "share_memory": "Le moteur prend {{percent}} % de la mémoire de chaque accélérateur.",
       "share_restarts": "Changer la part redémarre toutes les copies. Le modèle est indisponible jusqu'à leur retour.",
       "show_in_logs": "Afficher les erreurs",
-      "at_api": "Sur l'API"
+      "at_api": "Sur l'API",
+      "col_status": "État"
     },
     "engine": {
       "title": "Réglages du moteur",

@@ -3436,7 +3436,8 @@
       "stopping": {
         "title_one": "Deteniendo {{name}}",
         "title_many": "Deteniendo {{count}} despliegues",
-        "detail": "Ray Serve está liberando las copias. Un modelo grande puede tardar unos minutos en liberar su GPU."
+        "detail": "Ray Serve está liberando las copias. Un modelo grande puede tardar unos minutos en liberar su GPU.",
+        "detail_standalone": "El Mac está deteniendo el modelo y liberando su memoria."
       },
       "failed": {
         "title_one": "{{count}} despliegue no pudo iniciarse",
@@ -3618,7 +3619,8 @@
       "remove_message": "{{name}} saldrá del clúster. Su parte de cualquier modelo en ejecución se detiene.",
       "page_title": "Clúster",
       "stop_confirm": "Detener el clúster",
-      "stop_warning": "¿Detener {{name}}? Todos sus modelos dejan de responder hasta que vuelva a iniciar el clúster. Las máquinas y la red se conservan."
+      "stop_warning": "¿Detener {{name}}? Todos sus modelos dejan de responder hasta que vuelva a iniciar el clúster. Las máquinas y la red se conservan.",
+      "accelerators_in_use": "Aceleradores en uso"
     },
     "stray": {
       "title": "Modelos que se ejecutan aquí sin despliegue",
@@ -3753,6 +3755,12 @@
       "machine_line": "{{host}} · GPU: {{count}}",
       "checked": "Primero se comprueba cada máquina: debe alcanzar el nodo principal en la red del clúster ({{network}}).",
       "add": "Añadir ({{count}})"
+    },
+    "wiring_standalone": {
+      "gateway": "Pasarela",
+      "engine": "vLLM-Metal",
+      "no_model": "Aún sin modelo",
+      "help": "Un Mac sirve solo, un modelo a la vez. Las solicitudes le llegan por la pasarela."
     }
   },
   "inference": {
@@ -3873,7 +3881,8 @@
       "share_memory": "El motor usa el {{percent}} % de la memoria de cada acelerador.",
       "share_restarts": "Cambiar la fracción reinicia todas las copias. El modelo no está disponible hasta que vuelvan.",
       "show_in_logs": "Mostrar los errores",
-      "at_api": "En la API"
+      "at_api": "En la API",
+      "col_status": "Estado"
     },
     "engine": {
       "title": "Ajustes del motor",

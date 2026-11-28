@@ -80,6 +80,7 @@ import {
 } from "../inference/common";
 import { ChooseNetworkDialog } from "./ChooseNetworkDialog";
 import { AddMachinesDialog } from "./AddMachinesDialog";
+import { StandaloneWiring } from "./StandaloneWiring";
 import { DrainPlanDialog } from "./DrainPlanDialog";
 import type { DrainState } from "~/api/inference";
 import InsightsIcon from "@mui/icons-material/Insights";
@@ -200,6 +201,7 @@ export default function ClusterDetailPage() {
     ? driverUi(controlPlane.data?.driver)
     : { network: false, drain: false, multiNode: false, scaling: false };
   const macNode = driverKnown && !ui.multiNode ? members.data[0] : undefined;
+  const standalone = driverKnown && !ui.multiNode;
 
   // The one most likely to hang on a sick cluster, and now the one whose
   // hanging costs the least.
@@ -421,15 +423,18 @@ export default function ClusterDetailPage() {
             {t("common.start")}
           </Button>
         )}
-        <Button
-          size="small"
-          startIcon={<DnsOutlinedIcon />}
-          disabled={busy}
-          onClick={() => setAddOpen(true)}
-          data-add-machines-open=""
-        >
-          {t("clusters.add_machines.open")}
-        </Button>
+        {/* A Mac serves alone: one machine, nothing to add. */}
+        {ui.multiNode && (
+          <Button
+            size="small"
+            startIcon={<DnsOutlinedIcon />}
+            disabled={busy}
+            onClick={() => setAddOpen(true)}
+            data-add-machines-open=""
+          >
+            {t("clusters.add_machines.open")}
+          </Button>
+        )}
         <Button
           variant="contained"
           size="small"
@@ -545,14 +550,20 @@ export default function ClusterDetailPage() {
           <Card variant="outlined">
             <CardContent>
               <LabeledValue
-                label={t("clusters.detail.free_accelerators")}
+                label={standalone ? t("clusters.detail.accelerators_in_use") : t("clusters.detail.free_accelerators")}
                 value={
-                  data.metrics
-                    ? t("clusters.detail.n_of_m", {
-                        n: data.metrics.gpus_available,
-                        m: data.metrics.gpus_total,
+                  standalone
+                    ? // The Ray counters (free of total) stay 0 of 0 on a Mac: it has no Ray. A Mac runs one model at a time.
+                      t("clusters.detail.n_of_m", {
+                        n: Math.min(accelerators, data.deployments.filter((d) => d.ready_replicas > 0).length),
+                        m: accelerators,
                       })
-                    : t("clusters.unknown_machine")
+                    : data.metrics
+                      ? t("clusters.detail.n_of_m", {
+                          n: data.metrics.gpus_available,
+                          m: data.metrics.gpus_total,
+                        })
+                      : t("clusters.unknown_machine")
                 }
               />
             </CardContent>
@@ -569,54 +580,63 @@ export default function ClusterDetailPage() {
       </AsyncSection>
 
       {/* --- the picture ------------------------------------------------ */}
-      <Card variant="outlined">
-        <CardContent>
-          <Stack
-            direction="row"
-            justifyContent="space-between"
-            alignItems="center"
-            sx={{ mb: 1 }}
-          >
-            <Typography variant="subtitle2">{t("clusters.detail.wiring")}</Typography>
-            {/* The cluster's own Grafana dashboard.
-                It was rendered from the template and nothing in the product
-                linked to it, so the panels existed and could not be found.
-                Here rather than behind "Advanced": the numbers it draws are
-                the ones somebody looking at this card came for, and an
-                operator should not have to know the word "Advanced" to see
-                whether their hardware is working. */}
-            {data.metrics?.dashboard_url && (
-              <Button
-                size="small"
-                component="a"
-                href={data.metrics.dashboard_url}
-                target="_blank"
-                rel="noopener"
-                startIcon={<InsightsIcon />}
-              >
-                {t("clusters.detail.open_dashboard")}
-              </Button>
-            )}
-          </Stack>
-          <AsyncSection
-            loading={members.loading || fleet.loading}
-            error={members.error}
-            empty={data.members.length === 0}
-            height={420}
-          >
-            <ClusterTopology
-              cluster={cluster}
-              members={data.members}
-              nodes={data.nodes}
-              selectedNodeId={selectedNodeId}
-              onSelect={setSelectedNodeId}
-            />
-          </AsyncSection>
-          <Typography variant="caption" color="text.secondary">
-            {t("clusters.detail.click_machine")}
-          </Typography>
-        </CardContent>
-      </Card>
+      {standalone ? (
+        <StandaloneWiring
+            host={macNode ? hostOf(macNode.node_id) : ""}
+            models={data.deployments
+              .filter((d) => d.desired_state !== "deleted")
+              .map((d) => data.models.find((m) => m.id === d.model_id)?.display_name ?? d.name)}
+          />
+        ) : (
+        <Card variant="outlined">
+          <CardContent>
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="center"
+              sx={{ mb: 1 }}
+            >
+              <Typography variant="subtitle2">{t("clusters.detail.wiring")}</Typography>
+              {/* The cluster's own Grafana dashboard.
+                  It was rendered from the template and nothing in the product
+                  linked to it, so the panels existed and could not be found.
+                  Here rather than behind "Advanced": the numbers it draws are
+                  the ones somebody looking at this card came for, and an
+                  operator should not have to know the word "Advanced" to see
+                  whether their hardware is working. */}
+              {data.metrics?.dashboard_url && (
+                <Button
+                  size="small"
+                  component="a"
+                  href={data.metrics.dashboard_url}
+                  target="_blank"
+                  rel="noopener"
+                  startIcon={<InsightsIcon />}
+                >
+                  {t("clusters.detail.open_dashboard")}
+                </Button>
+              )}
+            </Stack>
+            <AsyncSection
+              loading={members.loading || fleet.loading}
+              error={members.error}
+              empty={data.members.length === 0}
+              height={420}
+            >
+              <ClusterTopology
+                cluster={cluster}
+                members={data.members}
+                nodes={data.nodes}
+                selectedNodeId={selectedNodeId}
+                onSelect={setSelectedNodeId}
+              />
+            </AsyncSection>
+            <Typography variant="caption" color="text.secondary">
+              {t("clusters.detail.click_machine")}
+            </Typography>
+          </CardContent>
+        </Card>
+      )}
 
       {/* --- only when the machines are not all alike -------------------- */}
       {!pools.loading && poolsWorthShowing(data.pools) && (

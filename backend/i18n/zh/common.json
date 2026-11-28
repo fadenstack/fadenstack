@@ -3436,7 +3436,8 @@
       "stopping": {
         "title_one": "正在停止 {{name}}",
         "title_many": "正在停止 {{count}} 个部署",
-        "detail": "Ray Serve 正在释放副本。大型模型可能需要几分钟才能释放 GPU。"
+        "detail": "Ray Serve 正在释放副本。大型模型可能需要几分钟才能释放 GPU。",
+        "detail_standalone": "这台 Mac 正在停止模型并释放内存。"
       },
       "failed": {
         "title_one": "{{count}} 个部署启动失败",
@@ -3618,7 +3619,8 @@
       "remove_message": "{{name}} 将离开集群，其承担的正在运行的模型部分会停止。",
       "page_title": "集群",
       "stop_confirm": "停止集群",
-      "stop_warning": "停止 {{name}}？在重新启动集群之前，其上的所有模型都会停止服务。机器和网络会保留。"
+      "stop_warning": "停止 {{name}}？在重新启动集群之前，其上的所有模型都会停止服务。机器和网络会保留。",
+      "accelerators_in_use": "使用中的加速器"
     },
     "stray": {
       "title": "在此运行但没有部署的模型",
@@ -3753,6 +3755,12 @@
       "machine_line": "{{host}} · GPU：{{count}}",
       "checked": "每台机器都会先经过检查：它必须能在集群网络（{{network}}）上访问主节点。",
       "add": "添加（{{count}}）"
+    },
+    "wiring_standalone": {
+      "gateway": "网关",
+      "engine": "vLLM-Metal",
+      "no_model": "尚无模型",
+      "help": "Mac 单机提供服务，一次一个模型。请求经由网关到达。"
     }
   },
   "inference": {
@@ -3873,7 +3881,8 @@
       "share_memory": "引擎占用每个加速器 {{percent}}% 的显存。",
       "share_restarts": "更改份额会重启所有副本，在它们恢复之前模型不可用。",
       "show_in_logs": "显示错误",
-      "at_api": "在 API 中"
+      "at_api": "在 API 中",
+      "col_status": "状态"
     },
     "engine": {
       "title": "引擎设置",
