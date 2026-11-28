@@ -147,12 +147,12 @@ describe("EngineSettingsEditor for a Mac", () => {
     expect(screen.getByTestId("engine-preset-balanced")).toBeEnabled();
   });
 
-  it("says the share is a fraction of what this Mac offers, and lists the Mac runtime's settings", async () => {
+  it("says the share is a fraction of what the Mac offers, and lists the Mac runtime's settings", async () => {
     render(<Harness mac={MAC} initial={{ gpu_memory_utilization: 0.5 }} />);
-    expect(screen.getByText(/Up to 27\.8 GB of the 55\.7 GB this Mac offers/)).toBeInTheDocument();
-    expect(screen.getByText(/Settings this Mac allows \(\d+, vLLM-Metal 0\.34\.0\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Up to 27\.8 GB of the 55\.7 GB the Mac offers/)).toBeInTheDocument();
+    expect(screen.getByText(/Settings the Mac allows \(\d+, vLLM-Metal 0\.34\.0\)/)).toBeInTheDocument();
     expect(screen.queryByText(/All vLLM settings/)).not.toBeInTheDocument();
-    await userEvent.click(screen.getByText(/Settings this Mac allows/));
+    await userEvent.click(screen.getByText(/Settings the Mac allows/));
     await userEvent.type(screen.getByPlaceholderText(/Search by flag/), "eager");
     expect(screen.queryByTestId("engine-flag-enforce-eager")).not.toBeInTheDocument();
     await userEvent.clear(screen.getByPlaceholderText(/Search by flag/));

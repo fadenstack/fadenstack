@@ -533,7 +533,7 @@ export default function NodeDetailPage() {
 
       {/* ── A Mac that can serve on its own ─────────────────────── */}
       {isNativeNode({ ...(node.capabilities ?? {}), ...caps }) && (
-        <MacServeSection nodeId={node.id} capabilities={{ ...(node.capabilities ?? {}), ...caps }} />
+        <MacServeSection nodeId={node.id} name={node.agent_id?.trim() || undefined} capabilities={{ ...(node.capabilities ?? {}), ...caps }} />
       )}
 
       {/* ── Controls ─────────────────────────────────────────────── */}

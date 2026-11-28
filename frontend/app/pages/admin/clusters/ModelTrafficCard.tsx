@@ -25,11 +25,13 @@ import RestartConfirm from "./RestartConfirm";
 
 interface ModelTrafficCardProps {
   environmentId: string;
+  /** A Mac environment: one machine, so the text names the Mac, not a head machine. */
+  standalone?: boolean;
   /** Serve was shut down: the deployments are being applied again. */
   onMoved?: () => void;
 }
 
-export default function ModelTrafficCard({ environmentId, onMoved }: ModelTrafficCardProps) {
+export default function ModelTrafficCard({ environmentId, onMoved, standalone = false }: ModelTrafficCardProps) {
   const { t } = useTranslation();
   const [status, setStatus] = useState<ModelTlsStatus | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -84,7 +86,7 @@ export default function ModelTrafficCard({ environmentId, onMoved }: ModelTraffi
               )}
             </Stack>
             <Typography variant="body2" color="text.secondary">
-              {plain === 0 ? t("clusters.model_tls.encrypted_detail") : t("clusters.model_tls.plain_detail")}
+              {plain === 0 ? t(standalone ? "clusters.model_tls.encrypted_detail_standalone" : "clusters.model_tls.encrypted_detail") : t("clusters.model_tls.plain_detail")}
             </Typography>
           </Box>
           {plain > 0 && status.can_move && !confirming && (
@@ -96,7 +98,7 @@ export default function ModelTrafficCard({ environmentId, onMoved }: ModelTraffi
 
         {plain > 0 && !status.head_supported && (
           <Alert severity="info" sx={{ mt: 2 }}>
-            {t("clusters.model_tls.update_agent")}
+            {t(standalone ? "clusters.model_tls.update_agent_standalone" : "clusters.model_tls.update_agent")}
           </Alert>
         )}
         {confirming && (

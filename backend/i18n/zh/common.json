@@ -3421,6 +3421,7 @@
       "starting": {
         "title": "正在启动集群",
         "detail_one": "正在准备 {{count}} 台机器：获取运行时并启动主节点。",
+        "detail_standalone": "正在准备该 Mac：获取运行时。",
         "detail_other": "正在准备 {{count}} 台机器：获取运行时、启动主节点并加入其他节点。"
       },
       "ready": {
@@ -3431,7 +3432,8 @@
       "deploying": {
         "title_one": "正在启动 {{name}}",
         "title_many": "正在启动 {{count}} 个部署",
-        "detail": "正在将模型复制到需要的机器，然后启动副本。"
+        "detail": "正在将模型复制到需要的机器，然后启动副本。",
+        "detail_standalone": "正在将模型复制到该 Mac，然后启动。"
       },
       "stopping": {
         "title_one": "正在停止 {{name}}",
@@ -3451,7 +3453,8 @@
       },
       "serving": {
         "title": "服务中",
-        "detail": "{{deployments}}正在 {{replicas}}上运行。"
+        "detail": "{{deployments}}正在 {{replicas}}上运行。",
+        "detail_standalone": "{{deployments}}正在运行。"
       },
       "cluster_stopping": {
         "title": "正在停止集群",
@@ -3539,6 +3542,9 @@
       "col_cluster": "集群",
       "col_state": "状态",
       "col_copies": "副本",
+      "col_ready": "就绪",
+      "ready_yes": "是",
+      "ready_no": "尚未",
       "col_address": "地址",
       "stopping": "正在停止",
       "not_published": "尚未发布",
@@ -3645,12 +3651,14 @@
       "encrypted": "已加密",
       "plain": "{{count}} 个未加密",
       "encrypted_detail": "网关通过双向 TLS 访问此集群的模型：头节点机器的代理只接受网关的证书。",
+      "encrypted_detail_standalone": "网关通过双向 TLS 访问模型：Mac 上的代理只接受网关的证书。",
       "plain_detail": "网关通过未加密的 HTTP 访问此集群的部分模型：Serve 在模型 TLS 之前启动，并在重新启动前一直在网络上监听。",
       "move": "加密模型流量",
       "move_warning": "此集群上的 Serve 将重启：其模型会停止，在 TLS 之后重新加载，加载完成后再次响应——大型模型需要数分钟。",
       "move_confirm": "重启并加密",
       "moved": "Serve 已停止；{{count}} 个模型正在 TLS 之后重新加载。",
-      "update_agent": "头节点机器上的代理尚不能运行模型 TLS 代理。请在该机器上重新运行安装命令以更新它。"
+      "update_agent": "头节点机器上的代理尚不能运行模型 TLS 代理。请在该机器上重新运行安装命令以更新它。",
+      "update_agent_standalone": "Mac 上的代理尚不能运行模型 TLS 代理。请在该 Mac 上重新运行安装命令以更新它。"
     },
     "ray_tls": {
       "title": "机器之间的流量",
@@ -3669,15 +3677,21 @@
     },
     "model_downloads": {
       "title": "机器从哪里获取模型",
+      "title_standalone": "Mac 从哪里获取模型",
       "switch_label": "机器自行下载模型",
+      "switch_label_standalone": "Mac 自行下载模型",
       "on_chip": "来自 Hugging Face",
       "off_chip": "来自本服务器",
       "on_detail": "每台机器从 Hugging Face 将模型下载到自己的模型存储；受限模型使用本服务器的 Hugging Face 令牌。服务器既不下载也不复制该模型。",
+      "on_detail_standalone": "Mac 从 Hugging Face 将模型下载到自己的模型存储；受限模型使用本服务器的 Hugging Face 令牌。服务器既不下载也不复制该模型。",
       "off_detail": "本服务器下载模型，每台机器再从服务器复制。机器无需联网即可工作；若服务器链路较慢，大模型需要花两倍的时间。",
+      "off_detail_standalone": "本服务器下载模型，Mac 再从服务器复制。Mac 无需联网即可工作；若服务器链路较慢，大模型需要花两倍的时间。",
       "checking": "正在询问各机器能否访问 Hugging Face…",
+      "checking_standalone": "正在询问 Mac 能否访问 Hugging Face…",
       "check_again": "重新检查",
       "reaches": "可访问 Hugging Face",
       "cannot_switch_on": "要开启此项，每台机器都必须能访问 Hugging Face：",
+      "cannot_switch_on_standalone": "要开启此项，Mac 必须能访问 Hugging Face：",
       "problem": {
         "no_internet": "{{host}}：无法访问 Hugging Face",
         "store_not_writable": "{{host}}：代理无法写入其模型存储",
@@ -3685,7 +3699,8 @@
         "offline": "{{host}}：离线",
         "no_answer": "{{host}}：未响应"
       },
-      "applies_next": "适用于下一个放到集群上的模型；已在机器上的模型保持不变。"
+      "applies_next": "适用于下一个放到集群上的模型；已在机器上的模型保持不变。",
+      "applies_next_standalone": "适用于下一个放到该 Mac 上的模型；已在其上的模型保持不变。"
     },
     "applies_on_start": "集群启动时生效",
     "runtime": {
@@ -3809,6 +3824,7 @@
       "sync": "同步",
       "files_unknown": "无法检查模型文件是否就位。",
       "files_everywhere": "所有机器上都有",
+      "files_everywhere_standalone": "在该 Mac 上",
       "files_on_some": "{{total}} 台机器中的 {{ready}} 台上有",
       "revision": "版本 {{revision}}",
       "unresolved": "未解析",
@@ -3818,11 +3834,13 @@
       "file_state_failed": "失败",
       "endpoints": "端点",
       "no_endpoint": "暂无地址。第一个副本开始服务后会出现。",
+      "no_endpoint_standalone": "暂无地址。模型开始服务后会出现。",
       "col_url": "URL",
       "col_message": "消息",
       "metrics": "指标",
       "no_metrics": "尚未观测到指标。",
       "application": "应用",
+      "application_standalone": "部署",
       "not_applied": "未应用",
       "runtime_state": "运行时状态",
       "copies_ready": "就绪副本",
@@ -3977,7 +3995,7 @@
       "label": "加速器内存占比",
       "help": "先存放权重，其余用于会话。若其他模型共用显卡，请预留空间。",
       "help_bytes": "每张 {{total}} 显卡最多使用 {{size}}：先存放权重，其余用于会话。",
-      "help_mac": "最多使用这台 Mac 提供的 {{total}} 中的 {{size}}：先存放权重，其余用于会话。",
+      "help_mac": "最多使用 Mac 提供的 {{total}} 中的 {{size}}：先存放权重，其余用于会话。",
       "default": "未设置：将使用 {{pct}}%。"
     },
     "kv8": {
@@ -4032,8 +4050,8 @@
     },
     "all": {
       "title": "全部 vLLM 设置（{{count}} 项，vLLM {{version}}）",
-      "title_mac": "这台 Mac 允许的设置（{{count}} 项，vLLM-Metal {{version}}）",
-      "title_mac_nover": "这台 Mac 允许的设置（{{count}} 项）",
+      "title_mac": "Mac 允许的设置（{{count}} 项，vLLM-Metal {{version}}）",
+      "title_mac_nover": "Mac 允许的设置（{{count}} 项）",
       "search": "按参数或描述搜索…",
       "only_set": "仅显示已设置",
       "no_match": "没有匹配的设置。",
@@ -4141,7 +4159,9 @@
     "settings_changed_other": "{{count}} 项设置不同于 vLLM 默认值",
     "settings_default": "vLLM 默认值",
     "download_note_size": "服务器先下载模型（{{size}}），再复制到各台机器。文件就位后部署即开始；您可以在其页面上跟踪进度。",
+    "download_note_size_mac": "服务器先下载模型（{{size}}），再复制到该 Mac。文件就位后部署即开始；您可以在其页面上跟踪进度。",
     "download_note": "服务器先下载模型，再复制到各台机器。文件就位后部署即开始；您可以在其页面上跟踪进度。",
+    "download_note_mac": "服务器先下载模型，再复制到该 Mac。文件就位后部署即开始；您可以在其页面上跟踪进度。",
     "kept_note": "本服务器已保存此模型：无需从 Hugging Face 下载任何内容。",
     "busy_warning": "当前空闲显存放不下所有副本（可容纳 {{count}} 个）。其余副本会在其他模型腾出空间后启动。",
     "creating": "正在创建部署…",
@@ -4243,12 +4263,14 @@
     "fit": {
       "fits_one": "可放入 {{count}} 块 GPU",
       "fits_other": "可放入 {{count}} 块 GPU",
+      "fits_mac": "可放入",
       "shares": "共用一块 GPU",
       "busy_now": "放得下，但当前没有空间",
       "too_large": "太大",
       "no_accelerators": "没有加速器",
       "unknown": "大小未知",
       "detail_needs": "每块 {{total}} 的加速器约需 {{needed}}。",
+      "detail_needs_mac": "约需 {{needed}}，Mac 共提供 {{total}}。",
       "detail_copies_one": "可容纳 {{count}} 个副本。",
       "detail_copies_other": "可容纳 {{count}} 个副本。",
       "detail_copies_now": "当前空闲：可容纳 {{count}} 个。",
@@ -5952,12 +5974,12 @@
     "copy": "复制 {{name}} 的 SHA-256"
   },
   "mac": {
-    "status_title": "这台 Mac",
+    "status_title": "Mac 机器",
     "runtime_ready": "原生运行时已安装并就绪。",
     "runtime_missing": "尚未安装原生运行时；部署第一个模型时会自动获取。",
     "sandbox_on": "沙盒已开启：模型引擎无法读取代理自身的文件。",
     "sandbox_off": "沙盒已关闭：模型引擎在没有沙盒的情况下运行。除非在测试，否则请重新开启。",
-    "sandbox_unknown": "此代理未报告沙盒状态。",
+    "sandbox_unknown": "代理未报告沙盒状态。",
     "firewall_title": "应用防火墙",
     "firewall_on": "应用防火墙已开启。它可能阻止网关访问模型端口；请在“系统设置”、“网络”、“防火墙”中允许 faden-agent 的传入连接。",
     "firewall_off": "应用防火墙已关闭。",
@@ -5965,11 +5987,12 @@
     "filevault_on": "FileVault 已开启。断电后，除非先用 `sudo fdesetup authrestart` 重启，否则 Mac 会等待登录。",
     "filevault_off": "FileVault 已关闭。Mac 可无人值守重启，但磁盘未加密。",
     "filevault_unknown": "FileVault 状态未知。",
-    "serve_button": "在这台 Mac 上提供模型",
-    "serve_hint": "一次一个模型，直接在这台 Mac 上运行，无需集群。",
-    "serve_failed": "无法设置这台 Mac：{{error}}",
-    "serve_done": "这台 Mac 已就绪：{{name}}。",
-    "fit_title": "这台 Mac 的内存",
+    "serve_button": "在 {{name}} 上提供模型",
+    "default_name": "该 Mac",
+    "serve_hint": "一次一个模型，直接在该 Mac 上运行，无需集群。",
+    "serve_failed": "无法设置该 Mac：{{error}}",
+    "serve_done": "{{name}} 已就绪。",
+    "fit_title": "Mac 的内存",
     "fit_working_set": "Mac 提供的 GPU 内存",
     "fit_estimated": "估算",
     "fit_reserve": "为系统保留",
@@ -5979,7 +6002,7 @@
     "fit_share": "GPU 内存占比",
     "fit_context": "上下文",
     "fit_sequences": "并行对话数",
-    "fit_too_large": "该模型无法放入这台 Mac：约需 {{needed}}，模型最多可用 {{available}}。",
+    "fit_too_large": "该模型无法放入该 Mac：约需 {{needed}}，模型最多可用 {{available}}。",
     "fit_one_model": "一台 Mac 一次运行一个模型。",
     "fit_waiting": "正在等待 Mac 报告其内存。",
     "chip_runtime_ready": "运行时就绪",
@@ -5994,7 +6017,7 @@
     "chip_filevault_off": "FileVault 已关",
     "chip_filevault_unknown": "FileVault 未知",
     "chip_memory": "{{size}} GPU 内存",
-    "memory_help": "macOS 允许模型在这台 Mac 上使用的 GPU 内存。",
+    "memory_help": "macOS 允许模型在该 Mac 上使用的 GPU 内存。",
     "details_show": "详情",
     "details_hide": "收起详情"
   }

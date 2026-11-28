@@ -31,10 +31,13 @@ import { inferenceApi, type MachineInternet, type ModelDownloadsStatus } from "~
 
 interface ModelDownloadsCardProps {
   environmentId: string;
+  /** A Mac environment: one machine, so the text names the Mac, not "the machines". */
+  standalone?: boolean;
 }
 
-export default function ModelDownloadsCard({ environmentId }: ModelDownloadsCardProps) {
+export default function ModelDownloadsCard({ environmentId, standalone = false }: ModelDownloadsCardProps) {
   const { t } = useTranslation();
+  const sfx = standalone ? "_standalone" : "";
   const [status, setStatus] = useState<ModelDownloadsStatus | null>(null);
   const [checking, setChecking] = useState(true);
   const [switching, setSwitching] = useState(false);
@@ -81,7 +84,7 @@ export default function ModelDownloadsCard({ environmentId }: ModelDownloadsCard
   const tooltip = blocked ? (
     <Box>
       <Typography variant="body2" sx={{ mb: 0.5 }}>
-        {t("clusters.model_downloads.cannot_switch_on")}
+        {t(`clusters.model_downloads.cannot_switch_on${sfx}`)}
       </Typography>
       {lacking.map((m) => (
         <Typography key={m.node_id} variant="body2" component="div">
@@ -99,7 +102,7 @@ export default function ModelDownloadsCard({ environmentId }: ModelDownloadsCard
         <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ sm: "flex-start" }}>
           <Box sx={{ flexGrow: 1 }}>
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-              <Typography variant="subtitle2">{t("clusters.model_downloads.title")}</Typography>
+              <Typography variant="subtitle2">{t(`clusters.model_downloads.title${sfx}`)}</Typography>
               {status && (
                 <Chip
                   size="small"
@@ -109,7 +112,7 @@ export default function ModelDownloadsCard({ environmentId }: ModelDownloadsCard
               )}
             </Stack>
             <Typography variant="body2" color="text.secondary">
-              {on ? t("clusters.model_downloads.on_detail") : t("clusters.model_downloads.off_detail")}
+              {on ? t(`clusters.model_downloads.on_detail${sfx}`) : t(`clusters.model_downloads.off_detail${sfx}`)}
             </Typography>
           </Box>
           <Tooltip title={tooltip} placement="left" describeChild>
@@ -122,10 +125,10 @@ export default function ModelDownloadsCard({ environmentId }: ModelDownloadsCard
                     checked={on}
                     disabled={status === null || switching || (checking && !on) || blocked}
                     onChange={(_event, checked) => void flip(checked)}
-                    inputProps={{ "aria-label": t("clusters.model_downloads.switch_label") }}
+                    inputProps={{ "aria-label": t(`clusters.model_downloads.switch_label${sfx}`) }}
                   />
                 }
-                label={t("clusters.model_downloads.switch_label")}
+                label={t(`clusters.model_downloads.switch_label${sfx}`)}
                 labelPlacement="start"
               />
             </span>
@@ -137,7 +140,7 @@ export default function ModelDownloadsCard({ environmentId }: ModelDownloadsCard
             <Stack direction="row" spacing={1} alignItems="center">
               <CircularProgress size={14} />
               <Typography variant="body2" color="text.secondary">
-                {t("clusters.model_downloads.checking")}
+                {t(`clusters.model_downloads.checking${sfx}`)}
               </Typography>
             </Stack>
           )}
@@ -155,7 +158,7 @@ export default function ModelDownloadsCard({ environmentId }: ModelDownloadsCard
         </Stack>
         {on && (
           <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 1 }}>
-            {t("clusters.model_downloads.applies_next")}
+            {t(`clusters.model_downloads.applies_next${sfx}`)}
           </Typography>
         )}
         {error && (

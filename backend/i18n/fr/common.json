@@ -3421,6 +3421,7 @@
       "starting": {
         "title": "Démarrage du cluster",
         "detail_one": "Préparation de {{count}} machine : récupération du runtime et démarrage du nœud principal.",
+        "detail_standalone": "Préparation du Mac : récupération du runtime.",
         "detail_other": "Préparation de {{count}} machines : récupération du runtime, démarrage du nœud principal, ajout des autres."
       },
       "ready": {
@@ -3431,7 +3432,8 @@
       "deploying": {
         "title_one": "Démarrage de {{name}}",
         "title_many": "Démarrage de {{count}} déploiements",
-        "detail": "Copie du modèle sur les machines qui en ont besoin, puis démarrage des copies."
+        "detail": "Copie du modèle sur les machines qui en ont besoin, puis démarrage des copies.",
+        "detail_standalone": "Copie du modèle sur le Mac, puis démarrage."
       },
       "stopping": {
         "title_one": "Arrêt de {{name}}",
@@ -3451,7 +3453,8 @@
       },
       "serving": {
         "title": "En service",
-        "detail": "{{deployments}} en cours sur {{replicas}}."
+        "detail": "{{deployments}} en cours sur {{replicas}}.",
+        "detail_standalone": "{{deployments}} en cours."
       },
       "cluster_stopping": {
         "title": "Arrêt du cluster",
@@ -3539,6 +3542,9 @@
       "col_cluster": "Cluster",
       "col_state": "État",
       "col_copies": "Copies",
+      "col_ready": "Prêt",
+      "ready_yes": "Oui",
+      "ready_no": "Pas encore",
       "col_address": "Adresse",
       "stopping": "arrêt en cours",
       "not_published": "pas encore publié",
@@ -3645,12 +3651,14 @@
       "encrypted": "Chiffré",
       "plain": "{{count}} non chiffré(s)",
       "encrypted_detail": "La passerelle atteint les modèles de ce cluster en TLS mutuel : le proxy de la machine principale n'accepte que le certificat de la passerelle.",
+      "encrypted_detail_standalone": "La passerelle atteint les modèles en TLS mutuel : le proxy du Mac n'accepte que le certificat de la passerelle.",
       "plain_detail": "La passerelle atteint certains modèles de ce cluster en HTTP non chiffré : Serve a démarré avant le TLS des modèles et reste à l'écoute sur le réseau jusqu'à son redémarrage.",
       "move": "Chiffrer le trafic des modèles",
       "move_warning": "Serve redémarre sur ce cluster : ses modèles s'arrêtent, se rechargent derrière TLS et répondent de nouveau une fois chargés — quelques minutes pour un grand modèle.",
       "move_confirm": "Redémarrer et chiffrer",
       "moved": "Serve arrêté ; {{count}} modèle(s) se rechargent derrière TLS.",
-      "update_agent": "L'agent de la machine principale ne peut pas encore exécuter le proxy TLS des modèles. Mettez-le à jour en relançant la ligne d'installation sur cette machine."
+      "update_agent": "L'agent de la machine principale ne peut pas encore exécuter le proxy TLS des modèles. Mettez-le à jour en relançant la ligne d'installation sur cette machine.",
+      "update_agent_standalone": "L'agent du Mac ne peut pas encore exécuter le proxy TLS des modèles. Mettez-le à jour en relançant la ligne d'installation sur le Mac."
     },
     "ray_tls": {
       "title": "Trafic entre les machines",
@@ -3669,15 +3677,21 @@
     },
     "model_downloads": {
       "title": "D'où les machines obtiennent les modèles",
+      "title_standalone": "D'où le Mac obtient les modèles",
       "switch_label": "Les machines téléchargent elles-mêmes les modèles",
+      "switch_label_standalone": "Le Mac télécharge lui-même les modèles",
       "on_chip": "Depuis Hugging Face",
       "off_chip": "Depuis ce serveur",
       "on_detail": "Chaque machine télécharge un modèle depuis Hugging Face dans son propre stockage de modèles, avec le jeton Hugging Face de ce serveur pour un modèle à accès restreint. Le serveur ne le télécharge ni ne le copie.",
+      "on_detail_standalone": "Le Mac télécharge un modèle depuis Hugging Face dans son propre stockage de modèles, avec le jeton Hugging Face de ce serveur pour un modèle à accès restreint. Le serveur ne le télécharge ni ne le copie.",
       "off_detail": "Ce serveur télécharge un modèle et chaque machine le copie depuis le serveur. Cela fonctionne sans internet sur les machines ; avec une liaison lente du serveur, un grand modèle prend ce temps deux fois.",
+      "off_detail_standalone": "Ce serveur télécharge un modèle et le Mac le copie depuis le serveur. Cela fonctionne sans internet sur le Mac ; avec une liaison lente du serveur, un grand modèle prend ce temps deux fois.",
       "checking": "Les machines sont interrogées : atteignent-elles Hugging Face…",
+      "checking_standalone": "Le Mac est interrogé : atteint-il Hugging Face…",
       "check_again": "Vérifier à nouveau",
       "reaches": "Atteint Hugging Face",
       "cannot_switch_on": "Pour l'activer, chaque machine doit atteindre Hugging Face :",
+      "cannot_switch_on_standalone": "Pour l'activer, le Mac doit atteindre Hugging Face :",
       "problem": {
         "no_internet": "{{host}} : n'atteint pas Hugging Face",
         "store_not_writable": "{{host}} : l'agent ne peut pas écrire dans son stockage de modèles",
@@ -3685,7 +3699,8 @@
         "offline": "{{host}} : hors ligne",
         "no_answer": "{{host}} : n'a pas répondu"
       },
-      "applies_next": "S'applique au prochain modèle placé sur le cluster ; les modèles déjà sur les machines restent."
+      "applies_next": "S'applique au prochain modèle placé sur le cluster ; les modèles déjà sur les machines restent.",
+      "applies_next_standalone": "S'applique au prochain modèle placé sur le Mac ; les modèles déjà présents restent."
     },
     "applies_on_start": "S'applique au démarrage du cluster",
     "runtime": {
@@ -3760,7 +3775,7 @@
       "gateway": "Passerelle",
       "engine": "vLLM-Metal",
       "no_model": "Pas encore de modèle",
-      "help": "Un Mac sert seul, un modèle à la fois. Les requêtes l'atteignent par la passerelle."
+      "help": "Le Mac sert seul, un modèle à la fois. Les requêtes l'atteignent par la passerelle."
     }
   },
   "inference": {
@@ -3809,6 +3824,7 @@
       "sync": "Synchroniser",
       "files_unknown": "Impossible de vérifier si les fichiers du modèle sont en place.",
       "files_everywhere": "sur chaque machine",
+      "files_everywhere_standalone": "sur le Mac",
       "files_on_some": "sur {{ready}} des {{total}} machines",
       "revision": "révision {{revision}}",
       "unresolved": "non résolue",
@@ -3818,11 +3834,13 @@
       "file_state_failed": "échec",
       "endpoints": "Points de terminaison",
       "no_endpoint": "Pas encore d'adresse. Elle apparaît dès que la première copie sert.",
+      "no_endpoint_standalone": "Pas encore d'adresse. Elle apparaît dès que le modèle sert.",
       "col_url": "URL",
       "col_message": "Message",
       "metrics": "Métriques",
       "no_metrics": "Aucune métrique observée pour l'instant.",
       "application": "Application",
+      "application_standalone": "Déploiement",
       "not_applied": "non appliquée",
       "runtime_state": "État du runtime",
       "copies_ready": "Copies prêtes",
@@ -3977,7 +3995,7 @@
       "label": "Part de la mémoire de l'accélérateur",
       "help": "D'abord les poids ; le reste contient les conversations. Laissez de la place si d'autres modèles partagent la carte.",
       "help_bytes": "Jusqu'à {{size}} de chaque carte de {{total}} : d'abord les poids, le reste pour les conversations.",
-      "help_mac": "Jusqu'à {{size}} des {{total}} qu'offre ce Mac : d'abord les poids, le reste pour les conversations.",
+      "help_mac": "Jusqu'à {{size}} des {{total}} qu'offre le Mac : d'abord les poids, le reste pour les conversations.",
       "default": "Non défini : {{pct}} % sont utilisés."
     },
     "kv8": {
@@ -4032,8 +4050,8 @@
     },
     "all": {
       "title": "Tous les réglages vLLM ({{count}}, vLLM {{version}})",
-      "title_mac": "Réglages que ce Mac autorise ({{count}}, vLLM-Metal {{version}})",
-      "title_mac_nover": "Réglages que ce Mac autorise ({{count}})",
+      "title_mac": "Réglages que le Mac autorise ({{count}}, vLLM-Metal {{version}})",
+      "title_mac_nover": "Réglages que le Mac autorise ({{count}})",
       "search": "Rechercher par option ou description…",
       "only_set": "Seulement ceux définis",
       "no_match": "Aucun réglage ne correspond.",
@@ -4141,7 +4159,9 @@
     "settings_changed_other": "{{count}} réglages différents des valeurs par défaut de vLLM",
     "settings_default": "Valeurs par défaut de vLLM",
     "download_note_size": "Le serveur télécharge d'abord le modèle ({{size}}), puis le copie sur les machines. Le déploiement démarre une fois les fichiers en place ; vous pouvez le suivre sur sa page.",
+    "download_note_size_mac": "Le serveur télécharge d'abord le modèle ({{size}}), puis le copie sur le Mac. Le déploiement démarre une fois les fichiers en place ; vous pouvez le suivre sur sa page.",
     "download_note": "Le serveur télécharge d'abord le modèle, puis le copie sur les machines. Le déploiement démarre une fois les fichiers en place ; vous pouvez le suivre sur sa page.",
+    "download_note_mac": "Le serveur télécharge d'abord le modèle, puis le copie sur le Mac. Le déploiement démarre une fois les fichiers en place ; vous pouvez le suivre sur sa page.",
     "kept_note": "Ce serveur conserve déjà ce modèle : rien n'est téléchargé depuis Hugging Face.",
     "busy_warning": "Toutes les copies ne tiennent pas dans la mémoire libre en ce moment (place pour {{count}}). Les autres démarrent quand d'autres modèles libèrent de la place.",
     "creating": "Création du déploiement…",
@@ -4243,12 +4263,14 @@
     "fit": {
       "fits_one": "Tient sur {{count}} GPU",
       "fits_other": "Tient sur {{count}} GPU",
+      "fits_mac": "Tient",
       "shares": "Partage un GPU",
       "busy_now": "Tient, mais pas maintenant",
       "too_large": "Trop grand",
       "no_accelerators": "Aucun accélérateur",
       "unknown": "Taille inconnue",
       "detail_needs": "Demande environ {{needed}} sur chaque accélérateur de {{total}}.",
+      "detail_needs_mac": "Demande environ {{needed}} des {{total}} qu'offre le Mac.",
       "detail_copies_one": "Place pour {{count}} copie.",
       "detail_copies_other": "Place pour {{count}} copies.",
       "detail_copies_now": "Libre en ce moment : place pour {{count}}.",
@@ -5952,12 +5974,12 @@
     "copy": "Copier le SHA-256 de {{name}}"
   },
   "mac": {
-    "status_title": "Ce Mac",
+    "status_title": "Machine Mac",
     "runtime_ready": "Le runtime natif est installé et prêt.",
     "runtime_missing": "Le runtime natif n'est pas encore installé ; il est récupéré au premier déploiement d'un modèle.",
     "sandbox_on": "Sandbox activé : le moteur du modèle ne peut pas lire les fichiers de l'agent.",
     "sandbox_off": "Sandbox désactivé : le moteur du modèle s'exécute sans sandbox. Réactivez-le sauf si vous testez.",
-    "sandbox_unknown": "L'état du sandbox n'est pas signalé par cet agent.",
+    "sandbox_unknown": "L'état du sandbox n'est pas signalé par l'agent.",
     "firewall_title": "Pare-feu applicatif",
     "firewall_on": "Le pare-feu applicatif est activé. Il peut empêcher la passerelle d'atteindre le port du modèle ; autorisez les connexions entrantes pour faden-agent dans Réglages Système, Réseau, Pare-feu.",
     "firewall_off": "Le pare-feu applicatif est désactivé.",
@@ -5965,11 +5987,12 @@
     "filevault_on": "FileVault est activé. Après une coupure de courant, le Mac attend une ouverture de session, sauf si vous le redémarrez d'abord avec `sudo fdesetup authrestart`.",
     "filevault_off": "FileVault est désactivé. Le Mac redémarre sans surveillance, mais son disque n'est pas chiffré.",
     "filevault_unknown": "L'état de FileVault est inconnu.",
-    "serve_button": "Servir des modèles sur ce Mac",
-    "serve_hint": "Un modèle à la fois, sur ce Mac lui-même, sans cluster.",
-    "serve_failed": "Impossible de configurer ce Mac : {{error}}",
-    "serve_done": "Ce Mac est prêt : {{name}}.",
-    "fit_title": "Mémoire de ce Mac",
+    "serve_button": "Servir des modèles sur {{name}}",
+    "default_name": "le Mac",
+    "serve_hint": "Un modèle à la fois, sur le Mac lui-même, sans cluster.",
+    "serve_failed": "Impossible de configurer le Mac : {{error}}",
+    "serve_done": "{{name}} est prêt.",
+    "fit_title": "Mémoire du Mac",
     "fit_working_set": "Mémoire GPU offerte par le Mac",
     "fit_estimated": "estimée",
     "fit_reserve": "Réservée au système",
@@ -5979,7 +6002,7 @@
     "fit_share": "Part de la mémoire GPU",
     "fit_context": "Contexte",
     "fit_sequences": "Conversations en parallèle",
-    "fit_too_large": "Ce modèle ne tient pas sur ce Mac : il faut environ {{needed}} et le modèle peut utiliser {{available}}.",
+    "fit_too_large": "Ce modèle ne tient pas sur le Mac : il faut environ {{needed}} et le modèle peut utiliser {{available}}.",
     "fit_one_model": "Un Mac exécute un modèle à la fois.",
     "fit_waiting": "En attente que le Mac signale sa mémoire.",
     "chip_runtime_ready": "Runtime prêt",
@@ -5994,7 +6017,7 @@
     "chip_filevault_off": "FileVault inactif",
     "chip_filevault_unknown": "FileVault inconnu",
     "chip_memory": "{{size}} de mémoire GPU",
-    "memory_help": "Mémoire GPU que macOS laisse au modèle sur ce Mac.",
+    "memory_help": "Mémoire GPU que macOS laisse au modèle sur le Mac.",
     "details_show": "Détails",
     "details_hide": "Masquer les détails"
   }

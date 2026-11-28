@@ -211,6 +211,8 @@ export function fitSummary(fit: Fit | null | undefined): { label: string; tone: 
   switch (fit.status) {
     case "fits": {
       if (fit.copies_now === 0) return { label: i18n.t("marketplace.fit.busy_now"), tone: "warning" };
+      // A Mac is one machine running one model: no GPUs to count.
+      if (fit.metal) return { label: i18n.t("marketplace.fit.fits_mac"), tone: "success" };
       if ((fit.gpus_per_copy ?? 1) < 1) return { label: i18n.t("marketplace.fit.shares"), tone: "success" };
       return { label: i18n.t("marketplace.fit.fits", { count: fit.gpus_per_copy ?? 1 }), tone: "success" };
     }
@@ -229,13 +231,16 @@ export function fitDetail(fit: Fit | null | undefined, cluster?: MarketCluster |
   const parts: string[] = [];
   if (fit.status === "fits") {
     if (fit.needed_bytes_per_gpu && fit.gpu_bytes) {
-      parts.push(i18n.t("marketplace.fit.detail_needs", {
+      parts.push(i18n.t(fit.metal ? "marketplace.fit.detail_needs_mac" : "marketplace.fit.detail_needs", {
         needed: formatGb(fit.needed_bytes_per_gpu),
         total: formatGb(fit.gpu_bytes),
       }));
     }
-    parts.push(i18n.t("marketplace.fit.detail_copies", { count: fit.copies }));
-    if (fit.copies_now < fit.copies) parts.push(i18n.t("marketplace.fit.detail_copies_now", { count: fit.copies_now }));
+    // A Mac runs one model at a time: no copies to offer.
+    if (!fit.metal) {
+      parts.push(i18n.t("marketplace.fit.detail_copies", { count: fit.copies }));
+      if (fit.copies_now < fit.copies) parts.push(i18n.t("marketplace.fit.detail_copies_now", { count: fit.copies_now }));
+    }
   } else if (fit.status === "too_large" && fit.needed_bytes_per_gpu) {
     parts.push(i18n.t("marketplace.fit.detail_too_large", {
       needed: formatGb(fit.weights_bytes ?? fit.needed_bytes_per_gpu),

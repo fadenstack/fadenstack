@@ -1,5 +1,5 @@
 /**
- * "Serve models on this Mac": the one click that puts a Mac in its own
+ * "Serve models on <machine>": the one click that puts a Mac in its own
  * standalone environment (one machine, one model at a time, no cluster) and
  * opens it, beside the Mac's status.
  */
@@ -19,9 +19,12 @@ import { MacStatusCard } from "./MacStatusCard";
 
 export function MacServeSection({
   nodeId,
+  name,
   capabilities,
 }: {
   nodeId: string;
+  /** The machine's name, for the button; the console is rarely on the Mac itself. */
+  name?: string;
   capabilities: Record<string, unknown>;
 }) {
   const { t } = useTranslation();
@@ -51,6 +54,7 @@ export function MacServeSection({
   return (
     <Stack spacing={1} data-testid="mac-serve">
       <MacStatusCard
+        name={name}
         capabilities={capabilities}
         action={
           mayServe ? (
@@ -63,7 +67,7 @@ export function MacServeSection({
                   onClick={() => void serve()}
                   data-testid="mac-serve-button"
                 >
-                  {t("mac.serve_button")}
+                  {t("mac.serve_button", { name: name || t("mac.default_name") })}
                 </Button>
               </span>
             </Tooltip>
