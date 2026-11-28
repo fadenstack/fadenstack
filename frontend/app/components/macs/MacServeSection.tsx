@@ -67,7 +67,7 @@ export function MacServeSection({
                   onClick={() => void serve()}
                   data-testid="mac-serve-button"
                 >
-                  {t("mac.serve_button", { name: name || t("mac.default_name") })}
+                  {t("mac.serve_button")}
                 </Button>
               </span>
             </Tooltip>
