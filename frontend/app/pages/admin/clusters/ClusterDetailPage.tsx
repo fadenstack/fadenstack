@@ -376,14 +376,6 @@ export default function ClusterDetailPage() {
     <Stack spacing={2} sx={{ pb: 4 }}>
       {error && <Alert severity="error">{error}</Alert>}
 
-      {macNode && (
-        <MacStatusCard
-          capabilities={
-            (data.nodes.find((n) => n.id === macNode.node_id)?.capabilities ?? {}) as Record<string, unknown>
-          }
-        />
-      )}
-
       <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
         <Button size="small" startIcon={<ArrowBackIcon />} onClick={() => navigate("/admin/clusters")}>
           {t("clusters.list.title")}
@@ -471,6 +463,14 @@ export default function ClusterDetailPage() {
         >
           {t("clusters.detail.stop_warning", { name: cluster.name })}
         </RestartConfirm>
+      )}
+
+      {macNode && (
+        <MacStatusCard
+          capabilities={
+            (data.nodes.find((n) => n.id === macNode.node_id)?.capabilities ?? {}) as Record<string, unknown>
+          }
+        />
       )}
       {deleting && <Alert severity="info">{deleting}</Alert>}
 

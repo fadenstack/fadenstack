@@ -139,6 +139,8 @@ describe("EngineSettingsEditor for a Mac", () => {
     expect(screen.getByLabelText("Skip graph capture")).toBeDisabled();
     expect(screen.getByLabelText("Run the model's own code")).toBeDisabled();
     expect(screen.getByText("Prefix caching stays off on a Mac.")).toBeInTheDocument();
+    // One muted line with a lock; the setting's long help gives way to it.
+    expect(screen.getAllByTestId("engine-refused").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Split long prompts").length).toBeGreaterThan(0);
     // The three presets that need a refused setting; Balanced stays.
     for (const id of ["long_context", "many_users", "low_memory"]) expect(screen.getByTestId(`engine-preset-${id}`)).toBeDisabled();

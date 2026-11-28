@@ -1,5 +1,6 @@
 /** The Mac's status and its memory plan, as the console shows them. */
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
@@ -12,22 +13,43 @@ import { MacStatusCard } from "./MacStatusCard";
 const GIB = 2 ** 30;
 
 describe("MacStatusCard", () => {
-  it("warns about a firewall that is on and a sandbox that is off", () => {
+  it("shows one row of chips and spells out only what needs action", () => {
     render(
       <MacStatusCard
-        capabilities={{ native_sandbox: false, mac_status: { filevault: true, firewall: { enabled: true } } }}
+        capabilities={{
+          native_sandbox: false,
+          metal: { recommended_max_working_set_bytes: 52 * GIB },
+          mac_status: { filevault: true, firewall: { enabled: true } },
+        }}
       />,
     );
-    expect(screen.getByTestId("mac-sandbox")).toHaveTextContent("Sandbox off");
-    expect(screen.getByTestId("mac-firewall")).toHaveTextContent("application firewall is on");
-    expect(screen.getByTestId("mac-filevault")).toHaveTextContent("fdesetup authrestart");
+    expect(screen.getByTestId("mac-runtime")).toHaveTextContent("Runtime ready");
+    expect(screen.getByTestId("mac-sandbox")).toHaveAttribute("data-tone", "warn");
+    expect(screen.getByTestId("mac-firewall")).toHaveAttribute("data-tone", "warn");
+    expect(screen.getByTestId("mac-memory")).toHaveTextContent("GPU memory");
+    // Sandbox off and firewall on are warnings that stay visible; FileVault is only a chip.
+    expect(screen.getByTestId("mac-sandbox-warning")).toHaveTextContent("Sandbox off");
+    expect(screen.getByTestId("mac-firewall-warning")).toHaveTextContent("application firewall is on");
+    expect(screen.queryByTestId("mac-filevault-warning")).not.toBeInTheDocument();
+  });
+
+  it("keeps the full sentences under Details", async () => {
+    render(<MacStatusCard capabilities={{ native_sandbox: true, mac_status: { filevault: true, firewall: { enabled: false } } }} />);
+    expect(screen.queryByTestId("mac-details")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("mac-sandbox-warning")).not.toBeInTheDocument();
+    const toggle = screen.getByTestId("mac-details-toggle");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByTestId("mac-details")).toHaveTextContent("fdesetup authrestart");
   });
 
   it("says unknown instead of guessing for an agent that reports nothing", () => {
     render(<MacStatusCard capabilities={{}} />);
-    expect(screen.getByTestId("mac-sandbox")).toHaveTextContent("not reported");
-    expect(screen.getByTestId("mac-firewall")).toHaveTextContent("not known");
-    expect(screen.getByTestId("mac-runtime")).toHaveTextContent("not installed");
+    expect(screen.getByTestId("mac-sandbox")).toHaveTextContent("Sandbox unknown");
+    expect(screen.getByTestId("mac-firewall")).toHaveTextContent("Firewall unknown");
+    expect(screen.getByTestId("mac-runtime")).toHaveTextContent("No runtime yet");
+    expect(screen.queryByTestId("mac-memory")).not.toBeInTheDocument();
   });
 });
 
@@ -71,5 +93,16 @@ describe("MacServeSection", () => {
       <MemoryRouter><MacServeSection nodeId="n" capabilities={{ native_runtime: 1, model_tls_native: 1 }} /></MemoryRouter>,
     );
     expect(screen.getByTestId("mac-serve-button")).toBeInTheDocument();
+  });
+});
+
+describe("locales", () => {
+  it("has the new Mac status keys in every language", async () => {
+    for (const l of ["en", "de", "fr", "es", "zh"]) {
+      const { default: common } = await import(`../../../../backend/i18n/${l}/common.json`);
+      for (const k of ["chip_runtime_ready", "chip_sandbox_off", "chip_firewall_on", "chip_filevault_on", "chip_memory", "memory_help", "details_show", "details_hide"]) {
+        expect((common.mac as Record<string, string>)[k], `${l} ${k}`).toBeTruthy();
+      }
+    }
   });
 });

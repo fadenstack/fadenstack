@@ -44,6 +44,7 @@ import Typography from "@mui/material/Typography";
 
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import SearchIcon from "@mui/icons-material/Search";
 
@@ -408,7 +409,7 @@ export function EngineSettingsEditor({
               label={t("engine.kv8.label")}
               chip={suggestionChip("kv_cache_dtype")}
               help={t("engine.kv8.help")}
-              note={macNote("kv_cache_dtype")}
+              refused={macNote("kv_cache_dtype")}
             >
               <Switch
                 disabled={disabled || macRefuses("kv_cache_dtype")}
@@ -454,7 +455,7 @@ export function EngineSettingsEditor({
               disabled={disabled}
               onChange={(v) => set("enable_prefix_caching", v === "auto" ? undefined : v === "on")}
               chip={suggestionChip("enable_prefix_caching")}
-              note={macNote("enable_prefix_caching")}
+              refused={macNote("enable_prefix_caching")}
               disabledValues={macRefuses("enable_prefix_caching") ? ["auto", "on"] : undefined}
             />
             <TriRow
@@ -464,7 +465,7 @@ export function EngineSettingsEditor({
               disabled={disabled}
               onChange={(v) => set("enable_chunked_prefill", v === "auto" ? undefined : v === "on")}
               chip={suggestionChip("enable_chunked_prefill")}
-              note={macNote("enable_chunked_prefill")}
+              refused={macNote("enable_chunked_prefill")}
               disabledValues={macRefuses("enable_chunked_prefill") ? ["auto", "on", "off"] : undefined}
             />
           </Section>
@@ -575,7 +576,7 @@ export function EngineSettingsEditor({
               label={t("engine.eager.label")}
               chip={suggestionChip("enforce_eager")}
               help={t("engine.eager.help")}
-              note={macNote("enforce_eager")}
+              refused={macNote("enforce_eager")}
             >
               <Switch
                 disabled={disabled || macRefuses("enforce_eager")}
@@ -587,7 +588,8 @@ export function EngineSettingsEditor({
             <Row
               label={t("engine.remote.label")}
               help={model?.needsRemoteCode ? t("engine.remote.help_needed") : t("engine.remote.help")}
-              note={macNote("trust_remote_code") ?? (locked("trust_remote_code") ? t("engine.admin_only") : undefined)}
+              refused={macNote("trust_remote_code")}
+              note={!macNote("trust_remote_code") && locked("trust_remote_code") ? t("engine.admin_only") : undefined}
             >
               <Switch
                 disabled={disabled || locked("trust_remote_code") || macRefuses("trust_remote_code")}
@@ -722,11 +724,14 @@ function Row({
   help,
   chip,
   note,
+  refused,
   children,
 }: {
   label: string;
   help?: string;
   note?: string;
+  /** Why a Mac does not offer this setting: the control is disabled, and this says why. */
+  refused?: string;
   chip?: React.ReactNode;
   children: React.ReactNode;
 }) {
@@ -739,10 +744,20 @@ function Row({
         {chip}
       </Stack>
       {children}
-      {help && (
-        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5, lineHeight: 1.35 }}>
-          {help}
-        </Typography>
+      {refused ? (
+        // The reason replaces the help: one muted line instead of two paragraphs.
+        <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mt: 0.5 }} data-testid="engine-refused">
+          <LockOutlinedIcon sx={{ fontSize: 14, mt: "2px", color: "text.secondary" }} aria-hidden />
+          <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.35 }}>
+            {refused}
+          </Typography>
+        </Stack>
+      ) : (
+        help && (
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5, lineHeight: 1.35 }}>
+            {help}
+          </Typography>
+        )
       )}
       {note && (
         <Typography variant="caption" color="warning.main" display="block" sx={{ mt: 0.5, lineHeight: 1.35 }}>
@@ -761,9 +776,11 @@ function TriRow({
   disabled,
   chip,
   note,
+  refused,
   disabledValues,
 }: {
   note?: string;
+  refused?: string;
   /** Choices that cannot be picked (a Mac refuses them). */
   disabledValues?: Tri[];
   label: string;
@@ -775,7 +792,7 @@ function TriRow({
 }) {
   const { t } = useTranslation();
   return (
-    <Row label={label} help={help} chip={chip} note={note}>
+    <Row label={label} help={help} chip={chip} note={note} refused={refused}>
       <ToggleButtonGroup
         exclusive
         size="small"
