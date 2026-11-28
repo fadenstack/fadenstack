@@ -179,3 +179,19 @@ def test_holder_of_finds_caffeinate_watching_a_child_of_the_launchd_pid(monkeypa
     assert power.IdleSleepGuard.holder_of(6312) == 6400
     assert power.IdleSleepGuard.holder_of(6314) == 6400
     assert power.IdleSleepGuard.holder_of(7777) is None
+
+
+def test_on_battery_is_reported_for_the_console(monkeypatch) -> None:
+    import types
+
+    import psutil
+
+    from faden_agent.power import IdleSleepGuard
+
+    monkeypatch.setattr(psutil, "sensors_battery", lambda: types.SimpleNamespace(power_plugged=False))
+    assert IdleSleepGuard.on_battery() is True
+    monkeypatch.setattr(psutil, "sensors_battery", lambda: types.SimpleNamespace(power_plugged=True))
+    assert IdleSleepGuard.on_battery() is False
+    monkeypatch.setattr(psutil, "sensors_battery", lambda: None)
+    assert IdleSleepGuard.on_battery() is None
+    assert "on_battery" in IdleSleepGuard().status()

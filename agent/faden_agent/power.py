@@ -143,9 +143,23 @@ class IdleSleepGuard:
                 return proc.info["pid"]
         return None
 
+    @staticmethod
+    def on_battery() -> bool | None:
+        """Whether this Mac runs on battery (it sleeps with the lid closed then); ``None`` for a desktop or unknown."""
+        try:
+            import psutil  # noqa: PLC0415
+
+            battery = psutil.sensors_battery()
+        except Exception:  # noqa: BLE001 - never stops the inventory
+            return None
+        if battery is None or battery.power_plugged is None:
+            return None
+        return not battery.power_plugged
+
     def status(self) -> dict[str, Any]:
         """For the inventory and the logs: not a capability."""
         return {
+            "on_battery": self.on_battery(),
             "prevent_idle_sleep": self._enabled,
             "active": self.running(),
             "method": "caffeinate -i -w",
