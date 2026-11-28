@@ -108,11 +108,11 @@ async def test_collect_reports_whether_the_agent_binary_is_allowed(monkeypatch: 
 def test_parse_ssh_listener() -> None:
     from faden_agent import mac_status
 
-    on = "tcp4       0      0  *.22                   *.*                    LISTEN     \ntcp4  0  0  *.8100  *.*  LISTEN\n"
-    off = "tcp4       0      0  *.8100                 *.*                    LISTEN     \ntcp4 0 0 1.2.3.4.5022 1.2.3.4.1 ESTABLISHED\n"
+    on = "Proto Recv-Q\ntcp4       0      0  *.22                   *.*                    LISTEN     \ntcp4  0  0  *.8100  *.*  LISTEN\n"
+    off = "Proto Recv-Q\ntcp4       0      0  *.8100                 *.*                    LISTEN     \ntcp4 0 0 1.2.3.4.5022 1.2.3.4.1 ESTABLISHED\n"
     assert mac_status.parse_ssh_listener(on) is True
     assert mac_status.parse_ssh_listener(off) is False
-    assert mac_status.parse_ssh_listener(None) is None
+    assert mac_status.parse_ssh_listener(None) is None and mac_status.parse_ssh_listener("") is None
 
 
 def test_remote_login_advice_only_when_known_off_with_filevault() -> None:
@@ -130,13 +130,13 @@ async def test_remote_login_detection(monkeypatch: pytest.MonkeyPatch) -> None:
     from faden_agent import mac_status
 
     async def fake_run(*argv):
-        return "tcp4 0 0 *.22 *.* LISTEN\n"
+        return "Proto\ntcp4 0 0 *.22 *.* LISTEN\n"
 
     monkeypatch.setattr(mac_status, "_run", fake_run)
     assert await mac_status.remote_login() is True
 
     async def no_listener(*argv):
-        return "tcp4 0 0 *.8100 *.* LISTEN\n"
+        return "Proto\ntcp4 0 0 *.8100 *.* LISTEN\n"
 
     async def not_found(*argv):
         return 113, 'Could not find service "com.openssh.sshd" in domain for system'

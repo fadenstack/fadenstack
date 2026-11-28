@@ -102,7 +102,7 @@ def parse_app_incoming(text: str | None) -> bool | None:
 
 def parse_ssh_listener(text: str | None) -> bool | None:
     """``netstat -an -p tcp``: whether anything listens on port 22 (``None``: no answer)."""
-    if not text:
+    if not text or "Proto" not in text:  # a real listing always has its header; anything else is no answer
         return None
     return any(
         line.split()[-1:] == ["LISTEN"] and re.search(r"[.:]22$", line.split()[3] if len(line.split()) > 3 else "")
