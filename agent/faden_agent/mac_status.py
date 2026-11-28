@@ -100,6 +100,60 @@ def parse_app_incoming(text: str | None) -> bool | None:
     return None
 
 
+def parse_ssh_listener(text: str | None) -> bool | None:
+    """``netstat -an -p tcp``: whether anything listens on port 22 (``None``: no answer)."""
+    if not text:
+        return None
+    return any(
+        line.split()[-1:] == ["LISTEN"] and re.search(r"[.:]22$", line.split()[3] if len(line.split()) > 3 else "")
+        for line in text.splitlines()
+    )
+
+
+async def remote_login() -> bool | None:
+    """Whether Remote Login (SSH) is on; ``None`` when it cannot be told without root.
+
+    ``systemsetup -getremotelogin`` needs root, so this reads two things any user may read: a listener on
+    port 22 (macOS runs sshd from a launchd socket, so the port is open exactly while Remote Login is on),
+    and whether launchd has the ``com.openssh.sshd`` service loaded. Both are read-only.
+    """
+    listening = parse_ssh_listener(await _run("/usr/sbin/netstat", "-an", "-p", "tcp"))
+    if listening:
+        return True
+    proc_out = await _run_any("/bin/launchctl", "print", "system/com.openssh.sshd")
+    if proc_out is None:
+        return None
+    code, text = proc_out
+    if code == 0:
+        return True
+    if "could not find service" in text.lower():
+        return False if listening is not None else None
+    return None
+
+
+async def _run_any(*argv: str) -> tuple[int, str] | None:
+    """Like :func:`_run` but also returns a non-zero exit's output."""
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *argv, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
+        )
+        out, _ = await asyncio.wait_for(proc.communicate(), _TIMEOUT_SEC)
+    except (OSError, TimeoutError, asyncio.TimeoutError):
+        return None
+    return proc.returncode or 0, out.decode("utf-8", "replace")
+
+
+def remote_login_advice(status: dict[str, Any]) -> list[str]:
+    """One line when FileVault is on and Remote Login is known to be off: a power cut then needs a local unlock."""
+    if status.get("filevault") is True and status.get("remote_login") is False:
+        return [
+            "FileVault is on and Remote Login is off: after a power cut this Mac waits for a local unlock.",
+            "  Turn on Remote Login to unlock over SSH, or restart on purpose with: sudo fdesetup authrestart",
+            "  See \"FileVault and unattended restarts\" in the help page \"Serve models on a Mac\".",
+        ]
+    return []
+
+
 async def app_incoming(path: str) -> bool | None:
     """Whether the application firewall lets *path* accept incoming connections (``None``: unknown).
 
@@ -127,12 +181,13 @@ async def collect(binary: str | None = None) -> dict[str, Any]:
     if sys.platform != "darwin":
         return {}
     binary = binary or own_binary()
-    vault, state, stealth, block_all, app = await asyncio.gather(
+    vault, state, stealth, block_all, app, ssh = await asyncio.gather(
         _run(_FDESETUP, "status"),
         _run(_SOCKETFILTERFW, "--getglobalstate"),
         _run(_SOCKETFILTERFW, "--getstealthmode"),
         _run(_SOCKETFILTERFW, "--getblockall"),
         app_incoming(binary) if binary else asyncio.sleep(0),
+        remote_login(),
     )
     firewall: dict[str, Any] = {
         "enabled": parse_firewall(state),
@@ -141,7 +196,7 @@ async def collect(binary: str | None = None) -> dict[str, Any]:
     }
     if binary:
         firewall["agent_allowed"] = app
-    return {"filevault": parse_filevault(vault), "firewall": firewall}
+    return {"filevault": parse_filevault(vault), "remote_login": ssh, "firewall": firewall}
 
 
 def firewall_advice(firewall: dict[str, Any], binary: str) -> list[str]:

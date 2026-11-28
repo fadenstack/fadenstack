@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
+import types
 import time
 from pathlib import Path
 
@@ -195,3 +196,36 @@ def test_on_battery_is_reported_for_the_console(monkeypatch) -> None:
     monkeypatch.setattr(psutil, "sensors_battery", lambda: None)
     assert IdleSleepGuard.on_battery() is None
     assert "on_battery" in IdleSleepGuard().status()
+
+
+def test_holder_of_reads_ps_when_psutil_cannot_see_another_users_cmdline(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Without root psutil gets AccessDenied (cmdline None) for the _fadenagent caffeinate; ps can read it."""
+
+    class P:
+        def __init__(self, pid, ppid, name, cmdline):
+            self.info = {"pid": pid, "ppid": ppid, "name": name, "cmdline": cmdline}
+
+    procs = [P(62301, 1, "faden-agent", None), P(62312, 62301, "caffeinate", None)]
+    monkeypatch.setattr(psutil, "process_iter", lambda *_a, **_k: iter(procs))
+    ps_out = "62301 /Library/Fadenstack/agent/current/faden-agent run\n62312 /usr/bin/caffeinate -i -w 62301\n"
+    monkeypatch.setattr(power.subprocess, "run", lambda *a, **k: types.SimpleNamespace(stdout=ps_out))
+    assert power.IdleSleepGuard.find_holder(62301) == (62312, True)
+
+
+def test_unreadable_caffeinate_is_inconclusive_not_absent(monkeypatch: pytest.MonkeyPatch) -> None:
+    class P:
+        def __init__(self, pid, ppid, name, cmdline):
+            self.info = {"pid": pid, "ppid": ppid, "name": name, "cmdline": cmdline}
+
+    procs = [P(62312, 62301, "caffeinate", None)]
+    monkeypatch.setattr(psutil, "process_iter", lambda *_a, **_k: iter(procs))
+
+    def boom(*a, **k):
+        raise OSError("no ps")
+
+    monkeypatch.setattr(power.subprocess, "run", boom)
+    assert power.IdleSleepGuard.find_holder(62301) == (None, False)
+    from faden_agent.__main__ import _sleep_line
+
+    assert "run with sudo" in _sleep_line(None, False) and "NOT prevented" not in _sleep_line(None, False)
+    assert "NOT prevented" in _sleep_line(None, True)
