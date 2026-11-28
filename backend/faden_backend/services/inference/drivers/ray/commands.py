@@ -129,7 +129,14 @@ class NodeCommandGateway:
                 service = self._get_service(session)
                 return await service.get_command(command_id=cmd_uuid)
         elif self._direct_service is not None:
-            return await self._direct_service.get_command(command_id=cmd_uuid)
+            cmd = await self._direct_service.get_command(command_id=cmd_uuid)
+            session = getattr(getattr(self._direct_service, "_dao", None), "session", None)
+            if cmd is not None and session is not None and hasattr(session, "refresh"):
+                # On the caller's own session the row is already in its identity map (issue put it there) and a
+                # SELECT does not overwrite a loaded object, so a status the agent wrote meanwhile (another
+                # connection, committed) would never show: wait() polled a stale copy until its budget ran out.
+                await session.refresh(cmd)
+            return cmd
         return None
 
     async def list_recent(
