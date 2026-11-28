@@ -150,3 +150,10 @@ async def test_remote_login_detection(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(mac_status, "_run_any", odd)
     assert await mac_status.remote_login() is None
+
+    async def empty_listing(*argv):
+        return None  # netstat hid the sockets (seen under some binaries): launchd still decides
+
+    monkeypatch.setattr(mac_status, "_run", empty_listing)
+    monkeypatch.setattr(mac_status, "_run_any", not_found)
+    assert await mac_status.remote_login() is False

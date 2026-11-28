@@ -126,8 +126,11 @@ async def remote_login() -> bool | None:
     code, text = proc_out
     if code == 0:
         return True
+    # launchd loads com.openssh.sshd exactly while Remote Login is on, and any user may print a loaded system
+    # service. netstat is only a fast "on": whether it lists other users' sockets depends on the calling
+    # binary (an empty listing under one Python, a full one under another, on the same Mac).
     if "could not find service" in text.lower():
-        return False if listening is not None else None
+        return False
     return None
 
 
