@@ -4277,6 +4277,7 @@
       "detail_too_large": "Demande environ {{needed}} ; le cluster dispose de {{total}} au total.",
       "note": {
         "kv_estimated": "La taille du cache de contexte est une estimation.",
+        "too_little_memory": "Un Mac a besoin d'au moins {{min}} Go de mémoire pour héberger un modèle.",
         "context_over_model_max": "Le contexte demandé est plus long que ce que le modèle prend en charge."
       }
     },
@@ -5974,6 +5975,8 @@
     "copy": "Copier le SHA-256 de {{name}}"
   },
   "mac": {
+    "experimental": "Expérimental",
+    "experimental_help": "Servir sur un Mac est nouveau dans cette version. Cela fonctionne, mais attendez-vous à des changements ; signalez les problèmes.",
     "status_title": "Machine Mac",
     "runtime_ready": "Le runtime natif est installé et prêt.",
     "runtime_missing": "Le runtime natif n'est pas encore installé ; il est récupéré au premier déploiement d'un modèle.",

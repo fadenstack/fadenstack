@@ -369,7 +369,8 @@ def plan_metal(needs: ModelNeeds, metal: dict[str, Any], *, context: int | None 
         return Fit(status="no_accelerators", notes=["no_accelerators"])
     if unified < METAL_MIN_UNIFIED_BYTES:
         return Fit(status="too_large", gpu_bytes=working_set, notes=["too_little_memory"],
-                   metal={"working_set_bytes": working_set, "estimated": estimated, "profile": METAL_PROFILE})
+                   metal={"working_set_bytes": working_set, "estimated": estimated, "profile": METAL_PROFILE,
+                          "min_unified_bytes": METAL_MIN_UNIFIED_BYTES})
     if not needs.weights_bytes:
         return Fit(status="unknown", notes=["size_unknown"])
 

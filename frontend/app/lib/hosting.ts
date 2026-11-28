@@ -249,7 +249,8 @@ export function fitDetail(fit: Fit | null | undefined, cluster?: MarketCluster |
   }
   for (const note of fit.notes) {
     if (note === "busy_now" || note === "no_accelerators" || note === "size_unknown") continue;
-    parts.push(i18n.t(`marketplace.fit.note.${note}`, { defaultValue: "" }));
+    const min = Math.round((fit.metal?.min_unified_bytes ?? 0) / 2 ** 30);
+    parts.push(i18n.t(`marketplace.fit.note.${note}`, { defaultValue: "", min }));
   }
   return parts.filter(Boolean).join(" ");
 }

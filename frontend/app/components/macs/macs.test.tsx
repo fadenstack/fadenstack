@@ -33,6 +33,11 @@ describe("MacStatusCard", () => {
     expect(screen.queryByTestId("mac-filevault-warning")).not.toBeInTheDocument();
   });
 
+  it("marks the Mac experimental", () => {
+    render(<MacStatusCard capabilities={{}} />);
+    expect(screen.getByTestId("experimental-chip")).toHaveTextContent("Experimental");
+  });
+
   it("keeps the full sentences under Details", async () => {
     render(<MacStatusCard capabilities={{ native_sandbox: true, mac_status: { filevault: true, firewall: { enabled: false } } }} />);
     expect(screen.queryByTestId("mac-details")).not.toBeInTheDocument();

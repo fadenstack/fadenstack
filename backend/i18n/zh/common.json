@@ -4277,6 +4277,7 @@
       "detail_too_large": "约需 {{needed}}；集群总共有 {{total}}。",
       "note": {
         "kv_estimated": "上下文缓存大小为估计值。",
+        "too_little_memory": "Mac 至少需要 {{min}} GB 内存才能托管模型。",
         "context_over_model_max": "请求的上下文长度超过了模型支持的长度。"
       }
     },
@@ -5974,6 +5975,8 @@
     "copy": "复制 {{name}} 的 SHA-256"
   },
   "mac": {
+    "experimental": "实验性",
+    "experimental_help": "在 Mac 上提供服务是此版本的新功能。它可以使用，但可能会有变化；请反馈问题。",
     "status_title": "Mac 机器",
     "runtime_ready": "原生运行时已安装并就绪。",
     "runtime_missing": "尚未安装原生运行时；部署第一个模型时会自动获取。",

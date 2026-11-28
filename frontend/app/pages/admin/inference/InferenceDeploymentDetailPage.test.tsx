@@ -20,6 +20,7 @@ import {
   MODEL_ID,
   WORKER_METRICS_REASON,
   artifactsPartial,
+  controlPlane,
   deployment,
   deploymentMetricsPartial,
   endpoints,
@@ -75,6 +76,18 @@ async function renderDetail() {
 describe("InferenceDeploymentDetailPage", () => {
   beforeEach(() => {
     mockAll();
+  });
+
+  it("marks a Mac (standalone) deployment experimental, and a Ray one not", async () => {
+    vi.spyOn(inferenceApi, "getControlPlane").mockResolvedValue({ ...controlPlane, driver: "standalone" });
+    const { unmount } = renderPage(<InferenceDeploymentDetailPage />, { path: ROUTE, initialPath: URL });
+    await screen.findByRole("heading", { name: "qwen-serve" });
+    expect(await screen.findByTestId("experimental-chip")).toHaveTextContent("Experimental");
+    unmount();
+    vi.spyOn(inferenceApi, "getControlPlane").mockResolvedValue({ ...controlPlane, driver: "ray" });
+    await renderDetail();
+    await screen.findByText("Health");
+    expect(screen.queryByTestId("experimental-chip")).not.toBeInTheDocument();
   });
 
   it("renders all ten elements the plan requires", async () => {

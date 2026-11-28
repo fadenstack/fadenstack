@@ -24,6 +24,7 @@ import { PictureSettings } from "~/components/hosting/PictureSettings";
 import { ImagesOffNote } from "~/components/hosting/ImagesOffNote";
 import { RecipeNotice } from "~/components/hosting/RecipeNotice";
 import { useImageGeneration } from "~/lib/useImageGeneration";
+import { ExperimentalChip } from "~/components/macs/ExperimentalChip";
 import { MacFitPanel } from "~/components/macs/MacFitPanel";
 import { formatBytes, parseExtraFlags, type EngineConfig } from "~/lib/engine";
 import {
@@ -378,6 +379,11 @@ export function HostModelDialog({
     <Dialog open={open} onClose={busy ? undefined : onClose} maxWidth="md" fullWidth>
       <DialogTitle sx={{ pb: 1 }}>
         {t("hosting.title", { model: title })}
+        {isMac && (
+          <Box component="span" sx={{ ml: 1, verticalAlign: "middle" }}>
+            <ExperimentalChip />
+          </Box>
+        )}
       </DialogTitle>
       <Box sx={{ px: 3, pb: 1 }}>
         <Stepper activeStep={steps.indexOf(step)} alternativeLabel>

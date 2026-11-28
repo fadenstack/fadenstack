@@ -4275,6 +4275,7 @@
       "detail_too_large": "Needs about {{needed}}; the cluster has {{total}} in all.",
       "note": {
         "kv_estimated": "The context cache size is an estimate.",
+        "too_little_memory": "A Mac needs at least {{min}} GB of memory to host a model.",
         "context_over_model_max": "The context asked for is longer than the model supports."
       }
     },
@@ -5972,6 +5973,8 @@
     "copy": "Copy SHA-256 of {{name}}"
   },
   "mac": {
+    "experimental": "Experimental",
+    "experimental_help": "Serving on a Mac is new in this release. It works, but expect changes; report problems.",
     "status_title": "Mac machine",
     "runtime_ready": "Native runtime is installed and ready.",
     "runtime_missing": "Native runtime is not installed yet; it is fetched when the first model is deployed.",
